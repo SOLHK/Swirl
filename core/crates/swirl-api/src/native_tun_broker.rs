@@ -125,6 +125,76 @@ fn supervisor_recovered(value: &Value) -> bool {
         && value["state"] == "recovered"
         && value["active_owners"].as_u64() == Some(0)
 }
+fn safe_error_code(code: &str) -> Option<&'static str> {
+    [
+        "BrokerHelperDirectory",
+        "BrokerHelperStdin",
+        "BrokerHelperStdout",
+        "BrokerHelperEof",
+        "BrokerHelperExited",
+        "BrokerHelperTimeout",
+        "BrokerHelperNotReady",
+        "BrokerHelperResponseIdentity",
+        "BrokerFrameLimit",
+        "BrokerJsonInvalid",
+        "BrokerResponseInvalid",
+        "TunHelperOutputPoisoned",
+        "TunHelperOutputClosed",
+        "TunHelperOutputBlocked",
+        "TunHelperPermission",
+        "TunNetworkConflict",
+        "TunPhysicalNetworkUnavailable",
+        "TunOwnedByAnotherHelper",
+        "TunWindowsNetworkOperation",
+        "TunJournalDirectory",
+        "TunRecoveryJournalInvalid",
+        "TunRecoveryJournalIdentity",
+        "TunRecoveryFailed",
+        "TunRecoveryConflict",
+        "TunEgressStillOwned",
+        "GatewayCaptureStillOwned",
+        "GatewayJournalDirectory",
+        "GatewayRecoveryJournalInvalid",
+        "GatewayRecoveryJournalIdentity",
+        "GatewayHelperPermission",
+        "GatewayNetworkConflict",
+        "GatewayOwnedByAnotherHelper",
+        "GatewayWindowsNetworkOperation",
+        "GatewayQuiesceFailed",
+        "GatewayQuiesceConflict",
+        "GatewayForwardingStillEnabled",
+        "GatewayRecoveryFailed",
+        "GatewayRecoveryConflict",
+    ]
+    .into_iter()
+    .find(|known| *known == code)
+}
+fn supervisor_failure(value: &Value) -> Option<&'static str> {
+    if value["native_tun_schema"] != 1
+        || value["request_id"] != crate::native_tun_control::SUPERVISOR_RECOVERY_REQUEST_ID
+        || value["ok"] != false
+    {
+        return None;
+    }
+    safe_error_code(value["error"].as_str()?)
+        .filter(|code| code.starts_with("Tun") || code.starts_with("Gateway"))
+}
+fn failure_response(phase: &'static str, error: &io::Error, request: Option<&Value>) -> Value {
+    // Errors may contain OS paths or configuration. Expose only this fixed
+    // enum list; never turn arbitrary Display text into a protocol field.
+    let code = safe_error_code(&error.to_string()).unwrap_or("BrokerOperationFailed");
+    let mut response = json!({"ok":false,"broker_schema":1,"broker_phase":phase,"error":code});
+    if let Some(code) = error.raw_os_error() {
+        response["os_error"] = json!(code);
+    }
+    if let Some(id) = request.and_then(|request| request["request_id"].as_str())
+        && swirl_core::v2::identity_uuid(id).is_ok()
+        && id == id.to_ascii_lowercase()
+    {
+        response["request_id"] = json!(id);
+    }
+    response
+}
 fn normalized_driver_path(value: &str) -> Option<String> {
     let value = value.replace('/', "\\");
     let value = value.strip_prefix(r"\\?\").unwrap_or(&value);
@@ -366,6 +436,9 @@ mod windows {
                 .ok_or_else(|| invalid("BrokerHelperStdin"))?
                 .write(value.clone(), Duration::from_secs(5))?;
             let response = decode(&receive(pipe, &self.output, Duration::from_secs(310))?)?;
+            if let Some(code) = supervisor_failure(&response) {
+                return Err(invalid(code));
+            }
             let schema = if value.get("native_tun_schema").is_some() {
                 Some("native_tun_schema")
             } else if value.get("control_schema").is_some() {
@@ -478,14 +551,32 @@ mod windows {
         verify_helper_identity(connection.get_ref(), helper_file.path())?;
         write_frame(connection.get_mut(), &reply)?;
         // No recover(), driver load or network write occurs above this point.
-        let mut helper = Helper::start(helper_file.path(), connection.get_ref())?;
+        let mut helper = match Helper::start(helper_file.path(), connection.get_ref()) {
+            Ok(helper) => helper,
+            Err(error) => {
+                let _ = write_frame(
+                    connection.get_mut(),
+                    &failure_response("helper_start", &error, None),
+                );
+                return Err(error);
+            }
+        };
         loop {
             let Some(bytes) = frame(&mut connection)? else {
                 return helper.close();
             };
             let mut request = command(&bytes)?;
             fixed_driver(&mut request, &driver_file)?;
-            let response = helper.call(connection.get_ref(), &request)?;
+            let response = match helper.call(connection.get_ref(), &request) {
+                Ok(response) => response,
+                Err(error) => {
+                    let _ = write_frame(
+                        connection.get_mut(),
+                        &failure_response("helper_command", &error, Some(&request)),
+                    );
+                    return Err(error);
+                }
+            };
             write_frame(connection.get_mut(), &response)?;
         }
     }
@@ -528,6 +619,53 @@ mod tests {
         assert!(hello(&serde_json::to_vec(&value).unwrap(), 1, 2).is_err());
         value["role"] = json!("administrator");
         assert!(hello(&serde_json::to_vec(&value).unwrap(), 1, 2).is_err());
+    }
+    #[test]
+    fn failure_reports_redact_arbitrary_errors_and_do_not_invent_request_identity() {
+        let private = io::Error::other(r"unreviewed failure at C:\private\configuration.json");
+        assert_eq!(
+            failure_response("helper_start", &private, None),
+            json!({"ok":false,"broker_schema":1,"broker_phase":"helper_start","error":"BrokerOperationFailed"})
+        );
+        let request = json!({"request_id":"80000000-0000-4000-8000-000000000001"});
+        assert_eq!(
+            failure_response(
+                "helper_command",
+                &io::Error::from_raw_os_error(5),
+                Some(&request)
+            ),
+            json!({"ok":false,"broker_schema":1,"broker_phase":"helper_command","error":"BrokerOperationFailed",
+                "os_error":5,"request_id":"80000000-0000-4000-8000-000000000001"})
+        );
+        let invalid_request = json!({"request_id":"not-a-uuid"});
+        assert!(
+            failure_response("helper_command", &private, Some(&invalid_request))
+                .get("request_id")
+                .is_none()
+        );
+    }
+    #[test]
+    fn only_a_known_supervisor_failure_preserves_a_recovery_error_code() {
+        let failure = json!({"native_tun_schema":1,"request_id":crate::native_tun_control::SUPERVISOR_RECOVERY_REQUEST_ID,
+            "ok":false,"error":"TunWindowsNetworkOperation"});
+        assert_eq!(
+            supervisor_failure(&failure),
+            Some("TunWindowsNetworkOperation")
+        );
+        for (key, value) in [
+            ("request_id", json!("80000000-0000-4000-8000-000000000001")),
+            ("native_tun_schema", json!(2)),
+            ("ok", json!(true)),
+            ("error", json!("BrokerHelperNotReady")),
+            (
+                "error",
+                json!(r"unreviewed failure at C:\private\configuration.json"),
+            ),
+        ] {
+            let mut unknown = failure.clone();
+            unknown[key] = value;
+            assert_eq!(supervisor_failure(&unknown), None);
+        }
     }
     #[test]
     fn only_the_final_owner_free_recovery_receipt_confirms_cleanup() {

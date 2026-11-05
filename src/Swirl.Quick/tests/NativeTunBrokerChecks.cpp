@@ -12,6 +12,7 @@
 #include <QSet>
 #include <QTcpServer>
 #include <QUuid>
+#include <limits>
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -67,10 +68,58 @@ bool emptyJournal(const QString &directory) {
     const QDir state(directory);
     return !state.exists() || state.entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot).isEmpty();
 }
+QJsonObject errorSummary(const QString &message) {
+    if (message.isEmpty()) return {};
+    // Only fixed protocol/transport enums and numeric OS/exit codes belong in
+    // CI evidence. Never copy arbitrary helper errors, configuration or paths.
+    static const QSet<QString> allowed{
+        "TunBrokerDisconnected", "TunBrokerWindowsRequired", "TunBrokerPipeEvent",
+        "TunBrokerPipeIo", "TunBrokerPipeCompletion", "TunBrokerPipeWait",
+        "TunBrokerIoTimeout", "TunBrokerExited", "TunBrokerPipeEof",
+        "TunBrokerCommandTooLarge", "TunBrokerResponseFrame", "TunBrokerExitWait",
+        "TunBrokerExitStatus", "TunBrokerRecoveryUnconfirmed", "CommandInvalidOrUnsupported",
+        "CommandInvalid", "UnsupportedControlSchema", "InvalidRequestId", "UnknownHandle",
+        "CoreLimit", "HandleLimit", "ReceiptMismatch", "TunHelperPermission",
+        "TunNetworkConflict", "TunPhysicalNetworkUnavailable", "TunOwnedByAnotherHelper",
+        "TunWindowsNetworkOperation", "TunJournalDirectory", "TunRecoveryJournalInvalid",
+        "TunRecoveryJournalIdentity", "TunRecoveryFailed", "TunRecoveryConflict",
+        "GatewayCaptureStillOwned", "TunEgressStillOwned", "BrokerOperationFailed",
+        "BrokerHelperDirectory", "BrokerHelperStdin", "BrokerHelperStdout",
+        "BrokerHelperEof", "BrokerHelperExited", "BrokerHelperTimeout",
+        "BrokerHelperNotReady", "BrokerHelperResponseIdentity", "BrokerFrameLimit",
+        "BrokerJsonInvalid", "BrokerResponseInvalid", "TunHelperOutputPoisoned",
+        "TunHelperOutputClosed", "TunHelperOutputBlocked", "GatewayJournalDirectory",
+        "GatewayRecoveryJournalInvalid", "GatewayRecoveryJournalIdentity",
+        "GatewayHelperPermission", "GatewayNetworkConflict", "GatewayOwnedByAnotherHelper",
+        "GatewayWindowsNetworkOperation", "GatewayQuiesceFailed", "GatewayQuiesceConflict",
+        "GatewayForwardingStillEnabled", "GatewayRecoveryFailed", "GatewayRecoveryConflict"
+    };
+    const auto suffix = message.indexOf(" (");
+    const auto code = suffix < 0 ? message : message.first(suffix);
+    if (!allowed.contains(code)) return {{"error", "UnclassifiedError"}};
+    QJsonObject summary{{"error", code}};
+    if (suffix >= 0 && message.endsWith(')')) {
+        const auto detail = message.mid(suffix + 2, message.size() - suffix - 3);
+        for (const auto &prefix : {QStringLiteral("Windows "), QStringLiteral("exit ")}) {
+            if (!detail.startsWith(prefix)) continue;
+            bool valid = false;
+            const auto number = detail.sliced(prefix.size()).toULongLong(&valid);
+            if (valid && number <= MAXDWORD)
+                summary.insert(prefix.startsWith("Windows") ? "windows_code" : "exit_code", double(number));
+        }
+    }
+    return summary;
+}
+void includeRequestId(QJsonObject *summary, const char *key, const QJsonValue &value) {
+    const auto text = value.toString();
+    const QUuid id(text);
+    if (!id.isNull() && id.toString(QUuid::WithoutBraces) == text) summary->insert(key, text);
+}
 }
 
 int runNativeTunBrokerChecks(const QString &output) {
     QJsonArray checks;
+    QJsonArray diagnostics;
     int failures = 0;
     NativeTunBrokerClient broker;
     QString state;
@@ -83,13 +132,19 @@ int runNativeTunBrokerChecks(const QString &output) {
     };
     const auto finish = [&] {
         QString error;
-        check("broker-transport-close-completes-with-no-live-process", broker.close(&error) && !broker.running());
+        const bool closed = broker.close(&error);
+        auto closure = errorSummary(error);
+        closure.insert("phase", "close");
+        closure.insert("ok", closed);
+        closure.insert("process_running", broker.running());
+        diagnostics.append(closure);
+        check("broker-transport-close-completes-with-no-live-process", closed && !broker.running());
         if (journalGuard) check("fixed-journal-empty-after-supervisor-exit", emptyJournal(state));
         const QJsonObject report{{"schema", 1}, {"kind", "native-tun-broker-control-test"},
             {"source_sha", RustCoreLibrary::expectedSourceSha()}, {"build_id", RustCoreLibrary::expectedBuildId()},
             {"ui_test_hooks", true}, {"native_tun_start_invoked", false},
             {"scope", "authenticated product broker and loopback Core control; empty journal recovery only; no TUN adapter or forwarding acceptance"},
-            {"checks", checks}, {"success", failures == 0}};
+            {"checks", checks}, {"diagnostics", diagnostics}, {"success", failures == 0}};
         if (output.isEmpty() || !QDir().mkpath(QFileInfo(output).absolutePath()) ||
             !writeBytes(output, QJsonDocument(report).toJson(QJsonDocument::Indented))) return 1;
         return failures ? 1 : 0;
@@ -141,7 +196,27 @@ int runNativeTunBrokerChecks(const QString &output) {
     const QSet<QString> allowed{"validate_configuration_v2", "start_v2", "snapshot", "stop", "native_tun_status", "native_tun_recover"};
     const auto command = [&](QJsonObject request) {
         if (!check("control-only-command-allowlist", allowed.contains(request.value("op").toString()))) return QJsonObject{};
-        return broker.command(request);
+        const auto response = broker.command(request);
+        auto detail = errorSummary(response.value("error").toString());
+        detail.insert("phase", "command");
+        detail.insert("op", request.value("op"));
+        detail.insert("ok", response.value("ok").isBool() ? response.value("ok") : QJsonValue(QJsonValue::Null));
+        includeRequestId(&detail, "request_id", request.value("request_id"));
+        includeRequestId(&detail, "response_request_id", response.value("request_id"));
+        detail.insert("request_id_matches", response.value("request_id") == request.value("request_id"));
+        static const QSet<QString> phases{"parse", "validate", "start", "prepare", "activate", "finish", "rollback", "status"};
+        if (phases.contains(response.value("phase").toString())) detail.insert("response_phase", response.value("phase"));
+        static const QSet<QString> brokerPhases{"helper_start", "helper_command"};
+        if (brokerPhases.contains(response.value("broker_phase").toString())) detail.insert("broker_phase", response.value("broker_phase"));
+        if (response.value("os_error").isDouble()) {
+            const auto number = response.value("os_error").toInteger();
+            if (double(number) == response.value("os_error").toDouble() &&
+                number >= std::numeric_limits<LONG>::min() && number <= std::numeric_limits<LONG>::max())
+                detail.insert("os_error", double(number));
+        }
+        detail.insert("plan_digest_length", response.value("plan_digest").toString().size());
+        diagnostics.append(detail);
+        return response;
     };
     const auto node = requestId(), store = requestId();
     const QJsonObject candidate{{"schema", 2}, {"listen", "127.0.0.1:0"},
