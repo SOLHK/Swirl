@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The unchanged six official QUIC Core tests through the loaded Rust C ABI.
+"""Official QUIC Core regressions through the loaded Rust C ABI.
 
 Requires SWIRL_NATIVE_LIBRARY plus the pinned HY2_SERVER/SWIRL_TUIC_SERVER.
 SWIRL_QUIC_FFI_EVIDENCE selects an independent JSON receipt. This exercises the
@@ -64,7 +64,7 @@ def main():
         raise RuntimeError("Choose a new C ABI evidence path to preserve previous results")
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(QuicFfiTests)
     expected = suite.countTestCases()
-    if expected != 6:
+    if expected != 7:
         raise RuntimeError("Reassess the official Core test count before changing this acceptance gate")
     captured = io.StringIO()
     began = time.monotonic()

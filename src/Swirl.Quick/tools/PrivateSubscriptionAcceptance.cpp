@@ -315,6 +315,7 @@ private:
 int selfTest() {
     QTemporaryDir temporary; int checks = 0; bool ok = temporary.isValid(); QJsonArray failedChecks;
     auto check = [&](bool value) { ++checks; ok = ok && value; if (!value) failedChecks.append(checks); };
+    check(QSslSocket::supportsSsl());
     const auto now = QDateTime::currentDateTimeUtc();
     check(validWindow(now.addSecs(-1), now.addSecs(10), now));
     check(!validWindow(now.addSecs(-601), now.addSecs(1), now));
@@ -456,6 +457,7 @@ int main(int argc, char **argv) {
     const auto end = QDateTime::fromString(args[4], Qt::ISODateWithMs).toUTC();
     const auto now = QDateTime::currentDateTimeUtc();
     if (!validWindow(start, end, now)) return fail("AuthorizationWindowInvalidOrExpired");
+    if (!QSslSocket::supportsSsl()) return fail("TlsBackendUnavailable");
     if (QSslConfiguration::defaultConfiguration().peerVerifyMode() == QSslSocket::VerifyNone) return fail("TlsVerificationRequired");
     auto bytes = readPrivate(args[2]); const auto manifest = QJsonDocument::fromJson(bytes).object(); bytes.fill('\0');
     const auto entries = manifest.value("subscriptions").toArray();

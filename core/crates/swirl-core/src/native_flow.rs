@@ -1010,6 +1010,11 @@ async fn run_udp(
                     _ = cancelled(&mut cancellation) => Err("SessionRevoked"),
                     result = timeout(routed.limit, association.send(&routed.target, &request.payload)) => result.map_err(|_| "UdpSendTimeout").and_then(|r| r),
                 };
+                if sent == Err("Hysteria2DatagramLength") && request.payload.is_empty() {
+                    crate::udp_drop(&counters, &shared.totals);
+                    let _ = request.finish(sent, &counters, &shared.totals);
+                    continue;
+                }
                 if sent.is_ok() {
                     last_activity = Instant::now();
                 }

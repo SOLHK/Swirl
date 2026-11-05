@@ -811,6 +811,17 @@ jobs:
           } finally {
             $summary | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/test-summary.json" -Encoding utf8
           }
+      - name: Preserve healthy Hysteria2 UDP associations after an empty packet
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_NATIVE_LIBRARY: ${{ github.workspace }}/build/rust-qt/Release/swirl_api.dll
+          SWIRL_QUIC_CORE_EVIDENCE: ${{ runner.temp }}/swirl-qt-quic-product/hysteria2-empty-socks.json
+        run: |
+          python tools/tests/test_quic_core.py QuicCoreTests.test_hysteria2_empty_udp_drops_only_that_packet_and_preserves_association -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/run_native_hy2_udp.py --report "$env:RUNNER_TEMP/swirl-qt-quic-product/hysteria2-empty-native.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve exact-source native Qt QUIC fixture evidence
         if: always()
         uses: actions/upload-artifact@v4

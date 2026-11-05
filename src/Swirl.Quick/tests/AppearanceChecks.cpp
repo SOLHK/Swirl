@@ -41,6 +41,7 @@
 #include <QSGTransformNode>
 #include <private/qquickitem_p.h>
 #ifdef Q_OS_WIN
+#include <private/qdxgivsyncservice_p.h>
 #include <private/qrhid3d11_p.h>
 #endif
 
@@ -71,6 +72,9 @@ static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
     result.insert("qtSwapInterval",qint64(chain->swapInterval));
     result.insert("qtSwapchainFlags",qint64(chain->swapChainFlags));
     result.insert("qtFrameLatencyWaitableObjectPresent",chain->frameLatencyWaitableObject!=nullptr);
+    // The platform's update-request watcher is independent of the swapchain
+    // waitable object. Observe its actual path before timed input, not per frame.
+    result.insert("qtVBlankServiceSupportsWindow",QDxgiVSyncService::instance()->supportsWindow(window));
     result.insert("dxgiSwapchainPresent",chain->swapChain!=nullptr);
     if(!chain->swapChain)return result;
     const auto hresult=[](HRESULT value){
@@ -573,8 +577,41 @@ Item {
                                         type==QEvent::MouseButtonPress?Qt::LeftButton:Qt::NoButton,Qt::NoModifier);
                                     return QCoreApplication::sendEvent(window,&event);
                                 };
-                                armNative();pressDeadline.start(40);sendMouse(QEvent::MouseButtonPress);pressObservation.exec();
-                                check(submittedContraction(),"native reversal fixture observes a submitted paired contraction within the first40ms");
+                                armNative();pressDeadline.start(40);
+                                const bool initialInputDelivered=sendMouse(QEvent::MouseButtonPress);
+                                const bool initialInputDown=control->property("down").toBool();
+                                pressObservation.exec();
+                                const bool initialContractedWithin40ms=submittedContraction();
+                                QJsonArray initialFrames;
+                                QJsonObject initialObservation;
+                                {
+                                    QMutexLocker lock(&presented->mutex);
+                                    initialFrames=presented->frames;
+                                    initialObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
+                                        {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
+                                    // A frame waiting for Present is not in frames yet. Only
+                                    // expose its phase values when this arm has a paired sync;
+                                    // otherwise those values can belong to the previous press.
+                                    if(presented->pending)initialObservation.insert("pendingFrame",QJsonObject{
+                                        {"frame",qint64(presented->frame)},{"frameBeginMs",presented->frameBeginMs},
+                                        {"synchronizedMs",presented->synchronizedMs},{"geometryCapturedMs",presented->geometryCapturedMs},
+                                        {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                        {"hasSceneGraphNodes",presented->hasSceneGraphNodes},{"geometryValid",presented->geometryValid},
+                                        {"surfaceScale",presented->surfaceScale},{"contentScale",presented->contentScale},
+                                        {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY}});
+                                }
+                                const bool initialObservedDown=control->property("down").toBool();
+                                const bool initialClockRunning=nativeClock->running();
+                                // Preserve this phase before the later arm clears its frames.
+                                // Logging follows the unchanged deadline decision; only the
+                                // subsequent release sequence can observe its I/O cost.
+                                qInfo().noquote()<<"NATIVE_PRESS_REVERSAL_INITIAL"<<QJsonDocument(QJsonObject{
+                                    {"inputDelivered",initialInputDelivered},{"inputDown",initialInputDown},
+                                    {"observedDown",initialObservedDown},{"nativeClockRunningAtObservation",initialClockRunning},
+                                    {"contractedWithin40ms",initialContractedWithin40ms},{"frames",initialFrames},
+                                    {"observation",initialObservation}
+                                }).toJson(QJsonDocument::Compact);
+                                check(initialContractedWithin40ms,"native reversal fixture observes a submitted paired contraction within the first40ms");
                                 // These values came from existing SG nodes after sync. The
                                 // same-stack release must hand off that adopted pose to
                                 // the GUI spring, rather than the earlier GUI clock value.
