@@ -113,7 +113,23 @@ $shadowDirectory=Join-Path $root 'native-plugin-cwd'
 # It is copied, never executed, to reproduce the compiler's basename collision.
 $shadowDll=Join-Path $shadowDirectory 'System.dll'
 [IO.File]::Copy((Join-Path ([Environment]::SystemDirectory) 'version.dll'),$shadowDll,$false)
-$helperBootstrap=[ordered]@{legacy_source_commit='7c756b1773934ebfde82c42769d5ccfde7427f1d';legacy_source_blob='b7413edb755ab4e90a9298a9652a17e3a00dc2ec';legacy_helper_sha256=(Get-SwirlIntegrationHash $LegacyIntegrationHelper);native_shadow_sha256=(Get-SwirlIntegrationHash $shadowDll);legacy_cs0009_observed=$false;processes=$helperProcesses}
+$helperBootstrap=[ordered]@{legacy_source_commit='7c756b1773934ebfde82c42769d5ccfde7427f1d';legacy_source_blob='b7413edb755ab4e90a9298a9652a17e3a00dc2ec';legacy_helper_sha256=(Get-SwirlIntegrationHash $LegacyIntegrationHelper);native_shadow_sha256=(Get-SwirlIntegrationHash $shadowDll);legacy_cs0009_observed=$false;legacy_compiler_error=$null;processes=$helperProcesses}
+$legacyProbe=Join-Path $evidence 'legacy-helper-probe.ps1'
+$probeSource=@'
+param([string]$Helper)
+$ErrorActionPreference='Stop'
+try { & $Helper }
+catch {
+    # Windows PowerShell 5.1 omits ErrorNumber from its formatted error text.
+    # Preserve the actual compiler ErrorRecord instead of guessing from text.
+    $failure=$_;$compiler=$failure.TargetObject
+    $number=if($null -ne $compiler -and $null -ne $compiler.PSObject.Properties['ErrorNumber']){[string]$compiler.ErrorNumber}else{''}
+    [ordered]@{error_number=$number;error_id=[string]$failure.FullyQualifiedErrorId}|ConvertTo-Json -Compress|Write-Output
+    [Console]::Error.WriteLine(($failure|Out-String))
+    exit 1
+}
+'@
+[IO.File]::WriteAllText($legacyProbe,$probeSource,(New-Object Text.UTF8Encoding($false)))
 $legacyWriter=[ordered]@{scope='A test-only RegSetValueExW probe with explicit zero padding outside cbData; not a claim about unrecorded bytes in the earlier CI failure.';executed=$false;expected=$null;observed=$null;requested_byte_count=$null;observed_byte_count=$null;appended_one_utf16_null=$false}
 $negative=[ordered]@{scope='Exact old unconditional cleanup operations on synthetic standard-user integration; actual old NSIS executable is tested separately in normal lifecycle.';source_commit='b6e22aad6cdaa370c95a35abe9f935cf0d91aa81';source_sha256=(Get-SwirlIntegrationHash $LegacyInstallerSource);executed=$false;assertion='original-integration-and-later-user-edits-preserved';observed_pass=$null;required_assertion_failed=$false}
 $errorText=$null
@@ -158,9 +174,10 @@ function Require([string]$Name,[bool]$Passed) {
     $cases.Add([ordered]@{name=$Name;passed=$Passed})
     if(-not $Passed){throw ('Integration regression failed: '+$Name)}
 }
-function Invoke-HelperProcess([string]$Name,[string]$Helper,[string]$WorkingDirectory,[string]$HelperMode,[int]$ExpectedExit) {
+function Invoke-HelperProcess([string]$Name,[string]$Helper,[string]$WorkingDirectory,[string]$HelperMode,[int]$ExpectedExit,[string]$ProbeHelper='') {
     $stdout=Join-Path $evidence ($Name+'.stdout.log');$stderr=Join-Path $evidence ($Name+'.stderr.log')
     $arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Helper+'"'
+    if($ProbeHelper){$arguments+=' -Helper "'+$ProbeHelper+'"'}
     if($HelperMode){$arguments+=' -Mode '+$HelperMode+' -ApplicationDirectory "'+$root+'" -ExpectedManifest "'+$manifestPath+'" -AppVersion "0.2.33"'}
     $entry=[ordered]@{name=$Name;expected_exit=$ExpectedExit;exit_code=$null;outputs_complete=$false;forced_termination=$false}
     $helperProcesses.Add($entry);$capture=$null
@@ -223,9 +240,11 @@ try {
     # Fresh processes exercise the actual -File entry before expensive builds.
     # The exact old helper must compile from a clean cwd, then fail specifically
     # with CS0009 when the native plugin name shadows its bare System.dll ref.
-    $null=Invoke-HelperProcess 'legacy-helper-clean-cwd' $LegacyIntegrationHelper $root '' 0
-    $diagnostic=Invoke-HelperProcess 'legacy-helper-native-shadow' $LegacyIntegrationHelper $shadowDirectory '' 1
-    $helperBootstrap.legacy_cs0009_observed=[IO.File]::ReadAllText($diagnostic) -match '\bCS0009\b'
+    $null=Invoke-HelperProcess 'legacy-helper-clean-cwd' $legacyProbe $root '' 0 $LegacyIntegrationHelper
+    $null=Invoke-HelperProcess 'legacy-helper-native-shadow' $legacyProbe $shadowDirectory '' 1 $LegacyIntegrationHelper
+    $compilerFailure=Get-Content -LiteralPath (Join-Path $evidence 'legacy-helper-native-shadow.stdout.log') -Raw -Encoding UTF8|ConvertFrom-Json
+    $helperBootstrap.legacy_cs0009_observed=$compilerFailure.error_number -ceq 'CS0009' -and $compilerFailure.error_id -ceq 'SOURCE_CODE_ERROR,Microsoft.PowerShell.Commands.AddTypeCommand'
+    $helperBootstrap.legacy_compiler_error=$compilerFailure
     Require 'legacy-helper-fails-on-native-system-dll-metadata' $helperBootstrap.legacy_cs0009_observed
     $currentHelper=Join-Path $repo 'scripts/WindowsUserIntegration.ps1'
     $null=Invoke-HelperProcess 'current-helper-validates-with-native-shadow' $currentHelper $shadowDirectory 'ValidateUninstall' 0
