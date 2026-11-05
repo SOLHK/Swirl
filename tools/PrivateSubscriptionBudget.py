@@ -12,7 +12,11 @@ Every window/process must use the same stable, persistent state directory. A
 different directory or machine is not automatically linked; moving execution
 requires preserving the complete ledger and its initialization/lock marker.
 This module cannot detect deletion of the whole directory or coordinate a
-second machine. Those unresolved conditions also preclude live readiness.
+second machine. Restoring an older complete, valid ledger is not detected
+either: the lock marker binds the task, not a monotonic accounting history.
+A restored snapshot therefore cannot establish the latest cumulative usage
+or serve as proof of remaining live budget. These unresolved conditions also
+preclude live readiness.
 """
 from __future__ import annotations
 
@@ -185,6 +189,10 @@ class Ledger:
             if s is not None:
                 if not isinstance(s, dict) or set(s) - {"upload", "download", "total", "expire"}:
                     raise BudgetError("InvalidBillingSnapshot")
+                # Validate JSON types before the header parser can coerce a
+                # numeric string while leaving it unchanged in the snapshot.
+                for counter in s.values():
+                    integer(counter)
                 parse_userinfo(";".join(f"{k}={v}" for k, v in s.items()))
         if (d["baseline"] is None) != (d["provider"] is None):
             raise BudgetError("InvalidBillingSnapshot")

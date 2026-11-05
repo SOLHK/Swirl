@@ -58,7 +58,7 @@ class PolicyTests(unittest.TestCase):
 class LedgerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name) / "private"
+        self.root = Path(self.temp.name).resolve() / "private"
 
     def tearDown(self):
         self.temp.cleanup()
@@ -183,6 +183,69 @@ with m.Ledger(sys.argv[2]) as ledger:
                 with budget.Ledger(self.root):
                     self.fail("corrupt ledger accepted")
             self.assertEqual(json.loads(file.read_text()), value)
+
+    def test_numeric_string_snapshots_rejected_on_entry(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE + "; expire=4102444800")
+        file = self.root / "traffic-budget.json"
+        value = json.loads(file.read_text())
+        for snapshot in ("baseline", "provider"):
+            value[snapshot] = {key: str(counter) for key, counter in value[snapshot].items()}
+        file.write_text(json.dumps(value))
+        corrupt = file.read_bytes()
+        with self.assertRaisesRegex(budget.BudgetError, "InvalidCounter"):
+            with budget.Ledger(self.root):
+                pass
+        self.assertEqual(file.read_bytes(), corrupt)
+
+    def test_billing_snapshot_fields_require_integer_json_values(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE + "; expire=4102444800")
+        file = self.root / "traffic-budget.json"
+        original = file.read_bytes()
+        for snapshot in ("baseline", "provider"):
+            for field in ("upload", "download", "total", "expire"):
+                counter = json.loads(original)[snapshot][field]
+                for invalid in (str(counter), float(counter), True, False, None):
+                    with self.subTest(snapshot=snapshot, field=field, invalid=invalid):
+                        value = json.loads(original)
+                        value[snapshot][field] = invalid
+                        file.write_text(json.dumps(value))
+                        corrupt = file.read_bytes()
+                        with self.assertRaisesRegex(budget.BudgetError, "InvalidCounter"):
+                            with budget.Ledger(self.root):
+                                pass
+                        self.assertEqual(file.read_bytes(), corrupt)
+                        output, errors = io.StringIO(), io.StringIO()
+                        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                            result = budget.main(["preflight", "--state-dir", str(self.root)])
+                        self.assertEqual(result, 2)
+                        self.assertEqual(json.loads(output.getvalue()), {"error": "InvalidCounter", "liveReady": False})
+                        self.assertEqual(errors.getvalue(), "")
+                        self.assertEqual(file.read_bytes(), corrupt)
+        child = subprocess.run([sys.executable, str(MODULE), "status", "--state-dir", str(self.root)],
+                               capture_output=True, text=True, timeout=10)
+        self.assertEqual(child.returncode, 2)
+        self.assertEqual(json.loads(child.stdout), {"error": "InvalidCounter", "liveReady": False})
+        self.assertEqual(child.stderr, "")
+        self.assertEqual(file.read_bytes(), corrupt)
+
+    def test_integer_snapshot_restoration_preserves_ledger(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE + "; expire=4102444800")
+            ticket = ledger.reserve_offline(1, 256)
+            ledger.account_offline(ticket, upload=16, download=32)
+            ledger.observe_provider("upload=100000010; download=900000050; total=100000000000; expire=4102444900")
+            before = ledger.summary()
+        file = self.root / "traffic-budget.json"
+        original = file.read_bytes()
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.summary(), before)
+            for snapshot in ("baseline", "provider"):
+                self.assertEqual(set(ledger.data[snapshot]), {"upload", "download", "total", "expire"})
+                self.assertTrue(all(type(counter) is int for counter in ledger.data[snapshot].values()))
+            self.assertFalse(ledger.summary()["liveReady"])
+        self.assertEqual(file.read_bytes(), original)
 
     def test_duplicate_json_key_and_invalid_json_never_rewrite_evidence(self):
         with budget.Ledger(self.root) as ledger:
