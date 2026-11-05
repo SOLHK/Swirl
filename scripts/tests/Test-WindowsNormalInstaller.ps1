@@ -124,7 +124,7 @@ $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;installer_sha256=(Get-
 
 function Require([string]$Name,[bool]$Passed){$checks.Add([ordered]@{name=$Name;passed=$Passed});if(-not $Passed){throw ('Normal installer regression failed: '+$Name)}}
 function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$Seconds,[int]$ExpectedExit=0) {
-    $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null;created_handle_retained=$false;output_drains_completed=$false};$processes.Add($entry)
+    $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null;created_handle_retained=$false;output_drains_completed=$false;failure_receipts=@()};$processes.Add($entry)
     $capture=$null;$timer=[Diagnostics.Stopwatch]::StartNew()
     try {
         $capture=Start-SwirlCapturedProcess -Executable $Executable -Arguments $Arguments -WorkingDirectory $evidence -StdoutPath (Join-Path $evidence ($Name+'.stdout.log')) -StderrPath (Join-Path $evidence ($Name+'.stderr.log'))
@@ -135,6 +135,11 @@ function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$
     }finally {
         $timer.Stop();$entry.elapsed_ms=$timer.Elapsed.TotalMilliseconds
         if($null -ne $capture){try{Close-SwirlCapturedProcess $capture}finally{$entry.exited=$capture.Exited;$entry.exit_code=$capture.ExitCode;$entry.created_handle_retained=$capture.CreatedHandleRetained;$entry.output_drains_completed=$capture.OutputsComplete;if($capture.ForcedTermination){$report.forced_termination=$true}}}
+        $stderrPath=Join-Path $evidence ($Name+'.stderr.log')
+        if($null -ne $entry.exit_code -and $entry.exit_code -ne 0 -and [IO.File]::Exists($stderrPath) -and (Get-Item -LiteralPath $stderrPath).Length -le 4096){
+            $receipts=[regex]::Matches([IO.File]::ReadAllText($stderrPath),'(?m)^SWIRL_(INSTALL|UNINSTALL)_FAILURE phase=([A-Za-z-]{1,64}) code=(-?\d{1,10}|error|timeout|missing-payload|unavailable)\r?$')
+            $entry.failure_receipts=@($receipts|ForEach-Object {[ordered]@{operation=$_.Groups[1].Value;phase=$_.Groups[2].Value;code=$_.Groups[3].Value}})
+        }
     }
 }
 function Assert-Payload([string[]]$Extra=@()) {
