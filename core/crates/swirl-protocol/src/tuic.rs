@@ -674,12 +674,27 @@ impl UdpAssociation {
             if bytes == [VERSION, HEARTBEAT] {
                 continue;
             }
-            let fragment = decode_fragment(&bytes)?;
+            let fragment = match decode_fragment(&bytes) {
+                Ok(fragment) => fragment,
+                // A damaged native datagram has its own boundary; dropping it
+                // must not tear down subsequent packets on this association.
+                Err(_) if self.native && bytes.starts_with(&[VERSION, PACKET]) => continue,
+                Err(error) => return Err(error),
+            };
             if fragment.association != self.association {
+                if self.native {
+                    continue;
+                }
                 return Err("TuicUdpAssociation");
             }
-            if let Some(message) = self.assembly.insert(fragment)? {
-                return Ok(message);
+            match self.assembly.insert(fragment) {
+                Ok(Some(message)) => return Ok(message),
+                Ok(None) => (),
+                // Loss can fill the bounded partial-packet map until its TTL.
+                // Keep its limits and reject only this native packet. Internal
+                // state failures and reliable-stream errors remain terminal.
+                Err(error) if !self.native || error == "TuicReassemblyState" => return Err(error),
+                Err(_) => (),
             }
         }
     }
@@ -759,6 +774,10 @@ impl UdpAssociation {
         result?
     }
 }
+
+#[cfg(test)]
+#[path = "tuic_udp_lifecycle_tests.rs"]
+mod udp_lifecycle_tests;
 
 #[cfg(test)]
 mod tests {

@@ -627,6 +627,92 @@ fn native_udp_real_loopback_dual_stack_keeps_empty_datagrams_and_rejects_truncat
     core.stop();
 }
 
+#[test]
+#[ignore = "requires a pinned local Hysteria2 peer in SWIRL_NATIVE_HY2_UDP_FIXTURE"]
+fn native_hysteria2_empty_udp_error_preserves_the_authenticated_flow() {
+    let fixture = std::env::var("SWIRL_NATIVE_HY2_UDP_FIXTURE").unwrap();
+    let fixture: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fixture).unwrap()).unwrap();
+    let outbound: Outbound = serde_json::from_value(fixture["outbound"].clone()).unwrap();
+    let Outbound::Hysteria2(peer) = &outbound else {
+        panic!("the lifecycle fixture must use Hysteria2");
+    };
+    assert!(peer.host.parse::<IpAddr>().unwrap().is_loopback());
+    assert!(peer.udp && !peer.insecure && peer.tls.ca_der_base64.is_some());
+    let port = u16::try_from(fixture["target_port"].as_u64().unwrap()).unwrap();
+    let prefix = fixture["reply_prefix"].as_str().unwrap().as_bytes();
+    let mut candidate = config();
+    candidate.nodes[0].outbound = outbound;
+    candidate.policy.mode = Mode::Global;
+    let mut core = start(candidate);
+    let dispatcher = core.flow_dispatcher().unwrap();
+    runtime().block_on(async {
+        for case in ["baseline", "empty-first", "empty-after-reply"] {
+            let mut flow = dispatcher
+                .open_udp(
+                    "192.0.2.2:12000".parse().unwrap(),
+                    // The official peer's explicit SOCKS5 outbound delegates
+                    // this fixture name to its fixed loopback UDP origin.
+                    NetworkTarget {
+                        host: "native-hy2.fixture.invalid".into(),
+                        port,
+                    },
+                )
+                .await
+                .unwrap();
+            assert!(
+                core.snapshot().unwrap()["connections"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|record| record["ended"] == false
+                        && record["node"] == "c0000000-0000-4000-8000-000000000001")
+            );
+            let mut buffer = [0; 64];
+            let mut rejected_counts = None;
+            if case == "empty-after-reply" {
+                flow.send(b"before-empty").await.unwrap();
+                let size = timeout(Duration::from_secs(3), flow.recv(&mut buffer))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(&buffer[..size], [prefix, b"before-empty"].concat());
+            }
+            if case != "baseline" {
+                let before = core.snapshot().unwrap();
+                assert_eq!(flow.send(b"").await, Err("Hysteria2DatagramLength"));
+                let after = core.snapshot().unwrap();
+                assert_eq!(after["upload"], before["upload"]);
+                assert_eq!(after["download"], before["download"]);
+                rejected_counts = Some((
+                    after["udp_dropped"].as_u64().unwrap(),
+                    before["udp_dropped"].as_u64().unwrap(),
+                ));
+            }
+            let payload: &[u8] = if case == "baseline" {
+                b"baseline"
+            } else {
+                b"after-empty"
+            };
+            flow.send(payload).await.unwrap();
+            let size = timeout(Duration::from_secs(3), flow.recv(&mut buffer))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(&buffer[..size], [prefix, payload].concat());
+            if let Some((after, before)) = rejected_counts {
+                assert_eq!(after, before + 1);
+            }
+            let snapshot = core.snapshot().unwrap();
+            assert_eq!(snapshot["active"], 1);
+            assert_eq!(snapshot["failed"], 0);
+            drop(flow);
+            until(|| core.snapshot().unwrap()["active"] == 0).await;
+        }
+    });
+    core.stop();
+}
+
 struct CounterWake {
     local: Arc<Counters>,
     total: Arc<Counters>,

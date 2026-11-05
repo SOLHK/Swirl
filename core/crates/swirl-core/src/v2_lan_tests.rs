@@ -1827,7 +1827,14 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
         control.write_all(&request).unwrap();
         let mut response = [0; 10];
         control.read_exact(&mut response).unwrap();
-        assert_eq!(response[1], 0);
+        assert_eq!(
+            response[1],
+            0,
+            "association {index}, relay range {}-{}, error {}",
+            lan.udp_port_start,
+            lan.udp_port_end,
+            core.lan_status().unwrap()["last_error"],
+        );
         let relay = SocketAddr::new(
             lan.listen_ip,
             u16::from_be_bytes([response[8], response[9]]),
