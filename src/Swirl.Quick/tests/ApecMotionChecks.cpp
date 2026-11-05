@@ -6,6 +6,8 @@
 #include <QQmlContext>
 #include <QQmlComponent>
 #include <QQmlExpression>
+#include <QQmlError>
+#include <QQmlIncubationController>
 #include <QQmlListReference>
 #include <QQmlProperty>
 #include <QTest>
@@ -117,6 +119,62 @@ Item {
         check("cold-settings-expansion-admits-shell-before-body-ready",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.coldExpansionStarted").toBool();},1500));
         check("cold-settings-body-finishes-in-same-animated-shell",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.item && apecFixture.miniHost.activeLoader.routeId==='settingsCold' && !apecFixture.miniHost.pendingGrab && !apecFixture.miniHost.moving && apecFixture.miniHost.activeLoader.opacity===1").toBool();},2500));
         eval("apecFixture.miniHost.visible=false");
+        {
+            // Keep the deliberately invalid component in its own engine. The
+            // production engine's zero-warning acceptance remains unchanged.
+            QList<QQmlError> loaderErrors;
+            QQmlIncubationController incubation;
+            QQmlEngine failureEngine;
+            failureEngine.setImportPathList(qmlEngine(window)->importPathList());
+            failureEngine.setIncubationController(&incubation);
+            failureEngine.setOutputWarningsToStandardError(false);
+            for(const auto &name:QStringList{"fontManager","motionPolicy","engineController","gpuEffectsSupported"})
+                failureEngine.rootContext()->setContextProperty(name,qmlContext(window)->contextProperty(name));
+            QObject::connect(&failureEngine,&QQmlEngine::warnings,&failureEngine,[&](const QList<QQmlError> &errors){loaderErrors.append(errors);});
+            const QUrl failureUrl("qrc:/qt/qml/SwirlQuick/ApecMotionFailureFixture.qml");
+            QQmlComponent failureComponent(&failureEngine);
+            failureComponent.setData(R"QML(
+import QtQuick
+import SwirlQuick
+SwirlPageHost {
+ id:host;width:180;height:120;routeKey:"healthy"
+ sourceComponent:routeKey==="broken"?broken:healthy
+ property int failureCount:0
+ property string failedRoute:""
+ property string fallbackRoute:""
+ property bool observedPending:false
+ Component {id:healthy;Item{objectName:"healthyFallbackPage"}}
+ Component {id:broken;Item{required property string deliberatelyMissing}}
+ onPendingLoaderChanged:if(pendingLoader!==null && pendingLoader.status===Loader.Loading)observedPending=true
+ onRouteFailed:(failed,fallback)=>{++failureCount;failedRoute=failed;fallbackRoute=fallback}
+ function requestFailure(){observedPending=false;routeKey="broken"}
+})QML",failureUrl);
+            std::unique_ptr<QObject> failedObject(failureComponent.create());
+            auto *failureHost=qobject_cast<QQuickItem *>(failedObject.get());
+            check("cold-route-error-fixture-loads",failureHost!=nullptr);
+            if(failureHost){
+                failureHost->setParentItem(window->contentItem());
+                const auto failureEval=[&](const QString &source){
+                    QQmlExpression expression(qmlContext(failureHost),failureHost,source);
+                    const auto result=expression.evaluate();
+                    check("cold-route-error-fixture-expression",!expression.hasError());return result;
+                };
+                check("cold-route-error-keeps-existing-page",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("item && activeLoader.routeId==='healthy'").toBool();},1500));
+                failureEval("requestFailure()");
+                check("cold-route-error-exercises-pending-incubation",QTest::qWaitFor([&]{return failureEval("observedPending").toBool();},1500));
+                check("cold-route-error-emits-one-failure",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("failureCount===1 && pendingLoader===null").toBool();},1500));
+                check("cold-route-error-restores-visible-enabled-page",failureEval("failedRoute==='broken' && fallbackRoute==='healthy' && item && activeLoader.routeId==='healthy' && activeLoader.visible && activeLoader.enabled && activeLoader.opacity===1 && !moving && !pendingGrab && pages.broken===undefined").toBool());
+                const int generation=failureEval("generation").toInt();
+                for(int frame=0;frame<5;++frame){incubation.incubateFor(5);wait(20);}
+                check("cold-route-error-does-not-retry-itself",failureEval("failureCount===1 && pendingLoader===null && pages.broken===undefined").toBool()&&failureEval("generation").toInt()==generation);
+                check("cold-route-error-has-only-expected-required-property-warning",loaderErrors.size()==1 && loaderErrors[0].url()==failureUrl && loaderErrors[0].description()=="Required property deliberatelyMissing was not initialized");
+                failureEval("routeKey='healthy'");wait(20);
+                failureEval("requestFailure()");
+                check("cold-route-error-explicit-retry-incubates",QTest::qWaitFor([&]{return failureEval("observedPending").toBool();},1500));
+                check("cold-route-error-retries-only-after-new-request",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("failureCount===2 && pendingLoader===null && activeLoader.routeId==='healthy' && pages.broken===undefined").toBool();},1500));
+                check("cold-route-error-explicit-retry-has-one-new-expected-warning",loaderErrors.size()==2 && loaderErrors[1].url()==failureUrl && loaderErrors[1].description()=="Required property deliberatelyMissing was not initialized");
+            }
+        }
         eval("apecFixture.arc.targetY=180;apecFixture.arc.retarget();apecFixture.arc.targetY=0;apecFixture.arc.retarget()");wait(340);
         check("same-turn-reversal-retires-old-destination",eval("!apecFixture.arc.moving && apecFixture.arc.position.y===0 && apecFixture.arc.destination.y===0").toBool());
         eval("apecFixture.arc.targetY=180;apecFixture.arc.retarget()");wait(100);

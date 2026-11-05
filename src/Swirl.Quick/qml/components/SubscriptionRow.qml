@@ -68,7 +68,7 @@ Item {
             property string label: row.stateLabel
             property bool busy: row.updating
             property string tone: row.failed ? "warning" : row.record.status === "已保存真实节点" ? "success" : "neutral"
-            Layout.preferredWidth: Theme.dp(126); Layout.fillHeight: true
+            Layout.preferredWidth: Theme.dp(row.width < Theme.dp(560) ? 84 : 126); Layout.fillHeight: true
             ColumnLayout {
                 anchors.verticalCenter: parent.verticalCenter; width: parent.width; spacing: Theme.dp(5)
                 RowLayout {

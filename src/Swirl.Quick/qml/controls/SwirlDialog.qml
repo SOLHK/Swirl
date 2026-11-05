@@ -55,6 +55,7 @@ Dialog {
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
     onClosed:{dismissals.pop(dialog);reveal.reset();scale=1;opacity=1}
     parent:ownerItem?ownerItem.Overlay.overlay:Overlay.overlay
+    margins:Theme.dp(20)
     width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
     x:parent ? Math.round((parent.width-width)/2) : 0
     y:parent ? Math.round((parent.height-height)/2) : 0
@@ -72,6 +73,7 @@ Dialog {
         Binding {target:discardPrompt.header;property:"font.hintingPreference";value:Font.PreferFullHinting}
         Binding {target:discardPrompt.header;property:"renderType";value:Text.NativeRendering}
         parent:dialog.parent
+        margins:dialog.margins
         width:Math.floor(Math.min(Theme.dp(400),dialog.width))
         x:parent ? Math.round((parent.width-width)/2) : 0
         y:parent ? Math.round((parent.height-height)/2) : 0
@@ -84,7 +86,7 @@ Dialog {
         exit:discardReveal.exitTransition
         onAboutToShow:{dismissals.push(discardPrompt,owner);discardReveal.prepare(SwirlMotion.popupVector(discardPrompt))}
         onClosed:{dismissals.pop(discardPrompt);discardReveal.reset()}
-        background:SwirlCardSurface{cornerRadius:Theme.popupRadius}
+        background:SwirlCardSurface{floating:true;cornerRadius:Theme.popupRadius}
         // Retain the prompt shell and header hook; its controls are only
         // instantiated while a real unsaved-change confirmation is visible.
         contentItem: Loader {
@@ -132,6 +134,7 @@ Dialog {
         id:heroBackground
         readonly property point origin:dialog.heroSource?dialog.heroSource.mapToItem(heroBackground,0,0):Qt.point(0,0)
         SwirlCardSurface {
+            floating:true
             x:Math.round(heroBackground.origin.x*(1-dialog.heroProgress));y:Math.round(heroBackground.origin.y*(1-dialog.heroProgress))
             width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)
             height:Math.round(dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height)

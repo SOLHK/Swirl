@@ -503,13 +503,18 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(card&&collapsedHeight<=100*eval("Theme.uiScale").toReal(),"subscription source uses a compact list row instead of a dashboard card");
         const auto originalSize=window->size();
         window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(250);
-        auto *title=item("subscriptionTitle-"+id),*refresh=item("refreshSubscription-"+id),*more=item("moreSubscription-"+id);
+        auto *title=item("subscriptionTitle-"+id),*use=item("useSubscription-"+id),*refresh=item("refreshSubscription-"+id),*more=item("moreSubscription-"+id);
         check(title&&title->width()>=60*eval("Theme.uiScale").toReal(),"subscription title keeps readable width at minimum window size");
         check(refresh&&more&&refresh->isVisible()&&refresh->isEnabled()&&more->isVisible()&&more->isEnabled(),"subscription actions stay visible and enabled at minimum window size");
+        check(use&&use->isVisible()&&use->isEnabled(),"subscription selection stays visible and enabled at minimum window size");
         if(title&&refresh&&more){
             const QRectF bounds(0,0,window->width(),window->height());
             const QRectF titleRect(title->mapToScene(QPointF()),title->size()),refreshRect(refresh->mapToScene(QPointF()),refresh->size()),moreRect(more->mapToScene(QPointF()),more->size());
             check(bounds.contains(titleRect)&&bounds.contains(refreshRect)&&bounds.contains(moreRect)&&!titleRect.intersects(refreshRect)&&!titleRect.intersects(moreRect)&&!refreshRect.intersects(moreRect),"subscription title and actions remain inside the minimum window without overlap");
+            if(use){
+                const QRectF useRect(use->mapToScene(QPointF()),use->size());
+                check(bounds.contains(useRect)&&!useRect.intersects(titleRect)&&!useRect.intersects(refreshRect)&&!useRect.intersects(moreRect),"subscription selection remains inside the minimum window without overlapping title or actions");
+            }
         }
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-minimum.png");
         window->resize(originalSize);QTest::qWait(250);

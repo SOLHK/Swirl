@@ -34,8 +34,8 @@ SwirlDialog {
     onClosed:search.clear()
     stateFingerprint:Qt.md5(JSON.stringify(selectedTarget))
     dismissBlocked:pending
-    width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-Theme.dp(36):Theme.dp(600)))
-    height:Math.floor(Math.min(Theme.dp(580),parent?parent.height-Theme.dp(36):Theme.dp(580)))
+    width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-2*margins:Theme.dp(600)))
+    height:Math.floor(Math.min(Theme.dp(580),parent?parent.height-2*margins:Theme.dp(580)))
     contentItem:ColumnLayout {
         spacing:Theme.dp(12)
         RowLayout {

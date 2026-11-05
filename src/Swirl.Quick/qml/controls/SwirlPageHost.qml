@@ -91,6 +91,17 @@ Item {
  }
  function completePending(loader){
   if(loader!==pendingLoader)return
+  // A failed cold route is terminal for this request. Retrying it here would
+  // recreate its Error cache entry until it fails again on the next frame.
+  if(loader.status===Loader.Error){
+   const fallback=loader===activeLoader?pendingFallback:activeLoader
+   pendingLoader=null;pendingFallback=null;activeLoader=fallback
+   releaseShared();finish()
+   const failedRoute=loader.routeId,copy=Object.assign({},pages)
+   delete copy[failedRoute];pages=copy;loader.destroy()
+   routeFailed(failedRoute,fallback?fallback.routeId:"");return
+  }
+  if(loader.status!==Loader.Ready)return
   if(loader!==activeLoader){requestRoute();return}
   const fallback=pendingFallback
   pendingLoader=null;pendingFallback=null
