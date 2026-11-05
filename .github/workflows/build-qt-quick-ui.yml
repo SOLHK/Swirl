@@ -213,7 +213,7 @@ jobs:
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop','node-ui-evidence','node-ui-native-evidence')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','node-chain.xml','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','node-chain.xml','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-native-tun-recovery.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -414,8 +414,15 @@ jobs:
           $policyCases = @($criticalUiReport.SelectNodes('//testcase[@name="swirl-policy-ui"]'))
           if ($policyCases.Count -ne 1 -or $policyCases[0].status -ne 'run' -or $policyCases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw 'The full-application policy regression must actually pass before packaging.' }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
-            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(native-tun-recovery|system-proxy-state|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
+            [xml]$markerReport = Get-Content -LiteralPath 'build/swirl-quick/swirl-native-tun-recovery.xml' -Raw
+            if (@($markerReport.SelectNodes('//Incident') | Where-Object { $_.type -ne 'pass' }).Count) { throw 'TUN recovery markers contain skipped or failed native assertions.' }
+            foreach ($required in @('absentKeyAndValueAreClearWithoutCreatingAnything','pendingAndConfirmedClearHaveStrictDwordValues','malformedMarkerIsUnknownAndMaintenanceDoesNotProceed','accessDeniedIsUnknownAndMaintenanceDoesNotProceed','facadeReportsRecoveryStateImmediately','inheritedPendingMarkerRejectsOrdinaryWorkerWithoutClearingOrRecovering','trustedPhysicalWorkerRetainsTheOtherSessionsPendingMarker','unknownMarkerRejectsEvenTrustedPhysicalWorkerWithoutClearingOrRecovering')) {
+              if ($null -eq $markerReport.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required TUN recovery marker case did not pass: $required" }
+            }
+            if ($markerReport.SelectNodes('/TestCase/TestFunction[@name="malformedMarkerIsUnknownAndMaintenanceDoesNotProceed"]/Incident[@type="pass"]').Count -ne 8) { throw 'All eight malformed TUN marker cases must actually run.' }
+            if ($markerReport.SelectNodes('/TestCase/TestFunction[@name="facadeReportsRecoveryStateImmediately"]/Incident[@type="pass"]').Count -ne 3) { throw 'All three initial TUN marker states must actually run.' }
             # A CTest suite-level pass must also have current native assertion
             # evidence. Missing rows or platform skips do not meet this gate.
             foreach ($suite in @('state','recovery','app-exit','normal-stop')) {
@@ -602,12 +609,12 @@ jobs:
             exit 0
           }
           $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/node-diagnostic-regression.xml'
-          ctest --test-dir build/swirl-quick -C Release -R '^swirl-(node-real-chain|node-section-model)$' --output-on-failure --no-tests=error --output-junit $junit
+          ctest --test-dir build/swirl-quick -C Release -R '^swirl-(node-real-chain|node-section-model|native-tun-recovery)$' --output-on-failure --no-tests=error --output-junit $junit
           $testExit = $LASTEXITCODE
           if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent node regression evidence is missing.' }
           if ($testExit -ne 0) { throw "Independent node diagnostic regression failed ($testExit)." }
           [xml]$report = Get-Content -LiteralPath $junit -Raw
-          foreach ($name in @('swirl-node-real-chain','swirl-node-section-model')) {
+          foreach ($name in @('swirl-node-real-chain','swirl-node-section-model','swirl-native-tun-recovery')) {
             $cases = @($report.SelectNodes("//testcase[@name='$name']"))
             if ($cases.Count -ne 1 -or $cases[0].status -ne 'run' -or $cases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw "Independent node regression did not execute successfully: $name" }
           }
@@ -622,6 +629,7 @@ jobs:
             build-evidence/node-diagnostic-regression.xml
             build/swirl-quick/node-chain.txt
             build/swirl-quick/node-chain.xml
+            build/swirl-quick/swirl-native-tun-recovery.xml
             build/swirl-quick/node-ui-evidence/node-probe-*.json
             build/swirl-quick/node-ui-evidence/*probe*.png
             build/swirl-quick/node-ui-native-evidence/node-probe-*.json
@@ -1018,7 +1026,7 @@ jobs:
               Write-Host 'Deferred for this UI-only diff: node-real-chain, stream-regression, subscription-download, qt-network-policy, gateway-network.'
             } else {
               # These network/security checks already passed before packaging.
-              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
+              $excludedTests += '|native-tun-recovery|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
             }
             $exclude = "^swirl-($excludedTests)$"
             # CTest changes directory for --test-dir. Keep the report in the
@@ -1164,6 +1172,7 @@ jobs:
             build/swirl-quick/policy-configuration.txt
             build/swirl-quick/swirl-telemetry-accounting.xml
             build/swirl-quick/swirl-system-proxy-state.xml
+            build/swirl-quick/swirl-native-tun-recovery.xml
             build/swirl-quick/swirl-system-proxy-recovery.xml
             build/swirl-quick/swirl-system-proxy-app-exit.xml
             build/swirl-quick/swirl-system-proxy-normal-stop.xml

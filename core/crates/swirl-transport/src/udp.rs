@@ -30,6 +30,7 @@ pub fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
 /// Bind a native UDP forwarding socket, returning buffer setup errors to the
 /// caller. This changes only this socket; system-wide network limits are intact.
 pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
+    let address = crate::egress::outbound_udp_bind_address(address)?;
     let socket = UdpSocket::bind(address).await?;
     crate::egress::pin_udp(&socket, address)?;
     reserve_datagram_buffers(&socket)?;

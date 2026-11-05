@@ -20,6 +20,9 @@ struct EngineStartOptions {
     // Internal node-test capability only, never loaded from user settings or
     // subscriptions. Rust atomically binds loopback port zero for these workers.
     bool internalProbeListener = false;
+    // Internal request capability derived from the live TUN owner, never a
+    // persisted/imported setting. It changes only isolated probe sockets.
+    bool internalProbePhysicalEgress = false;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.
@@ -94,6 +97,10 @@ public:
         bool gatewayForwarding=false;
         bool directSession=false;
         bool tunEnabled=false,allowLan=false;
+        // Includes starting, degraded and restoring broker ownership. A false
+        // healthy-TUN flag alone cannot prove that capture routes are absent.
+        bool tunCapturePossible=false;
+        bool tunRecoveryRequired=false;
         QJsonObject lan;
         QJsonObject configurationReceipt;
     };

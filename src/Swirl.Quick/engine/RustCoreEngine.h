@@ -2,6 +2,7 @@
 #include "ProxyEngine.h"
 #include "RustCoreLibrary.h"
 #include "NativeTunBrokerClient.h"
+#include "app/NativeTunRecovery.h"
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QSet>
@@ -20,7 +21,7 @@ public:
  void configurationCommand(const QJsonObject &) override;
  void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
- Status status() const override {return m_status;}
+ Status status() const override {auto value=m_status;value.tunCapturePossible=m_brokerSession||m_tunBroker.running()||m_tunRecoveryRequired;value.tunRecoveryRequired=m_tunRecoveryRequired;return value;}
  QString probeFailureStage() const override {return m_probeFailureStage;}
  qint64 probeOutboundConnectMs() const override {return m_probeOutboundConnectMs;}
  qint64 probeOriginTlsMs() const override {return m_probeOriginTlsMs;}
@@ -63,6 +64,8 @@ private:
  QSet<quint64> m_reportedForwardingFailures;
  bool m_forwardingFailureLimitReported=false;
  bool m_v2=false,m_lanTracked=false,m_brokerSession=false;
+ NativeTunRecoveryState m_tunRecoveryState=NativeTunRecoveryState::Unknown;
+ bool m_tunRecoveryRequired=true;
  QString m_engineEpoch;
  QJsonObject m_preparedPolicy,m_previousPolicy;
  bool m_configurationRollback=false;

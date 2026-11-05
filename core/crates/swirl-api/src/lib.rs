@@ -63,6 +63,8 @@ enum Command {
         url: String,
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
+        #[serde(default)]
+        physical_egress: bool,
     },
     ProbeStatus {
         handle: u64,
@@ -206,8 +208,12 @@ impl Controller {
                 url,
                 timeout_ms,
                 expected_status,
+                physical_egress,
             } => {
                 if let Some(core) = self.cores_v2.get(&handle) {
+                    if physical_egress {
+                        return Err("ProbePhysicalWorkerRequired");
+                    }
                     return Ok(
                         json!({"ok":true,"probe":core.probe_start(url,timeout_ms,expected_status)?}),
                     );
@@ -215,7 +221,7 @@ impl Controller {
                 Ok(json!({
                     "ok": true,
                     "probe": self.cores.get(&handle).ok_or("UnknownHandle")?
-                        .probe_start(url, timeout_ms, expected_status)?
+                        .probe_start_with_egress(url, timeout_ms, expected_status, physical_egress)?
                 }))
             }
             Command::ProbeStatus { handle } => {

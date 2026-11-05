@@ -26,6 +26,7 @@
 #include <QSaveFile>
 #include <QFileInfo>
 #include <QUdpSocket>
+#include <algorithm>
 
 static quint16 freePort(){
     LoopbackPortLease ports;
@@ -68,6 +69,12 @@ private slots:
         QVERIFY(!isolated.directSession);QCOMPARE(isolated.dnsConfig,source.dnsConfig);QVERIFY(isolated.customRules.isEmpty());QVERIFY(isolated.customGroups.isEmpty());
         QVERIFY(isolated.lanPassword.isEmpty());QVERIFY(isolated.inboundPassword.isEmpty());QCOMPARE(isolated.routingMode,QString("global"));
         QCOMPARE(isolated.nodes.size(),source.nodes.size());QVERIFY(!isolated.smartRouting);
+        // A saved TUN preference is not evidence of live capture ownership.
+        QVERIFY(!isolated.internalProbePhysicalEgress);
+        source.internalProbePhysicalEgress=true;
+        const auto physical=NodeTestService::isolatedOptions(source);
+        QVERIFY(physical.internalProbePhysicalEgress);QVERIFY(!physical.tunEnabled);
+        QVERIFY(physical.internalProbeListener);QCOMPARE(physical.proxyPort,quint16(0));
     }
     void probeFailureStatusText_data() {
         QTest::addColumn<QString>("phase");QTest::addColumn<QString>("code");QTest::addColumn<QString>("expected");
@@ -86,6 +93,8 @@ private slots:
         QTest::newRow("http-status")<<QString("http_status")<<QString("UrlTestStatus")<<QStringLiteral("HTTP 异常");
         QTest::newRow("invalid-configuration")<<QString("configuration")<<QString("NodeConfigurationRejected")<<QStringLiteral("配置无效");
         QTest::newRow("service-deadline")<<QString("timeout")<<QString("ProbeDeadlineExceeded")<<QStringLiteral("测试超时");
+        QTest::newRow("physical-conflict")<<QString("outbound_connect")<<QString("ProbeEgressNetworkConflict")<<QStringLiteral("网络路由冲突");
+        QTest::newRow("physical-unavailable")<<QString("outbound_connect")<<QString("ProbeEgressUnavailable")<<QStringLiteral("物理出口不可用");
         QTest::newRow("unknown-phase")<<QString("future_stage")<<QString("FutureCode")<<QStringLiteral("测试失败");
     }
     void probeFailureStatusText() {
@@ -291,8 +300,17 @@ private slots:
         QVERIFY(network.a.forwarded>beforeMainRequest);QVERIFY(network.a.forwarded>=2);
         tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
     }
+    void isolatedBatchPreservesConfiguredDnsAcrossWorkerReuse_data() {
+        QTest::addColumn<bool>("physical");
+        QTest::newRow("ordinary-system-routes")<<false;
+#ifdef Q_OS_WIN
+        QTest::newRow("isolated-physical-route")<<true;
+#endif
+    }
     void isolatedBatchPreservesConfiguredDnsAcrossWorkerReuse() {
+        QFETCH(bool,physical);
         ControlledNetwork network;QVERIFY(network.start());auto opts=options();QStringList ids;QVariantList hosts;
+        opts.internalProbePhysicalEgress=physical;
         // Four nodes require reusing at least one of the three probe workers.
         // These reserved names resolve only through the supplied local map;
         // even a missed map is confined to an explicit loopback DNS endpoint.
@@ -308,6 +326,7 @@ private slots:
         for(const auto &id:ids){
             QVERIFY(tests.result(id).value("success").toBool());
             QCOMPARE(tests.result(id).value("resolverPolicy").toString(),QString("isolated_configured_dns"));
+            QCOMPARE(tests.result(id).value("egressPolicy").toString(),physical?QString("isolated_physical_egress"):QString("system_routes"));
         }
         // A later batch must use its new resolver, not the preceding worker's
         // cached endpoint. Only 127.0.0.1 has the controlled SOCKS listener.
@@ -331,6 +350,64 @@ private slots:
         QCOMPARE(result.value("failureCode").toString(),QString("NodeConfigurationRejected"));
         QCOMPARE(result.value("resolverPolicy").toString(),QString("isolated_configured_dns"));
         QCOMPARE(network.a.forwarded,0);QCOMPARE(network.httpRequests,0);
+    }
+    void largeRealProbeBatchCancelsRestartsAndReusesThreeWorkers_data(){
+        QTest::addColumn<int>("count");
+        QTest::newRow("104-nodes")<<104;
+        QTest::newRow("88-nodes")<<88;
+    }
+    void largeRealProbeBatchCancelsRestartsAndReusesThreeWorkers(){
+        QFETCH(int,count);
+        ControlledNetwork network;QVERIFY(network.start());
+        QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
+        auto opts=options();QStringList ids;QVariantList hosts;
+        for(int i=0;i<count;++i){
+            auto n=node(QString("Batch fixture %1").arg(i),stalled.serverPort());
+            n.host=QString("batch-%1.invalid").arg(i);opts.nodes.append(n);ids.append(n.id);
+            hosts.append(QVariantMap{{"name",n.host},{"value","127.0.0.1"}});
+        }
+        opts.dnsConfig={{"mode",2},{"servers","127.0.0.1"},{"useHosts",false},{"queryFamily","ipv4_only"},{"hosts",hosts}};
+        NodeTestService tests;QList<QPointer<QTcpSocket>> pending;
+        connect(&stalled,&QTcpServer::newConnection,&stalled,[&]{
+            while(stalled.hasPendingConnections()){
+                auto *socket=stalled.nextPendingConnection();socket->setParent(&stalled);pending.append(socket);
+            }
+        });
+        tests.start(opts,ids,network.url());
+        QTRY_COMPARE_WITH_TIMEOUT(pending.size(),3,15000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->bytesAvailable()>0;}),5000);
+        QCOMPARE(tests.completed(),0);QCOMPARE(tests.total(),count);
+        QCOMPARE(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).size(),3);
+        tests.cancel();tests.start(opts,ids,network.url()); // retiring workers still block a rapid restart
+        QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->state()==QAbstractSocket::UnconnectedState;}),5000);
+        QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
+        QCOMPARE(pending.size(),3);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
+
+        for(auto &n:opts.nodes)n.port=network.a.serverPort();
+        QSet<ProxyEngine *> workers;int peak=0;
+        // Disconnect before captured stack state or the service is destroyed,
+        // including when a failing assertion returns before workers retire.
+        QObject workerObserver;
+        connect(&tests,&NodeTestService::changed,&workerObserver,[&]{
+            const auto live=tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly);
+            peak=qMax(peak,int(live.size()));for(auto *worker:live)workers.insert(worker);
+        });
+        tests.start(opts,ids+ids,network.url()); // duplicate selection IDs still yield one request per node
+        for(int i=0;i<20;++i)tests.start(opts,ids,network.url());
+        QCOMPARE(tests.total(),count);
+        QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),60000);
+        QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
+        QCOMPARE(peak,3);QCOMPARE(workers.size(),3);
+        QCOMPARE(tests.completed(),count);QCOMPARE(tests.succeeded(),count);QCOMPARE(tests.failed(),0);
+        QCOMPARE(tests.results().size(),count);QCOMPARE(network.a.forwarded,count);
+        QCOMPARE(network.httpRequests,count);QCOMPARE(network.httpRequestsByExit.value("exit-A"),count);
+        QCOMPARE(network.httpRequestsByExit.value("DIRECT-BYPASS"),0);
+        for(const auto &id:ids){const auto result=tests.result(id);
+            QVERIFY(result.value("success").toBool());QCOMPARE(result.value("http").toInt(),200);
+            QVERIFY(result.value("latency").toLongLong()>=0);QVERIFY(!tests.testing(id));
+        }
+        QTest::qWait(50);QCOMPARE(tests.completed(),count);QCOMPARE(network.httpRequests,count);
     }
     void independentMeasurementDoesNotClaimAConnectedSession() {
         ControlledNetwork network;QVERIFY(network.start());QTemporaryDir temp;

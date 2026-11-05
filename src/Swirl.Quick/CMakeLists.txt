@@ -468,6 +468,16 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-state.xml,xml" -o -,txt)
  set_tests_properties(swirl-system-proxy-state PROPERTIES LABELS security TIMEOUT 30)
  if(WIN32)
+  # The process-local HKCU override isolates marker cases from the user's
+  # actual TUN recovery state; no driver, route change or UAC is involved.
+  add_executable(SwirlNativeTunRecoveryTests tests/NativeTunRecoveryTests.cpp)
+  target_link_libraries(SwirlNativeTunRecoveryTests PRIVATE SwirlEngine Qt6::Test advapi32)
+  if(MSVC)
+   target_compile_options(SwirlNativeTunRecoveryTests PRIVATE /utf-8)
+  endif()
+  add_test(NAME swirl-native-tun-recovery COMMAND SwirlNativeTunRecoveryTests
+   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-native-tun-recovery.xml,xml" -o -,txt)
+  set_tests_properties(swirl-native-tun-recovery PROPERTIES RUN_SERIAL TRUE LABELS security TIMEOUT 30)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
   target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test winhttp)
   add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
@@ -720,7 +730,7 @@ if(WIN32)
 endif()
 
 foreach(runtime_target IN ITEMS SwirlLanProxyTests SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
- SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
+ SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlNativeTunRecoveryTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
  SwirlPrivateSubscriptionInspect SwirlPrivateSubscriptionAcceptance SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})

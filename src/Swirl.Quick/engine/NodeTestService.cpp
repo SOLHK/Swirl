@@ -11,6 +11,8 @@ QString NodeTestService::nodeReference(const QString &id){
 }
 QString NodeTestService::failureStatusText(const QVariantMap &result){
  const auto phase=result.value("phase").toString(),code=result.value("failureCode").toString();
+ if(code=="ProbeEgressNetworkConflict")return QStringLiteral("网络路由冲突");
+ if(code.startsWith("ProbeEgress"))return QStringLiteral("物理出口不可用");
  const bool timeout=QStringList{"UrlTestTimeout","UpstreamDnsTimeout","DnsTimeout","TuicDnsTimeout","Hysteria2DnsTimeout","UpstreamTcpTimeout",
   "UpstreamTlsTimeout","TlsHandshakeIoTimeout","UpstreamProtocolTimeout","QuicHandshakeTimeout","RealityHandshakeTimeout",
   "WebSocketUpgradeTimeout","InitialWriteTimeout","ProbeDeadlineExceeded"}.contains(code);
@@ -38,6 +40,7 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
  // routing, inbound authentication or system-network ownership.
  EngineStartOptions result;
  result.nodes=source.nodes;result.dnsConfig=source.dnsConfig;
+ result.internalProbePhysicalEgress=source.internalProbePhysicalEgress;
  result.proxyPort=0;result.internalProbeListener=true;
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
@@ -128,6 +131,7 @@ void NodeTestService::record(const QString &id,QVariantMap row){
  row["nodeReference"]=nodeReference(id);
  row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");
  row["resolverPolicy"]=m_options.dnsConfig.isEmpty()?QStringLiteral("isolated_default_dns"):QStringLiteral("isolated_configured_dns");
+ row["egressPolicy"]=m_options.internalProbePhysicalEgress?QStringLiteral("isolated_physical_egress"):QStringLiteral("system_routes");
  row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;
  if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",QStringLiteral("节点 #%1 · %2 · %3 · %4").arg(row.value("nodeReference").toString(),row.value("phase").toString(),row.value("failureCode").toString(),row.value("error").toString()));}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();

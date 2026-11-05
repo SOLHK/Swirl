@@ -20,6 +20,9 @@
 #include <limits>
 
 namespace {
+QString recoveryRequiredMessage(){
+ return QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+}
 const QStringList &privateSubnets(){
  static const QStringList values{"127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","100.64.0.0/10","::1/128","fc00::/7","fe80::/10"};
  return values;
@@ -192,6 +195,8 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
 RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
  m_poll.setInterval(250);connect(&m_poll,&QTimer::timeout,this,&RustCoreEngine::refresh);
  m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
+ m_tunRecoveryState=nativeTunRecoveryState();m_tunRecoveryRequired=m_tunRecoveryState!=NativeTunRecoveryState::Clear;
+ if(m_tunRecoveryRequired){m_status.state=State::Failed;m_status.error=Error::OwnershipFailed;m_status.message=recoveryRequiredMessage();}
 }
 // Owners can destroy their telemetry members before their engine member.
 // Shutdown during destruction must not signal those partially destroyed owners.
@@ -269,6 +274,7 @@ QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &op
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
+ if(o.internalProbePhysicalEgress&&(!o.internalProbeListener||!o.policyDocument.isEmpty()))return QStringLiteral("物理测速出口仅供独立节点检测使用，未改变活动会话的网络路径。");
  if(!o.policyDocument.isEmpty())return configurationV2(o,o.policyDocument,output);
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
@@ -476,6 +482,16 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
 void RustCoreEngine::start(const EngineStartOptions &options){
+ if(!m_brokerSession&&!m_tunBroker.running()){
+  if(!m_handle)m_tunRecoveryState=nativeTunRecoveryState();
+  // Only the current main owner's internal physical-probe grant can admit a
+  // fresh worker while its marker is pending. This worker owns no TUN routes
+  // and must never clear that marker when it stops. Unknown state stays closed.
+  const bool trustedProbe=options.internalProbeListener&&options.internalProbePhysicalEgress&&options.policyDocument.isEmpty();
+  m_tunRecoveryRequired=m_tunRecoveryState==NativeTunRecoveryState::Unknown
+   ||(m_tunRecoveryState==NativeTunRecoveryState::Pending&&!trustedProbe);
+  if(m_tunRecoveryRequired){fail(Error::OwnershipFailed,recoveryRequiredMessage());return;}
+ }
  if(!m_handle&&(m_brokerSession||m_tunBroker.running())){
   fail(Error::OwnershipFailed,QStringLiteral("原 TUN 会话的停止或恢复尚未确认，请先重试关闭代理。"));return;
  }
@@ -582,6 +598,7 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   if(!setNativeTunRecoveryPending(true,&markerError)){
    stop();fail(Error::ConfigurationFailed,markerError);return;
   }
+  m_tunRecoveryState=NativeTunRecoveryState::Pending;
   auto request=QJsonObject{{"native_tun_schema",1},{"op","native_tun_start"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
    {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch},
    {"config",QJsonObject{{"driver_path",QDir(QCoreApplication::applicationDirPath()).filePath("wintun.dll")},
@@ -689,11 +706,14 @@ void RustCoreEngine::stop(){
  m_brokerSession=false;
  if(stoppedBroker){
   QString markerError;
-  m_status.message=setNativeTunRecoveryPending(false,&markerError)?QString():markerError;
+  const bool cleared=setNativeTunRecoveryPending(false,&markerError);
+  m_tunRecoveryRequired=!cleared;m_tunRecoveryState=cleared?NativeTunRecoveryState::Clear:NativeTunRecoveryState::Unknown;
+  if(!cleared)m_status.error=Error::OwnershipFailed;
+  m_status.message=cleared?QString():recoveryRequiredMessage()+markerError;
   if(!markerError.isEmpty())emit diagnostic("SwirlRust","TunRecoveryMarkerUnconfirmed",markerError);
  }
  m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
- m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
+ m_status.state=m_tunRecoveryRequired?State::Failed:State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
  if(!m_handle)return;
@@ -799,7 +819,9 @@ void RustCoreEngine::probeNode(const QUrl &url){
   failProbe("input","ProbeUrlInvalid");emit statusChanged();return;
  }
  resetProbeState();
- const auto response=call({{"op","probe_start"},{"handle",qint64(m_handle)},{"url",text},{"timeout_ms",8000}});
+ QJsonObject request{{"op","probe_start"},{"handle",qint64(m_handle)},{"url",text},{"timeout_ms",8000}};
+ if(m_options.internalProbePhysicalEgress)request.insert("physical_egress",true);
+ const auto response=call(request);
  if(!response.value("ok").toBool()){
   failProbe("probe_start",response.value("error").toString("ProbeStartFailed"));emit statusChanged();return;
  }
