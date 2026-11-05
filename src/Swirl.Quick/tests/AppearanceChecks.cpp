@@ -668,7 +668,33 @@ Item {
                             const bool keyboardDelivered=QCoreApplication::sendEvent(window,&keyDown);
                             const bool keyboardDown=control->property("down").toBool();
                             pressObservation.exec();
-                            check(keyboardDelivered && keyboardDown && submittedContraction(),
+                            const bool keyboardContractedWithin40ms=submittedContraction();
+                            const bool keyboardPassed=keyboardDelivered && keyboardDown && keyboardContractedWithin40ms;
+                            if(!keyboardPassed){
+                                QJsonArray keyboardFrames;
+                                QJsonObject keyboardObservation;
+                                {
+                                    QMutexLocker lock(&presented->mutex);
+                                    keyboardFrames=presented->frames;
+                                    keyboardObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
+                                        {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
+                                    if(presented->pending)keyboardObservation.insert("pendingFrame",QJsonObject{
+                                        {"frame",qint64(presented->frame)},{"frameBeginMs",presented->frameBeginMs},
+                                        {"synchronizedMs",presented->synchronizedMs},{"geometryCapturedMs",presented->geometryCapturedMs},
+                                        {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                        {"hasSceneGraphNodes",presented->hasSceneGraphNodes},{"geometryValid",presented->geometryValid},
+                                        {"surfaceScale",presented->surfaceScale},{"contentScale",presented->contentScale},
+                                        {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY}});
+                                }
+                                // The unchanged deadline decision precedes all diagnostic
+                                // allocation and logging, which run only for a failed Space.
+                                qInfo().noquote()<<"NATIVE_PRESS_SPACE"<<QJsonDocument(QJsonObject{
+                                    {"theme",theme},{"control",name},{"inputDelivered",keyboardDelivered},{"inputDown",keyboardDown},
+                                    {"observedDown",control->property("down").toBool()},{"nativeClockRunningAtObservation",nativeClock->running()},
+                                    {"contractedWithin40ms",keyboardContractedWithin40ms},{"frames",keyboardFrames},{"observation",keyboardObservation}
+                                }).toJson(QJsonDocument::Compact);
+                            }
+                            check(keyboardPassed,
                                 "Space activation submits paired native surface and label geometry within the first40ms");
                             const auto keyboardAdopted=adoptedScale();
                             QKeyEvent keyUp(QEvent::KeyRelease,Qt::Key_Space,Qt::NoModifier);
