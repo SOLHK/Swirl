@@ -77,8 +77,22 @@ fn stalled_worker_is_terminated_and_reaped_before_recovery_can_run() {
 
 #[test]
 fn live_control_heartbeats_extend_the_worker_deadline_without_reaching_the_client() {
+    // Signal readiness from the producer loop and exit after its flushed final
+    // response, keeping PowerShell pipeline startup/teardown out of this deadline.
     let mut child = spawn_worker(
-        r#"[Console]::Out.WriteLine('ready'); [Console]::Out.Flush(); 1..10 | ForEach-Object { [Console]::Out.Write('{"native_tun_worker_heartbeat":1}' + [char]10); [Console]::Out.Flush(); [Threading.Thread]::Sleep(100) }; [Console]::Out.WriteLine('{"ok":true}')"#,
+        r#"
+$output = [Console]::Out
+$heartbeat = '{"native_tun_worker_heartbeat":1}' + [char]10
+for ($iteration = 0; $iteration -lt 10; $iteration++) {
+    if ($iteration -eq 0) { $output.WriteLine('ready'); $output.Flush() }
+    $output.Write($heartbeat)
+    $output.Flush()
+    [Threading.Thread]::Sleep(100)
+}
+$output.WriteLine('{"ok":true}')
+$output.Flush()
+[Environment]::Exit(0)
+"#,
         r#"printf 'ready\n'; for i in 1 2 3 4 5 6 7 8 9 10; do printf '{"native_tun_worker_heartbeat":1}\n'; sleep .1; done; printf '{"ok":true}\n'"#,
     );
     let input = ready_reader(&mut child);
@@ -89,9 +103,16 @@ fn live_control_heartbeats_extend_the_worker_deadline_without_reaching_the_clien
         let forwarded = forward_worker_output(input, &mut response, &observed)?;
         Ok::<_, io::Error>((forwarded, response))
     });
+    let waiting = Instant::now();
     let result = wait_for_worker(&mut child, &heartbeat, Duration::from_millis(600));
+    let elapsed = waiting.elapsed();
     let output = output.join().unwrap().unwrap();
-    assert!(result.unwrap());
+    assert!(
+        result.as_ref().is_ok_and(|success| *success),
+        "worker result={result:?}, heartbeat_count={}, normal_response_bytes={}, wait_elapsed={elapsed:?}",
+        heartbeat.load(Ordering::Acquire),
+        output.1.len()
+    );
     let expected = if cfg!(windows) {
         b"{\"ok\":true}\r\n".as_slice()
     } else {
