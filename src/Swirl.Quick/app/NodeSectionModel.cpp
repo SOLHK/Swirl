@@ -105,7 +105,7 @@ void NodeSectionModel::rebuild() {
 
     // Fixed namespaces keep manual/unknown ownership separate from subscriptions
     // even when display names or legacy source IDs collide.
-    if(sourceAllowed("manual",{})){order.append("manual");names.insert("manual",tr("手动添加"));}
+    if(sourceAllowed("manual",{})){order.append("manual");names.insert("manual",tr("独立导入"));}
     names.insert("legacy",tr("历史节点 · 归属待确认"));
     for(const auto &value:m_providers) {
         const auto provider=value.toMap();const auto id=provider.value("id").toString();

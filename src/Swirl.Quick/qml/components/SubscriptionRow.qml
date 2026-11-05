@@ -11,6 +11,7 @@ Item {
     property bool expanded: false
     property bool editable: true
     property bool refreshable: true
+    property bool activeSubscription: false
     property real insertionOffset: 0
     readonly property bool updating: record.status === "正在更新"
     readonly property bool failed: record.status === "更新失败"
@@ -23,6 +24,7 @@ Item {
     signal deleteRequested(Item source)
     signal reviewRequested(Item source)
     signal nodesRequested()
+    signal useRequested()
     objectName: "subscriptionCard-" + record.id
     implicitHeight: Theme.dp(76) + Math.round(details.implicitHeight * reveal)
     height: implicitHeight
@@ -78,7 +80,15 @@ Item {
             }
         }
         RowLayout {
-            Layout.preferredWidth: Theme.dp(88); spacing: 0
+            Layout.preferredWidth: Theme.dp(190); spacing: 0
+            SubscriptionAction {
+                objectName: "useSubscription-" + row.record.id
+                Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(34)
+                text: row.activeSubscription ? qsTr("使用中") : qsTr("使用此订阅")
+                selected: row.activeSubscription; enabled: row.editable
+                Accessible.name: qsTr("%1：%2").arg(row.record.name).arg(text)
+                onClicked: row.useRequested()
+            }
             SubscriptionAction {
                 id: refresh
                 objectName: "refreshSubscription-" + row.record.id

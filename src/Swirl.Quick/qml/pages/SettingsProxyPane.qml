@@ -56,5 +56,5 @@ ColumnLayout {
     Item { Layout.preferredHeight: Theme.dp(16) }
     SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("应用兼容建议"); description: qsTr("供 Codex 与其他应用手动参考。") }
     SwirlTextArea { Layout.fillWidth: true; readOnly: true; selectByMouse: true; text: engineController.proxyEnvironmentAdvice; wrapMode: TextEdit.Wrap; background: null; Accessible.name: qsTr("代理环境兼容建议") }
-    SwirlText { Layout.fillWidth: true; text: qsTr("当前版本尚未实现 TUN 数据通路与网关转发。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
+    SwirlText { Layout.fillWidth: true; text: qsTr("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启增强模式与网关转发。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
 }

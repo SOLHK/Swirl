@@ -150,7 +150,7 @@ ApplicationWindow {
                     Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
                     label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
                     detail: engineController.routingError || (engineController.tunEnabled
-                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("当前 Rust Core 暂不支持 TUN 模式"))
+                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。"))
                     tone: engineController.tunEnabled ? "success" : "neutral"
                     enabled: !engineController.busy
                     onClicked: {
@@ -180,6 +180,10 @@ ApplicationWindow {
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
                 id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:0; x:Theme.dp(0); y:AppState.currentPage==="activity"?Theme.dp(12):Theme.dp(48); width:parent.width; height:parent.height-y-Theme.dp(12)
+                onRouteFailed:(failedRoute,fallbackRoute)=>{
+                    if(AppState.currentPage===failedRoute){if(AppState.canGoBack)AppState.goBack();else if(fallbackRoute.length)AppState.navigate(fallbackRoute)}
+                    AppState.notice(qsTr("无法加载此页面，请重试。"))
+                }
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :

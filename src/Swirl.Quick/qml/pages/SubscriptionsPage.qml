@@ -22,6 +22,8 @@ Item {
     readonly property bool mutationPending: mutationSubmitting || mutationRequestId.length > 0
     readonly property bool editable: !mutationPending && !engineController.policyBusy && !engineController.imports.busy && !engineController.imports.hasPreview
     readonly property var providers: engineController.imports.providers
+    readonly property string activeSourceId: engineController.activeSubscriptionId
+    readonly property bool sourceSelected: engineController.subscriptionScopeEnabled
     readonly property string searchQuery: search.text.trim().toLowerCase()
     readonly property var listed: providers.filter(function(record) {
         return String(record.name).toLowerCase().indexOf(page.searchQuery) >= 0 && (page.filterIndex === 0 || (page.filterIndex === 1 ? record.status === "更新失败" : record.enabled))
@@ -51,6 +53,10 @@ Item {
         }
         if (owner) { owner.markSaved(); owner.close() }
         if (kind === "save") engineController.imports.refreshSubscription(savedId)
+        if (kind === "select") {
+            const provider = providers.find(record => record.id === source)
+            mutationMessage = qsTr("已使用「%1」。请在策略页选择该来源的出口。").arg(provider ? provider.name : qsTr("独立导入"))
+        }
     }
     function completeMutation(requestId, success) {
         if (!mutationRequestId.length || String(requestId) !== mutationRequestId) return
@@ -86,6 +92,13 @@ Item {
         beginMutation("delete", deleteDialog.recordId, deleteDialog)
         trackMutation(engineController.imports.removeSubscription(deleteDialog.recordId), v2)
     }
+    function selectSource(id) {
+        if (!editable || (sourceSelected && activeSourceId === id)) return
+        const v2 = engineController.policyV2Active
+        beginMutation("select", id, null)
+        mutationMessage = qsTr("正在切换来源并撤销原来源的连接…")
+        trackMutation(engineController.selectSubscription(id), v2)
+    }
     function removeLegacy() {
         const v2 = engineController.policyV2Active
         beginMutation("legacy", "", legacyDialog)
@@ -109,7 +122,7 @@ Item {
         anchors.fill: parent; anchors.margins: Theme.pagePadding; spacing: Theme.dp(14)
         SwirlPageHeader {
             id:subscriptionHeading;Layout.fillWidth:true;title:qsTr("订阅来源")
-            description:qsTr("管理更新节奏与来源节点，保留每次操作的结果。")
+            description:qsTr("选择使用的订阅，节点列表与代理出口仅使用该来源。")
             metadata:qsTr("%1 个来源，%2 个节点").arg(page.providers.length).arg(page.totalNodes)
             SubscriptionAction {objectName:"refreshAllSubscriptions";text:qsTr("更新全部");iconName:"refresh-source";enabled:page.editable&&page.providers.length>0;onClicked:engineController.imports.refreshAll()}
             SubscriptionAction {id:add;objectName:"addSubscription";text:qsTr("添加订阅");solid:true;iconName:"plus";enabled:page.editable;onClicked:page.edit(null,add)}
@@ -118,6 +131,14 @@ Item {
             Layout.fillWidth: true; spacing: Theme.dp(12)
             SwirlSearchField {id:search;objectName:"subscriptionSearch";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索来源名称");Accessible.name:placeholderText}
             SwirlSegmentedControl {objectName:"subscriptionFilter";Layout.preferredWidth:Theme.dp(234);Layout.preferredHeight:Theme.dp(34);options:[qsTr("全部"),qsTr("更新失败"),qsTr("自动更新")];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
+        }
+        RowLayout {
+            Layout.fillWidth: true; spacing: Theme.dp(8)
+            SwirlText {
+                Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12)
+                text: page.sourceSelected ? qsTr("当前使用：%1").arg(page.activeSourceId.length ? (page.providers.find(record => record.id === page.activeSourceId) || {}).name || qsTr("来源已删除，请重新选择") : qsTr("独立导入")) : qsTr("选择一条订阅后，只显示并使用该订阅的节点。")
+            }
+            SubscriptionAction { objectName: "useIndependentNodes"; text: qsTr("独立导入"); selected: page.sourceSelected && !page.activeSourceId.length; enabled: page.editable; onClicked: page.selectSource("") }
         }
         RowLayout {
             Layout.fillWidth: true; visible: engineController.imports.legacyNodeCount > 0; spacing: Theme.dp(8)
@@ -130,7 +151,7 @@ Item {
             SwirlText { text: qsTr("订阅来源"); leftPadding: Theme.dp(8); Layout.fillWidth: true; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { text: qsTr("节点"); Layout.preferredWidth: Theme.dp(48); horizontalAlignment: Text.AlignRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            Item { Layout.preferredWidth: Theme.dp(88) }
+            Item { Layout.preferredWidth: Theme.dp(190) }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.border }
         Item {
@@ -148,6 +169,7 @@ Item {
                     required property var entry
                     record: entry; width: Math.floor(subscriptionList.width)
                     expanded: page.expandedId === record.id
+                    activeSubscription: page.sourceSelected && page.activeSourceId === record.id
                     editable: page.editable; refreshable: page.editable
                     ListView.onPooled: { settle(); visible = false }
                     ListView.onReused: { visible = true; settle() }
@@ -156,7 +178,8 @@ Item {
                     onEditRequested: source => page.edit(record, source)
                     onDeleteRequested: source => page.confirmDelete(record, source)
                     onReviewRequested: source => page.reviewSource(record, source)
-                    onNodesRequested: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「%1」查看。").arg(record.name)) }
+                    onUseRequested: page.selectSource(String(record.id))
+                    onNodesRequested: { if (page.sourceSelected && page.activeSourceId !== record.id) page.mutationMessage = qsTr("请先使用「%1」，再查看该订阅的节点。").arg(record.name); else AppState.navigate("proxies") }
                 }
             }
             ColumnLayout {

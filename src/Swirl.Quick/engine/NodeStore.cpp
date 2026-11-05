@@ -140,7 +140,10 @@ QVariantList NodeStore::publicRows() const {
             auto row=n.publicInfo();
             const bool legacy=legacyNode(n),subscription=!legacy&&!n.sourceId.isEmpty();
             row.insert("sourceKind",legacy?QStringLiteral("legacy"):subscription?QStringLiteral("subscription"):QStringLiteral("manual"));
-            row.insert("sourceName",legacy?QStringLiteral("历史节点 · 归属待确认"):subscription?sources.value(n.sourceId):QStringLiteral("手动添加"));
+            const auto independent=n.importSource=="url"?QStringLiteral("独立链接导入"):n.importSource=="file"?QStringLiteral("文件导入"):
+                n.importSource=="clipboard"?QStringLiteral("剪贴板导入"):n.importSource=="text"?QStringLiteral("文本导入"):
+                n.importSource=="manual-import"?QStringLiteral("独立导入"):QStringLiteral("手动添加");
+            row.insert("sourceName",legacy?QStringLiteral("历史节点 · 归属待确认"):subscription?sources.value(n.sourceId):independent);
             m_publicRows.append(row);
         }
     }
@@ -340,6 +343,10 @@ bool NodeStore::decodeCatalogSnapshot(const QJsonObject &snapshot,ImportPlan *ou
     const auto network=snapshot.value("networkConfiguration");
     if(!network.isUndefined() && (!network.isObject() || network.toObject().value("schema").toInt()!=1)) {
         m_error=QStringLiteral("保存的网络配置无效；原文件保持不变。");return false;
+    }
+    const auto activeSource=network.toObject().value("activeSubscriptionId");
+    if(!activeSource.isUndefined()&&(!activeSource.isString()||(!activeSource.toString().isEmpty()&&QUuid(activeSource.toString()).isNull()))) {
+        m_error=QStringLiteral("保存的当前订阅标识无效；原文件保持不变。");return false;
     }
     ImportPlan plan;plan.m_owner=this;plan.m_revision=m_revision;
     plan.m_nodes=nodes;plan.m_selected=selected;plan.m_sources=subscriptions;plan.m_network=network.toObject();
@@ -610,6 +617,10 @@ QJsonObject withoutRemovedNodes(QJsonObject configuration,const QSet<QString> &r
         if(results.isEmpty())configuration.remove("subscriptionImportResults");
         else configuration.insert("subscriptionImportResults",results);
     }
+    if(!sourceId.isEmpty()&&configuration.value("subscriptionPolicySnapshots").isObject()) {
+        auto snapshots=configuration.value("subscriptionPolicySnapshots").toObject(),sources=snapshots.value("sources").toObject();
+        sources.remove(sourceId);snapshots.insert("sources",sources);configuration.insert("subscriptionPolicySnapshots",snapshots);
+    }
     return configuration;
 }
 }
@@ -623,6 +634,16 @@ bool NodeStore::prepareRemoveSubscription(const QString &id,ImportPlan *output) 
     QSet<QString> removed;auto nodes=m_nodes;
     nodes.removeIf([&](const auto &node){if(node.sourceId!=id)return false;removed.insert(node.id);return true;});
     return prepareCatalog(nodes,removed.contains(m_selected)?QString():m_selected,sources,withoutRemovedNodes(m_networkConfiguration,removed,id),output);
+}
+bool NodeStore::prepareSelectSubscription(const QString &id,ImportPlan *output) {
+    if(!allowMutation())return false;
+    if(!id.isEmpty()&&std::none_of(m_subscriptions.cbegin(),m_subscriptions.cend(),[&](const auto &source){return source.id==id;})) {
+        m_error=QStringLiteral("订阅不存在；未切换到其他来源。");return false;
+    }
+    auto network=m_networkConfiguration;network.insert("activeSubscriptionId",id);
+    QString selected;
+    for(const auto &node:m_nodes)if(node.id==m_selected&&node.sourceId==id){selected=m_selected;break;}
+    return prepareCatalog(m_nodes,selected,m_subscriptions,network,output);
 }
 bool NodeStore::cleanLegacyNodes() {
     ImportPlan plan;return prepareCleanLegacyNodes(&plan)&&commitImport(plan);

@@ -269,7 +269,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  if(!o.policyDocument.isEmpty())return configurationV2(o,o.policyDocument,output);
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
- if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
+ if(o.tunEnabled||o.gatewayForwarding)return "本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。请在“概览”关闭增强模式与网关转发后重试。";
  if(o.allowLan)return "旧版 allowLan 选项不能扩大本机监听范围；请使用独立的原生局域网代理入口。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";

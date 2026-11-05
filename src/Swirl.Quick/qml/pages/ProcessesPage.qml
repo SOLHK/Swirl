@@ -57,7 +57,7 @@ Item {
  height:Math.min(Theme.dp(430),parent?parent.height-Theme.dp(32):Theme.dp(430))
  contentItem:ScrollView {id:meteredScroll;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
  ColumnLayout{width:meteredScroll.availableWidth;spacing:Theme.dp(12)
-  SwirlText {renderType:Text.NativeRendering;text:"当前尚未实现 TUN 与进程网络阻止。下面的允许名单仅保存为配置，不代表已限制任何程序的网络。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+  SwirlText {renderType:Text.NativeRendering;text:"本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。进程网络阻止也尚未接入；下面的允许名单仅保存为配置，不代表已限制任何程序的网络。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
   SwirlText {text:page.engineController.elevated?"已具备管理员权限；当前构建仍不支持计费网络接管。":"当前构建不支持计费网络接管；保存名单不会自动开启。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
   SwirlTextArea {id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
   SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError||page.engineController.routingError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}

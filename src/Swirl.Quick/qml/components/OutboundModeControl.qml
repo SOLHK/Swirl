@@ -149,8 +149,7 @@ SwirlToolbarButton {
         objectName: "activityOutboundModeMenu"
         x: control.width - width
         y: control.height + Theme.dp(5)
-        width: Math.min(Theme.dp(260), control.Window.window ? control.Window.window.width - Theme.dp(24) : Theme.dp(260))
-        margins: Theme.dp(8)
+        width: Math.min(Theme.dp(260), control.Window.window ? control.Window.window.width - 2 * margins : Theme.dp(260))
         padding: Theme.dp(10)
         popupType: Popup.Item
         transformOrigin: Item.TopRight
@@ -169,10 +168,6 @@ SwirlToolbarButton {
                 text: control.statusText; wrapMode: Text.Wrap
                 font.pixelSize: Theme.fontSize(11); color: Theme.muted
             }
-        }
-        background: SwirlCardSurface {
-            transform: Translate { x: modeMenu.popupMotion.xOffset; y: modeMenu.popupMotion.yOffset }
-            cornerRadius: Theme.popupRadius
         }
         Instantiator {
             model: control.modes

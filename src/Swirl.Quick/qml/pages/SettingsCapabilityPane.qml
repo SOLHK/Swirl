@@ -9,11 +9,11 @@ ColumnLayout {
     required property var settingsPage
     readonly property string section: settingsPage.section
     readonly property var definitions: ({
-        "TUN": {summary: qsTr("当前版本尚未实现 TUN 虚拟网卡数据通路，无法接管系统全流量。"), rows: [
-            {name: qsTr("TUN 入口"), detail: qsTr("驱动、数据通路与流量回环防护尚未接入。"), kind: "toggle", runtime: "tun"},
+        "TUN": {summary: qsTr("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。"), rows: [
+            {name: qsTr("TUN 入口"), detail: qsTr("TUN 驱动部署与启动恢复尚未接入本测试版。"), kind: "toggle", runtime: "tun"},
             {name: qsTr("网卡选择"), detail: qsTr("当前无法创建或选择 TUN 网卡。"), kind: "choice", values: [qsTr("尚未接入")]},
             {name: qsTr("路由排除"), detail: qsTr("尚未提供系统路由排除设置。"), kind: "toggle"},
-            {name: qsTr("网关 DNS"), detail: qsTr("尚未提供 TUN DNS 接管。"), kind: "toggle"}]},
+            {name: qsTr("网关 DNS"), detail: qsTr("TUN DNS 接管尚未接入本测试版。"), kind: "toggle"}]},
         "DNS": {summary: qsTr("解析服务与本地映射可在 DNS 配置页管理。连接时由 Rust Core 校验实际支持的配置。"), rows: [
             {name: qsTr("解析器选择"), detail: qsTr("完整解析服务选项位于 DNS 配置页。"), kind: "choice", values: [qsTr("在 DNS 配置页管理")]},
             {name: qsTr("加密 DNS"), detail: qsTr("可在 DNS 配置页填写；保存不代表当前内核支持该传输。"), kind: "toggle"},

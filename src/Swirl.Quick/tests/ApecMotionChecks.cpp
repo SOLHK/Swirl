@@ -71,17 +71,34 @@ Item {
  SwirlDialog {id:guarded;ownerItem:fixture;title:"Guarded fixture";contentItem:SwirlTextField {objectName:"apecGuardedField";text:"Original";implicitHeight:40}}
  Component {id:miniA;Item{objectName:"miniPageA"}}
  Component {id:miniB;Item{objectName:"miniPageB"}}
- Component {id:miniC;Item{Repeater{model:240;Item{}}}}
+ Component {id:miniC;Item{readonly property Item motionTitle:loadedTitle;SwirlText{id:loadedTitle;x:Theme.pagePadding;y:Theme.pagePadding;text:"Cold route";font.pixelSize:Theme.pageTitleSize}Repeater{model:240;Item{}}}}
+ Item {id:coldCard;x:0;y:165;width:170;height:45;readonly property string motionDescription:"Cold body"
+  Rectangle {id:coldSurface;anchors.fill:parent;color:Theme.independentCard}
+  SwirlText {id:coldTitle;anchors.centerIn:parent;text:"Cold route";font.pixelSize:Theme.fontSize(15)}
+ }
  SwirlPageHost {
-  id:miniHost;x:0;y:220;width:180;height:120;routeKey:"a"
+  id:miniHost;x:0;y:220;width:180;height:120;routeKey:"a";insetRoutes:["settingsCold"]
   sourceComponent:routeKey==="a"?miniA:routeKey==="b"?miniB:miniC
   property bool interruptPreparation:false
   property bool interrupted:false
   property bool coldWasPending:false
-  onPreparingChanged:if(interruptPreparation && preparing && routeKey==="b"){
-   interruptPreparation=false;interrupted=true
-   routeKey="c";requestRoute();coldWasPending=pendingLoader!==null
-   routeKey="b";requestRoute()
+  property bool recordColdExpansion:false
+  property bool coldExpansionStarted:false
+  function openColdSettings(){
+   recordColdExpansion=true
+   SwirlMotion.shared={source:coldTitle,surface:coldSurface,card:coldCard,targetKey:"settings"}
+   routeKey="settingsCold"
+  }
+  onPreparingChanged:{
+   if(recordColdExpansion && preparing && routeKey==="settingsCold"){
+    recordColdExpansion=false
+    coldExpansionStarted=pendingLoader===activeLoader && activeLoader.status===Loader.Loading
+   }
+   if(interruptPreparation && preparing && routeKey==="b"){
+    interruptPreparation=false;interrupted=true
+    routeKey="c";requestRoute();coldWasPending=pendingLoader!==null
+    routeKey="b";requestRoute()
+   }
   }
  }
 })QML",QUrl("qrc:/qt/qml/SwirlQuick/ApecMotionFixture.qml"));
@@ -96,6 +113,9 @@ Item {
         eval("apecFixture.miniHost.interruptPreparation=true;apecFixture.miniHost.routeKey='b'");wait(550);
         check("prepare-retarget-fixture-exercises-cold-request",eval("apecFixture.miniHost.interrupted && apecFixture.miniHost.coldWasPending").toBool());
         check("prepare-retarget-returns-visible-enabled-final-route",eval("apecFixture.miniHost.activeLoader.routeId==='b' && !apecFixture.miniHost.pendingGrab && !apecFixture.miniHost.moving && apecFixture.miniHost.activeLoader.visible && apecFixture.miniHost.activeLoader.enabled && apecFixture.miniHost.activeLoader.opacity===1").toBool());
+        eval("apecFixture.miniHost.openColdSettings()");
+        check("cold-settings-expansion-admits-shell-before-body-ready",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.coldExpansionStarted").toBool();},1500));
+        check("cold-settings-body-finishes-in-same-animated-shell",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.item && apecFixture.miniHost.activeLoader.routeId==='settingsCold' && !apecFixture.miniHost.pendingGrab && !apecFixture.miniHost.moving && apecFixture.miniHost.activeLoader.opacity===1").toBool();},2500));
         eval("apecFixture.miniHost.visible=false");
         eval("apecFixture.arc.targetY=180;apecFixture.arc.retarget();apecFixture.arc.targetY=0;apecFixture.arc.retarget()");wait(340);
         check("same-turn-reversal-retires-old-destination",eval("!apecFixture.arc.moving && apecFixture.arc.position.y===0 && apecFixture.arc.destination.y===0").toBool());

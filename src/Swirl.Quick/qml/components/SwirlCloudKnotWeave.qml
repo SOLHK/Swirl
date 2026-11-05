@@ -19,6 +19,8 @@ Item {
     property var toolbarItems: []
     property Item sidebarAnchor: null
     property var wingScene: null
+    property var cardItems: []
+    property int geometryRevision: 0
     property bool active: false
     property bool presentationActive: true
     property bool wide: true
@@ -63,6 +65,7 @@ Item {
         backLayerTransform=layerTransform(frontLayer,behindCards);
         knotLayerTransform=layerTransform(knotTarget,frontLayer);
         frontToKnotTransform=layerTransform(frontLayer,knotTarget);
+        ++geometryRevision;
         if(!force && !flight.running && !previewing)return;
         if(!wingScene)return;
         const scene={sidebar:rectFor(sidebarAnchor),viewport:viewportRect,
@@ -157,8 +160,8 @@ Item {
         transform:Matrix4x4 {matrix:weave.backLayerTransform}
         Accessible.ignored:true
     }
-    // Card and toolbar surfaces naturally hide the travelling bodies. Only
-    // the reserved brand area opens a foreground window onto that same scene.
+    // Cards reveal travelling bodies through their decoration layers. Hosts
+    // without card layers retain the reserved brand-area foreground window.
     // Mapping both directions also works when the two host layers are offset
     // or scaled; no shared-parent/origin assumption is needed.
     Item {
@@ -220,6 +223,41 @@ Item {
             material:modelData
             objectName:"cloudFeatherFront-"+modelData.key
             z:modelData.index
+            visible:weave.cardItems.length===0
+        }
+    }
+    // Each card reveals the same travelling bodies above its fill and below
+    // its content. The shared scene clock never covers labels or hit targets.
+    Repeater {
+        model:weave.cardItems
+        delegate:Item {
+            id:cardFlight
+            required property var modelData
+            required property int index
+            objectName:"cloudKnotCardFlight-"+index
+            parent:modelData.decorationLayer
+            anchors.fill:parent
+            visible:weave.visible && weave.freeFlight
+            opacity:weave.opacity*weave.releaseOpacity
+            enabled:false;Accessible.ignored:true
+            Item {
+                id:cardGeometry
+                width:weave.frontLayer.width;height:weave.frontLayer.height
+                readonly property matrix4x4 sceneTransform:{
+                    weave.geometryRevision;cardFlight.modelData.lift;
+                    return weave.layerTransform(weave.frontLayer,cardFlight.modelData.decorationLayer);
+                }
+                transform:Matrix4x4 {matrix:cardGeometry.sceneTransform}
+                Repeater {
+                    model:weave.materials
+                    delegate:FeatherBody {
+                        required property var modelData
+                        material:modelData
+                        objectName:"cloudFeatherCard-"+cardFlight.index+"-"+modelData.key
+                        z:modelData.index
+                    }
+                }
+            }
         }
     }
     // Local copies change only depth where completed feather bodies cross.

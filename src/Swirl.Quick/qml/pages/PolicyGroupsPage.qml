@@ -111,7 +111,7 @@ Item {
         SwirlPageHeader {
             id:policyHeading;Layout.fillWidth:true;title:qsTr("策略与出口")
             description:qsTr("先选择默认出口，再为需要单独处理的服务分配策略。")
-            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)
+            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)+(page.engineController.subscriptionScopeEnabled?qsTr(" · 当前来源：%1").arg(page.engineController.activeSubscriptionId.length?(page.engineController.imports.providers.find(source=>source.id===page.engineController.activeSubscriptionId)||{}).name||qsTr("来源已删除"):qsTr("独立导入")):"")
             SubscriptionAction {id:addButton;objectName:page.tabIndex===0?"addServicePolicy":"addPolicyGroup";text:page.tabIndex===0?qsTr("添加服务"):qsTr("添加策略组");solid:true;iconName:"plus";enabled:page.editable;onClicked:{if(page.tabIndex===0)page.editService(null,addButton);else page.editGroup(null,addButton)}}
             SubscriptionAction {id:advancedButton;objectName:"policyAdvancedButton";iconName:"sliders";Accessible.name:qsTr("策略高级设置");tooltip:Accessible.name;onClicked:{advancedDialog.heroSource=advancedButton;advancedDialog.open()}}
         }

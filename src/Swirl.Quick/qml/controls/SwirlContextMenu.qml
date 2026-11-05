@@ -16,7 +16,8 @@ Menu {
     function showAt(anchor,x,y){
         if(motionPolicy.reversePopupExit(contextMenu))return
         if(anchor)popup(anchor,x||0,y||0)
-        else popup()
+        // Coordinate-free popup() uses the cursor instead of declared x/y.
+        else open()
     }
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
@@ -27,6 +28,7 @@ Menu {
     readonly property FontMetrics ownedMetrics: FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.buttonSize;font.weight:Theme.bodyFontWeight}
     signal itemTriggered(int index)
     padding:Theme.dp(6)
+    margins:Theme.dp(20)
     transformOrigin:Item.TopLeft
     readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
     // Popup owns x/y placement (including screen clamping); translate its
@@ -42,6 +44,7 @@ Menu {
     enter:reveal.enterTransition
     exit:reveal.exitTransition
     background: SwirlCardSurface {
+        floating: true
         transform: Translate { x: reveal.xOffset; y: reveal.yOffset }
         cornerRadius: Theme.menuRadius
     }
