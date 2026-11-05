@@ -2,13 +2,15 @@
     [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
     [string]$ExpectedSourceSha,
     [string]$ExpectedUserSid,
-    [string]$LegacyInstallerSource
+    [string]$LegacyInstallerSource,
+    [string]$LegacyIntegrationHelper
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $repo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'scripts/WindowsUserIntegration.ps1')
 . (Join-Path $PSScriptRoot 'WindowsShortcutFixture.ps1')
+. (Join-Path $PSScriptRoot 'WindowsProcessCapture.ps1')
 $evidence=[IO.Path]::GetFullPath($EvidenceDirectory)
 [IO.Directory]::CreateDirectory($evidence)|Out-Null
 
@@ -32,8 +34,25 @@ if (-not $ExpectedUserSid) {
     $stream=[IO.File]::Create($legacy)
     try {$null=$process.Start();$process.StandardOutput.BaseStream.CopyTo($stream);$process.WaitForExit();if($process.ExitCode -ne 0){throw 'Cannot read exact legacy NSIS bytes.'}}
     finally {$stream.Dispose();$process.Dispose()}
+    # Preserve the exact old helper for the native System.dll shadowing control.
+    $helperBaseline='7c756b1773934ebfde82c42769d5ccfde7427f1d'
+    & git -C $repo cat-file -e $helperBaseline 2>$null
+    if($LASTEXITCODE -ne 0){& git -C $repo fetch --no-tags --depth=1 origin $helperBaseline;if($LASTEXITCODE -ne 0){throw 'Exact legacy integration helper is unavailable.'}}
+    $legacyHelperDirectory=Join-Path $evidence 'legacy-integration-helper'
+    [IO.Directory]::CreateDirectory($legacyHelperDirectory)|Out-Null
+    $legacyHelper=Join-Path $legacyHelperDirectory 'WindowsUserIntegration.ps1'
+    $process=New-Object Diagnostics.Process
+    $process.StartInfo.FileName='git';$process.StartInfo.WorkingDirectory=$repo
+    $process.StartInfo.Arguments='cat-file blob '+$helperBaseline+':scripts/WindowsUserIntegration.ps1'
+    $process.StartInfo.UseShellExecute=$false;$process.StartInfo.RedirectStandardOutput=$true
+    $stream=[IO.File]::Create($legacyHelper)
+    try{$null=$process.Start();$process.StandardOutput.BaseStream.CopyTo($stream);$process.WaitForExit();if($process.ExitCode -ne 0){throw 'Cannot read exact legacy integration helper bytes.'}}
+    finally{$stream.Dispose();$process.Dispose()}
+    $legacyHelperBlob=(& git -C $repo hash-object $legacyHelper).Trim()
+    if($LASTEXITCODE -ne 0 -or $legacyHelperBlob -cne 'b7413edb755ab4e90a9298a9652a17e3a00dc2ec'){throw 'Legacy integration helper differs from the recorded Git blob.'}
+    [IO.File]::Copy((Join-Path $repo 'scripts/RustProductPackagePolicy.ps1'),(Join-Path $legacyHelperDirectory 'RustProductPackagePolicy.ps1'),$true)
     $argsPath=Join-Path $evidence 'child-arguments.json'
-    @{EvidenceDirectory=$evidence;ExpectedSourceSha=$source;LegacyInstallerSource=$legacy}|ConvertTo-Json|Set-Content -LiteralPath $argsPath -Encoding UTF8
+    @{EvidenceDirectory=$evidence;ExpectedSourceSha=$source;LegacyInstallerSource=$legacy;LegacyIntegrationHelper=$legacyHelper}|ConvertTo-Json|Set-Content -LiteralPath $argsPath -Encoding UTF8
     & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argsPath -EvidenceDirectory $evidence -TimeoutSeconds 240
     $capturePolicy=Get-Content -LiteralPath (Join-Path $evidence 'process-capture/process-capture-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
     if($capturePolicy.schema -ne 1 -or -not $capturePolicy.success -or $capturePolicy.source_sha -cne $source -or -not $capturePolicy.actual_non_admin_token -or -not $capturePolicy.actual_x86_powershell -or $capturePolicy.forced_termination -or -not $capturePolicy.fixture_removed -or @($capturePolicy.processes).Count -ne 5 -or @($capturePolicy.processes|Where-Object {-not $_.passed}).Count){throw 'Actual x86 standard-user process capture evidence is incomplete.'}
@@ -87,6 +106,14 @@ $manifestPath=Join-Path $root 'package-manifest.json'
 $context=New-SwirlIntegrationContext $root $manifestPath '0.2.33'
 $cases=New-Object 'System.Collections.Generic.List[object]'
 $rawRoundTrips=New-Object 'System.Collections.Generic.List[object]'
+$helperProcesses=New-Object 'System.Collections.Generic.List[object]'
+$shadowDirectory=Join-Path $root 'native-plugin-cwd'
+[IO.Directory]::CreateDirectory($shadowDirectory)|Out-Null
+# A trusted native Windows DLL has no .NET metadata, just like NSIS System.dll.
+# It is copied, never executed, to reproduce the compiler's basename collision.
+$shadowDll=Join-Path $shadowDirectory 'System.dll'
+[IO.File]::Copy((Join-Path ([Environment]::SystemDirectory) 'version.dll'),$shadowDll,$false)
+$helperBootstrap=[ordered]@{legacy_source_commit='7c756b1773934ebfde82c42769d5ccfde7427f1d';legacy_source_blob='b7413edb755ab4e90a9298a9652a17e3a00dc2ec';legacy_helper_sha256=(Get-SwirlIntegrationHash $LegacyIntegrationHelper);native_shadow_sha256=(Get-SwirlIntegrationHash $shadowDll);legacy_cs0009_observed=$false;processes=$helperProcesses}
 $legacyWriter=[ordered]@{scope='A test-only RegSetValueExW probe with explicit zero padding outside cbData; not a claim about unrecorded bytes in the earlier CI failure.';executed=$false;expected=$null;observed=$null;requested_byte_count=$null;observed_byte_count=$null;appended_one_utf16_null=$false}
 $negative=[ordered]@{scope='Exact old unconditional cleanup operations on synthetic standard-user integration; actual old NSIS executable is tested separately in normal lifecycle.';source_commit='b6e22aad6cdaa370c95a35abe9f935cf0d91aa81';source_sha256=(Get-SwirlIntegrationHash $LegacyInstallerSource);executed=$false;assertion='original-integration-and-later-user-edits-preserved';observed_pass=$null;required_assertion_failed=$false}
 $errorText=$null
@@ -130,6 +157,22 @@ namespace SwirlIntegration.PolicyTests {
 function Require([string]$Name,[bool]$Passed) {
     $cases.Add([ordered]@{name=$Name;passed=$Passed})
     if(-not $Passed){throw ('Integration regression failed: '+$Name)}
+}
+function Invoke-HelperProcess([string]$Name,[string]$Helper,[string]$WorkingDirectory,[string]$HelperMode,[int]$ExpectedExit) {
+    $stdout=Join-Path $evidence ($Name+'.stdout.log');$stderr=Join-Path $evidence ($Name+'.stderr.log')
+    $arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Helper+'"'
+    if($HelperMode){$arguments+=' -Mode '+$HelperMode+' -ApplicationDirectory "'+$root+'" -ExpectedManifest "'+$manifestPath+'" -AppVersion "0.2.33"'}
+    $entry=[ordered]@{name=$Name;expected_exit=$ExpectedExit;exit_code=$null;outputs_complete=$false;forced_termination=$false}
+    $helperProcesses.Add($entry);$capture=$null
+    try {
+        $capture=Start-SwirlCapturedProcess -Executable (Join-Path $PSHOME 'powershell.exe') -Arguments $arguments -WorkingDirectory $WorkingDirectory -StdoutPath $stdout -StderrPath $stderr
+        if(-not (Wait-SwirlCapturedProcess $capture 30000)){throw ('Integration helper process timed out: '+$Name)}
+        Require ($Name+'-exit-code') ($capture.ExitCode -eq $ExpectedExit)
+    }finally {
+        if($null -ne $capture){try{Close-SwirlCapturedProcess $capture}finally{$entry.exit_code=$capture.ExitCode;$entry.outputs_complete=$capture.OutputsComplete;$entry.forced_termination=$capture.ForcedTermination}}
+    }
+    Require ($Name+'-bounded-process-completed') ($entry.outputs_complete -and -not $entry.forced_termination)
+    return $stderr
 }
 function Bytes([string]$Text){return [ordered]@{exists=$true;bytes=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Text))}}
 function Snapshot {
@@ -177,7 +220,26 @@ try {
     Require 'all-desired-values-and-shortcut-bytes-applied' (@($wanted.Keys|Where-Object {-not (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context $_) $wanted[$_])}).Count -eq 0)
     $receipt=Read-SwirlIntegrationReceipt $context
     Require 'receipt-binds-sid-source-manifest-and-embedded-helper' ($receipt.user_sid -ceq $ExpectedUserSid -and $receipt.source_sha -ceq $ExpectedSourceSha -and $receipt.manifest_sha256 -ceq $context.ManifestHash -and $receipt.helper_sha256 -ceq $context.HelperHash)
-    $null=Uninstall-SwirlUserIntegration $context
+    # Fresh processes exercise the actual -File entry before expensive builds.
+    # The exact old helper must compile from a clean cwd, then fail specifically
+    # with CS0009 when the native plugin name shadows its bare System.dll ref.
+    $null=Invoke-HelperProcess 'legacy-helper-clean-cwd' $LegacyIntegrationHelper $root '' 0
+    $diagnostic=Invoke-HelperProcess 'legacy-helper-native-shadow' $LegacyIntegrationHelper $shadowDirectory '' 1
+    $helperBootstrap.legacy_cs0009_observed=[IO.File]::ReadAllText($diagnostic) -match '\bCS0009\b'
+    Require 'legacy-helper-fails-on-native-system-dll-metadata' $helperBootstrap.legacy_cs0009_observed
+    $currentHelper=Join-Path $repo 'scripts/WindowsUserIntegration.ps1'
+    $null=Invoke-HelperProcess 'current-helper-validates-with-native-shadow' $currentHelper $shadowDirectory 'ValidateUninstall' 0
+    $installedState=Snapshot;$savedReceipt=[IO.File]::ReadAllBytes($context.Receipt)
+    foreach($field in @('source_sha','manifest_sha256','helper_sha256')) {
+        try {
+            $bad=Read-SwirlIntegrationReceipt $context
+            $bad.$field='0' * ([string]$bad.$field).Length
+            Write-SwirlIntegrationReceipt $context $bad
+            $null=Invoke-HelperProcess ('current-helper-rejects-'+$field) $currentHelper $shadowDirectory 'ValidateUninstall' 1
+            Require ('identity-mismatch-preserves-integration-'+$field) ((Snapshot) -ceq $installedState)
+        }finally{[IO.File]::WriteAllBytes($context.Receipt,$savedReceipt)}
+    }
+    $null=Invoke-HelperProcess 'current-helper-uninstalls-with-native-shadow' $currentHelper $shadowDirectory 'Uninstall' 0
     Require 'uninstall-restores-all-original-raw-types-and-shortcut-bytes' ((Snapshot) -ceq $before)
 
     # Write deliberately noncanonical strings with the native API. A typed
@@ -286,7 +348,7 @@ try {
     Require 'legacy-control-fails-the-same-user-edit-preservation-assertion' $negative.required_assertion_failed
 } catch {$errorText=$_.Exception.Message}
 finally {
-    $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;helper_sha256=$context.HelperHash;user_sid=$ExpectedUserSid;actual_non_admin_token=$true;actual_x86_powershell=$true;registry_snapshot_format='Win32 DWORD type and exact RegQueryValueExW bytes';registry_write_api='NtSetValueKey with exact DataSize';scope='Real raw HKCU and shortcut transaction tests in a disposable standard-user profile; synthetic values and bytes, not product UI acceptance.';cases=@($cases.ToArray());raw_registry_roundtrips=@($rawRoundTrips.ToArray());legacy_writer_probe=$legacyWriter;negative_control=$negative;success=($null -eq $errorText -and @($cases|Where-Object {-not $_.passed}).Count -eq 0 -and $negative.required_assertion_failed);error=$errorText}
+    $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;helper_sha256=$context.HelperHash;user_sid=$ExpectedUserSid;actual_non_admin_token=$true;actual_x86_powershell=$true;registry_snapshot_format='Win32 DWORD type and exact RegQueryValueExW bytes';registry_write_api='NtSetValueKey with exact DataSize';scope='Real raw HKCU and shortcut transaction tests in a disposable standard-user profile; synthetic values and bytes, not product UI acceptance.';cases=@($cases.ToArray());raw_registry_roundtrips=@($rawRoundTrips.ToArray());helper_bootstrap=$helperBootstrap;legacy_writer_probe=$legacyWriter;negative_control=$negative;success=($null -eq $errorText -and @($cases|Where-Object {-not $_.passed}).Count -eq 0 -and $negative.required_assertion_failed);error=$errorText}
     $report|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $evidence 'integration-policy.json') -Encoding UTF8
 }
 if(-not $report.success){throw ('User integration policy regression failed: '+$errorText)}
