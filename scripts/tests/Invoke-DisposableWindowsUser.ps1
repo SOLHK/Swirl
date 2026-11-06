@@ -330,6 +330,18 @@ try {
         Add-FixtureAccessPlan $evidence 'Modify' $true
         Add-FixtureAccessPlan $targetScript 'ReadAndExecute' $false
         Add-FixtureAccessPlan $argumentPath 'Read' $false
+        # Cross-version inputs stay outside the child's writable evidence tree.
+        # Grant only these exact validated files, never the baseline directory.
+        foreach($inputName in @('CrossVersionInput','BaselineInstaller','BaselineAdmission')) {
+            $property=$argumentObject.PSObject.Properties[$inputName]
+            if($null -ne $property) {
+                $inputPath=[IO.Path]::GetFullPath([string]$property.Value)
+                Assert-SwirlPathWithoutLinks $inputPath
+                if(-not [IO.File]::Exists($inputPath) -or $inputPath.StartsWith($evidence.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)) {throw 'Baseline inputs must be exact read-only files outside the standard-user evidence tree.'}
+                $rights=if($inputName -ceq 'BaselineInstaller'){'ReadAndExecute'}else{'Read'}
+                Add-FixtureAccessPlan $inputPath $rights $false
+            }
+        }
         foreach($plan in $fileGrants){Grant-FixtureAccess $plan}
         $windowGrant=[SwirlDisposableUser.Native]::GrantWindowStation($userSid)
         $desktopGrant=[SwirlDisposableUser.Native]::GrantDesktop($userSid)

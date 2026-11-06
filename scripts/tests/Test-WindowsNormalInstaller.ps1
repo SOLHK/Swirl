@@ -7,9 +7,12 @@
     [string]$ExpectedUserSid,
     [string]$ExpectedNodeStoreHelperSha256,
     [object]$NodeStoreHelperEnvironment,
-    [ValidateSet('clean','restore','edits','upgrade')][string]$Scenario='clean',
+    [ValidateSet('clean','restore','edits','upgrade','cross-version')][string]$Scenario='clean',
     [bool]$NegativeControl=$false,
-    [string]$ProductVersion
+    [string]$ProductVersion,
+    [string]$CrossVersionInput,
+    [string]$BaselineInstaller,
+    [string]$BaselineAdmission
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
@@ -26,6 +29,54 @@ $manifest=Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8|ConvertFrom
 if($ExpectedSourceSha -notmatch '^[0-9a-f]{40}$' -or $manifest.source_sha -cne $ExpectedSourceSha -or $manifest.rust.source_sha -cne $ExpectedSourceSha){throw 'Normal installer package source mismatch.'}
 
 function Read-Json([string]$Path){return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}
+function Fixed-ProductVersion([string]$Path) {
+    # These numeric VERSIONINFO fields exist in Windows PowerShell 5.1's
+    # .NET Framework as well as the hosted PowerShell 7 parent.
+    $info=[Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    return '{0}.{1}.{2}.{3}' -f $info.ProductMajorPart,$info.ProductMinorPart,$info.ProductBuildPart,$info.ProductPrivatePart
+}
+$crossVersion=-not [string]::IsNullOrWhiteSpace($CrossVersionInput)
+if($crossVersion -or $BaselineInstaller -or $BaselineAdmission -or $Scenario -eq 'cross-version') {
+    if(-not $crossVersion -or -not $BaselineInstaller -or -not $BaselineAdmission -or $NegativeControl){throw 'Cross-version acceptance requires all three admitted baseline inputs and no negative-control substitution.'}
+    foreach($path in @($CrossVersionInput,$BaselineInstaller,$BaselineAdmission)){Assert-SwirlPathWithoutLinks $path}
+    $CrossVersionInput=(Resolve-Path -LiteralPath $CrossVersionInput).Path;$BaselineAdmission=(Resolve-Path -LiteralPath $BaselineAdmission).Path
+    $crossInput=Read-Json $CrossVersionInput;$admission=Read-Json $BaselineAdmission
+    $old=$crossInput.baseline;$oldSetup=(Resolve-Path -LiteralPath $BaselineInstaller).Path
+    if($crossInput.schema -ne 1 -or $crossInput.scope -cne 'optional-pr61-synthetic-cross-version-installer-acceptance' -or
+       $crossInput.repository -cne 'SOLHK/Swirl' -or $crossInput.pull_request -ne 61 -or
+       $crossInput.head_branch -cne 'work/node-probe-render-20261105' -or $crossInput.base_branch -cne 'test' -or
+       $crossInput.opt_in_label -cne 'qa-cross-version-upgrade' -or $crossInput.candidate_version -cne '0.2.40' -or $old.version -cne '0.2.39' -or
+       $admission.success -ne $true -or $admission.candidate_source_sha -cne $ExpectedSourceSha -or
+       $admission.input_sha256 -cne (Get-SwirlIntegrationHash $CrossVersionInput) -or
+       $admission.baseline_source_sha -cne $old.source_sha -or $admission.exe_sha256 -cne $old.exe_sha256 -or
+       $admission.run_id -ne $old.run_id -or $admission.artifact_id -ne $old.artifact_id -or $admission.persistence_sources_verified -ne $true -or
+       (Get-SwirlIntegrationHash $oldSetup) -cne $old.exe_sha256 -or (Get-Item -LiteralPath $oldSetup).Length -ne $old.exe_bytes -or
+       (Fixed-ProductVersion $oldSetup) -cne ($old.version+'.0')) {
+        throw 'Cross-version baseline admission, source, hash or version mismatch.'
+    }
+}
+function Profile-ProxyFingerprint {
+    # Only a fingerprint leaves the hosted parent profile; never publish any
+    # parent proxy URL or credential-bearing registry value.
+    $snapshot=[ordered]@{}
+    foreach($view in @([Microsoft.Win32.RegistryView]::Registry32,[Microsoft.Win32.RegistryView]::Registry64)) {
+        $hive=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,$view)
+        try {foreach($suffix in @('','\Connections')) {
+            $key=$hive.OpenSubKey(('Software\Microsoft\Windows\CurrentVersion\Internet Settings'+$suffix),$false)
+            try {
+                $values=[ordered]@{}
+                if($null -ne $key){foreach($name in @($key.GetValueNames()|Sort-Object)) {
+                    if($suffix -or $name -in @('ProxyEnable','ProxyServer','ProxyOverride','AutoConfigURL','AutoDetect')) {
+                        $values[$name]=[ordered]@{kind=$key.GetValueKind($name).ToString();value=$key.GetValue($name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)}
+                    }
+                }}
+                $snapshot[($view.ToString()+$suffix)]=$values
+            }finally{if($null -ne $key){$key.Dispose()}}
+        }}finally{$hive.Dispose()}
+    }
+    $hash=[Security.Cryptography.SHA256]::Create()
+    try{return -join ($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes(($snapshot|ConvertTo-Json -Depth 8 -Compress)))|ForEach-Object {$_.ToString('x2')})}finally{$hash.Dispose()}
+}
 function Snapshot-Integration([object]$Context) {
     $states=[ordered]@{}
     foreach($id in @($Context.Targets.Keys|Sort-Object)){$states[$id]=Get-SwirlIntegrationState $Context $id}
@@ -63,7 +114,7 @@ if(-not $ExpectedUserSid) {
     function Invoke-NormalCase([string]$Name,[string]$CaseInstaller,[string]$CaseScenario,[bool]$IsNegative,[string]$CaseEvidence) {
         [IO.Directory]::CreateDirectory($CaseEvidence)|Out-Null
         $caseHelper=$helper;$helperRuntime=$null
-        if($CaseScenario -eq 'upgrade' -and -not $IsNegative) {
+        if($CaseScenario -in @('upgrade','cross-version') -and -not $IsNegative) {
             # Evidence already receives the disposable SID's scoped ACL. Keep
             # the helper/runtime outside the product and usable after uninstall.
             $helperRuntime=Join-Path $CaseEvidence 'qa-node-store-runtime'
@@ -89,7 +140,9 @@ if(-not $ExpectedUserSid) {
         # profile environment. Forward only these already-verified host values,
         # not the runner's full environment or its credentials/profile paths.
         $helperEnvironment=@{GITHUB_ACTIONS=$env:GITHUB_ACTIONS;RUNNER_ENVIRONMENT=$env:RUNNER_ENVIRONMENT;SWIRL_DISPOSABLE_INSTALL_TEST=$env:SWIRL_DISPOSABLE_INSTALL_TEST}
-        @{Installer=$CaseInstaller;PackageDirectory=$package;ExpectedSourceSha=$source;EvidenceDirectory=$CaseEvidence;Scenario=$CaseScenario;NegativeControl=$IsNegative;ProductVersion=$version;NodeStoreHelper=$caseHelper;ExpectedNodeStoreHelperSha256=$helperHash;NodeStoreHelperEnvironment=$helperEnvironment}|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $argumentsPath -Encoding UTF8
+        $childArguments=@{Installer=$CaseInstaller;PackageDirectory=$package;ExpectedSourceSha=$source;EvidenceDirectory=$CaseEvidence;Scenario=$CaseScenario;NegativeControl=$IsNegative;ProductVersion=$version;NodeStoreHelper=$caseHelper;ExpectedNodeStoreHelperSha256=$helperHash;NodeStoreHelperEnvironment=$helperEnvironment}
+        if($CaseScenario -eq 'cross-version'){$childArguments.CrossVersionInput=$CrossVersionInput;$childArguments.BaselineInstaller=$oldSetup;$childArguments.BaselineAdmission=$BaselineAdmission}
+        $childArguments|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $argumentsPath -Encoding UTF8
         try {
             & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argumentsPath -EvidenceDirectory $CaseEvidence -TimeoutSeconds 600
         } finally {
@@ -99,6 +152,36 @@ if(-not $ExpectedUserSid) {
         $runner=Read-Json (Join-Path $CaseEvidence 'standard-user-runner.json')
         if(-not $case.success -or -not $runner.success -or $runner.forced_termination -or $runner.token.Administrator -or $runner.token.Elevated -or $runner.token.IntegritySid -cne 'S-1-16-8192'){throw ('Normal installer case failed: '+$Name)}
         $runs.Add([ordered]@{name=$Name;case=$case;standard_user=$runner;directory=$CaseEvidence})
+    }
+    if($crossVersion) {
+        $parentProxyBefore=Profile-ProxyFingerprint
+        try {
+            if($version -cne $crossInput.candidate_version){throw 'Cross-version candidate version differs from the explicit QA input.'}
+            foreach($entry in $crossInput.identical_persistence_sources.PSObject.Properties) {
+                foreach($revision in @($source,$old.source_sha)) {
+                    $blob=(& git -C $repo rev-parse ($revision+':'+$entry.Name)).Trim()
+                    if($LASTEXITCODE -ne 0 -or $blob -cne $entry.Value){throw 'Cross-version persistence sources are not the explicitly identical reviewed blobs.'}
+                }
+            }
+            Invoke-NormalCase 'actual-0239-to-0240-synthetic-configuration-upgrade' $setup 'cross-version' $false $evidence
+        }catch{$failure=$_.Exception.Message}
+        finally {
+            $casePath=Join-Path $evidence 'case.json';$runnerPath=Join-Path $evidence 'standard-user-runner.json'
+            $case=if(Test-Path -LiteralPath $casePath){Read-Json $casePath}else{$null}
+            $runner=if(Test-Path -LiteralPath $runnerPath){Read-Json $runnerPath}else{$null}
+            $parentUnchanged=(Snapshot-Integration $parentContext) -ceq $parentBefore
+            $parentProxyUnchanged=(Profile-ProxyFingerprint) -ceq $parentProxyBefore
+            $candidateUnchanged=(Get-SwirlIntegrationHash $setup) -ceq $installerHash
+            $baselineUnchanged=(Get-SwirlIntegrationHash $oldSetup) -ceq $old.exe_sha256
+            $complete=$null -ne $case -and $null -ne $runner -and $case.success -and $runner.success -and -not $runner.forced_termination -and
+                $runner.remaining_job_processes -eq 0 -and $runner.account_removed -and $runner.profile_removed -and $runner.input_acls_restored -and
+                $case.cross_version_upgrade.verified -and $case.dpapi_store_preservation.stages.Count -eq 5
+            $summary=[ordered]@{schema=1;scope='actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data';source_sha=$source;candidate_version=$version;installer_sha256=$installerHash;baseline=$old;baseline_admission=$admission;identical_persistence_sources=$crossInput.identical_persistence_sources;fixture_writer='Current separately paired QA helper using identical production NodeStore sources; not the historical application writer.';original_private_profile_tested=$false;provider_requests=0;case=$case;standard_user=$runner;host_user_integration_unchanged=$parentUnchanged;host_system_proxy_unchanged=$parentProxyUnchanged;candidate_installer_unchanged=$candidateUnchanged;baseline_installer_unchanged=$baselineUnchanged;success=($null -eq $failure -and $complete -and $parentUnchanged -and $parentProxyUnchanged -and $candidateUnchanged -and $baselineUnchanged);error=$failure}
+            $summary|ConvertTo-Json -Depth 22|Set-Content -LiteralPath (Join-Path $evidence 'cross-version.json') -Encoding UTF8
+        }
+        if(-not $summary.success){throw ('Cross-version installer acceptance failed: '+$failure)}
+        Write-Host 'Actual 0.2.39 to 0.2.40 installers preserved current-helper synthetic V1 data in one standard-user profile; original private profiles were not tested.'
+        return
     }
     try {
         Invoke-NormalCase 'candidate-clean-runtime-and-retry' $setup 'clean' $false $evidence
@@ -168,7 +251,11 @@ $checks=New-Object 'System.Collections.Generic.List[object]'
 $processes=New-Object 'System.Collections.Generic.List[object]'
 $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;installer_sha256=(Get-SwirlIntegrationHash $setup);scenario=$Scenario;negative=$NegativeControl;user_sid=$ExpectedUserSid;normal_user_installation=$true;non_admin_token_verified=$true;install_arguments='/S';isolated=$false;install_directory=$target;installed_files=0;installed_exe_sha256=$null;installed_rust_dll_sha256=$null;installed_manifest_sha256=$null;rust_roundtrips_verified=$false;tls_runtime_verified=$false;normal_ui_no_test_arguments=$false;normal_ui_closed_normally=$false;normal_ui_inherited_standard_user_profile=$false;normal_qml_cache_identity='NOT_REPORTED_BY_NORMAL_APPLICATION';smoke_cache_identity=$null;ui_test_hooks_disabled=$false;installed_ui_pages=0;integration_restored_or_user_edits_preserved=$false;user_data_preserved=$false;install_directory_removed=$false;retry_after_restore_failure=$false;forced_termination=$false;processes=$processes;checks=$checks;negative_control=@{required_assertion_failed=$false;assertion='original-integration-and-later-user-edits-preserved';observed_pass=$null};success=$false;error=$null}
 $storeStages=New-Object 'System.Collections.Generic.List[object]'
-$report.dpapi_store_preservation=[ordered]@{requested=($Scenario -eq 'upgrade');scope='same-package-reinstall-synthetic-v1-node-store';previous_release_migration=$false;helper_sha256=$ExpectedNodeStoreHelperSha256;rust_build_id=$manifest.rust.build_id;parent_host_scope_forwarded=$false;existing_store_create_refused=$false;verified=$false;stages=$storeStages}
+$report.dpapi_store_preservation=[ordered]@{requested=($Scenario -in @('upgrade','cross-version'));scope='same-package-reinstall-synthetic-v1-node-store';previous_release_migration=$false;helper_sha256=$ExpectedNodeStoreHelperSha256;rust_build_id=$manifest.rust.build_id;parent_host_scope_forwarded=$false;existing_store_create_refused=$false;verified=$false;stages=$storeStages}
+if($crossVersion){
+    $report.cross_version_upgrade=[ordered]@{scope='actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data';baseline_source_sha=$old.source_sha;baseline_version=$old.version;baseline_installer_sha256=$old.exe_sha256;candidate_source_sha=$ExpectedSourceSha;candidate_version=$ProductVersion;candidate_installer_sha256=$report.installer_sha256;current_helper_is_fixture_writer=$true;historical_application_writer_verified=$false;identical_persistence_sources=$crossInput.identical_persistence_sources;old_installed_manifest_sha256=$null;old_application_sha256=$null;old_rust_build_id=$null;old_normal_ui_closed_normally=$false;new_normal_ui_closed_normally=$false;system_proxy_settings_unchanged=$false;verified=$false}
+    $profileProxyBefore=Profile-ProxyFingerprint
+}
 $nodeStorePath=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SOLHK/Swirl/nodes.dpapi'
 $storeBaseline=$null
 
@@ -250,17 +337,17 @@ function Invoke-NodeStoreFixture([string]$Stage,[string]$Operation='verify',[int
     }
     return $receipt
 }
-function Assert-Payload([string[]]$Extra=@()) {
+function Assert-Payload([string[]]$Extra=@(),[object]$ExpectedManifest=$manifest,[string]$ExpectedManifestPath=$manifestPath) {
     $known=@('package-manifest.json','.swirl-install-owned','卸载 Swirl.exe')+$Extra
     if(-not $NegativeControl){$known+=@('.swirl-user-integration.json')}
-    $expected=@($manifest.files|ForEach-Object {[string]$_.path})+$known
+    $expected=@($ExpectedManifest.files|ForEach-Object {[string]$_.path})+$known
     $dirs=New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach($name in $expected){$p=$name;while($p.LastIndexOf('/') -gt 0){$p=$p.Substring(0,$p.LastIndexOf('/'));$null=$dirs.Add($p)}}
     $inventory=@(Get-ChildItem -LiteralPath $target -Recurse -Force|ForEach-Object {Assert-SwirlPathWithoutLinks $_.FullName;$(if($_.PSIsContainer){'directory:'}else{'file:'})+$_.FullName.Substring($target.Length+1).Replace('\','/')})
     $wanted=@($expected|ForEach-Object {'file:'+$_})+@($dirs|ForEach-Object {'directory:'+$_})
     if(@(Compare-Object ($wanted|Sort-Object) ($inventory|Sort-Object)).Count){throw 'Actual normal installation file/directory inventory differs from ownership.'}
-    foreach($entry in $manifest.files){if((Get-SwirlIntegrationHash (Join-Path $target $entry.path)) -ine $entry.sha256){throw ('Installed payload hash mismatch: '+$entry.path)}}
-    if((Get-SwirlIntegrationHash (Join-Path $target 'package-manifest.json')) -cne (Get-SwirlIntegrationHash $manifestPath)){throw 'Installed manifest differs from candidate payload.'}
+    foreach($entry in $ExpectedManifest.files){if((Get-SwirlIntegrationHash (Join-Path $target $entry.path)) -ine $entry.sha256){throw ('Installed payload hash mismatch: '+$entry.path)}}
+    if((Get-SwirlIntegrationHash (Join-Path $target 'package-manifest.json')) -cne (Get-SwirlIntegrationHash $ExpectedManifestPath)){throw 'Installed manifest differs from the expected payload.'}
     Require 'no-isolated-install-marker' (-not [IO.File]::Exists((Join-Path $target '.swirl-isolated-install')))
 }
 function Save-Shortcut([string]$Path,[string]$Description) {
@@ -293,8 +380,50 @@ try {
         $hive=Open-SwirlIntegrationHive;try{$key=$hive.CreateSubKey('Software\Swirl\UserOwned');try{$key.SetValue('Preserve',[long]9223372036854775806,[Microsoft.Win32.RegistryValueKind]::QWord)}finally{$key.Dispose()}}finally{$hive.Dispose()}
         $original=Capture-States
     }
+    $crossVersionExtras=@()
+    if($crossVersion) {
+        Require 'cross-version-child-has-the-explicit-scenario' ($Scenario -ceq 'cross-version' -and $ProductVersion -ceq $crossInput.candidate_version)
+        Run-Process 'baseline-install-0239' $oldSetup '/S' 120
+        $oldManifestPath=Join-Path $target 'package-manifest.json'
+        Require 'baseline-installed-manifest-matches-reviewed-old-package' ((Get-SwirlIntegrationHash $oldManifestPath) -ceq $old.package_manifest_sha256)
+        $oldManifest=Read-Json $oldManifestPath
+        Require 'baseline-installed-source-and-rust-build-match' ($oldManifest.source_sha -ceq $old.source_sha -and $oldManifest.rust.source_sha -ceq $old.source_sha -and $oldManifest.rust.build_id -ceq $old.rust_build_id)
+        Assert-Payload -ExpectedManifest $oldManifest -ExpectedManifestPath $oldManifestPath
+        $exe=Join-Path $target 'Swirl.exe'
+        Require 'actual-old-application-version-and-hash-match' ((Get-SwirlIntegrationHash $exe) -ceq $old.application_sha256 -and (Fixed-ProductVersion $exe) -ceq ($old.version+'.0'))
+        Require 'actual-old-version-is-registered' (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'display-version') (New-SwirlRegistryValueState 'String' ($old.version+'.0')))
+        $report.cross_version_upgrade.old_installed_manifest_sha256=Get-SwirlIntegrationHash $oldManifestPath
+        $report.cross_version_upgrade.old_application_sha256=Get-SwirlIntegrationHash $exe
+        $report.cross_version_upgrade.old_rust_build_id=$oldManifest.rust.build_id
+        # Seed an offline oracle only after installing the actual old package.
+        # The helper stays paired to the current source, outside both payloads.
+        Require 'old-profile-starts-with-no-node-store-or-sidecar' (-not (Test-Path -LiteralPath $nodeStorePath) -and -not (Test-Path -LiteralPath ($nodeStorePath+'.selected')))
+        $storeBaseline=Invoke-NodeStoreFixture 'create' 'create'
+        $null=Invoke-NodeStoreFixture 'create-existing-refused' 'create' 2
+        Require 'cross-version-refused-create-preserves-both-files' ((Get-SwirlIntegrationHash $nodeStorePath) -ceq $storeBaseline.ciphertext_sha256 -and (Get-SwirlIntegrationHash ($nodeStorePath+'.selected')) -ceq $storeBaseline.selection_sha256)
+        $report.dpapi_store_preservation.existing_store_create_refused=$true
+        $null=Invoke-NodeStoreFixture 'before-old-start'
+        $env:PATH=$target+';'+$env:WINDIR+'\System32;'+$env:WINDIR
+        Invoke-NormalUi 'baseline-0239-normal-ui'
+        $report.cross_version_upgrade.old_normal_ui_closed_normally=$report.normal_ui_closed_normally
+        $null=Invoke-NodeStoreFixture 'after-old-close'
+        $report.normal_ui_no_test_arguments=$false;$report.normal_ui_closed_normally=$false;$report.normal_ui_inherited_standard_user_profile=$false
+        Save-Shortcut $context.Targets['desktop'].path '用户安装后编辑的快捷方式'
+        Set-SwirlIntegrationState $context 'publisher' (New-SwirlRegistryValueState 'ExpandString' '%LOCALAPPDATA%\用户安装后修改')
+        Set-SwirlIntegrationState $context 'no-repair' ([ordered]@{exists=$false})
+        foreach($id in @('desktop','publisher','no-repair')){$original[$id]=Get-SwirlIntegrationState $context $id}
+        [IO.File]::WriteAllText((Join-Path $target 'user-notes.txt'),'Synthetic user-owned installation file')
+        [IO.Directory]::CreateDirectory((Join-Path $target 'data'))|Out-Null
+        [IO.File]::WriteAllText((Join-Path $target 'data/user-store.dpapi'),'Synthetic bytes only; no private credential')
+        $crossVersionExtras=@('user-notes.txt','data/user-store.dpapi')
+    }
     Run-Process 'install' $setup '/S' 120
-    Assert-Payload
+    Assert-Payload $crossVersionExtras
+    if($crossVersion) {
+        Require 'actual-new-version-is-registered' (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'display-version') (New-SwirlRegistryValueState 'String' ($ProductVersion+'.0')))
+        Require 'cross-version-upgrade-preserves-later-integration-edits' ((Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'desktop') $original['desktop']) -and (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'publisher') $original['publisher']) -and -not (Get-SwirlIntegrationState $context 'no-repair').exists)
+        $null=Invoke-NodeStoreFixture 'after-cross-version-install'
+    }
     $report.installed_files=@($manifest.files).Count
     $report.installed_exe_sha256=Get-SwirlIntegrationHash (Join-Path $target 'Swirl.exe')
     $report.installed_rust_dll_sha256=Get-SwirlIntegrationHash (Join-Path $target 'swirl_api.dll')
@@ -312,7 +441,12 @@ try {
     if($NegativeControl){$report.negative_control.legacy_uninstall_command_canonical_raw=$canonicalUninstall}
     else{Require 'candidate-uninstall-command-has-exact-canonical-raw-unicode-bytes' $canonicalUninstall}
     $shell=New-Object -ComObject WScript.Shell
-    try{foreach($id in @('desktop','start-menu')){$link=$shell.CreateShortcut($context.Targets[$id].path);try{
+    try{foreach($id in @('desktop','start-menu')){
+        if($crossVersion -and $id -ceq 'desktop') {
+            Require 'cross-version-keeps-the-exact-user-edited-shortcut' (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context $id) $original[$id])
+            continue
+        }
+        $link=$shell.CreateShortcut($context.Targets[$id].path);try{
         $location=[string]$link.IconLocation;$comma=$location.LastIndexOf(',')
         Require ('shortcut-icon-index-'+$id) ($comma -gt 0 -and $location.Substring($comma+1).Trim() -ceq '0')
         Require ('shortcut-target-and-icon-'+$id) ([IO.Path]::GetFullPath([string]$link.TargetPath) -ieq [IO.Path]::GetFullPath((Join-Path $target 'Swirl.exe')) -and [IO.Path]::GetFullPath($location.Substring(0,$comma).Trim('"')) -ieq [IO.Path]::GetFullPath((Join-Path $target 'Swirl-brand-0217-optical.ico')))
@@ -330,6 +464,11 @@ try {
     $report.tls_runtime_verified=$true
     $diagnostics=Join-Path $target 'Swirl-diagnostics.txt'
     if([IO.File]::Exists($diagnostics)){[IO.File]::Delete($diagnostics)}
+    if($crossVersion) {
+        Invoke-NormalUi 'candidate-0240-normal-ui'
+        $report.cross_version_upgrade.new_normal_ui_closed_normally=$report.normal_ui_closed_normally
+        $null=Invoke-NodeStoreFixture 'after-new-normal-close'
+    }
     if($Scenario -eq 'clean') {
         Run-Process 'production-ui-test-hooks-disabled' $exe '--policy-self-test' 30 4
         $report.ui_test_hooks_disabled=$true
@@ -353,7 +492,7 @@ try {
     $userData=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SOLHK/Swirl/installer-user-sentinel.txt'
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($userData))|Out-Null
     [IO.File]::WriteAllText($userData,'Synthetic normal-user data that uninstall must preserve.');$dataHash=Get-SwirlIntegrationHash $userData
-    $extras=@()
+    $extras=$crossVersionExtras
     if($Scenario -in @('edits','upgrade')) {
         Save-Shortcut $context.Targets['desktop'].path '用户安装后编辑的快捷方式'
         Set-SwirlIntegrationState $context 'publisher' (New-SwirlRegistryValueState 'ExpandString' '%LOCALAPPDATA%\用户安装后修改')
@@ -406,6 +545,14 @@ try {
         $null=Invoke-NodeStoreFixture 'after-uninstall'
         Require 'all-four-same-package-dpapi-preservation-phases-ran' ($storeStages.Count -eq 4 -and $report.normal_ui_no_test_arguments -and $report.normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile)
         $report.dpapi_store_preservation.verified=$true
+    }
+    if($crossVersion) {
+        $null=Invoke-NodeStoreFixture 'after-uninstall'
+        Require 'all-five-cross-version-offline-preservation-phases-ran' ($storeStages.Count -eq 5 -and $report.cross_version_upgrade.old_normal_ui_closed_normally -and $report.cross_version_upgrade.new_normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile)
+        $report.cross_version_upgrade.system_proxy_settings_unchanged=(Profile-ProxyFingerprint) -ceq $profileProxyBefore
+        Require 'ordinary-standard-user-proxy-settings-unchanged-after-upgrade-and-uninstall' $report.cross_version_upgrade.system_proxy_settings_unchanged
+        $report.dpapi_store_preservation.verified=$true
+        $report.cross_version_upgrade.verified=$true
     }
     $report.user_data_preserved=$true
     $report.success=-not $report.forced_termination
