@@ -70,8 +70,13 @@ unresolved reservations and the attempt count.
 
 The parent retains its own loopback fixture and accepts no arbitrary endpoint,
 subscription URL, credential or real-node configuration. The sole pre-reservation
-child is a bounded, contained `--build-info` query of the mandatory-guard worker;
-that entry has no networking dispatcher. Before a workload child starts, the
+child is a bounded, contained `--build-info` query of the mandatory-guard worker.
+Before even that query, the caller must provide the designated trusted QA
+build's SHA256 through `--worker-sha256`; missing, malformed or mismatched
+digests reject without starting any executable. Hashing an arbitrary path and
+then trusting its own metadata is not sufficient. CI derives the expected hash
+only after explicitly building the known QA target. This known worker's
+identity entry has no networking dispatcher. Before a workload child starts, the
 parent verifies source identity/file hash and commits the entire reservation
 and grant digest. Private pipes carry one grant, a matching guard-installation
 acknowledgement and a separate start message. An HMAC response authenticates the
@@ -114,6 +119,13 @@ has real Job child-limit and parent-crash cases. A local Linux run on the
 `e17c9a7b` checkout plus this patch passed 18/20 tests; the two Windows cases
 were explicitly skipped. This is not clean-commit Windows acceptance; the new
 source must pass its own CI.
+
+A subsequent pre-query admission correction on `5f5b2b09` plus its patch passed
+seven focused Linux tests: four digest/factory refusal cases, the actual native
+Core 204 positive control, argument redaction and early live refusal. The
+positive control used the previously recorded trusted worker digest, not a hash
+learned from executing the candidate. Windows and all-platform full suites are
+required on the resulting commit.
 
 Supervisor and legacy Qt `--live` both refuse before private paths, ledger
 creation or networking. Authenticated billing, full wire coverage and Qt

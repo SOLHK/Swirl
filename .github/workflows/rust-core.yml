@@ -56,7 +56,13 @@ jobs:
           cargo build --locked -p swirl-api --features private-acceptance-worker --bin swirl-private-worker
           cargo clippy --locked -p swirl-api --features private-acceptance-worker --all-targets -- -D warnings
           cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
-          python ../tools/tests/test_private_subscription_supervisor.py --evidence "${{ runner.temp }}/swirl-private-supervisor"
+          python - <<'PY'
+          import hashlib, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = hashlib.sha256(worker.read_bytes()).hexdigest()
+          raise SystemExit(subprocess.call([sys.executable, '../tools/tests/test_private_subscription_supervisor.py', '--evidence', '${{ runner.temp }}/swirl-private-supervisor'], env=process_env))
+          PY
       - name: Preserve supervised private-loopback evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -442,6 +448,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SWIRL_PRIVATE_EXPECTED_WORKER_SHA256=(Get-FileHash -LiteralPath $env:SWIRL_PRIVATE_WORKER -Algorithm SHA256).Hash.ToLowerInvariant()
           python ../tools/tests/test_private_subscription_supervisor.py --evidence "$env:RUNNER_TEMP/swirl-private-supervisor"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve Windows supervised private-loopback evidence

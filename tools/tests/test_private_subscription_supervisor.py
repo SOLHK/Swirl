@@ -122,6 +122,7 @@ class SyntheticLedgerTests(unittest.TestCase):
         with mock.patch.object(supervisor.WorkerIdentity, "inspect", side_effect=AssertionError("metadata spawned")), \
              contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
             result = supervisor.main(["--state-dir", str(self.path), "--worker", "PRIVATE_MARKER",
+                                      "--worker-sha256", "0" * 64,
                                       "--expected-source", "0" * 40, "--workload", "PRIVATE_MARKER"])
         self.assertEqual(result, 2)
         self.assertFalse(self.path.exists())
@@ -157,6 +158,43 @@ class OwnedProcessTests(unittest.TestCase):
             self.assertEqual(proof.record()["backend"], "windows-single-process-job")
 
 
+class WorkerIdentityAdmissionTests(unittest.TestCase):
+    def test_missing_expected_digest_never_reads_or_spawns(self):
+        with mock.patch.object(supervisor.WorkerIdentity, "_hash", side_effect=AssertionError("untrusted file read")), \
+             mock.patch.object(supervisor, "OwnedProcess", side_effect=AssertionError("untrusted executable started")) as spawn:
+            for missing in (None, "", "PRIVATE_MARKER", "0" * 63, True):
+                with self.subTest(value_type=type(missing).__name__), \
+                     self.assertRaisesRegex(budget.BudgetError, "ExpectedWorkerSha256Required"):
+                    supervisor.WorkerIdentity.inspect(Path(sys.executable), "1" * 40, missing)
+            spawn.assert_not_called()
+
+    def test_wrong_expected_digest_never_starts_unknown_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            unknown = Path(temporary).resolve() / "Swirl.exe"
+            unknown.write_bytes(b"Unknown executable must not self-attest through --build-info")
+            with mock.patch.object(supervisor, "OwnedProcess", side_effect=AssertionError("untrusted executable started")) as spawn:
+                with self.assertRaisesRegex(budget.BudgetError, "WorkerDigestMismatch"):
+                    supervisor.WorkerIdentity.inspect(unknown, "1" * 40, "0" * 64)
+                spawn.assert_not_called()
+
+    def test_missing_cli_digest_fails_before_inspection_or_directory_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary).resolve() / "not-created"
+            output = io.StringIO()
+            with mock.patch.object(supervisor.WorkerIdentity, "inspect", side_effect=AssertionError("metadata attempted")) as inspect, \
+                 contextlib.redirect_stdout(output):
+                result = supervisor.main(["--worker", "PRIVATE_MARKER", "--state-dir", str(state),
+                                          "--expected-source", "1" * 40, "--workload", "core_probe"])
+            inspect.assert_not_called()
+            self.assertEqual(result, 2)
+            self.assertFalse(state.exists())
+            self.assertEqual(json.loads(output.getvalue()), {"error": "SupervisorArgumentsRejected", "liveReady": False})
+
+    def test_identity_factory_cannot_be_bypassed_by_direct_construction(self):
+        with self.assertRaisesRegex(budget.BudgetError, "WorkerIdentityFactoryRequired"):
+            supervisor.WorkerIdentity(Path(sys.executable), {}, "1" * 64)
+
+
 class RealWorkerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -165,7 +203,8 @@ class RealWorkerTests(unittest.TestCase):
         if not executable:
             raise unittest.SkipTest("SWIRL_PRIVATE_WORKER not supplied; no Rust e2e claimed")
         expected = os.environ.get("SWIRL_PRIVATE_EXPECTED_SOURCE")
-        IDENTITY = cls.identity = supervisor.WorkerIdentity.inspect(executable, expected)
+        expected_digest = os.environ.get("SWIRL_PRIVATE_EXPECTED_WORKER_SHA256")
+        IDENTITY = cls.identity = supervisor.WorkerIdentity.inspect(executable, expected, expected_digest)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -328,12 +367,12 @@ class RealWorkerTests(unittest.TestCase):
         code = ("import sys\nsys.path.insert(0,sys.argv[1])\n"
                 "from PrivateSubscriptionBudget import Ledger\n"
                 "from PrivateSubscriptionSupervisor import WorkerIdentity,Supervisor\n"
-                "identity=WorkerIdentity.inspect(sys.argv[2],sys.argv[3])\n"
+                "identity=WorkerIdentity.inspect(sys.argv[2],sys.argv[3],sys.argv[5])\n"
                 "with Ledger(sys.argv[4]) as ledger:\n"
                 " ledger.initialize_synthetic()\n"
                 " Supervisor(ledger,identity).run('stall_runtime_after_connect',timeout_ms=8000)\n")
         outer = subprocess.Popen([sys.executable, "-c", code, str(TOOLS), str(self.identity.path),
-                                  self.identity.metadata["source_sha"], str(self.path)],
+                                  self.identity.metadata["source_sha"], str(self.path), self.identity.sha256],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         handle = None
         try:

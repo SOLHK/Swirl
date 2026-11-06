@@ -33,6 +33,7 @@ from PrivateSubscriptionProcess import OwnedProcess
 MAX_LINE = 16384
 WORKER_ROLE = "swirl_private_worker"
 GUARD_MODE = "mandatory_before_grant"
+_IDENTITY_ISSUER = object()
 OUTCOMES = {"quota_stopped": "QuotaStopped", "deadline_expired": "DeadlineExpired",
             "cancelled": "Cancelled", "fixture_rejected": "FixtureRejected",
             "fixture_closed": "FixtureClosed", "core_probe_succeeded": "CoreProbeSucceeded",
@@ -165,9 +166,30 @@ class _Frames:
 
 
 class WorkerIdentity:
-    """Hash and mandatory-guard identity of one inspected QA executable."""
-    def __init__(self, path, metadata, sha256):
-        self.path, self.metadata, self.sha256 = path, metadata, sha256
+    """Identity admitted by a trusted QA build digest before any execution.
+
+    The expected digest must come from the designated QA build receipt. Merely
+    hashing an arbitrary --worker path cannot establish a safe metadata entry.
+    """
+    __slots__ = ("_path", "_metadata", "_sha256", "_issuer")
+
+    def __init__(self, path, metadata, sha256, *, _issuer=None):
+        if _issuer is not _IDENTITY_ISSUER:
+            raise BudgetError("WorkerIdentityFactoryRequired")
+        self._path, self._metadata, self._sha256 = path, metadata.copy(), sha256
+        self._issuer = _issuer
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def metadata(self):
+        return self._metadata.copy()
+
+    @property
+    def sha256(self):
+        return self._sha256
 
     @staticmethod
     def _hash(path):
@@ -197,13 +219,19 @@ class WorkerIdentity:
             raise BudgetError("WorkerExecutableRejected") from None
 
     @classmethod
-    def inspect(cls, path, expected_source):
+    def inspect(cls, path, expected_source, expected_worker_sha256=None):
         if not isinstance(expected_source, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_source):
             raise BudgetError("ExpectedSourceRequired")
+        if not isinstance(expected_worker_sha256, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_worker_sha256):
+            raise BudgetError("ExpectedWorkerSha256Required")
+        expected_worker_sha256 = expected_worker_sha256.lower()
         path = Path(path)
         checksum = cls._hash(path)
-        # Read-only identity is the sole pre-reservation process. It uses the
-        # same OS containment/deadline and cannot enter a networking dispatcher.
+        if not hmac.compare_digest(checksum, expected_worker_sha256):
+            raise BudgetError("WorkerDigestMismatch")
+        # Only the externally pinned QA executable may use this read-only,
+        # pre-reservation entry. An unknown program's --build-info cannot prove
+        # its own startup is network-free. OS containment still applies here.
         with OwnedProcess([str(path), "--build-info"], deadline=time.monotonic() + 2,
                           environment=_environment()) as child:
             frames = _Frames(child)
@@ -225,9 +253,11 @@ class WorkerIdentity:
             raise BudgetError("WorkerIdentityMismatch")
         if cls._hash(path) != checksum:
             raise BudgetError("WorkerExecutableChanged")
-        return cls(path, metadata, checksum)
+        return cls(path, metadata, expected_worker_sha256, _issuer=_IDENTITY_ISSUER)
 
     def recheck(self):
+        if self._issuer is not _IDENTITY_ISSUER:
+            raise BudgetError("WorkerIdentityFactoryRequired")
         if self._hash(self.path) != self.sha256:
             raise BudgetError("WorkerExecutableChanged")
 
@@ -462,7 +492,7 @@ def _check_envelope(value, envelope, identity, op):
 class Supervisor:
     def __init__(self, ledger, identity):
         ledger.require_synthetic()
-        if not isinstance(identity, WorkerIdentity):
+        if not isinstance(identity, WorkerIdentity) or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
             raise BudgetError("WorkerIdentityRequired")
         self.ledger, self.identity = ledger, identity
 
@@ -631,6 +661,8 @@ def main(argv=None):
     parser = _PrivateArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--worker", type=Path, required=True)
+    parser.add_argument("--worker-sha256", required=True,
+                        help="SHA256 from the designated trusted QA-worker build receipt")
     parser.add_argument("--expected-source", required=True)
     parser.add_argument("--workload", choices=sorted(SUPERVISED_WORKLOADS), required=True)
     parser.add_argument("--node", type=int, default=1)
@@ -638,7 +670,7 @@ def main(argv=None):
     parser.add_argument("--timeout-ms", type=int, default=2000)
     try:
         args = parser.parse_args(argv)
-        identity = WorkerIdentity.inspect(args.worker, args.expected_source)
+        identity = WorkerIdentity.inspect(args.worker, args.expected_source, args.worker_sha256)
         with Ledger(args.state_dir) as ledger:
             if ledger.data is None:
                 ledger.initialize_synthetic()
