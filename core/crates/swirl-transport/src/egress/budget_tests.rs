@@ -5,6 +5,10 @@ use tokio::{
     time::{Duration, timeout},
 };
 
+fn quota(bytes: u64, connections: u32) -> Arc<TcpQuota> {
+    Arc::new(TcpQuota::new(bytes, connections, MAX_TIMEOUT_MS).unwrap())
+}
+
 async fn connection(guard: &Arc<TcpQuota>) -> (TcpConnection, TcpStream) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -21,7 +25,7 @@ async fn connection(guard: &Arc<TcpQuota>) -> (TcpConnection, TcpStream) {
 
 #[tokio::test]
 async fn writes_are_clipped_before_tcp_and_idle_peers_are_closed_at_limit() {
-    let guard = Arc::new(TcpQuota::new(31, 2).unwrap());
+    let guard = quota(31, 2);
     let (mut client, mut peer) = connection(&guard).await;
     let (_idle, mut idle_peer) = connection(&guard).await;
     assert_eq!(client.write(&[7; 4096]).await.unwrap(), 31);
@@ -55,7 +59,7 @@ async fn writes_are_clipped_before_tcp_and_idle_peers_are_closed_at_limit() {
 
 #[tokio::test]
 async fn download_limit_includes_bytes_before_protocol_parsing() {
-    let guard = Arc::new(TcpQuota::new(29, 1).unwrap());
+    let guard = quota(29, 1);
     let (mut client, mut peer) = connection(&guard).await;
     peer.write_all(&[9; 1024]).await.unwrap();
     let mut buffer = [0; 1024];
@@ -71,7 +75,7 @@ async fn download_limit_includes_bytes_before_protocol_parsing() {
 
 #[tokio::test]
 async fn nonblocking_read_shares_the_async_write_allowance() {
-    let guard = Arc::new(TcpQuota::new(5, 1).unwrap());
+    let guard = quota(5, 1);
     let (mut client, mut peer) = connection(&guard).await;
     client.write_all(&[1; 3]).await.unwrap();
     peer.write_all(&[2; 16]).await.unwrap();
@@ -94,7 +98,7 @@ async fn nonblocking_read_shares_the_async_write_allowance() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn concurrent_connections_share_one_combined_allowance() {
-    let guard = Arc::new(TcpQuota::new(257, 3).unwrap());
+    let guard = quota(257, 3);
     let mut peers = Vec::new();
     let mut clients = Vec::new();
     for _ in 0..3 {
@@ -131,7 +135,7 @@ async fn concurrent_connections_share_one_combined_allowance() {
 
 #[tokio::test]
 async fn cancellation_shuts_idle_socket_without_another_client_poll() {
-    let guard = Arc::new(TcpQuota::new(4096, 1).unwrap());
+    let guard = quota(4096, 1);
     let (_client, mut peer) = connection(&guard).await;
     guard.cancel();
     guard.cancel();
@@ -158,7 +162,7 @@ async fn cancellation_shuts_idle_socket_without_another_client_poll() {
 
 #[tokio::test]
 async fn pending_read_does_not_consume_allowance_and_half_close_preserves_reply() {
-    let guard = Arc::new(TcpQuota::new(100, 1).unwrap());
+    let guard = quota(100, 1);
     let (mut client, mut peer) = connection(&guard).await;
     let mut bytes = [0; 4];
     let pending = std::future::poll_fn(|cx| {
@@ -185,12 +189,143 @@ async fn pending_read_does_not_consume_allowance_and_half_close_preserves_reply(
 
 #[test]
 fn connection_attempts_are_not_refunded_and_parameters_are_bounded() {
-    let guard = Arc::new(TcpQuota::new(100, 1).unwrap());
+    let guard = quota(100, 1);
     drop(guard.admit().unwrap());
     assert!(guard.admit().is_err());
     assert_eq!(guard.snapshot().unwrap().connection_attempts, 1);
     assert!(guard.snapshot().unwrap().stopped);
     for (bytes, connections) in [(0, 1), (MAX_BYTES + 1, 1), (1, 0), (1, MAX_CONNECTIONS + 1)] {
-        assert!(TcpQuota::new(bytes, connections).is_err());
+        assert!(TcpQuota::new(bytes, connections, MAX_TIMEOUT_MS).is_err());
     }
+    assert!(TcpQuota::new(100, 1, 0).is_err());
+    assert!(TcpQuota::new(100, 1, MAX_TIMEOUT_MS + 1).is_err());
+}
+
+#[tokio::test]
+async fn cancelled_quota_never_polls_a_new_connection() {
+    let guard = quota(100, 1);
+    guard.cancel();
+    let mut polled = false;
+    let result = guard
+        .while_running(async {
+            polled = true;
+            Ok(())
+        })
+        .await;
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+    assert!(!polled);
+}
+
+#[tokio::test]
+async fn cancellation_drops_a_connect_future_before_socket_registration() {
+    let guard = quota(100, 1);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let admission = guard.admit().unwrap();
+    let socket = admission.socket(address).unwrap();
+    let (connected_tx, connected_rx) = tokio::sync::oneshot::channel();
+    let connecting = tokio::spawn(async move {
+        admission
+            .while_running(async move {
+                let stream = socket.connect(address).await?;
+                connected_tx.send(()).unwrap();
+                // Keep a real native socket inside an unfinished connect
+                // operation, before TcpConnection can register its duplicate.
+                std::future::pending::<()>().await;
+                Ok(stream)
+            })
+            .await
+    });
+    let (mut peer, _) = timeout(Duration::from_secs(2), listener.accept())
+        .await
+        .unwrap()
+        .unwrap();
+    connected_rx.await.unwrap();
+    assert!(guard.state.lock().unwrap().sockets.is_empty());
+    guard.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), connecting)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    assert_eq!(
+        timeout(Duration::from_secs(2), peer.read_u8())
+            .await
+            .unwrap()
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::UnexpectedEof
+    );
+    let receipt = guard.snapshot().unwrap();
+    assert_eq!(receipt.connection_attempts, 1);
+    assert_eq!(receipt.upload + receipt.download, 0);
+}
+
+#[tokio::test]
+async fn failed_native_connect_keeps_its_attempt_and_buffer_reservation() {
+    let guard = quota(100, 1);
+    // A bound but non-listening local TCP socket produces a real refusal
+    // without relying on a port that another process might claim.
+    let refused = TcpSocket::new_v4().unwrap();
+    refused.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let address = refused.local_addr().unwrap();
+    let admission = guard.admit().unwrap();
+    let socket = admission.socket(address).unwrap();
+    assert!(
+        timeout(
+            Duration::from_secs(2),
+            admission.while_running(socket.connect(address))
+        )
+        .await
+        .unwrap()
+        .is_err()
+    );
+    let receipt = guard.snapshot().unwrap();
+    assert_eq!(receipt.connection_attempts, 1);
+    assert_eq!(receipt.upload + receipt.download, 0);
+    assert_eq!(receipt.receive_reservation, RECEIVE_RESERVATION);
+    assert!(guard.admit().is_err());
+}
+
+#[test]
+fn watchdog_closes_idle_socket_without_a_running_async_timer() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let guard = Arc::new(TcpQuota::new(4096, 1, 1000).unwrap());
+    let (_client, mut peer) = runtime.block_on(connection(&guard));
+    let watchdog = guard.start_watchdog().unwrap();
+    // The Tokio runtime is not polling anything here. Only the independent
+    // watchdog can expire and close this socket without another client read.
+    watchdog.join().unwrap();
+    let receipt = guard.snapshot().unwrap();
+    assert!(receipt.timed_out && receipt.stopped);
+    assert_eq!(receipt.timeout_ms, 1000);
+    assert_eq!(receipt.shutdown_failures, 0);
+    runtime.block_on(async {
+        assert_eq!(
+            timeout(Duration::from_secs(2), peer.read_u8())
+                .await
+                .unwrap()
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::UnexpectedEof
+        );
+    });
+}
+
+#[test]
+fn cancelling_quota_wakes_watchdog_before_its_deadline() {
+    let guard = quota(100, 1);
+    let watchdog = guard.start_watchdog().unwrap();
+    guard.cancel();
+    watchdog.join().unwrap();
+    let receipt = guard.snapshot().unwrap();
+    assert!(receipt.stopped);
+    assert!(!receipt.timed_out);
 }

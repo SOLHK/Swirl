@@ -45,6 +45,7 @@ pub fn bind_tcp(address: SocketAddr) -> io::Result<TcpListener> {
 /// LAN port reservations and active associations must use the same primitive.
 /// The caller remains responsible for the established datagram buffer contract.
 pub fn bind_udp_std(address: SocketAddr) -> io::Result<std::net::UdpSocket> {
+    crate::egress::check_private_udp()?;
     bound_socket(address, Type::DGRAM, Protocol::UDP).map(Into::into)
 }
 

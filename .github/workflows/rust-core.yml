@@ -38,6 +38,12 @@ jobs:
           python-version: '3.14'
       - name: Offline private-subscription accounting invariants
         run: python ../tools/tests/test_private_subscription_budget.py
+      - name: Guarded private TCP cancellation and receive reservations
+        run: |
+          cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
+          cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          cargo check --locked -p swirl-api --features private-acceptance
+          cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
       - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
         shell: bash
         env:
@@ -398,6 +404,8 @@ jobs:
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo check --locked -p swirl-api --features private-acceptance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
       - name: Provision pinned official Windows Codex CLI
         working-directory: .
         shell: pwsh

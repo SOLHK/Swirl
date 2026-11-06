@@ -1,5 +1,6 @@
 """Offline accounting and real process-lock tests; zero provider requests."""
 import contextlib
+from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import io
 import json
@@ -53,6 +54,22 @@ class PolicyTests(unittest.TestCase):
     def test_execution_limits_remain_small(self):
         self.assertEqual((budget.MAX_CONCURRENT, budget.FIRST_ROUND, budget.TIMEOUT_MS, budget.BODY_LIMIT),
                          (3, 12, 8000, 65536))
+
+    def test_tcp_plan_includes_every_connection_receive_reserve(self):
+        plan = budget.tcp_plan(65536, 3, 8000)
+        self.assertEqual(plan, {"byteLimit": 65536, "connectionLimit": 3,
+                                "receiveReservation": 3 * 1024 * 1024, "timeoutMs": 8000})
+        maximum = budget.tcp_plan(budget.TCP_MAX_BYTES, budget.TCP_MAX_CONNECTIONS)
+        self.assertEqual(maximum["byteLimit"] + maximum["receiveReservation"], 64 * 1024 * 1024)
+        # A one-byte transfer still needs a full distinct kernel allowance;
+        # the old 1 MiB reservation could not cover this minimum TCP plan.
+        minimum = budget.tcp_plan(1, 1)
+        self.assertGreater(minimum["byteLimit"] + minimum["receiveReservation"], budget.MAX_PROBE_RESERVATION)
+        for values in ((0, 1, 1), (budget.TCP_MAX_BYTES + 1, 1, 1), (1, 0, 1),
+                       (1, budget.TCP_MAX_CONNECTIONS + 1, 1), (1, 1, 0), (1, 1, 8001),
+                       (True, 1, 1), (1, "1", 1), (1, 1, 1.0)):
+            with self.subTest(values=values), self.assertRaises(budget.BudgetError):
+                budget.tcp_plan(*values)
 
 
 @unittest.skipUnless(os.name in {"posix", "nt"}, "Private storage adapter unavailable")
@@ -121,6 +138,85 @@ with m.Ledger(sys.argv[2]) as ledger:
         with budget.Ledger(self.root) as ledger:
             self.assertEqual(ledger.summary(), before)
             self.assertEqual(ledger.summary()["heldBytes"], 1024)
+
+    def test_failed_reservation_poisons_session_before_any_subsequent_work(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            existing = ledger.reserve_offline(1, 128)
+            committed = ledger.path.read_bytes()
+            target = ledger.windows if ledger.windows else budget.os
+            with mock.patch.object(target, "replace", side_effect=OSError("synthetic commit failure")):
+                with self.assertRaises(OSError):
+                    ledger.reserve_tcp_offline(2, 1024, 2)
+            self.assertEqual(ledger.path.read_bytes(), committed)
+            # No ticket was returned for the failed reservation. Catching the
+            # write exception must not let that in-memory attempt be used or
+            # let another request consume a budget which was never committed.
+            operations = [ledger.summary, lambda: ledger.reserve_offline(3, 64),
+                          lambda: ledger.reserve_tcp_offline(3, 1024, 1),
+                          lambda: ledger.account_offline(existing, upload=1),
+                          lambda: ledger.finish_offline(existing, quiescent=True),
+                          lambda: ledger.observe_provider(BASE), lambda: ledger.initialize(BASE)]
+            for operation in operations:
+                with self.assertRaisesRegex(budget.BudgetError, "LedgerCommitUncertain"):
+                    operation()
+            self.assertEqual(ledger.path.read_bytes(), committed)
+        # Reusing the object is safe only after closing, reacquiring the lock
+        # and reading actual disk state. The failed new attempt was not saved.
+        with ledger:
+            self.assertEqual(ledger.summary()["attempts"], 1)
+            self.assertEqual(ledger.summary()["heldBytes"], 128)
+            self.assertEqual(ledger.reserve_tcp_offline(2, 1024, 2), "2")
+
+    def test_failed_settlement_cannot_refund_reservation_in_same_session(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ticket = ledger.reserve_tcp_offline(1, 128, 2)
+            ledger.account_offline(ticket, upload=17, download=19)
+            before = ledger.summary()
+            target = ledger.windows if ledger.windows else budget.os
+            with mock.patch.object(target, "replace", side_effect=OSError("synthetic commit failure")):
+                with self.assertRaises(OSError):
+                    ledger.finish_offline(ticket, quiescent=True)
+            with self.assertRaisesRegex(budget.BudgetError, "LedgerCommitUncertain"):
+                ledger.reserve_offline(2, 1)
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.summary(), before)
+            with self.assertRaisesRegex(budget.BudgetError, "NodeAlreadyReserved"):
+                ledger.reserve_tcp_offline(1, 128, 2)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX directory durability check")
+    def test_post_replace_fsync_failure_never_rolls_back_a_committed_reservation(self):
+        real_fsync = os.fsync
+
+        def fail_directory_sync(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise OSError("synthetic directory sync failure")
+            return real_fsync(fd)
+
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            with mock.patch.object(budget.os, "fsync", side_effect=fail_directory_sync):
+                with self.assertRaises(OSError):
+                    ledger.reserve_tcp_offline(1, 256, 3)
+            with self.assertRaisesRegex(budget.BudgetError, "LedgerCommitUncertain"):
+                ledger.summary()
+        with budget.Ledger(self.root) as ledger:
+            # Replace happened before fsync failed. Reading the durable file
+            # retains that uncertainty conservatively instead of refunding it.
+            self.assertEqual(ledger.summary()["attempts"], 1)
+            self.assertEqual(ledger.summary()["heldBytes"], 256 + 3 * budget.TCP_RECEIVE_RESERVATION)
+
+    def test_initialization_sync_failure_cannot_reinitialize_in_same_session(self):
+        with budget.Ledger(self.root) as ledger:
+            with mock.patch.object(budget.os, "fsync", side_effect=OSError("synthetic marker sync failure")):
+                with self.assertRaises(OSError):
+                    ledger.initialize(BASE)
+            with self.assertRaisesRegex(budget.BudgetError, "LedgerCommitUncertain"):
+                ledger.initialize(BASE)
+        with self.assertRaisesRegex(budget.BudgetError, "LedgerMissingAfterInitialization"):
+            with budget.Ledger(self.root):
+                self.fail("initialization failure silently reset baseline")
 
     def test_another_process_cannot_open_same_task(self):
         with budget.Ledger(self.root) as ledger:
@@ -410,6 +506,152 @@ with m.Ledger(sys.argv[2]) as ledger:
             with self.assertRaisesRegex(budget.BudgetError, "NormalTargetReached"):
                 ledger.reserve_offline(1, 1)
             self.assertEqual(ledger.summary()["attempts"], 0)
+
+    def test_tcp_payload_cannot_consume_held_kernel_reserve(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ticket = ledger.reserve_tcp_offline(1, 256, 3, timeout_ms=4000)
+            plan = ledger.data["reservations"][ticket]["tcp"].copy()
+            before = ledger.summary()
+            ledger.account_offline(ticket, upload=100, download=156)
+            after = ledger.summary()
+            self.assertEqual(after["heldBytes"], 3 * budget.TCP_RECEIVE_RESERVATION)
+            self.assertEqual(after["guardedBytes"], before["guardedBytes"])
+            for debit in ({"upload": 1}, {"download": 1}):
+                with self.assertRaisesRegex(budget.BudgetError, "RequestByteLimit"):
+                    ledger.account_offline(ticket, **debit)
+            with self.assertRaisesRegex(budget.BudgetError, "UnreleasedRequests"):
+                ledger.finish_offline(ticket)
+            self.assertEqual(ledger.summary(), after)
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.data["reservations"][ticket]["tcp"], plan)
+            self.assertEqual(ledger.summary(), after)
+            self.assertFalse(ledger.summary()["liveReady"])
+
+    def test_tcp_reservation_migration_preserves_schema_one_accounting(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            existing = ledger.reserve_offline(1, 1024)
+            ledger.account_offline(existing, upload=10, download=20)
+            before = ledger.summary()
+        path = self.root / "traffic-budget.json"
+        data = json.loads(path.read_text())
+        data["schema"] = 1
+        path.write_text(json.dumps(data))
+        legacy = path.read_bytes()
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.summary(), before)
+            self.assertEqual(path.read_bytes(), legacy)
+            ticket = ledger.reserve_tcp_offline(2, 2048, 2)
+            self.assertEqual(ledger.data["schema"], 2)
+            self.assertEqual(ledger.data["reservations"][existing], data["reservations"][existing])
+            self.assertEqual(ledger.summary()["heldBytes"], 994 + 2048 + 2 * budget.TCP_RECEIVE_RESERVATION)
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual((ledger.summary()["baselineUsed"], ledger.summary()["attempts"]), (1_000_000_000, 2))
+            self.assertEqual((ledger.summary()["localUpload"], ledger.summary()["localDownload"]), (10, 20))
+            self.assertEqual(ledger.data["reservations"][ticket]["tcp"], budget.tcp_plan(2048, 2))
+
+    def test_full_tcp_plan_is_reserved_before_concurrent_admission(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+
+            def attempt(ordinal):
+                try:
+                    return ledger.reserve_tcp_offline(ordinal, 65536, 2)
+                except budget.BudgetError as error:
+                    return str(error)
+
+            with ThreadPoolExecutor(max_workers=8) as workers:
+                results = list(workers.map(attempt, range(1, 9)))
+            self.assertEqual(sorted(x for x in results if x != "ConcurrencyLimit"), ["1", "2", "3"])
+            self.assertEqual(results.count("ConcurrencyLimit"), 5)
+            self.assertEqual(ledger.summary()["heldBytes"], 3 * (65536 + 2 * budget.TCP_RECEIVE_RESERVATION))
+            self.assertEqual(ledger.summary()["attempts"], 3)
+            saved = json.loads(ledger.path.read_text())
+            self.assertEqual(saved, ledger.data)
+
+    def test_tcp_admission_counts_receive_reserve_at_target_and_package_boundary(self):
+        amount = 65536 + 2 * budget.TCP_RECEIVE_RESERVATION
+        cases = [("target", f"upload=100000000; download={900000000 + budget.TARGET - amount}; total=100000000000", "NormalTargetReached"),
+                 ("package", f"upload=100000000; download=900000000; total={budget.RESERVE_PACKAGE + 1_000_000_000 + amount - 1}", "PackageReserve")]
+        for name, header, error in cases:
+            with self.subTest(name=name), budget.Ledger(self.root / name) as ledger:
+                ledger.initialize(BASE if name == "target" else header)
+                if name == "target":
+                    ledger.observe_provider(header)
+                # Payload alone would fit; admitting the full plan must fail.
+                state = ledger.summary()
+                self.assertEqual(budget.policy(state["billingDelta"], 0, 65536, state["providerRemaining"]), "WithinNormalTarget")
+                with self.assertRaisesRegex(budget.BudgetError, error):
+                    ledger.reserve_tcp_offline(1, 65536, 2)
+                self.assertEqual(ledger.summary()["attempts"], 0)
+                self.assertEqual(ledger.summary()["heldBytes"], 0)
+
+    def test_tcp_crash_keeps_every_unsettled_byte_and_attempt_across_processes(self):
+        program = """
+import importlib.util, os, sys
+spec=importlib.util.spec_from_file_location('budget', sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with m.Ledger(sys.argv[2]) as ledger:
+ ledger.initialize(sys.argv[3])
+ t=ledger.reserve_tcp_offline(1, 4096, 4, 1000)
+ ledger.account_offline(t, upload=23, download=31)
+ os._exit(0)
+"""
+        child = subprocess.run([sys.executable, "-c", program, str(MODULE), str(self.root), BASE],
+                               capture_output=True, timeout=10)
+        self.assertEqual(child.returncode, 0, child.stderr.decode())
+        with budget.Ledger(self.root) as ledger:
+            state = ledger.summary()
+            self.assertEqual(state["heldBytes"], 4096 + 4 * budget.TCP_RECEIVE_RESERVATION - 54)
+            self.assertEqual(state["guardedBytes"], 4096 + 4 * budget.TCP_RECEIVE_RESERVATION)
+            self.assertEqual((state["attempts"], state["localUpload"], state["localDownload"]), (1, 23, 31))
+            self.assertEqual(ledger.data["reservations"]["1"]["tcp"]["timeoutMs"], 1000)
+            with self.assertRaisesRegex(budget.BudgetError, "NodeAlreadyReserved"):
+                ledger.reserve_tcp_offline(1, 4096, 4)
+
+    def test_tcp_plan_tampering_is_rejected_without_rewriting_evidence(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ledger.reserve_tcp_offline(1, 256, 2)
+        path = self.root / "traffic-budget.json"
+        original = path.read_bytes()
+        mutations = [lambda d: d.update(schema=1),
+                     lambda d: d["reservations"]["1"].update(held=256),
+                     lambda d: d["reservations"]["1"]["tcp"].pop("timeoutMs")]
+        for field, bad in (("byteLimit", 0), ("byteLimit", "256"), ("connectionLimit", 49),
+                           ("connectionLimit", True), ("receiveReservation", 0),
+                           ("receiveReservation", float(2 * budget.TCP_RECEIVE_RESERVATION)),
+                           ("timeoutMs", 8001), ("timeoutMs", True)):
+            mutations.append(lambda d, f=field, b=bad: d["reservations"]["1"]["tcp"].update({f: b}))
+        for mutate in mutations:
+            value = json.loads(original)
+            mutate(value)
+            path.write_text(json.dumps(value))
+            corrupt = path.read_bytes()
+            with self.assertRaises(budget.BudgetError):
+                with budget.Ledger(self.root):
+                    self.fail("altered TCP plan accepted")
+            self.assertEqual(path.read_bytes(), corrupt)
+
+    def test_remaining_budget_accounts_for_local_bytes_and_holds_separately_from_billing(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ticket = ledger.reserve_offline(1, 1024)
+            ledger.account_offline(ticket, upload=128, download=256)
+            state = ledger.summary()
+            self.assertEqual(state["billingDelta"], 0)
+            self.assertEqual(state["guardedBytes"], 1024)
+            self.assertEqual(state["remainingAbsoluteBudget"], budget.ABSOLUTE - 1024)
+            self.assertEqual(state["remainingStopBudget"], budget.STOP - 1024)
+            # Growth from another client is NOT attributed to local testing.
+            ledger.observe_provider("upload=100001000; download=900000000; total=100000000000")
+            state = ledger.summary()
+            self.assertEqual((state["billingDelta"], state["localUpload"], state["localDownload"]), (1000, 128, 256))
+            self.assertEqual(state["guardedBytes"], 1000 + 640)
+            self.assertEqual(state["remainingAbsoluteBudget"], budget.ABSOLUTE - 1640)
+            ledger.finish_offline(ticket, quiescent=True)
+            self.assertEqual(ledger.summary()["remainingAbsoluteBudget"], budget.ABSOLUTE - 1000)
 
     def test_known_stats_never_fake_native_readiness(self):
         with budget.Ledger(self.root) as ledger:

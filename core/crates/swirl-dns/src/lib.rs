@@ -346,6 +346,10 @@ impl Resolver {
         }
         // Keep the permit until the underlying OS lookup actually finishes even
         // if the caller times out/cancels. This bounds detached blocking lookups.
+        // Mark this unmetered path before spawning: a later guard installation
+        // must not race a detached OS resolver that is already running.
+        swirl_transport::egress::check_unmetered_egress()
+            .map_err(|_| "DnsPrivateMeteredResolverRequired")?;
         let host = host.to_owned();
         let lookup = tokio::spawn(async move {
             let _permit = permit;

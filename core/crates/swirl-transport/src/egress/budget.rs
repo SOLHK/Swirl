@@ -5,22 +5,30 @@
 //! The parent must persist the full request reservation before starting this
 //! process, including RECEIVE_RESERVATION per permitted connection attempt.
 //! This guard never supplies provider billing or persistent task accounting.
+//! The independent deadline closes registered streams; cancelling a still
+//! pending connect wakes its Tokio future so it can drop the owned socket.
+//! An externally supervised process deadline is still required if that runtime
+//! stops polling, and only confirmed process exit can settle its reservation.
 use socket2::{SockRef, Socket};
 use std::{
+    future::Future,
     io,
     net::{Shutdown, SocketAddr},
     pin::Pin,
-    sync::{Arc, Mutex, OnceLock, Weak},
+    sync::{Arc, Condvar, Mutex, OnceLock, Weak},
     task::{Context, Poll},
+    time::{Duration, Instant},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpSocket, TcpStream},
+    sync::watch,
 };
 
 pub const MAX_BYTES: u64 = 16 * 1024 * 1024;
 pub const MAX_CONNECTIONS: u32 = 48;
 pub const RECEIVE_RESERVATION: u64 = 1024 * 1024;
+pub const MAX_TIMEOUT_MS: u32 = 8000;
 const RECEIVE_BUFFER: u32 = 64 * 1024;
 static GUARD: OnceLock<Arc<TcpQuota>> = OnceLock::new();
 static STARTED: Mutex<bool> = Mutex::new(false);
@@ -33,6 +41,8 @@ pub struct Snapshot {
     pub connection_limit: u32,
     pub connection_attempts: u32,
     pub receive_reservation: u64,
+    pub timeout_ms: u32,
+    pub timed_out: bool,
     pub stopped: bool,
     pub shutdown_failures: u32,
 }
@@ -40,10 +50,23 @@ pub struct Snapshot {
 struct State {
     receipt: Snapshot,
     sockets: Vec<Weak<Socket>>,
+    deadline: Instant,
+    cancelled: watch::Sender<bool>,
+    deadline_wakeup: Arc<Condvar>,
 }
 
 impl State {
-    fn check(&self) -> io::Result<()> {
+    fn expire_if_due(&mut self) {
+        if !self.receipt.stopped && Instant::now() >= self.deadline {
+            self.receipt.timed_out = true;
+            self.stop();
+        }
+    }
+
+    fn check(&mut self) -> io::Result<()> {
+        // The watchdog also closes idle sockets. This check prevents a late
+        // scheduler wake from granting another read/write after the deadline.
+        self.expire_if_due();
         if self.receipt.stopped {
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -70,6 +93,8 @@ impl State {
             return;
         }
         self.receipt.stopped = true;
+        self.cancelled.send_replace(true);
+        self.deadline_wakeup.notify_all();
         for socket in self.sockets.iter().filter_map(Weak::upgrade) {
             if let Err(error) = socket.shutdown(Shutdown::Both)
                 && error.kind() != io::ErrorKind::NotConnected
@@ -85,13 +110,20 @@ pub struct TcpQuota {
 }
 
 impl TcpQuota {
-    fn new(bytes: u64, connections: u32) -> io::Result<Self> {
-        if bytes == 0 || bytes > MAX_BYTES || connections == 0 || connections > MAX_CONNECTIONS {
+    fn new(bytes: u64, connections: u32, timeout_ms: u32) -> io::Result<Self> {
+        if bytes == 0
+            || bytes > MAX_BYTES
+            || connections == 0
+            || connections > MAX_CONNECTIONS
+            || timeout_ms == 0
+            || timeout_ms > MAX_TIMEOUT_MS
+        {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "PrivateQuotaParameters",
             ));
         }
+        let (cancelled, _) = watch::channel(false);
         Ok(Self {
             state: Mutex::new(State {
                 receipt: Snapshot {
@@ -101,20 +133,74 @@ impl TcpQuota {
                     connection_limit: connections,
                     connection_attempts: 0,
                     receive_reservation: u64::from(connections) * RECEIVE_RESERVATION,
+                    timeout_ms,
+                    timed_out: false,
                     stopped: false,
                     shutdown_failures: 0,
                 },
                 sockets: Vec::new(),
+                deadline: Instant::now() + Duration::from_millis(u64::from(timeout_ms)),
+                cancelled,
+                deadline_wakeup: Arc::new(Condvar::new()),
             }),
         })
     }
 
     pub fn snapshot(&self) -> io::Result<Snapshot> {
-        Ok(self
+        let mut state = self
             .state
             .lock()
-            .map_err(|_| io::Error::other("PrivateQuotaState"))?
-            .receipt)
+            .map_err(|_| io::Error::other("PrivateQuotaState"))?;
+        state.expire_if_due();
+        Ok(state.receipt)
+    }
+
+    fn start_watchdog(self: &Arc<Self>) -> io::Result<std::thread::JoinHandle<()>> {
+        let guard = Arc::clone(self);
+        // Installation may happen before the worker creates a Tokio runtime.
+        // One bounded watchdog must therefore not depend on that runtime's
+        // timer or on a stalled protocol task polling its socket again.
+        std::thread::Builder::new()
+            .name("swirl-private-quota-deadline".into())
+            .spawn(move || {
+                let state = guard
+                    .state
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner());
+                let wakeup = Arc::clone(&state.deadline_wakeup);
+                let remaining = state.deadline.saturating_duration_since(Instant::now());
+                let (mut state, _) = wakeup
+                    .wait_timeout_while(state, remaining, |state| !state.receipt.stopped)
+                    .unwrap_or_else(|poison| poison.into_inner());
+                if !state.receipt.stopped {
+                    state.receipt.timed_out = true;
+                    state.stop();
+                }
+            })
+    }
+
+    async fn cancelled(&self) {
+        let mut signal = match self.state.lock() {
+            Ok(state) => state.cancelled.subscribe(),
+            Err(_) => return,
+        };
+        let _ = signal.wait_for(|stopped| *stopped).await;
+    }
+
+    pub(super) async fn while_running<T>(
+        &self,
+        operation: impl Future<Output = io::Result<T>>,
+    ) -> io::Result<T> {
+        // TcpSocket is owned by this future before it becomes a registered
+        // TcpConnection. Dropping it cancels even an unfinished TCP connect.
+        tokio::select! {
+            biased;
+            _ = self.cancelled() => Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "PrivateQuotaStopped",
+            )),
+            result = operation => result,
+        }
     }
 
     /// Actively shuts down every registered TCP socket, including idle streams
@@ -164,6 +250,16 @@ impl TcpQuota {
 /// Install once, before any outbound TCP socket is created in this dedicated
 /// process. A second install and late installation both fail closed.
 pub fn install(bytes: u64, connections: u32) -> io::Result<Arc<TcpQuota>> {
+    install_with_timeout(bytes, connections, MAX_TIMEOUT_MS)
+}
+
+/// As `install`, with one immutable deadline shared by every connection and
+/// retry in this process. It starts at installation and cannot be extended.
+pub fn install_with_timeout(
+    bytes: u64,
+    connections: u32,
+    timeout_ms: u32,
+) -> io::Result<Arc<TcpQuota>> {
     let started = STARTED
         .lock()
         .map_err(|_| io::Error::other("PrivateQuotaState"))?;
@@ -173,10 +269,18 @@ pub fn install(bytes: u64, connections: u32) -> io::Result<Arc<TcpQuota>> {
             "PrivateQuotaLateInstall",
         ));
     }
-    let guard = Arc::new(TcpQuota::new(bytes, connections)?);
-    GUARD
-        .set(Arc::clone(&guard))
-        .map_err(|_| io::Error::other("PrivateQuotaAlreadyInstalled"))?;
+    if GUARD.get().is_some() {
+        return Err(io::Error::other("PrivateQuotaAlreadyInstalled"));
+    }
+    let guard = Arc::new(TcpQuota::new(bytes, connections, timeout_ms)?);
+    let watchdog = guard.start_watchdog()?;
+    GUARD.set(Arc::clone(&guard)).map_err(|_| {
+        guard.cancel();
+        io::Error::other("PrivateQuotaAlreadyInstalled")
+    })?;
+    // The watchdog has a fixed deadline and is woken immediately by cancel.
+    // The dedicated process supervisor still owns task/process exit and billing.
+    drop(watchdog);
     Ok(guard)
 }
 
@@ -192,14 +296,19 @@ pub(super) fn admit_connection() -> io::Result<Option<Arc<TcpQuota>>> {
 }
 
 pub(super) fn check_udp() -> io::Result<()> {
+    reject_unmetered("PrivateQuotaUdpDenied")
+}
+
+pub(super) fn check_unmetered_egress() -> io::Result<()> {
+    reject_unmetered("PrivateQuotaUnmeteredDenied")
+}
+
+fn reject_unmetered(code: &'static str) -> io::Result<()> {
     *STARTED
         .lock()
         .map_err(|_| io::Error::other("PrivateQuotaState"))? = true;
     if active() {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "PrivateQuotaUdpDenied",
-        ));
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, code));
     }
     Ok(())
 }

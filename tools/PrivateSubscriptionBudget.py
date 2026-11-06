@@ -21,7 +21,6 @@ preclude live readiness.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import os
 from pathlib import Path
@@ -37,7 +36,12 @@ GB = 1_000_000_000
 TARGET, REVIEW, NO_EXPANSION, STOP, ABSOLUTE = (n * GB for n in (2, 5, 10, 15, 20))
 RESERVE_PACKAGE = 80 * GB
 MAX_CONCURRENT, FIRST_ROUND, TIMEOUT_MS, BODY_LIMIT = 3, 12, 8000, 65536
+# Legacy, unstructured offline reservations keep their original ceiling. TCP
+# plans have a separate, explicit cap matching swirl-transport's guarded path.
 MAX_PROBE_RESERVATION = 1024 * 1024
+TCP_MAX_BYTES = 16 * 1024 * 1024
+TCP_MAX_CONNECTIONS = 48
+TCP_RECEIVE_RESERVATION = 1024 * 1024
 MAX_COUNTER = (1 << 63) - 1
 
 
@@ -197,6 +201,26 @@ def integer(value):
     return value
 
 
+def tcp_plan(byte_limit, connection_limit, timeout_ms=TIMEOUT_MS):
+    """Describe an offline TCP reservation, never permission to start traffic.
+
+    The payload quota is below TLS/protocol framing. A separate receive reserve
+    covers unread kernel buffers for EVERY allowed attempt, including failures;
+    it cannot be spent as additional payload. Headers and retransmissions are
+    still outside the Rust socket counters, so this is not a complete wire or
+    provider-billing bound and cannot make ``require_live_ready`` succeed.
+    """
+    if not 1 <= integer(byte_limit) <= TCP_MAX_BYTES:
+        raise BudgetError("InvalidTcpByteLimit")
+    if not 1 <= integer(connection_limit) <= TCP_MAX_CONNECTIONS:
+        raise BudgetError("InvalidTcpConnectionLimit")
+    if not 1 <= integer(timeout_ms) <= TIMEOUT_MS:
+        raise BudgetError("InvalidTcpTimeout")
+    return {"byteLimit": byte_limit, "connectionLimit": connection_limit,
+            "receiveReservation": connection_limit * TCP_RECEIVE_RESERVATION,
+            "timeoutMs": timeout_ms}
+
+
 def parse_userinfo(header):
     """Validate numeric subscription-userinfo without retaining the raw header.
 
@@ -263,8 +287,16 @@ class Ledger:
         self.mutex = threading.RLock()
         self.initialized = False
         self.windows = None
+        self.commit_uncertain = False
 
     def __enter__(self):
+        if self.lock:
+            raise BudgetError("LedgerAlreadyLocked")
+        # Re-entering must reload the durable ledger rather than use any data
+        # left in memory by a previous session or an interrupted commit.
+        self.data = None
+        self.initialized = False
+        self.commit_uncertain = False
         if os.name not in {"posix", "nt"}:
             raise BudgetError("PrivateStorageAdapterRequired")
         if any(p.is_symlink() or (p.exists() and getattr(p.lstat(), "st_file_attributes", 0) & 0x400)
@@ -339,7 +371,7 @@ class Ledger:
         d = self.data
         keys = {"schema", "task", "baseline", "provider", "localUpload", "localDownload",
                 "attempts", "sequence", "reservations"}
-        if not isinstance(d, dict) or set(d) != keys or type(d.get("schema")) is not int or d["schema"] != 1 or d["task"] != TASK:
+        if not isinstance(d, dict) or set(d) != keys or type(d.get("schema")) is not int or d["schema"] not in (1, 2) or d["task"] != TASK:
             raise BudgetError("InvalidTaskLedger")
         for key in ("localUpload", "localDownload", "attempts", "sequence"):
             integer(d.get(key))
@@ -364,28 +396,45 @@ class Ledger:
             raise BudgetError("InvalidAttemptCount")
         seen_nodes = set()
         for key, r in d["reservations"].items():
-            if not re.fullmatch(r"[1-9][0-9]{0,11}", key) or not isinstance(r, dict) or set(r) != {"node", "held", "sent", "received"}:
+            fields = {"node", "held", "sent", "received"}
+            if not re.fullmatch(r"[1-9][0-9]{0,11}", key) or not isinstance(r, dict) or set(r) not in (fields, fields | {"tcp"}):
                 raise BudgetError("InvalidReservations")
             if type(r["node"]) is not int or not 1 <= r["node"] <= 100000:
                 raise BudgetError("InvalidNodeOrdinal")
             if r["node"] in seen_nodes or int(key) > d["sequence"]:
                 raise BudgetError("InvalidReservations")
             seen_nodes.add(r["node"])
-            if integer(r["held"]) > MAX_PROBE_RESERVATION:
-                raise BudgetError("InvalidReservations")
+            integer(r["held"])
             integer(r["sent"])
             integer(r["received"])
-            if not 1 <= r["held"] + r["sent"] + r["received"] <= MAX_PROBE_RESERVATION:
+            reserved = r["held"] + r["sent"] + r["received"]
+            if "tcp" in r:
+                plan = r["tcp"]
+                if (d["schema"] != 2 or not isinstance(plan, dict)
+                        or set(plan) != {"byteLimit", "connectionLimit", "receiveReservation", "timeoutMs"}):
+                    raise BudgetError("InvalidTcpReservation")
+                integer(plan["receiveReservation"])
+                expected = tcp_plan(plan["byteLimit"], plan["connectionLimit"], plan["timeoutMs"])
+                if (plan != expected or reserved != plan["byteLimit"] + plan["receiveReservation"]
+                        or r["sent"] + r["received"] > plan["byteLimit"]):
+                    raise BudgetError("InvalidTcpReservation")
+            elif not 1 <= reserved <= MAX_PROBE_RESERVATION:
                 raise BudgetError("InvalidReservations")
         if sum(r["sent"] for r in d["reservations"].values()) > d["localUpload"] or sum(r["received"] for r in d["reservations"].values()) > d["localDownload"]:
             raise BudgetError("InvalidLocalTotals")
 
-    def _save(self):
+    def _check_session(self):
         if not self.lock:
             raise BudgetError("LedgerNotLocked")
-        self._validate()
-        fd, temporary = self.windows.temporary(self.root) if self.windows else tempfile.mkstemp(prefix=".budget-", dir=self.root)
+        if self.commit_uncertain:
+            raise BudgetError("LedgerCommitUncertain")
+
+    def _save(self):
+        self._check_session()
+        temporary = None
         try:
+            self._validate()
+            fd, temporary = self.windows.temporary(self.root) if self.windows else tempfile.mkstemp(prefix=".budget-", dir=self.root)
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 if not self.windows:
                     os.fchmod(stream.fileno(), 0o600)
@@ -401,30 +450,47 @@ class Ledger:
                     os.fsync(parent)
                 finally:
                     os.close(parent)
+        except BaseException:
+            # A failure can happen either before or after replace. Rolling back
+            # memory would pretend to know which bytes reached durable storage.
+            # Poison this session instead: it must close and reload under the
+            # exclusive lock before it can reserve, settle or report a budget.
+            self.commit_uncertain = True
+            raise
         finally:
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(temporary)
+            if temporary is not None:
+                try:
+                    os.unlink(temporary)
+                except FileNotFoundError:
+                    pass
+                except BaseException:
+                    self.commit_uncertain = True
+                    raise
 
     def initialize(self, userinfo=None):
         with self.mutex:
+            self._check_session()
             if self.data is not None or self.initialized:
                 raise BudgetError("TaskAlreadyInitialized")
-            if not self.lock:
-                raise BudgetError("LedgerNotLocked")
             snapshot = parse_userinfo(userinfo) if userinfo is not None else None
             # Persist a separate initialization marker BEFORE the ledger. A
             # crash or deletion must stop rather than silently create baseline 0.
-            self.lock.write((TASK + "\n").encode("ascii"))
-            self.lock.flush()
-            os.fsync(self.lock.fileno())
-            self.initialized = True
-            self.data = {"schema": 1, "task": TASK, "baseline": snapshot, "provider": snapshot,
-                         "localUpload": 0, "localDownload": 0, "attempts": 0, "sequence": 0,
-                         "reservations": {}}
-            self._save()
+            try:
+                self.lock.write((TASK + "\n").encode("ascii"))
+                self.lock.flush()
+                os.fsync(self.lock.fileno())
+                self.initialized = True
+                self.data = {"schema": 2, "task": TASK, "baseline": snapshot, "provider": snapshot,
+                             "localUpload": 0, "localDownload": 0, "attempts": 0, "sequence": 0,
+                             "reservations": {}}
+                self._save()
+            except BaseException:
+                self.commit_uncertain = True
+                raise
 
     def observe_provider(self, userinfo):
         with self.mutex:
+            self._check_session()
             fresh = parse_userinfo(userinfo)
             if self.data is None or self.data["baseline"] is None:
                 raise BudgetError("BaselineUnavailable")
@@ -436,6 +502,7 @@ class Ledger:
 
     def summary(self):
         with self.mutex:
+            self._check_session()
             if self.data is None:
                 raise BudgetError("TaskNotInitialized")
             d = self.data
@@ -446,12 +513,15 @@ class Ledger:
             used_now = None if current is None else current["upload"] + current["download"]
             billed = None if current is None else used_now - used_start
             remaining = None if current is None else current["total"] - used_now
+            guarded = None if billed is None else max(billed, local) + held
             state = "BillingUnavailable" if billed is None else policy(billed, local, held, remaining)
             if current is not None and current.get("expire", 0) and current["expire"] <= int(time.time()):
                 state = "BillingExpired"
             return {"task": TASK, "policy": state, "baselineUsed": used_start, "latestUsed": used_now,
                     "billingDelta": billed, "providerRemaining": remaining,
-                    "remainingAbsoluteBudget": None if billed is None else max(0, ABSOLUTE - billed),
+                    "guardedBytes": guarded,
+                    "remainingAbsoluteBudget": None if guarded is None else max(0, ABSOLUTE - guarded),
+                    "remainingStopBudget": None if guarded is None else max(0, STOP - guarded),
                     "localUpload": d["localUpload"], "localDownload": d["localDownload"],
                     "heldBytes": held, "attempts": d["attempts"],
                     "providerStatisticsAuthenticated": False, "wireAccountingAttached": False,
@@ -459,11 +529,25 @@ class Ledger:
 
     def reserve_offline(self, node, amount=MAX_PROBE_RESERVATION):
         """Exercise admission without opening a socket. Never an execution grant."""
+        if not 1 <= integer(amount) <= MAX_PROBE_RESERVATION:
+            raise BudgetError("InvalidReservationSize")
+        return self._reserve_offline(node, amount)
+
+    def reserve_tcp_offline(self, node, byte_limit, connection_limit, timeout_ms=TIMEOUT_MS):
+        """Persist the exact bounded TCP plan and ALL kernel receive reserves.
+
+        Schema-1 accounting is preserved; adopting the explicit plan upgrades
+        only its schema number and new reservation. Neither this method nor a
+        successful disk commit provides authenticated billing or a live grant.
+        """
+        plan = tcp_plan(byte_limit, connection_limit, timeout_ms)
+        return self._reserve_offline(node, plan["byteLimit"] + plan["receiveReservation"], plan)
+
+    def _reserve_offline(self, node, amount, plan=None):
         with self.mutex:
+            self._check_session()
             if type(node) is not int or not 1 <= node <= 100000:
                 raise BudgetError("InvalidNodeOrdinal")
-            if not 1 <= integer(amount) <= MAX_PROBE_RESERVATION:
-                raise BudgetError("InvalidReservationSize")
             state = self.summary()
             if state["policy"] != "WithinNormalTarget":
                 raise BudgetError(state["policy"])
@@ -482,6 +566,9 @@ class Ledger:
             d["sequence"] += 1
             ticket = str(d["sequence"])
             d["reservations"][ticket] = {"node": node, "held": amount, "sent": 0, "received": 0}
+            if plan is not None:
+                d["schema"] = 2
+                d["reservations"][ticket]["tcp"] = plan
             self._save()
             return ticket
 
@@ -500,6 +587,8 @@ class Ledger:
                 raise BudgetError("UnknownReservation")
             if upload + download > r["held"]:
                 raise BudgetError("RequestByteLimit")
+            if "tcp" in r and r["sent"] + r["received"] + upload + download > r["tcp"]["byteLimit"]:
+                raise BudgetError("RequestByteLimit")
             r["held"] -= upload + download
             r["sent"] += upload
             r["received"] += download
@@ -508,7 +597,9 @@ class Ledger:
             self._save()
 
     def finish_offline(self, ticket, quiescent=False):
+        """Simulate settlement; caller assertions are NOT live exit/billing proof."""
         with self.mutex:
+            self._check_session()
             if not quiescent:
                 raise BudgetError("UnreleasedRequests")
             if self.data is None or str(ticket) not in self.data["reservations"]:

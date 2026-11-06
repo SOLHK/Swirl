@@ -8,6 +8,8 @@ use tokio::{
 // Separate test executable gives the irreversible process guard its own process.
 #[tokio::test]
 async fn installed_guard_covers_spawned_connectors_and_refuses_udp_and_reset() {
+    assert!(budget::install_with_timeout(32, 2, 0).is_err());
+    assert!(budget::install_with_timeout(32, 2, budget::MAX_TIMEOUT_MS + 1).is_err());
     let guard = budget::install(32, 2).unwrap();
     assert!(budget::install(64, 2).is_err());
     let local = "127.0.0.1:0".parse().unwrap();
@@ -30,6 +32,8 @@ async fn installed_guard_covers_spawned_connectors_and_refuses_udp_and_reset() {
     assert_eq!(writer.await.unwrap(), 32);
     assert_eq!(bytes.len(), 32);
     let snapshot = guard.snapshot().unwrap();
+    assert_eq!(snapshot.timeout_ms, budget::MAX_TIMEOUT_MS);
+    assert!(!snapshot.timed_out);
     assert_eq!(
         (snapshot.upload, snapshot.download, snapshot.stopped),
         (32, 0, true)

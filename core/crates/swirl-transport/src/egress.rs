@@ -249,6 +249,15 @@ pub fn private_acceptance_active() -> bool {
     false
 }
 
+/// Admit a legacy/special egress path that cannot carry the private quota.
+/// Normal product builds are unchanged. A guarded worker denies the path;
+/// starting it first also prevents subsequently installing a partial guard.
+pub fn check_unmetered_egress() -> io::Result<()> {
+    #[cfg(feature = "private-acceptance")]
+    budget::check_unmetered_egress()?;
+    Ok(())
+}
+
 pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpConnection> {
     #[cfg(feature = "private-acceptance")]
     {
@@ -257,7 +266,11 @@ pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpConnection> {
             .as_ref()
             .map(|guard| guard.socket(address))
             .transpose()?;
-        let stream = connect_tcp_inner(address, socket).await?;
+        let connect = connect_tcp_inner(address, socket);
+        let stream = match &admission {
+            Some(guard) => guard.while_running(connect).await?,
+            None => connect.await?,
+        };
         TcpConnection::new(stream, admission)
     }
     #[cfg(not(feature = "private-acceptance"))]

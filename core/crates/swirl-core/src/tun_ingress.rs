@@ -89,6 +89,8 @@ impl Dispatch for TunDispatch {
     }
 
     fn open_udp(&mut self, meta: &FlowMeta) -> std::result::Result<Box<dyn UdpPipe>, &'static str> {
+        swirl_transport::egress::check_unmetered_egress()
+            .map_err(|_| "UdpPrivateMeteringRequired")?;
         let shared = self.shared.clone();
         let destination = meta.destination;
         let meta = meta.clone();
