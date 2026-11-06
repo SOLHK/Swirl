@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 MODULE = Path(__file__).parents[1] / "PrivateSubscriptionBudget.py"
 spec = importlib.util.spec_from_file_location("private_budget", MODULE)
@@ -54,7 +55,7 @@ class PolicyTests(unittest.TestCase):
                          (3, 12, 8000, 65536))
 
 
-@unittest.skipUnless(os.name == "posix", "Private storage adapter deliberately fails closed off POSIX")
+@unittest.skipUnless(os.name in {"posix", "nt"}, "Private storage adapter unavailable")
 class LedgerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -105,6 +106,22 @@ with m.Ledger(sys.argv[2]) as ledger:
             with self.assertRaisesRegex(budget.BudgetError, "NodeAlreadyReserved"):
                 ledger.reserve_offline(3)
 
+    def test_failed_atomic_commit_retains_previous_durable_accounting(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ticket = ledger.reserve_offline(1, 1024)
+            before = ledger.summary()
+            committed = ledger.path.read_bytes()
+            target = ledger.windows if ledger.windows else budget.os
+            with mock.patch.object(target, "replace", side_effect=OSError("synthetic commit failure")):
+                with self.assertRaises(OSError):
+                    ledger.account_offline(ticket, upload=10, download=20)
+            self.assertEqual(ledger.path.read_bytes(), committed)
+            self.assertEqual(list(self.root.glob(".budget-*")), [])
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.summary(), before)
+            self.assertEqual(ledger.summary()["heldBytes"], 1024)
+
     def test_another_process_cannot_open_same_task(self):
         with budget.Ledger(self.root) as ledger:
             ledger.initialize(BASE)
@@ -149,6 +166,7 @@ with m.Ledger(sys.argv[2]) as ledger:
             with budget.Ledger(self.root):
                 self.fail("missing persistent ledger was accepted")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX ownership and mode checks")
     def test_private_modes_and_symlink_rejection(self):
         with budget.Ledger(self.root) as ledger:
             ledger.initialize(BASE)
@@ -164,6 +182,58 @@ with m.Ledger(sys.argv[2]) as ledger:
         with self.assertRaisesRegex(budget.BudgetError, "PrivateLedgerRequired"):
             with budget.Ledger(self.root):
                 self.fail("public ledger accepted")
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle and ACL checks")
+    def test_windows_lock_prevents_removal_and_directory_rename(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            with self.assertRaises(PermissionError):
+                (self.root / "traffic-budget.lock").unlink()
+            with self.assertRaises(PermissionError):
+                self.root.rename(self.root.with_name("renamed"))
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle and ACL checks")
+    def test_windows_refuses_permissive_existing_directory_and_file(self):
+        # A normal temporary directory inherits broader permissions. Opening
+        # existing storage must reject it without silently replacing its ACL.
+        self.root.mkdir()
+        with self.assertRaisesRegex(budget.BudgetError, "PrivateAclRequired"):
+            with budget.Ledger(self.root):
+                self.fail("inherited directory ACL accepted")
+        self.root.rmdir()
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+        path = self.root / "traffic-budget.json"
+        before = path.read_bytes()
+        command = subprocess.run(["icacls.exe", str(path), "/grant", "*S-1-1-0:(R)"],
+                                 capture_output=True, timeout=10)
+        self.assertEqual(command.returncode, 0, command.stderr.decode(errors="replace"))
+        with self.assertRaisesRegex(budget.BudgetError, "PrivateAclRequired"):
+            with budget.Ledger(self.root):
+                self.fail("Everyone-readable ledger accepted")
+        self.assertEqual(path.read_bytes(), before)
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction and hard-link checks")
+    def test_windows_refuses_junctions_and_multiply_linked_files(self):
+        import _winapi
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+        alias = Path(self.temp.name) / "junction"
+        _winapi.CreateJunction(str(self.root), str(alias))
+        try:
+            with self.assertRaisesRegex(budget.BudgetError, "PrivateDirectoryRequired"):
+                with budget.Ledger(alias):
+                    self.fail("junction accepted")
+        finally:
+            alias.rmdir()
+        linked = Path(self.temp.name) / "linked-budget.json"
+        os.link(self.root / "traffic-budget.json", linked)
+        try:
+            with self.assertRaisesRegex(budget.BudgetError, "PrivateStorageRequired"):
+                with budget.Ledger(self.root):
+                    self.fail("multiply linked ledger accepted")
+        finally:
+            linked.unlink()
 
     def test_invalid_ledger_not_auto_repaired(self):
         with budget.Ledger(self.root) as ledger:

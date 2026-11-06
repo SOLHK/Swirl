@@ -30,6 +30,7 @@ import stat
 import tempfile
 import threading
 import time
+import uuid
 
 TASK = "swirl-0.2.40-private-acceptance"
 GB = 1_000_000_000
@@ -42,6 +43,152 @@ MAX_COUNTER = (1 << 63) - 1
 
 class BudgetError(Exception):
     """Only fixed codes, never private exception text, cross the CLI boundary."""
+
+
+class _WindowsStorage:
+    """User-owned Windows handles with a protected DACL and exclusive lock file."""
+
+    def __init__(self):
+        import ctypes as c
+        from ctypes import wintypes as w
+        self.c = c
+        self.kernel = c.WinDLL("kernel32", use_last_error=True)
+        self.security = c.WinDLL("advapi32", use_last_error=True)
+        pointer = c.c_void_p
+        for library, name, result, arguments in (
+            (self.kernel, "GetCurrentProcess", w.HANDLE, []),
+            (self.kernel, "GetDriveTypeW", w.UINT, [w.LPCWSTR]),
+            (self.kernel, "CloseHandle", w.BOOL, [w.HANDLE]),
+            (self.kernel, "LocalFree", pointer, [pointer]),
+            (self.kernel, "CreateDirectoryW", w.BOOL, [w.LPCWSTR, pointer]),
+            (self.kernel, "CreateFileW", w.HANDLE, [w.LPCWSTR, w.DWORD, w.DWORD, pointer, w.DWORD, w.DWORD, w.HANDLE]),
+            (self.kernel, "GetFileInformationByHandle", w.BOOL, [w.HANDLE, pointer]),
+            (self.kernel, "MoveFileExW", w.BOOL, [w.LPCWSTR, w.LPCWSTR, w.DWORD]),
+            (self.security, "OpenProcessToken", w.BOOL, [w.HANDLE, w.DWORD, pointer]),
+            (self.security, "GetTokenInformation", w.BOOL, [w.HANDLE, c.c_int, pointer, w.DWORD, pointer]),
+            (self.security, "ConvertSidToStringSidW", w.BOOL, [pointer, pointer]),
+            (self.security, "ConvertStringSecurityDescriptorToSecurityDescriptorW", w.BOOL, [w.LPCWSTR, w.DWORD, pointer, pointer]),
+            (self.security, "GetSecurityInfo", w.DWORD, [w.HANDLE, c.c_int, w.DWORD, pointer, pointer, pointer, pointer, pointer]),
+            (self.security, "GetSecurityDescriptorControl", w.BOOL, [pointer, pointer, pointer]),
+            (self.security, "GetAce", w.BOOL, [pointer, w.DWORD, pointer]),
+            (self.security, "EqualSid", w.BOOL, [pointer, pointer]),
+        ):
+            function = getattr(library, name)
+            function.restype, function.argtypes = result, arguments
+
+        class SecurityAttributes(c.Structure):
+            _fields_ = [("length", w.DWORD), ("descriptor", pointer), ("inherit", w.BOOL)]
+
+        class FileInformation(c.Structure):
+            _fields_ = [("attributes", w.DWORD), ("created", w.FILETIME),
+                        ("accessed", w.FILETIME), ("written", w.FILETIME),
+                        ("volume", w.DWORD), ("sizeHigh", w.DWORD), ("sizeLow", w.DWORD),
+                        ("links", w.DWORD), ("indexHigh", w.DWORD), ("indexLow", w.DWORD)]
+
+        self.FileInformation = FileInformation
+        token, needed = w.HANDLE(), w.DWORD()
+        if not self.security.OpenProcessToken(self.kernel.GetCurrentProcess(), 8, c.byref(token)):
+            raise BudgetError("PrivateIdentityUnavailable")
+        try:
+            self.security.GetTokenInformation(token, 1, None, 0, c.byref(needed))
+            self.token_user = c.create_string_buffer(needed.value)
+            if not self.security.GetTokenInformation(token, 1, self.token_user, needed, c.byref(needed)):
+                raise BudgetError("PrivateIdentityUnavailable")
+            self.sid = pointer.from_buffer(self.token_user).value
+        finally:
+            self.kernel.CloseHandle(token)
+        text_sid = w.LPWSTR()
+        if not self.security.ConvertSidToStringSidW(self.sid, c.byref(text_sid)):
+            raise BudgetError("PrivateIdentityUnavailable")
+        try:
+            sddl = f"O:{text_sid.value}D:P(A;OICI;FA;;;{text_sid.value})"
+        finally:
+            self.kernel.LocalFree(text_sid)
+        self.descriptor = pointer()
+        if not self.security.ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, c.byref(self.descriptor), None):
+            raise BudgetError("PrivateDescriptorUnavailable")
+        self.attributes = SecurityAttributes(c.sizeof(SecurityAttributes), self.descriptor, False)
+        self.directory = None
+
+    def close(self):
+        if self.directory is not None:
+            self.kernel.CloseHandle(self.directory)
+            self.directory = None
+        self.kernel.LocalFree(self.descriptor)
+        self.descriptor = None
+
+    def validate(self, handle, directory=False):
+        c = self.c
+        info = self.FileInformation()
+        if not self.kernel.GetFileInformationByHandle(handle, c.byref(info)):
+            raise BudgetError("PrivateStorageRequired")
+        if info.attributes & 0x400 or bool(info.attributes & 0x10) != directory or (not directory and info.links != 1):
+            raise BudgetError("PrivateStorageRequired")
+        owner, dacl, descriptor = c.c_void_p(), c.c_void_p(), c.c_void_p()
+        if self.security.GetSecurityInfo(handle, 1, 5, c.byref(owner), None, c.byref(dacl), None, c.byref(descriptor)):
+            raise BudgetError("PrivateAclRequired")
+        try:
+            if not owner or not self.security.EqualSid(owner, self.sid) or not dacl:
+                raise BudgetError("PrivateAclRequired")
+            # ACL header's AceCount is a WORD at offset 4. Require exactly one
+            # full-control allow entry for the authenticated process user.
+            if c.c_ushort.from_address(dacl.value + 4).value != 1:
+                raise BudgetError("PrivateAclRequired")
+            ace = c.c_void_p()
+            if not self.security.GetAce(dacl, 0, c.byref(ace)):
+                raise BudgetError("PrivateAclRequired")
+            if (c.c_ubyte.from_address(ace.value).value != 0
+                    or c.c_ubyte.from_address(ace.value + 1).value & 8
+                    or c.c_uint32.from_address(ace.value + 4).value != 0x1F01FF
+                    or not self.security.EqualSid(ace.value + 8, self.sid)):
+                raise BudgetError("PrivateAclRequired")
+            if directory:
+                control, revision = c.c_ushort(), c.c_ulong()
+                if (not self.security.GetSecurityDescriptorControl(descriptor, c.byref(control), c.byref(revision))
+                        or not control.value & 0x1000):
+                    raise BudgetError("PrivateAclRequired")
+        finally:
+            self.kernel.LocalFree(descriptor)
+
+    def open(self, path, *, create=False, directory=False, exclusive=False):
+        import msvcrt
+        c = self.c
+        access = 0x20080 if directory else 0xC0020000 if create or exclusive else 0x80020000
+        flags = 0x00200000 | (0x02000000 if directory else 0x80000000)
+        handle = self.kernel.CreateFileW(str(path), access, 0 if exclusive else 3,
+                                        c.byref(self.attributes), 4 if exclusive else 1 if create else 3,
+                                        flags, None)
+        if handle == c.c_void_p(-1).value:
+            if exclusive and c.get_last_error() == 32:
+                raise BudgetError("AnotherAcceptanceProcessActive")
+            raise BudgetError("PrivateStorageOpenFailed")
+        try:
+            self.validate(handle, directory)
+            if directory:
+                return handle
+            return msvcrt.open_osfhandle(handle, (os.O_RDWR if create or exclusive else os.O_RDONLY) | os.O_BINARY)
+        except BaseException:
+            self.kernel.CloseHandle(handle)
+            raise
+
+    def prepare(self, root):
+        if self.kernel.GetDriveTypeW(root.anchor) != 3:  # DRIVE_FIXED
+            raise BudgetError("PrivateLocalDirectoryRequired")
+        root.parent.mkdir(parents=True, exist_ok=True)
+        if not self.kernel.CreateDirectoryW(str(root), self.c.byref(self.attributes)) and self.c.get_last_error() != 183:
+            raise BudgetError("PrivateDirectoryRequired")
+        # Keep the directory open without FILE_SHARE_DELETE for this session.
+        self.directory = self.open(root, directory=True)
+
+    def temporary(self, root):
+        path = root / (".budget-" + uuid.uuid4().hex)
+        return self.open(path, create=True), path
+
+    def replace(self, source, target):
+        # The temporary file was fsynced. WRITE_THROUGH completes the rename
+        # before reporting success, within the same directory and volume.
+        if not self.kernel.MoveFileExW(str(source), str(target), 0x9):
+            raise BudgetError("PrivateLedgerCommitFailed")
 
 
 def integer(value):
@@ -115,30 +262,39 @@ class Ledger:
         self.data = None
         self.mutex = threading.RLock()
         self.initialized = False
+        self.windows = None
 
     def __enter__(self):
-        if os.name != "posix":
-            # chmod(0600) is not a private Windows ACL. Do not pretend it is.
+        if os.name not in {"posix", "nt"}:
             raise BudgetError("PrivateStorageAdapterRequired")
-        if any(p.is_symlink() for p in [self.root, *self.root.parents]):
+        if any(p.is_symlink() or (p.exists() and getattr(p.lstat(), "st_file_attributes", 0) & 0x400)
+               for p in [self.root, *self.root.parents]):
             raise BudgetError("PrivateDirectoryRequired")
         if any((p / ".git").exists() for p in [self.root, *self.root.parents]):
             raise BudgetError("OutsideRepositoryRequired")
-        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        info = self.root.stat()
-        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
-            raise BudgetError("PrivateDirectoryRequired")
-        import fcntl
-        fd = os.open(self.root / "traffic-budget.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-        self.lock = os.fdopen(fd, "r+b")
         try:
-            lock_info = os.fstat(fd)
-            if not stat.S_ISREG(lock_info.st_mode) or stat.S_IMODE(lock_info.st_mode) != 0o600 or lock_info.st_uid != os.getuid():
-                raise BudgetError("PrivateLockRequired")
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise BudgetError("AnotherAcceptanceProcessActive") from None
+            if os.name == "nt":
+                if not re.fullmatch(r"[A-Za-z]:", self.root.drive) or ":" in str(self.root)[2:]:
+                    raise BudgetError("PrivateLocalDirectoryRequired")
+                self.windows = _WindowsStorage()
+                self.windows.prepare(self.root)
+                fd = self.windows.open(self.root / "traffic-budget.lock", exclusive=True)
+            else:
+                self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+                info = self.root.stat()
+                if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+                    raise BudgetError("PrivateDirectoryRequired")
+                fd = os.open(self.root / "traffic-budget.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            self.lock = os.fdopen(fd, "r+b")
+            if os.name == "posix":
+                import fcntl
+                lock_info = os.fstat(fd)
+                if not stat.S_ISREG(lock_info.st_mode) or stat.S_IMODE(lock_info.st_mode) != 0o600 or lock_info.st_uid != os.getuid():
+                    raise BudgetError("PrivateLockRequired")
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise BudgetError("AnotherAcceptanceProcessActive") from None
             marker = self.lock.read(4096)
             if marker not in (b"", (TASK + "\n").encode("ascii")):
                 raise BudgetError("InvalidTaskBinding")
@@ -148,10 +304,11 @@ class Ledger:
             if self.path.exists() or self.path.is_symlink():
                 if not self.initialized:
                     raise BudgetError("TaskBindingMissing")
-                fd = os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW)
+                fd = self.windows.open(self.path) if self.windows else os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW)
                 with os.fdopen(fd, "r", encoding="utf-8") as stream:
                     info = os.fstat(stream.fileno())
-                    if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid() or info.st_size > 65536:
+                    if (not stat.S_ISREG(info.st_mode) or info.st_size > 65536
+                            or (not self.windows and (stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid()))):
                         raise BudgetError("PrivateLedgerRequired")
                     def unique_keys(pairs):
                         result = {}
@@ -167,14 +324,16 @@ class Ledger:
                 self._validate()
             return self
         except BaseException:
-            self.lock.close()
-            self.lock = None
+            self.__exit__()
             raise
 
     def __exit__(self, *unused):
         if self.lock:
             self.lock.close()
             self.lock = None
+        if self.windows:
+            self.windows.close()
+            self.windows = None
 
     def _validate(self):
         d = self.data
@@ -225,19 +384,23 @@ class Ledger:
         if not self.lock:
             raise BudgetError("LedgerNotLocked")
         self._validate()
-        fd, temporary = tempfile.mkstemp(prefix=".budget-", dir=self.root)
+        fd, temporary = self.windows.temporary(self.root) if self.windows else tempfile.mkstemp(prefix=".budget-", dir=self.root)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                os.fchmod(stream.fileno(), 0o600)
+                if not self.windows:
+                    os.fchmod(stream.fileno(), 0o600)
                 json.dump(self.data, stream, separators=(",", ":"), sort_keys=True)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, self.path)
-            parent = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(parent)
-            finally:
-                os.close(parent)
+            if self.windows:
+                self.windows.replace(temporary, self.path)
+            else:
+                os.replace(temporary, self.path)
+                parent = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(parent)
+                finally:
+                    os.close(parent)
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
