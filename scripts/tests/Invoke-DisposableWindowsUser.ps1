@@ -361,7 +361,7 @@ $result=[ordered]@{schema=1;success=$false;scope='A real temporary local standar
     profile_loaded=$false;child_completed=$false;remaining_job_processes=$null;forced_termination=$false
     account_removed=$false;profile_removed=$false;desktop_access_removed=$false;window_station_access_removed=$false
     desktop_dacl_restored=$false;window_station_dacl_restored=$false
-    input_acls_restored=$false;input_acl_checks=@();fixture_removed=$false;error=$null;cleanup_errors=@();profile_cleanup=$null}
+    input_acls_restored=$false;input_acl_checks=@();fixture_removed=$false;error=$null;cleanup_errors=@();profile_cleanup=$null;profile_owner_diagnostics=$null}
 function Add-FixtureAccessPlan([string]$Path,[Security.AccessControl.FileSystemRights]$Rights,[bool]$Inherit) {
     $before=[SwirlDisposableUser.Native]::FileAclSddl($Path)
     $fileGrants.Add([pscustomobject]@{path=$Path;before=$before;rights=$Rights;inherit=$Inherit})
@@ -596,6 +596,65 @@ finally {
                 $result.profile_removed=$true
             }
         }catch{$cleanupErrors.Add('profile: '+$_.Exception.Message)}
+    }
+    if($created -and $null -ne $result.profile_cleanup -and -not $result.profile_removed){
+        # Freeze the unchanged 30-second profile decision before querying.
+        # Observe before account deletion can change external owner lifetimes.
+        # This never retries deletion, unloads hives or changes acceptance flags.
+        $ownerDiagnostic=[ordered]@{schema=1;scope='Post-failure evidence only; original acceptance remains failed.'
+            attempted=$false;status='not-admitted';frozen_request_sha256=$null
+            launcher_exit_code=$null;report_file=$null;report_sha256=$null;observation_success=$false;session_end_confirmed=$false;error=$null}
+        $result.profile_owner_diagnostics=$ownerDiagnostic
+        try {
+            $cleanup=$result.profile_cleanup
+            if(-not $cleanup.path_verified -or -not $cleanup.token_path_verified -or
+               $cleanup.deadline_ms -ne 30000 -or $null -eq $cleanup.elapsed_ms -or $cleanup.elapsed_ms -lt 30000 -or
+               $null -eq $cleanup.final_state -or -not $cleanup.final_state.profile_path_exists -or
+               $cleanup.final_state.profile_key_exists -or $cleanup.final_state.user_hive_loaded -or $cleanup.final_state.user_classes_hive_loaded -or
+               $null -eq $cleanup.inventory_final -or $PSVersionTable.PSVersion.Major -ne 7 -or
+               [string]::IsNullOrWhiteSpace($env:SWIRL_PROFILE_OWNER_PYTHON) -or $env:GITHUB_SHA -cnotmatch '^[0-9a-f]{40}$'){
+                throw 'OwnerDiagnosticFrozenFailureUnavailable'
+            }
+            $ownerFiles=@($cleanup.inventory_final.entries|Where-Object {$_.kind -ceq 'file' -and $null -eq $_.hresult -and $null -ne $_.attributes -and -not ($_.attributes -band 0x410)})
+            if($ownerFiles.Count -lt 1 -or $ownerFiles.Count -gt 32){throw 'OwnerDiagnosticFileLimit'}
+            $ownerDirectory=Join-Path $evidence 'profile-owner-diagnostics'
+            Assert-SwirlPathWithoutLinks $ownerDirectory
+            if(Test-Path -LiteralPath $ownerDirectory){throw 'OwnerDiagnosticOutputAlreadyExists'}
+            [IO.Directory]::CreateDirectory($ownerDirectory)|Out-Null
+            $ownerRequest=Join-Path $ownerDirectory 'frozen-cleanup.json'
+            [ordered]@{schema=1;source_sha=$env:GITHUB_SHA;new_account_created=$created;username=$userName;sid=$userSid
+                profile_removed=$result.profile_removed;frozen_scope='Profile cleanup at its original deadline; account and fixture cleanup are still pending.'
+                profile_path=$profilePath;token_profile_path=$tokenProfilePath;path_verified=$cleanup.path_verified;token_path_verified=$cleanup.token_path_verified
+                cleanup_deadline_ms=[int]$cleanup.deadline_ms;cleanup_elapsed_ms=$cleanup.elapsed_ms;final_state=$cleanup.final_state
+                files=$ownerFiles;original_cleanup=$cleanup}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ownerRequest -Encoding UTF8
+            $ownerDiagnostic.frozen_request_sha256=(Get-FileHash -LiteralPath $ownerRequest -Algorithm SHA256).Hash.ToLowerInvariant()
+            $ownerLauncher=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../tools/ObserveWindowsProfileResidualOwners.py'))
+            $ownerPowerShell=Join-Path $PSHOME 'pwsh.exe'
+            foreach($ownerPath in @($env:SWIRL_PROFILE_OWNER_PYTHON,$ownerLauncher,$ownerPowerShell)){
+                if($ownerPath -notmatch '^[A-Za-z]:\\' -or $ownerPath.Substring(2) -match '[/:<>"|?*\x00-\x1f]'){throw 'OwnerDiagnosticLocalPathRequired'}
+                Assert-SwirlPathWithoutLinks $ownerPath
+                if(-not [IO.File]::Exists($ownerPath)){throw 'OwnerDiagnosticExecutableUnavailable'}
+            }
+            $ownerDiagnostic.attempted=$true
+            try {
+                & $env:SWIRL_PROFILE_OWNER_PYTHON $ownerLauncher --request $ownerRequest --request-sha256 $ownerDiagnostic.frozen_request_sha256 --powershell $ownerPowerShell > (Join-Path $ownerDirectory 'launcher-stdout.log') 2> (Join-Path $ownerDirectory 'launcher-stderr.log')
+            }finally{$ownerDiagnostic.launcher_exit_code=$LASTEXITCODE}
+            $ownerReport=Join-Path $ownerDirectory 'owner-diagnostics.json'
+            Assert-SwirlPathWithoutLinks $ownerReport
+            if(-not [IO.File]::Exists($ownerReport) -or (New-Object IO.FileInfo $ownerReport).Length -gt 262144){throw 'OwnerDiagnosticReceiptUnavailable'}
+            $ownerReceipt=Get-Content -LiteralPath $ownerReport -Raw -Encoding UTF8|ConvertFrom-Json
+            if($ownerReceipt.schema -ne 1 -or $ownerReceipt.source_sha -cne $env:GITHUB_SHA -or
+               $ownerReceipt.frozen_request_sha256 -cne $ownerDiagnostic.frozen_request_sha256 -or
+               $ownerReceipt.original_profile_removed -ne $false -or $ownerReceipt.original_cleanup_deadline_ms -ne 30000){throw 'OwnerDiagnosticReceiptIdentityInvalid'}
+            $ownerDiagnostic.status=[string]$ownerReceipt.status
+            $ownerDiagnostic.report_file='profile-owner-diagnostics/owner-diagnostics.json'
+            $ownerDiagnostic.report_sha256=(Get-FileHash -LiteralPath $ownerReport -Algorithm SHA256).Hash.ToLowerInvariant()
+            $ownerDiagnostic.observation_success=$ownerReceipt.success -eq $true -and $ownerDiagnostic.launcher_exit_code -eq 0
+            $ownerDiagnostic.session_end_confirmed=$ownerReceipt.session_end_confirmed -eq $true
+        }catch{
+            $ownerDiagnostic.error=if($_.Exception.Message -cmatch '^OwnerDiagnostic[A-Za-z]+$'){$_.Exception.Message}else{'OwnerDiagnosticObservationUnavailable'}
+            $ownerDiagnostic.status='incomplete'
+        }
     }
     if($created){try{[SwirlDisposableUser.Native]::RemoveUser($userName);$result.account_removed=-not [SwirlDisposableUser.Native]::UserExists($userName)}catch{$cleanupErrors.Add('account: '+$_.Exception.Message)}}
     try {

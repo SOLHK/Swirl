@@ -17,8 +17,13 @@
 #include <QtQml/private/qqmlengine_p.h>
 #include <QtQml/private/qqmldata_p.h>
 #include <QtQml/private/qqmlcontextdata_p.h>
+#include <QtQml/private/qqmlobjectcreator_p.h>
+#include <QtQml/private/qqmlsourcecoordinate_p.h>
 #include <QtQml/private/qqmlvmemetaobject_p.h>
+#include <QtQml/private/qv4engine_p.h>
+#include <QtQml/private/qv4mm_p.h>
 #include <QElapsedTimer>
+#include <QMetaEnum>
 #include <QScopedValueRollback>
 #include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
 #include <QJsonArray>
@@ -123,6 +128,7 @@ struct QmlVmeWarningCapture {
     QElapsedTimer runtime;
     QElapsedTimer firstMatch;
     QSet<const QObject *> observedObjects;
+    int capturedWarnings=0;
     bool reporting=false;
 };
 
@@ -183,6 +189,85 @@ static QJsonObject qmlWarningContextChain(QQmlContextData *context)
     return QJsonObject{{"entries",entries},{"truncated",context!=nullptr}};
 }
 
+static QJsonObject qmlWarningGcState(QQmlApplicationEngine &engine)
+{
+    const auto *v4=engine.handle();
+    const auto *memory=v4?v4->memoryManager:nullptr;
+    QJsonObject result{{"memoryManagerPresent",memory!=nullptr}};
+    if(!memory)return result;
+    const auto *state=memory->gcStateMachine.get();
+    result.insert("isGCOngoing",v4->isGCOngoing);
+    result.insert("gcBlocked",static_cast<int>(memory->gcBlocked));
+    result.insert("markStackPresent",memory->m_markStack!=nullptr);
+    result.insert("stateMachinePresent",state!=nullptr);
+    if(state){
+        result.insert("state",static_cast<int>(state->state));
+        result.insert("stateName",QString::fromLatin1(
+            QMetaEnum::fromType<QV4::GCStateMachine::GCState>().valueToKey(state->state)));
+    }
+    return result;
+}
+
+static QJsonObject qmlWarningCreationCandidates(QQmlApplicationEngine &engine,
+                                               const QQmlError &warning)
+{
+    // Qt 6.12's qmlWarning(QObject *) records source coordinates but does not
+    // set QQmlError::object(). These guarded objects are location candidates,
+    // never a recovered error-object identity. Suspended incubators and the
+    // complete QObject tree are outside this current creator's scope.
+    auto *creator=QQmlEnginePrivate::get(&engine)->activeObjectCreator;
+    constexpr int maximumScanned=8192;
+    constexpr int maximumCandidates=16;
+    const bool locationAvailable=!warning.url().isEmpty()
+        &&warning.line()>0&&warning.column()>0;
+    QJsonArray candidates;
+    QJsonObject result{
+        {"creatorPresent",creator!=nullptr},{"creatorAddress",qmlWarningAddress(creator)},
+        {"sourceLocationAvailable",locationAvailable},
+        {"scanLimit",maximumScanned},{"candidateLimit",maximumCandidates},
+        {"scannedGuards",0},{"matchingGuards",0},{"scanTruncated",false},
+        {"candidatesTruncated",false},{"candidates",candidates},
+        {"scope",QStringLiteral("Current active creator only; guarded objects matched by outerContext URL and instance line/column. Candidates are not QQmlError::object identities. Suspended incubators and the full object tree are not covered.")}};
+    if(!creator||!locationAvailable)return result;
+    const auto &created=creator->allCreatedObjects();
+    int scanned=0;
+    int matching=0;
+    for(const auto &guard:created){
+        if(scanned>=maximumScanned)break;
+        ++scanned;
+        auto *object=guard.data();
+        if(!object)continue;
+        const auto *objectState=QObjectPrivate::get(object);
+        if(objectState->wasDeleted||objectState->isDeletingChildren)continue;
+        const auto *data=QQmlData::get(object,false);
+        if(!data||!data->outerContext||data->outerContext->url()!=warning.url()
+            ||qmlConvertSourceCoordinate<quint16,int>(data->lineNumber)!=warning.line()
+            ||qmlConvertSourceCoordinate<quint16,int>(data->columnNumber)!=warning.column())continue;
+        ++matching;
+        if(candidates.size()>=maximumCandidates)continue;
+        QJsonArray parents;
+        auto *parent=object->parent();
+        while(parent&&parents.size()<16){
+            parents.append(qmlWarningObjectState(parent));
+            const auto *parentState=QObjectPrivate::get(parent);
+            if(parentState->wasDeleted||parentState->isDeletingChildren)break;
+            parent=parent->parent();
+        }
+        candidates.append(QJsonObject{
+            {"identityScope",QStringLiteral("source-location candidate from QQmlGuard")},
+            {"guardIndex",scanned-1},{"object",qmlWarningObjectState(object)},
+            {"parents",parents},{"parentsTruncated",parent!=nullptr},
+            {"context",qmlWarningContextChain(data->context)},
+            {"outerContext",qmlWarningContextChain(data->outerContext)}});
+    }
+    result.insert("scannedGuards",scanned);
+    result.insert("matchingGuards",matching);
+    result.insert("scanTruncated",created.size()>static_cast<size_t>(scanned));
+    result.insert("candidatesTruncated",matching>maximumCandidates);
+    result.insert("candidates",candidates);
+    return result;
+}
+
 static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
                                       QmlVmeWarningCapture &capture,
                                       const QList<QQmlError> &warnings)
@@ -191,7 +276,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
     // metadata and never reads a QML property, evaluates JavaScript, drains an
     // incubator, or creates a public QQmlContext wrapper.
     if(capture.reporting)return;
-    constexpr int maximumObjects=16;
+    constexpr int maximumWarnings=16;
     constexpr qint64 firstClusterMs=250;
     for(const auto &warning:warnings){
         const auto description=warning.description();
@@ -202,13 +287,16 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
         if(!matches)continue;
         if(!capture.firstMatch.isValid())capture.firstMatch.start();
         if(capture.firstMatch.elapsed()>firstClusterMs
-            ||capture.observedObjects.size()>=maximumObjects)return;
+            ||capture.capturedWarnings>=maximumWarnings)return;
         auto *object=warning.object();
-        if(capture.observedObjects.contains(object))continue;
-        capture.observedObjects.insert(object);
+        if(object&&capture.observedObjects.contains(object))continue;
+        if(object)capture.observedObjects.insert(object);
+        ++capture.capturedWarnings;
         QScopedValueRollback<bool> reporting(capture.reporting,true);
         const auto *engineState=QQmlEnginePrivate::get(&engine);
         const int inProgressBefore=engineState->inProgressCreations;
+        const auto gcState=qmlWarningGcState(engine);
+        const auto creationCandidates=object?QJsonObject{}:qmlWarningCreationCandidates(engine,warning);
         auto *controller=engine.incubationController();
         QJsonArray parents;
         const auto *objectState=object?QObjectPrivate::get(object):nullptr;
@@ -228,7 +316,8 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
             {"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
             {"elapsedMs",capture.firstMatch.elapsed()},
             {"runtimeMs",capture.runtime.elapsed()},
-            {"captureLimit",maximumObjects},{"clusterWindowMs",firstClusterMs},
+            {"captureLimit",maximumWarnings},{"clusterWindowMs",firstClusterMs},
+            {"capturedWarnings",capture.capturedWarnings},
             {"capturedObjects",static_cast<int>(capture.observedObjects.size())},
             {"description",description},{"url",url.scheme()==QStringLiteral("qrc")?url.toString():url.fileName()},
             {"line",warning.line()},{"column",warning.column()},
@@ -236,6 +325,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
             {"parents",parents},{"parentsTruncated",parent!=nullptr},
             {"context",qmlWarningContextChain(data?data->context:nullptr)},
             {"outerContext",qmlWarningContextChain(data?data->outerContext:nullptr)},
+            {"gc",gcState},{"creationCandidates",creationCandidates},
             {"inProgressCreations",inProgressBefore},
             {"publicIncubators",controller?controller->incubatingObjectCount():0},
             {"inProgressAfterObservation",engineState->inProgressCreations},
