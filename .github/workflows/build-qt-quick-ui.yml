@@ -318,6 +318,11 @@ jobs:
           if ((Get-FileHash -LiteralPath 'dist/msvc-runtime.json' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/msvc-runtime.json' -Algorithm SHA256).Hash) { throw 'Test runtime CRT metadata differs from the verified deployment.' }
           & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
+      - name: Refuse legacy live QA entry before private paths or self-test dispatch
+        shell: pwsh
+        run: |
+          python tools/tests/test_runtime_acceptance_refusal.py --executable dist/Swirl.exe --expected-source $env:GITHUB_SHA --flavor qa --output build-evidence/runtime-refusal-qa --powershell (Get-Command powershell.exe -ErrorAction Stop).Source --powershell (Get-Command pwsh -ErrorAction Stop).Source
+          if ($LASTEXITCODE -ne 0) { throw 'The actual QA executable or legacy PowerShell launcher admitted an unguarded runtime entry.' }
       - name: Verify authenticated product broker control without starting TUN
         if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
         shell: pwsh
@@ -844,6 +849,11 @@ jobs:
               }
             }
           }
+      - name: Refuse legacy live parameters in the actual production Release
+        shell: pwsh
+        run: |
+          python tools/tests/test_runtime_acceptance_refusal.py --executable installer-bin/Swirl.exe --expected-source $env:GITHUB_SHA --flavor release --output out/package-evidence/runtime-refusal-release
+          if ($LASTEXITCODE -ne 0) { throw 'The actual production executable admitted a legacy runtime entry.' }
       # Retain successful compiler work before downstream tests can time out.
       # Restored test evidence is still discarded before every build above.
       - name: Save reusable compiler outputs
@@ -1401,6 +1411,7 @@ jobs:
             build-evidence/critical-policy-evidence/
             build-evidence/critical-network.xml
             build-evidence/node-diagnostic-regression.xml
+            build-evidence/runtime-refusal-qa/
             build-evidence/native-tun-broker-control.xml
             build-evidence/native-tun-broker-control.json
             build-evidence/native-tun-broker-control-fixture.json

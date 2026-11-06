@@ -22,6 +22,22 @@ BASE = "upload=100000000; download=900000000; total=100000000000"
 
 
 class PolicyTests(unittest.TestCase):
+    def test_delayed_local_usage_and_other_clients_cannot_share_budget_credit(self):
+        # These observations may be disjoint: the provider has reported other
+        # clients while this task's settled socket counts have not arrived yet.
+        # No timestamp or attribution proof permits treating their overlap as
+        # known. Test every task boundary with individually smaller observations.
+        cases = ((1_100_000_000, 900_000_000, "NormalTargetReached"),
+                 (4_000_000_000, 1_000_000_000, "ReviewRequired"),
+                 (9_000_000_000, 1_000_000_000, "NoExpansion"),
+                 (14_000_000_000, 1_000_000_000, "MandatoryStop"),
+                 (19_000_000_000, 1_000_000_000, "AbsoluteLimit"))
+        for billed, local, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(budget.policy(billed, local, 0, 100 * budget.GB), expected)
+        # Even equal values do not establish that the same bytes were billed.
+        self.assertEqual(budget.policy(600, 600, 0, budget.RESERVE_PACKAGE + 599), "PackageReserve")
+
     def test_decimal_thresholds_and_package_reserve(self):
         for consumed, code in ((0, "WithinNormalTarget"), (2, "NormalTargetReached"),
                                (5, "ReviewRequired"), (10, "NoExpansion"),
@@ -29,10 +45,10 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(consumed=consumed):
                 self.assertEqual(budget.policy(consumed * budget.GB, 0, 0, 100 * budget.GB), code)
         self.assertEqual(budget.policy(0, 0, 1, 80 * budget.GB), "PackageReserve")
-        # Provider counters can lag; already-measured local traffic must also
-        # preserve the user's 80 GB, without double-counting billed traffic.
+        # Provider counters can lag, and their growth may be other clients.
+        # Without attribution evidence, retain all local traffic in headroom.
         self.assertEqual(budget.policy(0, 1_500_000_000, 0, 81 * budget.GB), "PackageReserve")
-        self.assertEqual(budget.policy(1_500_000_000, 1_500_000_000, 0, 81 * budget.GB), "WithinNormalTarget")
+        self.assertEqual(budget.policy(1_500_000_000, 1_500_000_000, 0, 81 * budget.GB), "PackageReserve")
         self.assertEqual(budget.policy(15 * budget.GB, 0, 0, 79 * budget.GB), "MandatoryStop")
         self.assertEqual(budget.policy(0, 2 * budget.GB - 10, 10, 100 * budget.GB), "NormalTargetReached")
 
@@ -80,6 +96,43 @@ class LedgerTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_unattributed_provider_growth_keeps_delayed_local_debit_after_restart(self):
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(BASE)
+            ticket = ledger.reserve_offline(1, 1000)
+            ledger.account_offline(ticket, download=1000)
+            ledger.finish_offline(ticket, quiescent=True)
+            ledger.observe_provider(f"upload=100000000; download={900000000 + budget.TARGET - 500}; total=100000000000")
+            state = ledger.summary()
+            self.assertEqual(state["billingDelta"], budget.TARGET - 500)
+            self.assertEqual((state["localUpload"], state["localDownload"], state["heldBytes"]), (0, 1000, 0))
+            durable = ledger.path.read_bytes()
+        with budget.Ledger(self.root) as ledger:
+            self.assertEqual(ledger.summary(), state)
+            self.assertEqual(state["policy"], "NormalTargetReached")
+            with self.assertRaisesRegex(budget.BudgetError, "NormalTargetReached"):
+                ledger.reserve_offline(2, 1)
+            self.assertEqual(ledger.path.read_bytes(), durable)
+            self.assertEqual(ledger.summary()["attempts"], 1)
+
+    def test_other_client_growth_does_not_release_package_headroom(self):
+        # Only numeric offline fixtures; no provider request or private ledger.
+        total = budget.RESERVE_PACKAGE + 1200
+        with budget.Ledger(self.root) as ledger:
+            ledger.initialize(f"upload=100; download=900; total={total}")
+            ticket = ledger.reserve_offline(1, 100)
+            ledger.account_offline(ticket, download=100)
+            ledger.finish_offline(ticket, quiescent=True)
+            ledger.observe_provider(f"upload=100; download=1001; total={total}")
+            state = ledger.summary()
+            self.assertEqual((state["billingDelta"], state["localDownload"], state["providerRemaining"]),
+                             (101, 100, budget.RESERVE_PACKAGE + 99))
+            durable = ledger.path.read_bytes()
+            self.assertEqual(state["policy"], "PackageReserve")
+            with self.assertRaisesRegex(budget.BudgetError, "PackageReserve"):
+                ledger.reserve_offline(2, 1)
+            self.assertEqual(ledger.path.read_bytes(), durable)
 
     def test_restart_keeps_baseline_counts_and_unsettled_reservations(self):
         with budget.Ledger(self.root) as ledger:
@@ -648,10 +701,10 @@ with m.Ledger(sys.argv[2]) as ledger:
             ledger.observe_provider("upload=100001000; download=900000000; total=100000000000")
             state = ledger.summary()
             self.assertEqual((state["billingDelta"], state["localUpload"], state["localDownload"]), (1000, 128, 256))
-            self.assertEqual(state["guardedBytes"], 1000 + 640)
-            self.assertEqual(state["remainingAbsoluteBudget"], budget.ABSOLUTE - 1640)
+            self.assertEqual(state["guardedBytes"], 1000 + 384 + 640)
+            self.assertEqual(state["remainingAbsoluteBudget"], budget.ABSOLUTE - 2024)
             ledger.finish_offline(ticket, quiescent=True)
-            self.assertEqual(ledger.summary()["remainingAbsoluteBudget"], budget.ABSOLUTE - 1000)
+            self.assertEqual(ledger.summary()["remainingAbsoluteBudget"], budget.ABSOLUTE - 1384)
 
     def test_known_stats_never_fake_native_readiness(self):
         with budget.Ledger(self.root) as ledger:

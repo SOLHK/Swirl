@@ -36,7 +36,9 @@ if ($argumentObject -isnot [pscustomobject] -or
 if (-not ('SwirlDisposableUser.Native' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -57,14 +59,61 @@ namespace SwirlDisposableUser {
     [DllImport("userenv.dll",CharSet=CharSet.Unicode,ExactSpelling=true,SetLastError=true)]
     [return: MarshalAs(UnmanagedType.Bool)] static extern bool DeleteProfileW(string sid,string profile,string computer);
     public sealed class ProfileDeleteResult { public bool Succeeded; public int Error; }
+    static ProfileDeleteResult DeleteProfileResult(string sid,string profile) {
+      bool succeeded=DeleteProfileW(sid,profile,null);
+      int error=succeeded ? 0 : Marshal.GetLastWin32Error();
+      return new ProfileDeleteResult { Succeeded=succeeded, Error=error };
+    }
     public static ProfileDeleteResult DeleteOwnedProfile(string sid) {
       // https://learn.microsoft.com/windows/win32/api/userenv/nf-userenv-deleteprofilew
       // PowerShell converts $null passed to a string parameter to "". The
       // computer argument must be a native NULL on supported Windows versions.
       // Preserve BOOL separately: FALSE with error 0 is not a successful call.
-      bool succeeded=DeleteProfileW(sid,null,null);
-      int error=succeeded ? 0 : Marshal.GetLastWin32Error();
-      return new ProfileDeleteResult { Succeeded=succeeded, Error=error };
+      return DeleteProfileResult(sid,null);
+    }
+    public static ProfileDeleteResult DeleteOwnedProfileAtVerifiedPath(string sid,string profile) {
+      // The caller admits only its exact token-verified, unlinked temporary
+      // profile after the registry-resolved call succeeded and both hives left.
+      if(String.IsNullOrWhiteSpace(profile)||!Path.IsPathRooted(profile))throw new ArgumentException("A verified absolute profile path is required.");
+      return DeleteProfileResult(sid,profile);
+    }
+    public sealed class ProfileInventoryEntry {
+      public string relative_path,kind,attribute_names,error_operation,error_message;
+      public int depth; public int? attributes,hresult; public long? bytes;
+    }
+    public sealed class ProfileInventory {
+      public int entry_limit=128,depth_limit=12; public bool truncated;
+      public string[] truncation_reasons; public ProfileInventoryEntry[] entries;
+    }
+    sealed class ProfileInventoryPath { public string Full,Relative; public int Depth; }
+    public static ProfileInventory ReadOwnedProfileInventory(string root) {
+      // Metadata only. Lazy enumeration, bounded queue and no recursion through
+      // observed reparse points; do not read file contents or resolve link targets.
+      var result=new ProfileInventory();var entries=new List<ProfileInventoryEntry>();
+      var limits=new List<string>();var pending=new Queue<ProfileInventoryPath>();
+      pending.Enqueue(new ProfileInventoryPath { Full=Path.GetFullPath(root),Relative=".",Depth=0 });
+      while(pending.Count!=0) {
+        var path=pending.Dequeue();var entry=new ProfileInventoryEntry { relative_path=path.Relative,depth=path.Depth,kind="unknown" };
+        entries.Add(entry);string operation="attributes";
+        try {
+          FileAttributes attributes=File.GetAttributes(path.Full);
+          entry.attributes=(int)attributes;entry.attribute_names=attributes.ToString();
+          if((attributes&FileAttributes.ReparsePoint)!=0){entry.kind="reparse-point-not-followed";continue;}
+          if((attributes&FileAttributes.Directory)==0){entry.kind="file";operation="file-size";entry.bytes=new FileInfo(path.Full).Length;continue;}
+          entry.kind="directory";
+          if(path.Depth>=result.depth_limit){result.truncated=true;if(!limits.Contains("depth-limit"))limits.Add("depth-limit");continue;}
+          operation="directory-enumeration";
+          foreach(string child in Directory.EnumerateFileSystemEntries(path.Full)) {
+            if(entries.Count+pending.Count>=result.entry_limit){result.truncated=true;if(!limits.Contains("entry-limit"))limits.Add("entry-limit");break;}
+            pending.Enqueue(new ProfileInventoryPath { Full=child,Relative=(path.Relative=="." ? "" : path.Relative+"/")+Path.GetFileName(child),Depth=path.Depth+1 });
+          }
+        }catch(Exception error){
+          entry.error_operation=operation;entry.hresult=error.HResult;
+          entry.error_message="Profile metadata observation failed; no file contents were read.";
+          if(error is FileNotFoundException||error is DirectoryNotFoundException)entry.kind="missing";
+        }
+      }
+      result.entries=entries.ToArray();result.truncation_reasons=limits.ToArray();return result;
     }
     [DllImport("userenv.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool GetUserProfileDirectoryW(IntPtr token,StringBuilder path,ref uint length);
     [DllImport("advapi32.dll",SetLastError=true)] static extern bool OpenProcessToken(IntPtr process,uint access,out IntPtr token);
@@ -451,10 +500,11 @@ finally {
     if($created -and $userSid){
         $profileAttempts=New-Object 'System.Collections.Generic.List[object]'
         $profileObservations=New-Object 'System.Collections.Generic.List[object]'
-        $result.profile_cleanup=[ordered]@{deadline_ms=30000;poll_interval_ms=200;path_scope='Exact newly created disposable account; raw profile paths omitted from observations.';path_verified=$false;native_delete_accepted=$false;attempts=$profileAttempts;observations=$profileObservations;final_state=$null;elapsed_ms=$null}
+        $result.profile_cleanup=[ordered]@{deadline_ms=30000;poll_interval_ms=200;path_scope='Exact newly created disposable account; raw profile paths omitted from observations.';path_verified=$false;token_path_verified=$false;native_delete_accepted=$false;explicit_path_delete_attempted=$false;attempts=$profileAttempts;observations=$profileObservations;inventory_before=$null;inventory_after_registry_delete=$null;inventory_final=$null;final_state=$null;elapsed_ms=$null}
         try {
             $profileKey='Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\'+$userSid
-            $profilePath=if($null -ne $result.token){[string]$result.token.ProfilePath}else{$null}
+            $tokenProfilePath=if($null -ne $result.token){[string]$result.token.ProfilePath}else{$null}
+            $profilePath=$tokenProfilePath
             if(Test-Path -LiteralPath $profileKey){
                 $registeredPath=[Environment]::ExpandEnvironmentVariables((Get-ItemProperty -LiteralPath $profileKey).ProfileImagePath)
                 if($profilePath -and [IO.Path]::GetFullPath($profilePath) -ine [IO.Path]::GetFullPath($registeredPath)){throw 'Disposable profile registry path differs from the verified child token.'}
@@ -464,6 +514,7 @@ finally {
                 Assert-SwirlPathWithoutLinks $profilePath
                 if($profilePath -ieq [Environment]::GetFolderPath('UserProfile') -or [IO.Path]::GetFileName($profilePath) -notlike ($userName+'*')){throw 'Refusing a profile outside the newly created account.'}
                 $result.profile_cleanup.path_verified=$true
+                $result.profile_cleanup.token_path_verified=-not [string]::IsNullOrWhiteSpace($tokenProfilePath)
                 $profileWatch=[Diagnostics.Stopwatch]::StartNew()
                 function Read-OwnedProfileCleanupState {
                     $observation=[ordered]@{
@@ -477,6 +528,7 @@ finally {
                     return $observation
                 }
                 try {
+                    $result.profile_cleanup.inventory_before=[SwirlDisposableUser.Native]::ReadOwnedProfileInventory($profilePath)
                     while($true) {
                         $state=Read-OwnedProfileCleanupState
                         $profileObservations.Add($state);$result.profile_cleanup.final_state=$state
@@ -484,13 +536,35 @@ finally {
                         if($profileWatch.ElapsedMilliseconds -ge 30000){break}
                         # The native NULL profile path is resolved from ProfileList.
                         # Retry only a still-registered profile after a failed BOOL.
-                        # An accepted deletion needs observation, not another delete.
+                        # After acceptance, do not repeat the registry-resolved
+                        # call; observe cleanup, with one verified explicit-path
+                        # retry below if only the owned directory remains.
                         if($state.profile_key_exists -and -not $result.profile_cleanup.native_delete_accepted) {
-                            $attempt=[ordered]@{number=($profileAttempts.Count+1);before=$state;native_succeeded=$null;native_error=$null;after=$null}
+                            $attempt=[ordered]@{number=($profileAttempts.Count+1);path_mode='registry-resolved-null';before=$state;native_succeeded=$null;native_error=$null;after=$null}
                             $profileAttempts.Add($attempt)
                             $native=[SwirlDisposableUser.Native]::DeleteOwnedProfile($userSid)
                             $attempt.native_succeeded=$native.Succeeded;$attempt.native_error=$native.Error
-                            if($native.Succeeded){$result.profile_cleanup.native_delete_accepted=$true}
+                            if($native.Succeeded){
+                                $result.profile_cleanup.native_delete_accepted=$true
+                                $result.profile_cleanup.inventory_after_registry_delete=[SwirlDisposableUser.Native]::ReadOwnedProfileInventory($profilePath)
+                            }
+                            $attempt.after=Read-OwnedProfileCleanupState
+                            $state=$attempt.after;$result.profile_cleanup.final_state=$state
+                            if($attempt.after.elapsed_ms -le 30000 -and -not $attempt.after.profile_key_exists -and -not $attempt.after.profile_path_exists -and -not $attempt.after.user_hive_loaded -and -not $attempt.after.user_classes_hive_loaded){$result.profile_removed=$true;break}
+                        }
+                        if($profileWatch.ElapsedMilliseconds -lt 30000 -and $result.profile_cleanup.native_delete_accepted -and $result.profile_cleanup.token_path_verified -and
+                           -not $result.profile_cleanup.explicit_path_delete_attempted -and $state.profile_path_exists -and
+                           -not $state.profile_key_exists -and -not $state.user_hive_loaded -and -not $state.user_classes_hive_loaded) {
+                            # Once ProfileList is gone, a NULL-path retry cannot
+                            # resolve the directory. Admit one documented native
+                            # profile deletion with the previously verified path.
+                            # No direct filesystem deletion or hive unload.
+                            Assert-SwirlPathWithoutLinks $tokenProfilePath
+                            $result.profile_cleanup.explicit_path_delete_attempted=$true
+                            $attempt=[ordered]@{number=($profileAttempts.Count+1);path_mode='explicit-verified-token-path';before=$state;native_succeeded=$null;native_error=$null;after=$null}
+                            $profileAttempts.Add($attempt)
+                            $native=[SwirlDisposableUser.Native]::DeleteOwnedProfileAtVerifiedPath($userSid,$tokenProfilePath)
+                            $attempt.native_succeeded=$native.Succeeded;$attempt.native_error=$native.Error
                             $attempt.after=Read-OwnedProfileCleanupState
                             $result.profile_cleanup.final_state=$attempt.after
                             if($attempt.after.elapsed_ms -le 30000 -and -not $attempt.after.profile_key_exists -and -not $attempt.after.profile_path_exists -and -not $attempt.after.user_hive_loaded -and -not $attempt.after.user_classes_hive_loaded){$result.profile_removed=$true;break}
@@ -499,7 +573,23 @@ finally {
                         if($remaining -le 0){break}
                         Start-Sleep -Milliseconds ([int][Math]::Min(200,$remaining))
                     }
-                }finally{$profileWatch.Stop();$result.profile_cleanup.elapsed_ms=$profileWatch.Elapsed.TotalMilliseconds}
+                }finally{
+                    # A service can recreate a directory after an earlier
+                    # absence observation. Final metadata must not contradict
+                    # a success flag, or receive extra time after the deadline.
+                    $previouslyAbsent=$result.profile_removed
+                    $result.profile_removed=$false
+                    try {
+                        $result.profile_cleanup.inventory_final=[SwirlDisposableUser.Native]::ReadOwnedProfileInventory($profilePath)
+                        $finalState=Read-OwnedProfileCleanupState
+                        $result.profile_cleanup.final_state=$finalState
+                        $result.profile_removed=$previouslyAbsent -and $finalState.elapsed_ms -le 30000 -and
+                            -not $finalState.profile_key_exists -and -not $finalState.profile_path_exists -and
+                            -not $finalState.user_hive_loaded -and -not $finalState.user_classes_hive_loaded
+                    }finally{
+                        $profileWatch.Stop();$result.profile_cleanup.elapsed_ms=$profileWatch.Elapsed.TotalMilliseconds
+                    }
+                }
                 if(-not $result.profile_removed){throw 'Disposable profile key, directory and both user hives were not confirmed absent within 30000 ms; see profile_cleanup.'}
             }else{
                 if($result.profile_loaded -or (Test-Path -LiteralPath $profileKey) -or (Test-Path -LiteralPath ('Registry::HKEY_USERS\'+$userSid)) -or (Test-Path -LiteralPath ('Registry::HKEY_USERS\'+$userSid+'_Classes'))){throw 'The owned profile path is unavailable; cleanup cannot be verified.'}

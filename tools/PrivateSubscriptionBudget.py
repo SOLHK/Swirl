@@ -8,8 +8,12 @@ Supervised synthetic reservations are a separately typed domain, executed only
 by PrivateSubscriptionSupervisor against its own authenticated loopback peer.
 
 The ledger survives batches, process restarts and interrupted reservations.
-Provider billing and local transfer counts remain separate. Byte units are
-decimal GB, conservatively smaller than GiB. No reset operation is provided.
+Provider billing and local transfer counts remain separate. Admission grants
+no overlap credit without attribution evidence: account growth, settled local
+counts and outstanding reservations are added conservatively. That upper bound
+is not measured traffic or a claim that account growth came from this task.
+Byte units are decimal GB, conservatively smaller than GiB. No reset operation
+is provided.
 Every window/process must use the same stable, persistent state directory. A
 different directory or machine is not automatically linked; moving execution
 requires preserving the complete ledger and its initialization/lock marker.
@@ -290,15 +294,17 @@ def parse_userinfo(header):
 def policy(billed, local, held, provider_remaining):
     values = [integer(v) for v in (billed, local, held, provider_remaining)]
     billed, local, held, provider_remaining = values
-    # These are independent observations, not amounts to add and double-count.
-    # Held reservations cover unaccounted or interrupted traffic conservatively.
-    guarded = max(billed, local) + held
+    # Account growth can be other clients' usage while this task's local bytes
+    # are still unreported. Neither equal counts nor a larger billed count
+    # proves overlap. Keep both for admission until a future authenticated
+    # reconciliation supplies attribution/coverage evidence. This can count
+    # reflected local bytes twice, but cannot spend unproven overlap credit.
+    guarded = billed + local + held
     if guarded >= ABSOLUTE:
         return "AbsoluteLimit"
     if guarded >= STOP:
         return "MandatoryStop"
-    unbilled_local = max(0, local - billed)
-    if provider_remaining < RESERVE_PACKAGE + unbilled_local + held:
+    if provider_remaining < RESERVE_PACKAGE + local + held:
         return "PackageReserve"
     if guarded >= NO_EXPANSION:
         return "NoExpansion"
@@ -622,7 +628,7 @@ class Ledger:
             billed = None if current is None else used_now - used_start
             remaining = None if current is None else current["total"] - used_now
             synthetic = d["schema"] == 3
-            guarded = local + held if synthetic else None if billed is None else max(billed, local) + held
+            guarded = local + held if synthetic else None if billed is None else billed + local + held
             state = policy(0, local, held, MAX_COUNTER) if synthetic else "BillingUnavailable" if billed is None else policy(billed, local, held, remaining)
             if current is not None and current.get("expire", 0) and current["expire"] <= int(time.time()):
                 state = "BillingExpired"

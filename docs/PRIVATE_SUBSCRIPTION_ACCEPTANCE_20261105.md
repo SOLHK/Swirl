@@ -14,6 +14,26 @@ the actual importer and an independent encrypted NodeStore round trip.
 
 ## Current 0.2.40 live boundary
 
+The historical `Swirl.exe --runtime-store/--runtime-commands/--runtime-state`
+QA entry is also closed. Either QA or Release refuses any of those options,
+including partial, empty and separate-value arguments, before Qt startup,
+maintenance/self-test dispatch or private-store access. The legacy
+`tools/Invoke-WindowsRustAcceptance.ps1` launcher refuses before resolving its
+paths or creating output. Both return exit 64 and the fixed, value-free
+`AuthenticatedBillingAndWireGuardRequired` error. Ordinary UI operation and
+the existing `ControlledNetwork` controller tests are unchanged. This closes
+an alternate unguarded acceptance entry; it does not connect the live guard.
+
+`tools/tests/test_runtime_acceptance_refusal.py` runs the actual deployed QA and
+production EXEs with synthetic sentinel paths, then the old launcher with
+Windows PowerShell 5.1 and PowerShell 7. It checks exact error/exit 64, value
+redaction and unchanged sentinel/profile/output trees. A deliberately absent
+QPA plugin prevents an accidentally reopened GUI from reaching network setup;
+mixed TLS/Rust self-tests and extra-argument maintenance calls prove refusal
+precedes their dispatch. Raw output and source/EXE hashes are retained even on
+failure. These negative checks do not replace the existing legal runtime
+self-tests or `ControlledNetwork` positive cases.
+
 `--live` unconditionally returns `AuthenticatedBillingAndWireGuardRequired`
 before reading a private manifest, creating an output directory or starting a
 network runtime. A fresh authorization window does not bypass this refusal.
@@ -26,6 +46,19 @@ the session until it closes and reloads actual disk state under the exclusive
 lock. Existing baselines, local counts and outstanding reservations survive a
 schema-1 to schema-2 upgrade. Official account growth and local socket bytes
 remain separate; account growth can include other clients.
+
+Until authenticated reconciliation proves which local bytes are already
+reflected, budget admission gives no overlap credit. It conservatively adds
+account growth, settled local counts and outstanding holds; the reported
+package remainder must also cover all local counts and holds above 80 GB.
+Taking the larger of account growth and local counts is insufficient when
+other clients have been billed while this task's usage is delayed. This may
+count already reflected local bytes twice for refusal, but never attributes
+all account growth to Swirl or reports that admission bound as measured
+traffic. No stored baseline, schema, counter or reservation is reset. The
+synthetic domain has no official account observation, so its accounting is
+unchanged. This conservative numeric rule is still not authenticated billing
+or a complete wire bound.
 
 The optional Rust `private-acceptance` build provides one process-wide TCP
 quota, an immutable deadline of at most 8000 ms, cancellation during connect,

@@ -57,6 +57,7 @@
 #include <QStandardPaths>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <cstdio>
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
@@ -347,6 +348,19 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    // The legacy real-node QA harness has no authenticated billing/ledger or
+    // complete wire guard. Reject even partial/empty options in BOTH builds,
+    // before maintenance dispatch, Qt startup, private stores or networking.
+    // Never echo an argument: its value may contain a private path or token.
+    for (int i = 1; i < argc; ++i) {
+        const QByteArray argument(argv[i]);
+        for (const auto option : {"--runtime-store", "--runtime-commands", "--runtime-state"}) {
+            if (argument == option || argument.startsWith(QByteArray(option) + '=')) {
+                std::fputs("{\"errorCode\":\"AuthenticatedBillingAndWireGuardRequired\",\"networkStarted\":false}\n", stderr);
+                return 64;
+            }
+        }
+    }
     // Package verification runs the real EXE/DLL, before any UI, NodeStore,
     // system-proxy ownership, or persisted settings are opened.
     for (int i = 1; i < argc; ++i) {

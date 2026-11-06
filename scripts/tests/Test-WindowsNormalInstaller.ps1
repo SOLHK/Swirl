@@ -177,6 +177,7 @@ if(-not $ExpectedUserSid) {
                 $runner.remaining_job_processes -eq 0 -and $runner.account_removed -and $runner.profile_removed -and $runner.input_acls_restored -and
                 $case.cross_version_upgrade.verified -and $case.dpapi_store_preservation.stages.Count -eq 5
             $summary=[ordered]@{schema=1;scope='actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data';source_sha=$source;candidate_version=$version;installer_sha256=$installerHash;baseline=$old;baseline_admission=$admission;identical_persistence_sources=$crossInput.identical_persistence_sources;fixture_writer='Current separately paired QA helper using identical production NodeStore sources; not the historical application writer.';original_private_profile_tested=$false;provider_requests=0;case=$case;standard_user=$runner;host_user_integration_unchanged=$parentUnchanged;host_system_proxy_unchanged=$parentProxyUnchanged;candidate_installer_unchanged=$candidateUnchanged;baseline_installer_unchanged=$baselineUnchanged;success=($null -eq $failure -and $complete -and $parentUnchanged -and $parentProxyUnchanged -and $candidateUnchanged -and $baselineUnchanged);error=$failure}
+            $summary.system_proxy_scope='Actual old normal-UI exit through candidate upgrade, normal UI, uninstall and final fixture verification; cold-profile history is reported separately.'
             $summary|ConvertTo-Json -Depth 22|Set-Content -LiteralPath (Join-Path $evidence 'cross-version.json') -Encoding UTF8
         }
         if(-not $summary.success){throw ('Cross-version installer acceptance failed: '+$failure)}
@@ -254,26 +255,50 @@ $storeStages=New-Object 'System.Collections.Generic.List[object]'
 $report.dpapi_store_preservation=[ordered]@{requested=($Scenario -in @('upgrade','cross-version'));scope='same-package-reinstall-synthetic-v1-node-store';previous_release_migration=$false;helper_sha256=$ExpectedNodeStoreHelperSha256;rust_build_id=$manifest.rust.build_id;parent_host_scope_forwarded=$false;existing_store_create_refused=$false;verified=$false;stages=$storeStages}
 if($crossVersion){
     $report.cross_version_upgrade=[ordered]@{scope='actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data';baseline_source_sha=$old.source_sha;baseline_version=$old.version;baseline_installer_sha256=$old.exe_sha256;candidate_source_sha=$ExpectedSourceSha;candidate_version=$ProductVersion;candidate_installer_sha256=$report.installer_sha256;current_helper_is_fixture_writer=$true;historical_application_writer_verified=$false;identical_persistence_sources=$crossInput.identical_persistence_sources;old_installed_manifest_sha256=$null;old_application_sha256=$null;old_rust_build_id=$null;old_normal_ui_closed_normally=$false;new_normal_ui_closed_normally=$false;system_proxy_settings_unchanged=$false;verified=$false}
+    $report.cross_version_upgrade.system_proxy_scope='Actual old normal-UI exit through candidate upgrade, normal UI, uninstall and final fixture verification; cold-profile history is reported separately.'
+    $report.cross_version_upgrade.cold_profile_proxy_changed=$null
+    $report.cross_version_upgrade.cold_profile_full_journey_completed=$false
     $profileProxyBefore=Profile-ProxyFingerprint
-    # Stage diagnostics only read raw registry bytes. Do not prime WinINet
-    # before the real applications or alter the original comparison baseline.
+    # Retain the original cold-profile history. The immutable old application's
+    # required first run prepares the real upgrade state; never prime WinINet.
     . (Join-Path $PSScriptRoot 'WindowsProxyDiagnostics.ps1')
     $proxyStages=New-Object 'System.Collections.Generic.List[object]'
-    $proxyDiagnostic=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;scope='Raw-only redacted observations in the actual cross-version standard-user profile; original raw-fingerprint assertion remains unchanged.';original_fingerprint_before=$profileProxyBefore;original_fingerprint_after=$null;raw_baseline=$null;stages=$proxyStages;raw_final=$null;final_difference=$null;final_diagnostic_error=$null;post_assertion_query=$null;post_assertion_query_ran=$false;post_assertion_query_error=$null;post_assertion_query_scope='Runs only after the original fingerprint decision; never contributes to that decision or to the case success result.'}
+    $proxyDiagnostic=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;scope='Cold-profile history is retained; candidate upgrade requires complete native-registry and original-fingerprint equality to the actual old normal-UI exit state.';original_fingerprint_before=$profileProxyBefore;original_fingerprint_after=$null;original_fingerprint_unchanged=$null;raw_baseline=$null;stages=$proxyStages;raw_final=$null;final_difference=$null;cold_profile_changed=$null;cold_profile_full_journey_completed=$false;upgrade_oracle=$null;upgrade_final=$null;final_diagnostic_error=$null;post_assertion_query=$null;post_assertion_query_ran=$false;post_assertion_query_error=$null;post_assertion_query_scope='Runs only after the final candidate-upgrade comparison; never contributes to that comparison or to the case success result.'}
     $report.cross_version_upgrade.proxy_diagnostics='proxy-diagnostics.json'
 }
 $nodeStorePath=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SOLHK/Swirl/nodes.dpapi'
 $storeBaseline=$null
 
 function Require([string]$Name,[bool]$Passed){$checks.Add([ordered]@{name=$Name;passed=$Passed});if(-not $Passed){throw ('Normal installer regression failed: '+$Name)}}
+function Get-UpgradeProxyComparison([object]$Raw,[string]$Fingerprint) {
+    $oracle=$proxyDiagnostic.upgrade_oracle
+    $comparison=[ordered]@{oracle_present=($null -ne $oracle);fingerprint=$Fingerprint;fingerprint_unchanged=$false;raw_sha256_unchanged=$false;raw_difference=$null;passed=$false}
+    if($null -ne $oracle) {
+        $comparison.fingerprint_unchanged=$Fingerprint -ceq $oracle.fingerprint
+        $comparison.raw_sha256_unchanged=$Raw.sha256 -ceq $oracle.raw.sha256
+        $comparison.raw_difference=Compare-SwirlProxyRegistryDiagnostic $oracle.raw $Raw
+        $comparison.passed=$comparison.fingerprint_unchanged -and $comparison.raw_sha256_unchanged -and $comparison.raw_difference.equal
+    }
+    return $comparison
+}
 function Record-ProfileProxyObservation([string]$Stage) {
     $raw=Get-SwirlProxyRegistryDiagnostic
-    $entry=[ordered]@{stage=$Stage;observation_mode='raw-registry-only';raw=$raw;difference_from_original_baseline=(Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $raw);difference_since_previous_observation=$null}
+    $fingerprint=Profile-ProxyFingerprint
+    $entry=[ordered]@{stage=$Stage;observation_mode='raw-registry-only';raw=$raw;fingerprint=$fingerprint;difference_from_original_baseline=(Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $raw);difference_since_previous_observation=$null;upgrade_comparison=$null}
     if($proxyStages.Count -gt 0){$entry.difference_since_previous_observation=Compare-SwirlProxyRegistryDiagnostic $proxyStages[$proxyStages.Count-1].raw $raw}
+    if($Stage -ceq 'after-old-normal-ui') {
+        Require 'upgrade-proxy-oracle-captured-once-after-natural-old-ui-exit' ($null -eq $proxyDiagnostic.upgrade_oracle -and $report.normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile -and -not $report.forced_termination)
+        # Freeze both complete representations before any later helper or
+        # user-edit fixture. Neither is reset, filtered or normalized afterward.
+        $proxyDiagnostic.upgrade_oracle=[ordered]@{stage=$Stage;fingerprint=$fingerprint;raw=$raw}
+    }
+    $upgradeStage=$Stage -in @('before-new-install','after-new-install','before-new-normal-ui','after-new-normal-ui','before-uninstall','after-uninstall')
+    if($upgradeStage){$entry.upgrade_comparison=Get-UpgradeProxyComparison $raw $fingerprint}
     $proxyStages.Add($entry)
     # Save every stage before the disposable account is removed, including when
     # a later installer assertion fails. Only names, types, lengths and hashes.
     $proxyDiagnostic|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'proxy-diagnostics.json') -Encoding UTF8
+    if($upgradeStage){Require ('complete-upgrade-proxy-state-unchanged-'+$Stage) $entry.upgrade_comparison.passed}
 }
 function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$Seconds,[int]$ExpectedExit=0) {
     $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null;created_handle_retained=$false;output_drains_completed=$false;failure_receipts=@()};$processes.Add($entry)
@@ -580,7 +605,10 @@ try {
         Require 'all-five-cross-version-offline-preservation-phases-ran' ($storeStages.Count -eq 5 -and $report.cross_version_upgrade.old_normal_ui_closed_normally -and $report.cross_version_upgrade.new_normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile)
         $profileProxyAfter=Profile-ProxyFingerprint
         $proxyDiagnostic.original_fingerprint_after=$profileProxyAfter
-        $report.cross_version_upgrade.system_proxy_settings_unchanged=$profileProxyAfter -ceq $profileProxyBefore
+        $proxyDiagnostic.raw_final=Get-SwirlProxyRegistryDiagnostic
+        $proxyDiagnostic.upgrade_final=Get-UpgradeProxyComparison $proxyDiagnostic.raw_final $profileProxyAfter
+        Require 'all-ten-cross-version-proxy-stages-recorded' ($proxyStages.Count -eq 10)
+        $report.cross_version_upgrade.system_proxy_settings_unchanged=$proxyDiagnostic.upgrade_final.passed
         Require 'ordinary-standard-user-proxy-settings-unchanged-after-upgrade-and-uninstall' $report.cross_version_upgrade.system_proxy_settings_unchanged
         $report.dpapi_store_preservation.verified=$true
         $report.cross_version_upgrade.verified=$true
@@ -591,13 +619,23 @@ try {
 finally{
     if($crossVersion) {
         try {
-            $proxyDiagnostic.raw_final=Get-SwirlProxyRegistryDiagnostic
-            if($null -ne $proxyDiagnostic.raw_baseline){$proxyDiagnostic.final_difference=Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $proxyDiagnostic.raw_final}
+            # Also retain a final cold-profile observation on an early failure;
+            # its completion flag distinguishes a partial run from the full trip.
+            if($null -eq $proxyDiagnostic.raw_final){$proxyDiagnostic.raw_final=Get-SwirlProxyRegistryDiagnostic}
+            if($null -eq $proxyDiagnostic.original_fingerprint_after){$proxyDiagnostic.original_fingerprint_after=Profile-ProxyFingerprint}
+            $proxyDiagnostic.original_fingerprint_unchanged=$proxyDiagnostic.original_fingerprint_after -ceq $proxyDiagnostic.original_fingerprint_before
+            if($null -ne $proxyDiagnostic.raw_baseline) {
+                $proxyDiagnostic.final_difference=Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $proxyDiagnostic.raw_final
+                $proxyDiagnostic.cold_profile_changed=-not ($proxyDiagnostic.original_fingerprint_unchanged -and $proxyDiagnostic.final_difference.equal)
+            }
+            $proxyDiagnostic.cold_profile_full_journey_completed=$null -ne $proxyDiagnostic.upgrade_final
+            $report.cross_version_upgrade.cold_profile_proxy_changed=$proxyDiagnostic.cold_profile_changed
+            $report.cross_version_upgrade.cold_profile_full_journey_completed=$proxyDiagnostic.cold_profile_full_journey_completed
         }catch{
             $report.success=$false;$proxyDiagnostic.final_diagnostic_error=$_.Exception.Message
             if($null -eq $report.error){$report.error='Final redacted proxy diagnostic failed; inspect proxy-diagnostics.json.'}
         }
-        if($null -ne $proxyDiagnostic.original_fingerprint_after) {
+        if($null -ne $proxyDiagnostic.upgrade_final) {
             try {
                 $proxyDiagnostic.post_assertion_query_ran=$true
                 $proxyDiagnostic.post_assertion_query=Get-SwirlProxyQueryDiagnostic
