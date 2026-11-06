@@ -107,6 +107,9 @@ impl State {
 
 pub struct TcpQuota {
     state: Mutex<State>,
+    // Only the dedicated synthetic worker installs this immutable endpoint.
+    // Ordinary opt-in quota callers keep their existing transport behavior.
+    endpoint: Option<SocketAddr>,
 }
 
 impl TcpQuota {
@@ -125,6 +128,7 @@ impl TcpQuota {
         }
         let (cancelled, _) = watch::channel(false);
         Ok(Self {
+            endpoint: None,
             state: Mutex::new(State {
                 receipt: Snapshot {
                     byte_limit: bytes,
@@ -231,6 +235,13 @@ impl TcpQuota {
     }
 
     pub(super) fn socket(&self, address: SocketAddr) -> io::Result<TcpSocket> {
+        if self.endpoint.is_some_and(|endpoint| endpoint != address) {
+            self.cancel();
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "PrivateQuotaEndpointDenied",
+            ));
+        }
         let socket = if address.is_ipv6() {
             TcpSocket::new_v6()?
         } else {
@@ -260,6 +271,43 @@ pub fn install_with_timeout(
     connections: u32,
     timeout_ms: u32,
 ) -> io::Result<Arc<TcpQuota>> {
+    install_inner(bytes, connections, timeout_ms, None)
+}
+
+/// The QA worker may contact only its one parent-owned loopback fixture.
+/// This function is not exported through the ordinary product C ABI. The
+/// worker's private IPC admission must authenticate the grant before calling it.
+#[cfg(feature = "private-acceptance-worker")]
+pub fn install_worker(
+    bytes: u64,
+    connections: u32,
+    timeout_ms: u32,
+    endpoint: SocketAddr,
+) -> io::Result<Arc<TcpQuota>> {
+    if !endpoint.ip().is_loopback()
+        || endpoint.port() == 0
+        || matches!(endpoint, SocketAddr::V6(address) if address.scope_id() != 0 || address.flowinfo() != 0)
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaEndpointDenied",
+        ));
+    }
+    install_inner(bytes, connections, timeout_ms, Some(endpoint))
+}
+
+fn install_inner(
+    bytes: u64,
+    connections: u32,
+    timeout_ms: u32,
+    endpoint: Option<SocketAddr>,
+) -> io::Result<Arc<TcpQuota>> {
+    if cfg!(feature = "private-acceptance-worker") && endpoint.is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaWorkerGrantRequired",
+        ));
+    }
     let started = STARTED
         .lock()
         .map_err(|_| io::Error::other("PrivateQuotaState"))?;
@@ -272,7 +320,9 @@ pub fn install_with_timeout(
     if GUARD.get().is_some() {
         return Err(io::Error::other("PrivateQuotaAlreadyInstalled"));
     }
-    let guard = Arc::new(TcpQuota::new(bytes, connections, timeout_ms)?);
+    let mut guard = TcpQuota::new(bytes, connections, timeout_ms)?;
+    guard.endpoint = endpoint;
+    let guard = Arc::new(guard);
     let watchdog = guard.start_watchdog()?;
     GUARD.set(Arc::clone(&guard)).map_err(|_| {
         guard.cancel();
@@ -292,7 +342,38 @@ pub(super) fn admit_connection() -> io::Result<Option<Arc<TcpQuota>>> {
     *STARTED
         .lock()
         .map_err(|_| io::Error::other("PrivateQuotaState"))? = true;
+    if cfg!(feature = "private-acceptance-worker") && GUARD.get().is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaWorkerGrantRequired",
+        ));
+    }
     GUARD.get().map(TcpQuota::admit).transpose()
+}
+
+#[cfg(feature = "private-acceptance-worker")]
+pub(super) fn check_listener(address: SocketAddr) -> io::Result<()> {
+    *STARTED
+        .lock()
+        .map_err(|_| io::Error::other("PrivateQuotaState"))? = true;
+    let guard = GUARD.get().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaWorkerGrantRequired",
+        )
+    })?;
+    if !address.ip().is_loopback() || address.port() != 0 {
+        guard.cancel();
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaListenerDenied",
+        ));
+    }
+    guard
+        .state
+        .lock()
+        .map_err(|_| io::Error::other("PrivateQuotaState"))?
+        .check()
 }
 
 pub(super) fn check_udp() -> io::Result<()> {
@@ -307,7 +388,11 @@ fn reject_unmetered(code: &'static str) -> io::Result<()> {
     *STARTED
         .lock()
         .map_err(|_| io::Error::other("PrivateQuotaState"))? = true;
-    if active() {
+    if active() || cfg!(feature = "private-acceptance-worker") {
+        #[cfg(feature = "private-acceptance-worker")]
+        if let Some(guard) = GUARD.get() {
+            guard.cancel();
+        }
         return Err(io::Error::new(io::ErrorKind::PermissionDenied, code));
     }
     Ok(())

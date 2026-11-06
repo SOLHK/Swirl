@@ -36,6 +36,7 @@ fn bound_socket(address: SocketAddr, kind: Type, protocol: Protocol) -> io::Resu
 /// a Tokio I/O runtime. Port zero is available for internal socket fixtures;
 /// product configuration continues to enforce its own nonzero port contract.
 pub fn bind_tcp(address: SocketAddr) -> io::Result<TcpListener> {
+    crate::egress::check_private_listener(address)?;
     let socket = bound_socket(address, Type::STREAM, Protocol::TCP)?;
     socket.listen(128)?;
     TcpListener::from_std(socket.into())

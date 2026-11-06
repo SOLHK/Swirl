@@ -5,6 +5,15 @@ edition.workspace = true
 publish.workspace = true
 [features]
 private-acceptance = ["swirl-transport/private-acceptance"]
+private-acceptance-worker = ["private-acceptance", "swirl-transport/private-acceptance-worker"]
+[[bin]]
+name = "swirl-private-worker"
+path = "src/bin/swirl-private-worker.rs"
+required-features = ["private-acceptance-worker"]
+[[test]]
+name = "private_worker"
+path = "tests/private_worker.rs"
+required-features = ["private-acceptance-worker"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 [dependencies]

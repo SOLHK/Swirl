@@ -42,18 +42,83 @@ Socket reads/writes include TLS and protocol framing, but do not measure IP
 headers, retransmissions or unread kernel data. These controls do not establish
 complete wire accounting or provider billing.
 
-Live execution still requires a fresh authenticated provider snapshot, one
-stable ledger, a protected dedicated process, demonstrated coverage of every
-egress path, and confirmed process/task exit before provider reconciliation
-and settlement. The original Windows private ledger and DPAPI inputs must
-remain in their controlled environment; a new empty ledger is not a substitute.
-Never unblock the legacy command with a boolean or by removing its early return.
+The dedicated synthetic coordinator below now exercises durable admission,
+a mandatory guarded process and OS-confirmed exit together. Its live
+integration still requires fresh authenticated provider snapshots bound to the
+original account/history, coverage of every egress path, the ordinary Qt UI
+entry and provider reconciliation before settlement. The original Windows
+private ledger and DPAPI inputs must remain in their controlled environment;
+a new empty ledger is not a substitute. Never unblock the legacy command with
+a boolean or by removing its early return.
 
 The cumulative policy remains decimal 2/5/10/15/20 GB with at least 80 GB kept
 available. The first live round must contain at most 12 executable nodes, at
 most three concurrent attempts and an eight-second deadline per attempt.
 Prefer HTTPS 204 and cap ordinary GET bodies at 64 KiB. These are required
 admission conditions, not evidence that live execution has occurred.
+
+## Supervised synthetic process path
+
+`tools/PrivateSubscriptionSupervisor.py` uses the existing `Ledger` storage,
+exclusive lock and durable replacement. A distinct synthetic schema-3 domain
+records its identity, immutable source/worker hash/configuration fingerprint,
+full TCP reservation and execution phases. Official baseline/provider counters
+remain null. It cannot relabel an existing schema-1/2 ledger, accept provider
+observations, or use the old offline boolean settlement. Completed or interrupted
+configuration fingerprints cannot silently be retried; reopening retains
+unresolved reservations and the attempt count.
+
+The parent retains its own loopback fixture and accepts no arbitrary endpoint,
+subscription URL, credential or real-node configuration. The sole pre-reservation
+child is a bounded, contained `--build-info` query of the mandatory-guard worker;
+that entry has no networking dispatcher. Before a workload child starts, the
+parent verifies source identity/file hash and commits the entire reservation
+and grant digest. Private pipes carry one grant, a matching guard-installation
+acknowledgement and a separate start message. An HMAC response authenticates the
+owned fixture before workload traffic. Limits and deadlines cannot be reset.
+
+The separate `swirl-private-worker` target requires Cargo feature
+`private-acceptance-worker`. Before its grant it rejects TCP, DNS, UDP, native
+management and listener admission; afterwards it permits only the owned
+loopback endpoint. Ordinary product/optional-quota behavior is unchanged.
+There is no ordinary DLL install command, and the worker is not product payload.
+Its `core_probe` uses the actual Controller start/probe/status/stop path,
+certificate-verified TLS and authenticated HTTP CONNECT to a fixed synthetic
+HEAD/204 origin. This is HTTP through a TLS proxy, not an HTTPS origin, private
+node or Qt UI test.
+
+`PrivateSubscriptionProcess.py` starts a Windows child suspended, assigns a
+non-inheritable kill-on-close Job with active-process limit one, then resumes
+it. The parent deadline is at most eight seconds, independent of Tokio polling.
+Windows exit proof requires both a signaled child handle and an empty Job.
+POSIX process groups support portable synthetic regression, not Windows proof.
+Creation and Job assignment are not atomic: a parent killed in that narrow
+window may leave an unresumed child. No grant was sent and the hold remains;
+this is not zero-orphan proof. The Windows crash test kills the parent only
+after the actual authenticated socket is active and the Job owns the child.
+Final socket counters must match the grant; child JSON is not exit proof.
+The coordinator checks OS exit, drains/joins output readers, closes child
+handles and all fixture sockets/tasks, and only then settles. Missing receipts,
+malformed output, cleanup failures, uncertain writes and crashes retain the full
+hold. Unknown traffic stays unknown. Socket counts and fixture application
+bytes remain separate; neither is official billing.
+The counted sockets are active egress to the owned fixture. Core's ephemeral
+local listener is not exposed through worker IPC, but its inbound bytes are
+not quota counters; ordinary inbound/UI integration remains unverified.
+
+All three Rust CI jobs build the exact-source worker, run its protocol tests
+and all-target Clippy, then run `tools/tests/test_private_subscription_supervisor.py`.
+The suite covers real quota stops/cancellation, a stalled runtime killed by its
+parent, concurrency, crash holds and failure-to-settle controls. Windows also
+has real Job child-limit and parent-crash cases. A local Linux run on the
+`e17c9a7b` checkout plus this patch passed 18/20 tests; the two Windows cases
+were explicitly skipped. This is not clean-commit Windows acceptance; the new
+source must pass its own CI.
+
+Supervisor and legacy Qt `--live` both refuse before private paths, ledger
+creation or networking. Authenticated billing, full wire coverage and Qt
+integration remain implementation gaps, in addition to the unavailable original
+private Windows context. Synthetic results do not grant live execution or merge.
 
 ## Historical capture harness (unreachable from `--live`)
 

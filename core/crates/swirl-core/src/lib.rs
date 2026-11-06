@@ -198,6 +198,8 @@ impl Core {
     ) -> Result<Self> {
         config.validate()?;
         validate_transports(&config, &transports)?;
+        swirl_transport::egress::check_private_listener(config.listen)
+            .map_err(|_| "PrivateQuotaListenerDenied")?;
         let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)

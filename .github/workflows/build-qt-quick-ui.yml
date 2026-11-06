@@ -224,6 +224,7 @@ jobs:
             '-S', 'src/Swirl.Quick', '-B', 'build/swirl-quick',
             '-G', 'Visual Studio 17 2022', '-A', 'x64',
             '-DSWIRL_BUILD_UI_TESTS=ON',
+            '-DSWIRL_BUILD_CORE_TESTS=ON',
             "-DSWIRL_RUST_TARGET=$env:GITHUB_WORKSPACE/core/target",
             "-DSWIRL_TEST_FONT_DIRECTORY=$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
           )
@@ -238,7 +239,12 @@ jobs:
       - name: Build UI
         id: ui_build
         shell: pwsh
-        run: cmake --build build/swirl-quick --config Release --parallel 4
+        run: |
+          cmake --build build/swirl-quick --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Qt QA build failed.' }
+          if (-not (Test-Path -LiteralPath 'build/swirl-quick/Release/SwirlPrivateSubscriptionAcceptance.exe' -PathType Leaf)) {
+            throw 'The offline NodeStore installer fixture was not built in the QA configuration.'
+          }
       - name: Bundle UI runtime
         shell: pwsh
         run: |
@@ -680,12 +686,25 @@ jobs:
           # GUI-subsystem executables return immediately from PowerShell's '&' invocation.
           # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
           $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $diag = Join-Path (Resolve-Path "dist").Path 'Swirl-diagnostics.txt'
+          if (Test-Path -LiteralPath $diag) { Remove-Item -LiteralPath $diag -Force }
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
+          # The next preview launch rewrites this diagnostic file. Preserve the
+          # actual deployed smoke, including VME object/context diagnostics.
+          New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
+          $pagesObserved = $false
+          $diagnosticHash = $null
+          if (Test-Path -LiteralPath $diag) {
+            Copy-Item -LiteralPath $diag -Destination 'build-evidence/deployed-all-pages.log'
+            $diagnosticHash = (Get-FileHash -LiteralPath $diag -Algorithm SHA256).Hash.ToLowerInvariant()
+            $pagesObserved = [bool](Select-String -LiteralPath $diag -Pattern '^4: SMOKE_PAGES 61\s*$')
+          }
+          @{schema=1;source_sha=$env:GITHUB_SHA;exe_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant();diagnostics_sha256=$diagnosticHash;exit_code=$process.ExitCode;smoke_pages_61_observed=$pagesObserved} | ConvertTo-Json | Set-Content -LiteralPath 'build-evidence/deployed-all-pages.json' -Encoding utf8
           if ($process.ExitCode -ne 0) {
-            $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
             if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
             throw "Qt Quick startup failed: $($process.ExitCode)"
           }
+          if (-not $pagesObserved) { throw 'Deployed all-pages smoke did not record the required 61 routes.' }
       - name: Check Qt Quick UI previews at multiple sizes and scales
         shell: pwsh
         run: |
@@ -769,7 +788,7 @@ jobs:
         run: |
           . ./scripts/Assert-BuildSource.ps1
           Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
-          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
@@ -1191,6 +1210,8 @@ jobs:
             build-evidence/native-tun-broker-control-fixture.json
             build-evidence/system-proxy-stop/
             build-evidence/overview-input.log
+            build-evidence/deployed-all-pages.log
+            build-evidence/deployed-all-pages.json
             build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml

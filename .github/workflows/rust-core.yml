@@ -44,6 +44,27 @@ jobs:
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
           cargo check --locked -p swirl-api --features private-acceptance
           cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
+      - name: Supervised private ledger and mandatory guarded worker
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker
+        run: |
+          set -euo pipefail
+          python -m pip install cryptography==50.0.2
+          cargo build --locked -p swirl-api --features private-acceptance-worker --bin swirl-private-worker
+          cargo clippy --locked -p swirl-api --features private-acceptance-worker --all-targets -- -D warnings
+          cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
+          python ../tools/tests/test_private_subscription_supervisor.py --evidence "${{ runner.temp }}/swirl-private-supervisor"
+      - name: Preserve supervised private-loopback evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Supervisor-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-supervisor
+          if-no-files-found: error
+          retention-days: 14
       - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
         shell: bash
         env:
@@ -406,6 +427,31 @@ jobs:
           cargo check --locked -p swirl-api --features private-acceptance
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
+      - name: Verify Windows supervised private ledger and single-process Job
+        shell: pwsh
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker.exe
+        run: |
+          python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --locked -p swirl-api --features private-acceptance-worker --bin swirl-private-worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked -p swirl-api --features private-acceptance-worker --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_private_subscription_supervisor.py --evidence "$env:RUNNER_TEMP/swirl-private-supervisor"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Windows supervised private-loopback evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Supervisor-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-supervisor
+          if-no-files-found: error
+          retention-days: 14
       - name: Provision pinned official Windows Codex CLI
         working-directory: .
         shell: pwsh

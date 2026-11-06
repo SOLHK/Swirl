@@ -258,6 +258,15 @@ pub fn check_unmetered_egress() -> io::Result<()> {
     Ok(())
 }
 
+/// A mandatory QA worker may open only an ephemeral loopback listener after
+/// its immutable grant. Ordinary product/optional-quota builds are unchanged.
+pub fn check_private_listener(address: SocketAddr) -> io::Result<()> {
+    #[cfg(feature = "private-acceptance-worker")]
+    budget::check_listener(address)?;
+    let _ = address;
+    Ok(())
+}
+
 pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpConnection> {
     #[cfg(feature = "private-acceptance")]
     {

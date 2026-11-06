@@ -1,9 +1,11 @@
-"""Persistent, offline budget gate for a single private acceptance task.
+"""Persistent offline and supervised-synthetic private acceptance accounting.
 
 This module performs NO networking and accepts NO subscription URL or secret.
 The current Swirl probe path has no authoritative wire counter / hard-stop
 adapter. ``require_live_ready`` therefore always refuses live execution. A
 successful offline reservation is not permission to launch a native probe.
+Supervised synthetic reservations are a separately typed domain, executed only
+by PrivateSubscriptionSupervisor against its own authenticated loopback peer.
 
 The ledger survives batches, process restarts and interrupted reservations.
 Provider billing and local transfer counts remain separate. Byte units are
@@ -21,6 +23,7 @@ preclude live readiness.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -43,6 +46,9 @@ TCP_MAX_BYTES = 16 * 1024 * 1024
 TCP_MAX_CONNECTIONS = 48
 TCP_RECEIVE_RESERVATION = 1024 * 1024
 MAX_COUNTER = (1 << 63) - 1
+SYNTHETIC_DOMAIN = "synthetic-loopback-v1"
+SUPERVISED_PHASES = {"reserved", "prepared", "spawned", "guard_ready", "running", "active", "unresolved", "settled"}
+SUPERVISED_WORKLOADS = {"upload_until_stop", "download_until_stop", "stall_runtime_after_connect", "core_probe"}
 
 
 class BudgetError(Exception):
@@ -221,6 +227,38 @@ def tcp_plan(byte_limit, connection_limit, timeout_ms=TIMEOUT_MS):
             "timeoutMs": timeout_ms}
 
 
+def validate_guard_receipt(guard, plan, *, initial=False, terminal=True):
+    fields = {"byte_limit", "upload", "download", "connection_limit", "connection_attempts",
+              "receive_reservation", "timeout_ms", "timed_out", "stopped", "shutdown_failures"}
+    if not isinstance(guard, dict) or set(guard) != fields:
+        raise BudgetError("InvalidGuardReceipt")
+    for key in fields - {"timed_out", "stopped"}:
+        integer(guard[key])
+    if (type(guard["timed_out"]) is not bool or type(guard["stopped"]) is not bool
+            or guard["byte_limit"] != plan["byteLimit"]
+            or guard["connection_limit"] != plan["connectionLimit"]
+            or guard["receive_reservation"] != plan["receiveReservation"]
+            or guard["timeout_ms"] != plan["timeoutMs"]
+            or guard["upload"] + guard["download"] > plan["byteLimit"]
+            or guard["connection_attempts"] > plan["connectionLimit"]
+            or guard["shutdown_failures"] != 0):
+        raise BudgetError("InvalidGuardReceipt")
+    if initial:
+        if any(guard[key] for key in ("upload", "download", "connection_attempts", "timed_out", "stopped")):
+            raise BudgetError("NonzeroInitialGuard")
+    elif terminal and not guard["stopped"]:
+        raise BudgetError("FinalGuardNotStopped")
+
+
+def _validate_exit_record(value, pid):
+    if (not isinstance(value, dict) or set(value) != {"pid", "exitCode", "backend", "processSignaled", "ownedProcessSetEmpty"}
+            or type(value["pid"]) is not int or value["pid"] != pid
+            or type(value["exitCode"]) is not int or not -(1 << 31) <= value["exitCode"] < (1 << 32)
+            or value["backend"] not in {"windows-single-process-job", "posix-synthetic-process-group"}
+            or value["processSignaled"] is not True or value["ownedProcessSetEmpty"] is not True):
+        raise BudgetError("InvalidStoredExitProof")
+
+
 def parse_userinfo(header):
     """Validate numeric subscription-userinfo without retaining the raw header.
 
@@ -371,8 +409,16 @@ class Ledger:
         d = self.data
         keys = {"schema", "task", "baseline", "provider", "localUpload", "localDownload",
                 "attempts", "sequence", "reservations"}
-        if not isinstance(d, dict) or set(d) != keys or type(d.get("schema")) is not int or d["schema"] not in (1, 2) or d["task"] != TASK:
+        if (not isinstance(d, dict) or type(d.get("schema")) is not int
+                or d["schema"] not in (1, 2, 3) or d.get("task") != TASK
+                or set(d) != (keys | {"domain", "ledgerId", "history"} if d["schema"] == 3 else keys)):
             raise BudgetError("InvalidTaskLedger")
+        if d["schema"] == 3:
+            if (d["domain"] != SYNTHETIC_DOMAIN or not isinstance(d["ledgerId"], str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", d["ledgerId"])
+                    or d["baseline"] is not None or d["provider"] is not None
+                    or not isinstance(d["history"], dict)):
+                raise BudgetError("InvalidSyntheticLedger")
         for key in ("localUpload", "localDownload", "attempts", "sequence"):
             integer(d.get(key))
         for key in ("baseline", "provider"):
@@ -410,7 +456,7 @@ class Ledger:
             reserved = r["held"] + r["sent"] + r["received"]
             if "tcp" in r:
                 plan = r["tcp"]
-                if (d["schema"] != 2 or not isinstance(plan, dict)
+                if (d["schema"] not in (2, 3) or not isinstance(plan, dict)
                         or set(plan) != {"byteLimit", "connectionLimit", "receiveReservation", "timeoutMs"}):
                     raise BudgetError("InvalidTcpReservation")
                 integer(plan["receiveReservation"])
@@ -422,6 +468,66 @@ class Ledger:
                 raise BudgetError("InvalidReservations")
         if sum(r["sent"] for r in d["reservations"].values()) > d["localUpload"] or sum(r["received"] for r in d["reservations"].values()) > d["localDownload"]:
             raise BudgetError("InvalidLocalTotals")
+        if d["schema"] == 3:
+            self._validate_supervision()
+
+    def _validate_supervision(self):
+        d = self.data
+        if set(d["history"]) != {str(n) for n in range(1, d["sequence"] + 1)}:
+            raise BudgetError("InvalidSupervisedHistory")
+        fingerprints = set()
+        measured_up = measured_down = 0
+        for ticket, h in d["history"].items():
+            fields = {"node", "configFingerprint", "sourceSha", "workerSha256", "buildId", "nonce",
+                      "workload", "plan", "planDigest", "phase", "pid", "ownerToken", "outcome", "receipt"}
+            if not isinstance(h, dict) or set(h) != fields:
+                raise BudgetError("InvalidSupervisedHistory")
+            for key, size in (("configFingerprint", 64), ("sourceSha", 40), ("workerSha256", 64), ("nonce", 64)):
+                if not isinstance(h[key], str) or not re.fullmatch(r"[0-9a-f]{%d}" % size, h[key]):
+                    raise BudgetError("InvalidSupervisedIdentity")
+            if (not isinstance(h["buildId"], str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", h["buildId"])
+                    or h["phase"] not in SUPERVISED_PHASES or h["workload"] not in SUPERVISED_WORKLOADS
+                    or type(h["node"]) is not int or not 1 <= h["node"] <= 100000):
+                raise BudgetError("InvalidSupervisedHistory")
+            if h["configFingerprint"] in fingerprints:
+                raise BudgetError("DuplicateConfigurationAttempt")
+            fingerprints.add(h["configFingerprint"])
+            if h["planDigest"] is not None and (not isinstance(h["planDigest"], str) or not re.fullmatch(r"[0-9a-f]{64}", h["planDigest"])):
+                raise BudgetError("InvalidSupervisedPlan")
+            plan = h["plan"]
+            if (not isinstance(plan, dict) or set(plan) != {"byteLimit", "connectionLimit", "receiveReservation", "timeoutMs"}
+                    or plan != tcp_plan(plan["byteLimit"], plan["connectionLimit"], plan["timeoutMs"])):
+                raise BudgetError("InvalidSupervisedPlan")
+            if h["pid"] is not None and (type(h["pid"]) is not int or not 1 <= h["pid"] <= 0xffffffff):
+                raise BudgetError("InvalidSupervisedProcess")
+            if h["ownerToken"] is not None and (not isinstance(h["ownerToken"], str) or not re.fullmatch(r"[0-9a-f]{64}", h["ownerToken"])):
+                raise BudgetError("InvalidSupervisedProcess")
+            if (h["pid"] is None) != (h["ownerToken"] is None):
+                raise BudgetError("InvalidSupervisedProcess")
+            if h["outcome"] is not None and (not isinstance(h["outcome"], str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", h["outcome"])):
+                raise BudgetError("InvalidSupervisedOutcome")
+            if h["phase"] in {"spawned", "guard_ready", "running", "active", "settled"} and (h["pid"] is None or h["planDigest"] is None):
+                raise BudgetError("InvalidSupervisedProcess")
+            if h["phase"] == "settled":
+                receipt = h["receipt"]
+                if (ticket in d["reservations"] or not isinstance(receipt, dict)
+                        or set(receipt) != {"upload", "download", "exit", "guard", "guardDigest"}
+                        or not isinstance(receipt["guardDigest"], str) or not re.fullmatch(r"[0-9a-f]{64}", receipt["guardDigest"])
+                        or not isinstance(receipt["exit"], dict)):
+                    raise BudgetError("InvalidSupervisedSettlement")
+                _validate_exit_record(receipt["exit"], h["pid"])
+                validate_guard_receipt(receipt["guard"], plan)
+                if (receipt["upload"] != receipt["guard"]["upload"] or receipt["download"] != receipt["guard"]["download"]
+                        or receipt["guardDigest"] != hashlib.sha256(json.dumps(receipt["guard"], sort_keys=True, separators=(",", ":")).encode()).hexdigest()):
+                    raise BudgetError("InvalidSupervisedSettlement")
+                measured_up += integer(receipt["upload"])
+                measured_down += integer(receipt["download"])
+            elif h["receipt"] is not None or ticket not in d["reservations"] or d["reservations"][ticket]["node"] != h["node"]:
+                raise BudgetError("InvalidSupervisedReservation")
+            elif d["reservations"][ticket].get("tcp") != plan:
+                raise BudgetError("InvalidSupervisedPlan")
+        if measured_up != d["localUpload"] or measured_down != d["localDownload"]:
+            raise BudgetError("InvalidSupervisedTotals")
 
     def _check_session(self):
         if not self.lock:
@@ -491,6 +597,8 @@ class Ledger:
     def observe_provider(self, userinfo):
         with self.mutex:
             self._check_session()
+            if self.data is not None and self.data["schema"] == 3:
+                raise BudgetError("SyntheticProviderObservationForbidden")
             fresh = parse_userinfo(userinfo)
             if self.data is None or self.data["baseline"] is None:
                 raise BudgetError("BaselineUnavailable")
@@ -513,8 +621,9 @@ class Ledger:
             used_now = None if current is None else current["upload"] + current["download"]
             billed = None if current is None else used_now - used_start
             remaining = None if current is None else current["total"] - used_now
-            guarded = None if billed is None else max(billed, local) + held
-            state = "BillingUnavailable" if billed is None else policy(billed, local, held, remaining)
+            synthetic = d["schema"] == 3
+            guarded = local + held if synthetic else None if billed is None else max(billed, local) + held
+            state = policy(0, local, held, MAX_COUNTER) if synthetic else "BillingUnavailable" if billed is None else policy(billed, local, held, remaining)
             if current is not None and current.get("expire", 0) and current["expire"] <= int(time.time()):
                 state = "BillingExpired"
             return {"task": TASK, "policy": state, "baselineUsed": used_start, "latestUsed": used_now,
@@ -525,7 +634,10 @@ class Ledger:
                     "localUpload": d["localUpload"], "localDownload": d["localDownload"],
                     "heldBytes": held, "attempts": d["attempts"],
                     "providerStatisticsAuthenticated": False, "wireAccountingAttached": False,
-                    "hardCancellationAttached": False, "liveReady": False}
+                    "hardCancellationAttached": False, "liveReady": False,
+                    "accountingDomain": SYNTHETIC_DOMAIN if synthetic else "offline-unverified",
+                    "localTotalsScope": "confirmed-settled-socket-counts" if synthetic else "offline-simulated-counts",
+                    "unresolvedReservations": sum(h["phase"] != "settled" for h in d["history"].values()) if synthetic else len(d["reservations"])}
 
     def reserve_offline(self, node, amount=MAX_PROBE_RESERVATION):
         """Exercise admission without opening a socket. Never an execution grant."""
@@ -543,9 +655,11 @@ class Ledger:
         plan = tcp_plan(byte_limit, connection_limit, timeout_ms)
         return self._reserve_offline(node, plan["byteLimit"] + plan["receiveReservation"], plan)
 
-    def _reserve_offline(self, node, amount, plan=None):
+    def _reserve_offline(self, node, amount, plan=None, execution=None):
         with self.mutex:
             self._check_session()
+            if self.data is not None and (self.data["schema"] == 3) != (execution is not None):
+                raise BudgetError("AccountingDomainMismatch")
             if type(node) is not int or not 1 <= node <= 100000:
                 raise BudgetError("InvalidNodeOrdinal")
             state = self.summary()
@@ -558,8 +672,9 @@ class Ledger:
                 raise BudgetError("ConcurrencyLimit")
             if d["attempts"] >= FIRST_ROUND:
                 raise BudgetError("FirstRoundComplete")
-            predicted = policy(state["billingDelta"], state["localUpload"] + state["localDownload"],
-                               state["heldBytes"] + amount, state["providerRemaining"])
+            predicted = policy(state["billingDelta"] if execution is None else 0,
+                               state["localUpload"] + state["localDownload"],
+                               state["heldBytes"] + amount, state["providerRemaining"] if execution is None else MAX_COUNTER)
             if predicted != "WithinNormalTarget":
                 raise BudgetError(predicted)
             d["attempts"] += 1
@@ -567,8 +682,10 @@ class Ledger:
             ticket = str(d["sequence"])
             d["reservations"][ticket] = {"node": node, "held": amount, "sent": 0, "received": 0}
             if plan is not None:
-                d["schema"] = 2
+                d["schema"] = max(2, d["schema"])
                 d["reservations"][ticket]["tcp"] = plan
+            if execution is not None:
+                d["history"][ticket] = execution
             self._save()
             return ticket
 
@@ -579,6 +696,9 @@ class Ledger:
         attempts. HTTP body size must never be used as provider billing here.
         """
         with self.mutex:
+            self._check_session()
+            if self.data is not None and self.data["schema"] == 3:
+                raise BudgetError("AccountingDomainMismatch")
             upload, download = integer(upload), integer(download)
             if self.summary()["policy"] != "WithinNormalTarget":
                 raise BudgetError(self.summary()["policy"])
@@ -600,11 +720,116 @@ class Ledger:
         """Simulate settlement; caller assertions are NOT live exit/billing proof."""
         with self.mutex:
             self._check_session()
+            if self.data is not None and self.data["schema"] == 3:
+                raise BudgetError("AccountingDomainMismatch")
             if not quiescent:
                 raise BudgetError("UnreleasedRequests")
             if self.data is None or str(ticket) not in self.data["reservations"]:
                 raise BudgetError("UnknownReservation")
             del self.data["reservations"][str(ticket)]
+            self._save()
+
+    def initialize_synthetic(self):
+        """Create a NEW synthetic domain. Never migrate/relabel an existing ledger.
+
+        Provider counters stay unknown, not a fabricated zero billing baseline.
+        This uses the same durable file, lock and limits as offline accounting.
+        """
+        with self.mutex:
+            self._check_session()
+            if self.data is not None or self.initialized:
+                raise BudgetError("TaskAlreadyInitialized")
+            try:
+                self.lock.write((TASK + "\n").encode("ascii"))
+                self.lock.flush()
+                os.fsync(self.lock.fileno())
+                self.initialized = True
+                self.data = {"schema": 3, "task": TASK, "baseline": None, "provider": None,
+                             "localUpload": 0, "localDownload": 0, "attempts": 0, "sequence": 0,
+                             "reservations": {}, "domain": SYNTHETIC_DOMAIN,
+                             "ledgerId": os.urandom(32).hex(), "history": {}}
+                self._save()
+            except BaseException:
+                self.commit_uncertain = True
+                raise
+
+    def require_synthetic(self):
+        self._check_session()
+        if self.data is None or self.data["schema"] != 3 or self.data["domain"] != SYNTHETIC_DOMAIN:
+            raise BudgetError("SyntheticLedgerRequired")
+
+    def reserve_supervised(self, node, byte_limit, connection_limit, timeout_ms, *,
+                           config_fingerprint, source_sha, worker_sha256, build_id, nonce, workload):
+        with self.mutex:
+            self.require_synthetic()
+            if any(h["configFingerprint"] == config_fingerprint for h in self.data["history"].values()):
+                raise BudgetError("ConfigurationAlreadyAttempted")
+            plan = tcp_plan(byte_limit, connection_limit, timeout_ms)
+            execution = {"node": node, "configFingerprint": config_fingerprint, "sourceSha": source_sha,
+                         "workerSha256": worker_sha256, "buildId": build_id, "nonce": nonce,
+                         "workload": workload, "plan": plan.copy(), "planDigest": None, "phase": "reserved", "pid": None,
+                         "ownerToken": None, "outcome": None, "receipt": None}
+            return self._reserve_offline(node, plan["byteLimit"] + plan["receiveReservation"], plan, execution)
+
+    def bind_supervised_grant(self, ticket, plan_digest):
+        with self.mutex:
+            self.require_synthetic()
+            history = self.data["history"].get(str(ticket))
+            if history is None or history["phase"] != "reserved":
+                raise BudgetError("SupervisedPhaseMismatch")
+            history["planDigest"], history["phase"] = plan_digest, "prepared"
+            self._save()
+
+    def advance_supervised(self, ticket, phase, *, process=None):
+        with self.mutex:
+            self.require_synthetic()
+            history = self.data["history"].get(str(ticket))
+            transitions = {"spawned": "prepared", "guard_ready": "spawned", "running": "guard_ready", "active": "running"}
+            if history is None or transitions.get(phase) != history["phase"]:
+                raise BudgetError("SupervisedPhaseMismatch")
+            if phase == "spawned":
+                from PrivateSubscriptionProcess import OwnedProcess
+                if not isinstance(process, OwnedProcess):
+                    raise BudgetError("OwnedProcessRequired")
+                history["pid"], history["ownerToken"] = process.pid, process.owner_token
+            history["phase"] = phase
+            self._save()
+
+    def retain_supervised(self, ticket, outcome):
+        """Unknown bytes/exit remain a full hold; reopening never changes this."""
+        with self.mutex:
+            self.require_synthetic()
+            history = self.data["history"].get(str(ticket))
+            if history is None or history["phase"] == "settled":
+                raise BudgetError("SupervisedPhaseMismatch")
+            history["phase"], history["outcome"] = "unresolved", outcome
+            self._save()
+
+    def settle_synthetic(self, ticket, guard, exit_proof, outcome):
+        """Accept actual socket counts only after a locally issued OS exit proof.
+
+        This releases SYNTHETIC holds only. Live provider/wire settlement remains
+        deliberately unavailable; a child JSON `quiescent` flag is never proof.
+        """
+        from PrivateSubscriptionProcess import ExitProof
+        with self.mutex:
+            self.require_synthetic()
+            ticket = str(ticket)
+            history = self.data["history"].get(ticket)
+            if history is None or history["phase"] != "active":
+                raise BudgetError("SupervisedPhaseMismatch")
+            if not isinstance(exit_proof, ExitProof) or not exit_proof.matches(history["pid"], history["ownerToken"]):
+                raise BudgetError("ProcessExitProofRequired")
+            reservation = self.data["reservations"][ticket]
+            plan = reservation["tcp"]
+            validate_guard_receipt(guard, plan)
+            upload, download = integer(guard.get("upload")), integer(guard.get("download"))
+            self.data["localUpload"] += upload
+            self.data["localDownload"] += download
+            history["phase"], history["outcome"] = "settled", outcome
+            history["receipt"] = {"upload": upload, "download": download, "exit": exit_proof.record(), "guard": guard.copy(),
+                                  "guardDigest": hashlib.sha256(json.dumps(guard, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
+            del self.data["reservations"][ticket]
             self._save()
 
     def require_live_ready(self):
