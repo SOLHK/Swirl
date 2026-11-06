@@ -75,7 +75,7 @@ async fn mixed_address_failures_are_ambiguous_regardless_of_completion_order() {
 #[tokio::test]
 async fn dial_denial_and_network_errors_keep_distinct_socks5_wire_replies() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
+    use tokio::net::{TcpListener, TcpStream};
 
     // Inject typed OS failures into the product scheduler, not into the reply
     // encoder. The client reads real TCP bytes. This does not claim that the
