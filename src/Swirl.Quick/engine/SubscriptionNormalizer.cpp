@@ -227,6 +227,35 @@ void uri(Result &r,const QString &line){
     Q_UNUSED(decoded);
     if(decoder.hasError()){r.error="节点 URI 的编码不是有效 UTF-8；未应用配置。";return;}
     const auto scheme=line.left(split).toLower();QJsonObject node;QStringList issues;
+    if (scheme == "anytls") {
+        // anytls-go/docs/uri_scheme.md: the encoded username is the password.
+        // Preserve this catalog protocol without advertising native forwarding.
+        const QUrl url(line, QUrl::StrictMode);
+        if (!url.isValid() || url.host().isEmpty() || url.port(443) < 1 ||
+            url.userInfo(QUrl::FullyEncoded).contains(':') ||
+            (!url.path().isEmpty() && url.path() != "/")) {
+            r.error = "AnyTLS URI 地址、密码或路径无效。";
+            return;
+        }
+        node = {{"name", url.fragment(QUrl::FullyDecoded)}, {"type", scheme},
+                {"server", url.host()}, {"port", url.port(443)},
+                {"password", url.userName(QUrl::FullyDecoded)}, {"tls", true}};
+        QSet<QString> seen;
+        for (const auto &[key, value] : QUrlQuery(url).queryItems(QUrl::FullyDecoded)) {
+            if (seen.contains(key)) { r.error = "AnyTLS URI 含重复参数。"; return; }
+            seen.insert(key);
+            if (key == "sni") {
+                node["sni"] = value;
+            } else if (key == "insecure") {
+                if (value != "0" && value != "1") { r.error = "AnyTLS insecure 参数必须是 0 或 1。"; return; }
+                if (value == "1") issue(issues, "AnyTLS 源链接要求关闭证书验证；已保留原文并禁止连接。");
+            } else {
+                issue(issues, "AnyTLS URI 包含未映射扩展，原始参数已保留；不能忽略后连接。");
+            }
+        }
+        append(r, node, QJsonObject{{"uri", line}}, issues);
+        return;
+    }
     if(scheme=="hysteria2"||scheme=="hy2"){hysteria2Uri(r,line,split);return;}
     if(scheme=="tuic"){tuicUri(r,line,split);return;}
     // Hysteria v1 has no authoritative share-link specification; client
@@ -322,6 +351,9 @@ void uri(Result &r,const QString &line){
     for(const auto &pair:q.queryItems(QUrl::FullyDecoded)){
         const auto &key=pair.first;const auto &value=pair.second;
         if(queryKeys.contains(key)){r.error="节点 URI 含重复参数，无法安全确定配置。";return;}queryKeys.insert(key);
+        // Xray's sharing specification permits an empty certificate pin.
+        // A nonempty pin remains unsupported and must block activation.
+        if (key == "pcs" && value.isEmpty()) continue;
         if(!known.contains(key)){issue(issues,"节点 URI 包含未映射选项，原始参数已保留。");continue;}
         const auto canonical=key=="peer"?QString("sni"):key=="type"?QString("network"):key=="allowInsecure"||key=="insecure"?QString("skip-cert-verify"):key=="serviceName"?QString("path"):key;
         QJsonValue typed=value;
@@ -774,7 +806,7 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
     const auto firstContent=[&]{for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(!value.isEmpty()&&!value.startsWith('#')&&!value.startsWith(';')&&!value.startsWith("//"))return value;}return QString();}();
     const bool iniHeading=QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(firstContent).hasMatch();
     if(iniHeading&&!json.isArray()){ini(r,text);return r;}
-    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks5-tls|socks|http|https|hysteria2|hysteria|hy2|tuic)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
+    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks5-tls|socks|http|https|hysteria2|hysteria|hy2|tuic|anytls)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
         r.handled=true;r.format="通用 URI / Shadowrocket";
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
     }

@@ -559,7 +559,7 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         if(missing && policy.value("mode")!=QJsonValue("direct"))
             m_message+=QStringLiteral(" 默认策略尚无有效出口；请到「策略 → 默认策略 → 更换出口」选择本次导入的节点。");
     }
-    if(certificatesEnforced)m_message+=QStringLiteral(" %1 条 Trojan 记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
+    if(certificatesEnforced)m_message+=QStringLiteral(" %1 条记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
 void NodeImportService::finish(const QString &error) {
