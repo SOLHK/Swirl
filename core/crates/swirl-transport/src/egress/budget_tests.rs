@@ -268,23 +268,23 @@ async fn cancellation_drops_a_connect_future_before_socket_registration() {
 #[tokio::test]
 async fn failed_native_connect_keeps_its_attempt_and_buffer_reservation() {
     let guard = quota(100, 1);
-    // A bound but non-listening local TCP socket produces a real refusal
-    // without relying on a port that another process might claim.
-    let refused = TcpSocket::new_v4().unwrap();
-    refused.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let address = refused.local_addr().unwrap();
+    // A held, non-listening port need not reject a SYN immediately on Windows
+    // or macOS. Instead request an IPv6 destination on a real IPv4 socket:
+    // native connect must reject the address family without any remote peer.
+    // This tests failed-attempt accounting, separately from pending-connect
+    // cancellation and the watchdog tests below.
     let admission = guard.admit().unwrap();
-    let socket = admission.socket(address).unwrap();
-    assert!(
-        timeout(
-            Duration::from_secs(2),
-            admission.while_running(socket.connect(address))
-        )
-        .await
-        .unwrap()
-        .is_err()
-    );
+    let socket = admission.socket("127.0.0.1:443".parse().unwrap()).unwrap();
+    let error = timeout(
+        Duration::from_secs(2),
+        admission.while_running(socket.connect("[::1]:443".parse().unwrap())),
+    )
+    .await
+    .expect("native address-family rejection did not complete")
+    .expect_err("IPv4 socket accepted an IPv6 destination");
+    assert!(error.raw_os_error().is_some(), "expected a native OS error");
     let receipt = guard.snapshot().unwrap();
+    assert!(!receipt.stopped && !receipt.timed_out);
     assert_eq!(receipt.connection_attempts, 1);
     assert_eq!(receipt.upload + receipt.download, 0);
     assert_eq!(receipt.receive_reservation, RECEIVE_RESERVATION);

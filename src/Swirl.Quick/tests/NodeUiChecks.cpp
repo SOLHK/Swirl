@@ -215,10 +215,12 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(controller->nodes().isEmpty()&&!controller->processAlive(),"node page starts empty without starting engine");
     click("nodeAddButton");fill("nodeNameField","A");fill("nodeHostField","https://invalid");fill("nodePortField",QString::number(net.a.serverPort()));click("nodeSaveButton");
     check(controller->nodes().isEmpty()&&!controller->nodeError().isEmpty(),"invalid host rejected through UI without fake save");
-    fill("nodeHostField","127.0.0.1");click("nodeSaveButton");check(controller->nodes().size()==1,"UI saves first real node");
+    // Later fixture steps inspect saved rows; preserve a setup failure before
+    // attempting selections or dereferencing an absent persisted catalog.
+    fill("nodeHostField","127.0.0.1");click("nodeSaveButton");if(!check(controller->nodes().size()==1,"UI saves first real node"))return 2;
     check(controller->selectedNodeId().isEmpty()&&controller->activeNodeId().isEmpty(),"adding a resource does not choose a configured or running exit");
     click("nodeAddButton");fill("nodeNameField","B");fill("nodeHostField","127.0.0.1");fill("nodePortField",QString::number(net.b.serverPort()));fill("nodeUsernameField",QString::fromUtf8(net.b.username));fill("nodePasswordField",QString::fromUtf8(net.b.password));
-    check(item("nodePasswordField")&&item("nodePasswordField")->property("echoMode").toInt()==2,"credential field is masked");click("nodeSaveButton");check(controller->nodes().size()==2,"UI saves authenticated SOCKS5 node");
+    check(item("nodePasswordField")&&item("nodePasswordField")->property("echoMode").toInt()==2,"credential field is masked");click("nodeSaveButton");if(!check(controller->nodes().size()==2,"UI saves authenticated SOCKS5 node"))return 2;
     check(controller->selectedNodeId().isEmpty()&&controller->activeNodeId().isEmpty(),"adding another resource still leaves exit selection to policies");
     LoopbackPortLease ports;
     if(!check(ports.reserve(),"distinct UI TCP/UDP and control ports are reserved together")) {
@@ -426,7 +428,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     }
     check(!controller->requestSucceeded() && controller->requestStateText()==QStringLiteral("尚未发起实际请求"),"disconnect clears stale request success text");
     choosePolicy(nodeA,false);const auto lastActiveBeforeEdit=controller->activeNodeId();
-    select(1);click("nodeEditButton");check(item("nodePasswordField")&&item("nodePasswordField")->property("text").toString().isEmpty(),"editing never reveals stored credentials");fill("nodeNameField","B edited");click("nodeSaveButton");check(controller->nodes().last().toMap().value("name").toString()=="B edited","UI edits saved metadata");
+    select(1);click("nodeEditButton");check(item("nodePasswordField")&&item("nodePasswordField")->property("text").toString().isEmpty(),"editing never reveals stored credentials");fill("nodeNameField","B edited");click("nodeSaveButton");const auto editedNodes=controller->nodes();check(!editedNodes.isEmpty()&&editedNodes.last().toMap().value("name").toString()=="B edited","UI edits saved metadata");
     check(controller->selectedNodeId()==nodeA&&controller->activeNodeId()==lastActiveBeforeEdit&&!controller->processAlive(),"editing resource B preserves the configured exit A and stopped runtime snapshot");
     click("nodeDeleteButton");check(controller->nodes().size()==1,"UI deletes selected node");select(0);click("nodeDeleteButton");check(controller->nodes().isEmpty(),"UI removes all saved test nodes");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"test cleanup reaps engine");
@@ -481,7 +483,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QDir().mkpath(businessQa+"/business-frames");
         for(int frame=0;frame<25;++frame){QTest::qWait(40);window->grabWindow().scaledToWidth(1000,Qt::SmoothTransformation).save(businessQa+QString("/business-frames/%1.png").arg(frame,3,10,QChar('0')));}
     }
-    check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().size()==1&&controller->nodes().size()==1&&subscriptionRequests==1,"subscription UI saves HTTPS source and imports an actual node");
+    if(!check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().size()==1&&controller->nodes().size()==1&&subscriptionRequests==1,"subscription UI saves HTTPS source and imports an actual node"))return 2;
     if(!controller->imports()->providers().isEmpty()){
         auto *badge=item("subscriptionStatus-"+controller->imports()->providers().first().toMap().value("id").toString());
         check(badge&&!badge->property("busy").toBool()&&badge->property("tone").toString()=="success","subscription success follows completed storage and stops busy motion");
@@ -492,7 +494,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(eval("pageLoader.item.resultCount===1").toBool(),"country filter combines with the real imported node list");
     const auto subscriptionSource=controller->imports()->providers().first().toMap().value("id").toString();
     check(controller->saveNode({{"name","JP manual HTTP"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}),"manual node adds a second region outside the subscription");
-    check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->nodes().size()==2;},10000),"manual filter fixture waits for its actual saved catalog");
+    if(!check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->nodes().size()==2;},10000),"manual filter fixture waits for its actual saved catalog"))return 2;
     const auto manualId=controller->nodes().last().toMap().value("id").toString();
     check(eval("pageLoader.item.countries.length===2").toBool(),"all sources exposes both actual regions");
     eval("pageLoader.item.countryCode='JP'");
