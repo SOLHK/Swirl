@@ -3,7 +3,10 @@
     [Parameter(Mandatory=$true)][string]$PackageDirectory,
     [Parameter(Mandatory=$true)][string]$ExpectedSourceSha,
     [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
+    [Parameter(Mandatory=$true)][string]$NodeStoreHelper,
     [string]$ExpectedUserSid,
+    [string]$ExpectedNodeStoreHelperSha256,
+    [object]$NodeStoreHelperEnvironment,
     [ValidateSet('clean','restore','edits','upgrade')][string]$Scenario='clean',
     [bool]$NegativeControl=$false,
     [string]$ProductVersion
@@ -42,6 +45,14 @@ if(-not $ExpectedUserSid) {
     $source=(& git -C $repo rev-parse HEAD).Trim()
     if($LASTEXITCODE -ne 0 -or $source -cne $ExpectedSourceSha){throw 'Normal installer checkout identity mismatch.'}
     $null=Assert-SwirlProductManifest -ApplicationDirectory $package -ExpectedSourceSha $source
+    Assert-SwirlPathWithoutLinks $NodeStoreHelper
+    $helper=(Resolve-Path -LiteralPath $NodeStoreHelper).Path
+    if([IO.Path]::GetFileName($helper) -cne 'SwirlPrivateSubscriptionAcceptance.exe'){throw 'The offline installer fixture requires its separate QA helper.'}
+    $helperHash=Get-SwirlIntegrationHash $helper
+    $helperPair=Read-Json (Join-Path ([IO.Path]::GetDirectoryName($helper)) 'swirl-rust-build.json')
+    # Both configurations use the same Rust input/source identity calculation.
+    # Fail on a stale QA helper or differently paired runtime; never bypass it.
+    if($helperPair.source_sha -cne $source -or $helperPair.build_id -cne $manifest.rust.build_id){throw 'QA helper and production Rust runtime must have the same exact source/build pairing.'}
     $version=(Get-Content -LiteralPath (Join-Path $repo 'src/Swirl.Quick/PRODUCT_VERSION.txt') -Raw -Encoding UTF8).Trim()
     $installerHash=Get-SwirlIntegrationHash $setup
     $parentContext=New-SwirlIntegrationContext (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs/Swirl') $manifestPath $version
@@ -51,9 +62,39 @@ if(-not $ExpectedUserSid) {
     $failure=$null
     function Invoke-NormalCase([string]$Name,[string]$CaseInstaller,[string]$CaseScenario,[bool]$IsNegative,[string]$CaseEvidence) {
         [IO.Directory]::CreateDirectory($CaseEvidence)|Out-Null
+        $caseHelper=$helper;$helperRuntime=$null
+        if($CaseScenario -eq 'upgrade' -and -not $IsNegative) {
+            # Evidence already receives the disposable SID's scoped ACL. Keep
+            # the helper/runtime outside the product and usable after uninstall.
+            $helperRuntime=Join-Path $CaseEvidence 'qa-node-store-runtime'
+            if(Test-Path -LiteralPath $helperRuntime){throw 'QA runtime staging must start from an absent owned directory.'}
+            [IO.Directory]::CreateDirectory($helperRuntime)|Out-Null
+            $caseHelper=Join-Path $helperRuntime 'SwirlPrivateSubscriptionAcceptance.exe'
+            [IO.File]::Copy($helper,$caseHelper,$false)
+            if((Get-SwirlIntegrationHash $caseHelper) -cne $helperHash){throw 'QA helper copy changed.'}
+            $runtime=@($manifest.files|Where-Object {$_.path -cmatch '^[^/\\]+\.dll$' -or $_.path -ceq 'swirl-rust-build.json'})
+            foreach($required in @('Qt6Core.dll','Qt6Network.dll','Qt6Gui.dll','swirl_api.dll','swirl-rust-build.json')) {
+                if(@($runtime|Where-Object {$_.path -ceq $required}).Count -ne 1){throw ('Missing QA runtime dependency: '+$required)}
+            }
+            foreach($entry in $runtime) {
+                $runtimeInput=Join-Path $package $entry.path;$runtimeOutput=Join-Path $helperRuntime $entry.path
+                Assert-SwirlPathWithoutLinks $runtimeInput
+                [IO.File]::Copy($runtimeInput,$runtimeOutput,$false)
+                if((Get-SwirlIntegrationHash $runtimeOutput) -cne $entry.sha256){throw 'QA runtime copy differs from verified product dependency.'}
+            }
+            @{schema=1;source_sha=$source;helper_sha256=$helperHash;rust_build_id=$helperPair.build_id;scope='Separate offline QA oracle with exact paired product runtime; never product payload';files=$runtime}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $CaseEvidence 'qa-node-store-runtime.json') -Encoding UTF8
+        }
         $argumentsPath=Join-Path $CaseEvidence 'child-arguments.json'
-        @{Installer=$CaseInstaller;PackageDirectory=$package;ExpectedSourceSha=$source;EvidenceDirectory=$CaseEvidence;Scenario=$CaseScenario;NegativeControl=$IsNegative;ProductVersion=$version}|ConvertTo-Json|Set-Content -LiteralPath $argumentsPath -Encoding UTF8
-        & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argumentsPath -EvidenceDirectory $CaseEvidence -TimeoutSeconds 600
+        # CreateProcessWithLogonW(NULL environment) creates the new user's
+        # profile environment. Forward only these already-verified host values,
+        # not the runner's full environment or its credentials/profile paths.
+        $helperEnvironment=@{GITHUB_ACTIONS=$env:GITHUB_ACTIONS;RUNNER_ENVIRONMENT=$env:RUNNER_ENVIRONMENT;SWIRL_DISPOSABLE_INSTALL_TEST=$env:SWIRL_DISPOSABLE_INSTALL_TEST}
+        @{Installer=$CaseInstaller;PackageDirectory=$package;ExpectedSourceSha=$source;EvidenceDirectory=$CaseEvidence;Scenario=$CaseScenario;NegativeControl=$IsNegative;ProductVersion=$version;NodeStoreHelper=$caseHelper;ExpectedNodeStoreHelperSha256=$helperHash;NodeStoreHelperEnvironment=$helperEnvironment}|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $argumentsPath -Encoding UTF8
+        try {
+            & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argumentsPath -EvidenceDirectory $CaseEvidence -TimeoutSeconds 600
+        } finally {
+            if($null -ne $helperRuntime -and (Test-Path -LiteralPath $helperRuntime)){Assert-SwirlPathWithoutLinks $helperRuntime;Remove-Item -LiteralPath $helperRuntime -Recurse -Force}
+        }
         $case=Read-Json (Join-Path $CaseEvidence 'case.json')
         $runner=Read-Json (Join-Path $CaseEvidence 'standard-user-runner.json')
         if(-not $case.success -or -not $runner.success -or $runner.forced_termination -or $runner.token.Administrator -or $runner.token.Elevated -or $runner.token.IntegritySid -cne 'S-1-16-8192'){throw ('Normal installer case failed: '+$Name)}
@@ -103,11 +144,16 @@ if(-not $ExpectedUserSid) {
         $candidateUnchanged=(Get-SwirlIntegrationHash $setup) -ceq $installerHash
         $allRuns=$runs.Count -eq 5 -and @($runs|Where-Object {-not $_.case.success -or -not $_.standard_user.success -or $_.standard_user.forced_termination}).Count -eq 0
         $clean=if($runs.Count){$runs[0].case}else{$null}
+        $upgrade=@($runs|Where-Object {$_.case.scenario -eq 'upgrade' -and -not $_.case.negative})
+        $dpapi=if($upgrade.Count -eq 1){$upgrade[0].case.dpapi_store_preservation}else{$null}
+        $dpapiVerified=$null -ne $dpapi -and $dpapi.verified -and $dpapi.parent_host_scope_forwarded -and $dpapi.existing_store_create_refused -and $dpapi.stages.Count -eq 4
         $summary=[ordered]@{schema=1;source_sha=$source;installer_sha256=$installerHash;scope='Actual default per-user NSIS install without /ISOLATED or /D, normal application startup/close and uninstall under fresh real non-administrator accounts on a disposable hosted Windows runner.';normal_user_installation=$allRuns;non_admin_token_verified=$allRuns;windows11_codex_desktop='NOT_RUN';physical_windows11_display_acceptance='NOT_RUN';candidate_installer_unchanged=$candidateUnchanged;host_user_integration_unchanged=$parentUnchanged;cases=@($runs.ToArray());negative_control=$baseline;production_runtime=$clean;success=($null -eq $failure -and $allRuns -and $baseline.required_assertion_failed -and $candidateUnchanged -and $parentUnchanged);error=$failure}
+        $summary.same_package_dpapi_store=$dpapi
+        $summary.success=$summary.success -and $dpapiVerified
         $summary|ConvertTo-Json -Depth 18|Set-Content -LiteralPath (Join-Path $evidence 'lifecycle.json') -Encoding UTF8
     }
     if(-not $summary.success){throw ('Normal installer acceptance failed: '+$failure)}
-    Write-Host 'Actual normal per-user install/runtime/uninstall, original state, user edits, retry, upgrade and exact old NSIS negative control verified.'
+    Write-Host 'Actual normal per-user install/runtime/uninstall, same-package synthetic DPAPI preservation, user edits, retry and exact old NSIS negative control verified; no previous-release migration.'
     return
 }
 
@@ -121,6 +167,10 @@ $context=New-SwirlIntegrationContext $target $manifestPath $ProductVersion
 $checks=New-Object 'System.Collections.Generic.List[object]'
 $processes=New-Object 'System.Collections.Generic.List[object]'
 $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;installer_sha256=(Get-SwirlIntegrationHash $setup);scenario=$Scenario;negative=$NegativeControl;user_sid=$ExpectedUserSid;normal_user_installation=$true;non_admin_token_verified=$true;install_arguments='/S';isolated=$false;install_directory=$target;installed_files=0;installed_exe_sha256=$null;installed_rust_dll_sha256=$null;installed_manifest_sha256=$null;rust_roundtrips_verified=$false;tls_runtime_verified=$false;normal_ui_no_test_arguments=$false;normal_ui_closed_normally=$false;normal_ui_inherited_standard_user_profile=$false;normal_qml_cache_identity='NOT_REPORTED_BY_NORMAL_APPLICATION';smoke_cache_identity=$null;ui_test_hooks_disabled=$false;installed_ui_pages=0;integration_restored_or_user_edits_preserved=$false;user_data_preserved=$false;install_directory_removed=$false;retry_after_restore_failure=$false;forced_termination=$false;processes=$processes;checks=$checks;negative_control=@{required_assertion_failed=$false;assertion='original-integration-and-later-user-edits-preserved';observed_pass=$null};success=$false;error=$null}
+$storeStages=New-Object 'System.Collections.Generic.List[object]'
+$report.dpapi_store_preservation=[ordered]@{requested=($Scenario -eq 'upgrade');scope='same-package-reinstall-synthetic-v1-node-store';previous_release_migration=$false;helper_sha256=$ExpectedNodeStoreHelperSha256;rust_build_id=$manifest.rust.build_id;parent_host_scope_forwarded=$false;existing_store_create_refused=$false;verified=$false;stages=$storeStages}
+$nodeStorePath=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SOLHK/Swirl/nodes.dpapi'
+$storeBaseline=$null
 
 function Require([string]$Name,[bool]$Passed){$checks.Add([ordered]@{name=$Name;passed=$Passed});if(-not $Passed){throw ('Normal installer regression failed: '+$Name)}}
 function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$Seconds,[int]$ExpectedExit=0) {
@@ -141,6 +191,64 @@ function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$
             $entry.failure_receipts=@($receipts|ForEach-Object {[ordered]@{operation=$_.Groups[1].Value;phase=$_.Groups[2].Value;code=$_.Groups[3].Value}})
         }
     }
+}
+function Invoke-NormalUi([string]$LogPrefix) {
+    $normal=$null;$normalCapture=$null
+    $normalEntry=[ordered]@{name=($LogPrefix+'-no-arguments');expected_exit_code=0;exit_code=$null;exited=$false;close_requested=$false;created_handle_retained=$false;output_drains_completed=$false};$processes.Add($normalEntry)
+    try {
+        $normalCapture=Start-SwirlCapturedProcess -Executable $exe -Arguments '' -WorkingDirectory ([Environment]::GetFolderPath('UserProfile')) -StdoutPath (Join-Path $evidence ($LogPrefix+'.stdout.log')) -StderrPath (Join-Path $evidence ($LogPrefix+'.stderr.log'))
+        $normal=$normalCapture.Process
+        $watch=[Diagnostics.Stopwatch]::StartNew()
+        do {$normal.Refresh();if($normal.HasExited){throw 'Ordinary application exited before showing its main window.'};if($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl'){break};Start-Sleep -Milliseconds 100}while($watch.Elapsed.TotalSeconds -lt 15)
+        Require 'normal-ui-main-window-created-without-test-arguments' ($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl')
+        $report.normal_ui_no_test_arguments=$true
+        $normalEntry.close_requested=$normal.CloseMainWindow()
+        Require 'normal-ui-accepts-user-window-close' $normalEntry.close_requested
+        $normalEntry.exited=Wait-SwirlCapturedProcess $normalCapture 15000
+        if(-not $normalEntry.exited){throw 'Ordinary UI close did not complete.'}
+        $normalEntry.exit_code=$normalCapture.ExitCode
+        Require 'normal-ui-exits-successfully' ($normalEntry.exit_code -eq 0)
+    }finally{if($null -ne $normalCapture){try{Close-SwirlCapturedProcess $normalCapture}finally{$normalEntry.exited=$normalCapture.Exited;$normalEntry.exit_code=$normalCapture.ExitCode;$normalEntry.created_handle_retained=$normalCapture.CreatedHandleRetained;$normalEntry.output_drains_completed=$normalCapture.OutputsComplete;if($normalCapture.ForcedTermination){$report.forced_termination=$true}}}}
+    # Normal application startup deliberately has no test-only diagnostic
+    # handler/cache marker. Its actual HWND, WM_CLOSE and natural exit above
+    # are evidence; the later smoke/cache report belongs to its own process.
+    $profile=[IO.Path]::GetFullPath([Environment]::GetFolderPath('UserProfile')).TrimEnd('\')
+    Require 'normal-ui-inherits-the-real-standard-user-profile' ($env:USERPROFILE -ieq $profile -and $identity.User.Value -ceq $ExpectedUserSid -and -not $env:SWIRL_TEST_ROOT)
+    $report.normal_ui_closed_normally=$true;$report.normal_ui_inherited_standard_user_profile=$true
+}
+function Invoke-NodeStoreFixture([string]$Stage,[string]$Operation='verify',[int]$ExpectedExit=0) {
+    Assert-SwirlPathWithoutLinks $nodeStorePath
+    Assert-SwirlPathWithoutLinks $NodeStoreHelper
+    Require 'offline-qa-helper-hash-matches-staged-identity' ($ExpectedNodeStoreHelperSha256 -cmatch '^[0-9a-f]{64}$' -and (Get-SwirlIntegrationHash $NodeStoreHelper) -ceq $ExpectedNodeStoreHelperSha256)
+    $receiptPath=Join-Path $evidence ('dpapi-'+$Stage+'.json')
+    Require 'offline-node-store-phase-receipt-is-new' (-not (Test-Path -LiteralPath $receiptPath))
+    $arguments='--installer-store-fixture '+$Operation+' "'+$ExpectedSourceSha+'" "'+$ExpectedUserSid+'" "'+$nodeStorePath+'" "'+$receiptPath+'"'
+    $hostValues=@{GITHUB_ACTIONS='true';RUNNER_ENVIRONMENT='github-hosted';SWIRL_DISPOSABLE_INSTALL_TEST='1'}
+    $previousEnvironment=@{PATH=$env:PATH}
+    foreach($environmentName in $hostValues.Keys) {
+        $provided=$NodeStoreHelperEnvironment.PSObject.Properties[$environmentName]
+        Require 'offline-helper-receives-verified-disposable-host-context' ($null -ne $provided -and $provided.Value -ceq $hostValues[$environmentName])
+        $previousEnvironment[$environmentName]=[Environment]::GetEnvironmentVariable($environmentName,'Process')
+    }
+    try {
+        $env:PATH=[IO.Path]::GetDirectoryName($NodeStoreHelper)+';'+$env:WINDIR+'\System32;'+$env:WINDIR
+        foreach($environmentName in $hostValues.Keys){[Environment]::SetEnvironmentVariable($environmentName,[string]$NodeStoreHelperEnvironment.PSObject.Properties[$environmentName].Value,'Process')}
+        Run-Process ('dpapi-'+$Stage) $NodeStoreHelper $arguments 30 $ExpectedExit
+    } finally {foreach($environmentName in $previousEnvironment.Keys){[Environment]::SetEnvironmentVariable($environmentName,$previousEnvironment[$environmentName],'Process')}}
+    $receipt=Read-Json $receiptPath
+    Require 'offline-node-store-receipt-has-exact-user-source-and-scope' ($receipt.schema -eq 1 -and $receipt.kind -ceq 'installer-node-store-fixture' -and $receipt.scope -ceq 'same-package-reinstall-synthetic-v1-node-store' -and $receipt.operation -ceq $Operation -and $receipt.source_sha -ceq $ExpectedSourceSha -and $receipt.user_sid -ceq $ExpectedUserSid -and [IO.Path]::GetFullPath($receipt.store_path) -ieq [IO.Path]::GetFullPath($nodeStorePath) -and $receipt.ordinary_profile -eq $true -and $receipt.host_scope_verified -eq $true -and $receipt.rust_build_id -ceq $manifest.rust.build_id -and $receipt.qt_runtime_version -ceq '6.12.0' -and $receipt.network_requests -eq 0 -and $receipt.engine_started -eq $false)
+    $report.dpapi_store_preservation.parent_host_scope_forwarded=$true
+    if($ExpectedExit -ne 0) {
+        Require 'existing-node-store-create-refused-without-writing' ($receipt.success -eq $false -and $receipt.store_write_attempted -eq $false -and $receipt.error_code -ceq 'ExistingStoreRefused')
+        return $receipt
+    }
+    Require 'production-node-store-decrypts-and-preserves-fixed-semantics' ($receipt.success -eq $true -and $receipt.store_format -ceq 'SWIRLNODE1' -and $receipt.dpapi_roundtrip_verified -eq $true -and $receipt.plaintext_absent -eq $true -and $receipt.read_only_reload -eq $true -and $receipt.node_count -eq 2 -and $receipt.subscription_count -eq 1 -and $receipt.node_parameters_match -eq $true -and $receipt.selection_matches -eq $true -and $receipt.disabled_subscription_matches -eq $true -and $receipt.network_configuration_matches -eq $true)
+    Require 'node-store-receipt-hashes-match-actual-profile-files' ($receipt.ciphertext_sha256 -cmatch '^[0-9a-f]{64}$' -and $receipt.selection_sha256 -cmatch '^[0-9a-f]{64}$' -and (Get-SwirlIntegrationHash $nodeStorePath) -ceq $receipt.ciphertext_sha256 -and (Get-SwirlIntegrationHash ($nodeStorePath+'.selected')) -ceq $receipt.selection_sha256)
+    if($Operation -eq 'verify') {
+        Require 'same-package-node-store-and-selection-bytes-unchanged' ($receipt.store_write_attempted -eq $false -and $null -ne $storeBaseline -and $receipt.ciphertext_sha256 -ceq $storeBaseline.ciphertext_sha256 -and $receipt.selection_sha256 -ceq $storeBaseline.selection_sha256)
+        $storeStages.Add([ordered]@{stage=$Stage;receipt=$receipt})
+    }
+    return $receipt
 }
 function Assert-Payload([string[]]$Extra=@()) {
     $known=@('package-manifest.json','.swirl-install-owned','卸载 Swirl.exe')+$Extra
@@ -226,28 +334,7 @@ try {
         Run-Process 'production-ui-test-hooks-disabled' $exe '--policy-self-test' 30 4
         $report.ui_test_hooks_disabled=$true
         if([IO.File]::Exists($diagnostics)){[IO.File]::Delete($diagnostics)}
-        $normal=$null;$normalCapture=$null
-        $normalEntry=[ordered]@{name='normal-ui-no-arguments';expected_exit_code=0;exit_code=$null;exited=$false;close_requested=$false;created_handle_retained=$false;output_drains_completed=$false};$processes.Add($normalEntry)
-        try {
-            $normalCapture=Start-SwirlCapturedProcess -Executable $exe -Arguments '' -WorkingDirectory ([Environment]::GetFolderPath('UserProfile')) -StdoutPath (Join-Path $evidence 'normal-ui.stdout.log') -StderrPath (Join-Path $evidence 'normal-ui.stderr.log')
-            $normal=$normalCapture.Process
-            $watch=[Diagnostics.Stopwatch]::StartNew()
-            do {$normal.Refresh();if($normal.HasExited){throw 'Ordinary application exited before showing its main window.'};if($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl'){break};Start-Sleep -Milliseconds 100}while($watch.Elapsed.TotalSeconds -lt 15)
-            Require 'normal-ui-main-window-created-without-test-arguments' ($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl')
-            $report.normal_ui_no_test_arguments=$true
-            $normalEntry.close_requested=$normal.CloseMainWindow()
-            Require 'normal-ui-accepts-user-window-close' $normalEntry.close_requested
-            $normalEntry.exited=Wait-SwirlCapturedProcess $normalCapture 15000
-            if(-not $normalEntry.exited){throw 'Ordinary UI close did not complete.'}
-            $normalEntry.exit_code=$normalCapture.ExitCode
-            Require 'normal-ui-exits-successfully' ($normalEntry.exit_code -eq 0)
-        }finally{if($null -ne $normalCapture){try{Close-SwirlCapturedProcess $normalCapture}finally{$normalEntry.exited=$normalCapture.Exited;$normalEntry.exit_code=$normalCapture.ExitCode;$normalEntry.created_handle_retained=$normalCapture.CreatedHandleRetained;$normalEntry.output_drains_completed=$normalCapture.OutputsComplete;if($normalCapture.ForcedTermination){$report.forced_termination=$true}}}}
-        # Normal application startup deliberately has no test-only diagnostic
-        # handler/cache marker. Its actual HWND, WM_CLOSE and natural exit above
-        # are evidence; the later smoke/cache report belongs to its own process.
-        $profile=[IO.Path]::GetFullPath([Environment]::GetFolderPath('UserProfile')).TrimEnd('\')
-        Require 'normal-ui-inherits-the-real-standard-user-profile' ($env:USERPROFILE -ieq $profile -and $identity.User.Value -ceq $ExpectedUserSid -and -not $env:SWIRL_TEST_ROOT)
-        $report.normal_ui_closed_normally=$true;$report.normal_ui_inherited_standard_user_profile=$true
+        Invoke-NormalUi 'normal-ui'
         $smokeRoot=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SwirlNormalInstallerSmoke'
         [IO.Directory]::CreateDirectory($smokeRoot)|Out-Null;$env:SWIRL_TEST_ROOT=$smokeRoot
         Run-Process 'installed-all-pages' $exe '--smoke-test --font-review' 60
@@ -278,9 +365,18 @@ try {
         $extras=@('user-notes.txt','data/user-store.dpapi')
     }
     if($Scenario -eq 'upgrade') {
+        Require 'fresh-ordinary-profile-has-no-node-store-or-sidecar' (-not (Test-Path -LiteralPath $nodeStorePath) -and -not (Test-Path -LiteralPath ($nodeStorePath+'.selected')))
+        $storeBaseline=Invoke-NodeStoreFixture 'create' 'create'
+        $null=Invoke-NodeStoreFixture 'create-existing-refused' 'create' 2
+        Require 'refused-create-keeps-both-original-profile-file-hashes' ((Get-SwirlIntegrationHash $nodeStorePath) -ceq $storeBaseline.ciphertext_sha256 -and (Get-SwirlIntegrationHash ($nodeStorePath+'.selected')) -ceq $storeBaseline.selection_sha256)
+        $report.dpapi_store_preservation.existing_store_create_refused=$true
+        $null=Invoke-NodeStoreFixture 'before-reinstall'
         Run-Process 'same-package-upgrade' $setup '/S' 120
         Assert-Payload $extras
         Require 'actual-upgrade-preserves-later-shortcut-registry-edit-and-delete' ((Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'desktop') $original['desktop']) -and (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'publisher') $original['publisher']) -and -not (Get-SwirlIntegrationState $context 'no-repair').exists)
+        $null=Invoke-NodeStoreFixture 'after-reinstall'
+        Invoke-NormalUi 'upgrade-normal-ui'
+        $null=Invoke-NodeStoreFixture 'after-normal-close'
     }
     $uninstaller=Join-Path $evidence 'actual-installed-uninstaller.exe'
     [IO.File]::Copy((Join-Path $target '卸载 Swirl.exe'),$uninstaller,$false)
@@ -306,6 +402,11 @@ try {
         Require 'user-owned-installation-bytes-preserved' ([IO.File]::ReadAllText((Join-Path $target 'user-notes.txt')) -ceq 'Synthetic user-owned installation file' -and [IO.File]::ReadAllText((Join-Path $target 'data/user-store.dpapi')) -ceq 'Synthetic bytes only; no private credential')
     }else{Require 'clean-payload-installation-directory-removed' $report.install_directory_removed}
     Require 'ordinary-profile-user-data-survives-uninstall' ((Get-SwirlIntegrationHash $userData) -ceq $dataHash)
+    if($Scenario -eq 'upgrade') {
+        $null=Invoke-NodeStoreFixture 'after-uninstall'
+        Require 'all-four-same-package-dpapi-preservation-phases-ran' ($storeStages.Count -eq 4 -and $report.normal_ui_no_test_arguments -and $report.normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile)
+        $report.dpapi_store_preservation.verified=$true
+    }
     $report.user_data_preserved=$true
     $report.success=-not $report.forced_termination
 }catch{$report.error=$_.Exception.Message;$report.success=$false}

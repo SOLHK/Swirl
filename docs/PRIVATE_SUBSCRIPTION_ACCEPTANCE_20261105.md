@@ -8,6 +8,10 @@ The default invocation refuses networking. `--self-test` uses synthetic data
 and loopback fixtures only; `--offline-body` decrypts a local response and checks
 the actual importer and an independent encrypted NodeStore round trip.
 
+## Offline installer persistence fixture
+
+`--installer-store-fixture` is a separate fixed synthetic `create`/`verify` mode for the opted-in disposable Windows installer job. It requires the exact source identity, real non-admin medium-integrity user SID and ordinary Swirl profile; it does not accept node credentials or start an engine. Creation refuses an existing store. Verification uses production NodeStore decryption, checks the two fixed loopback nodes, disabled subscription, selection and V1 network configuration, and proves it did not rewrite the store or selection sidecar. The installer harness compares both file hashes across same-package reinstall, ordinary startup/close and uninstall. It is not previous-release migration or live-network acceptance. Scope refusals write no receipt; later receipts only create a new local non-reparse file outside the profile.
+
 ## Current 0.2.40 live boundary
 
 `--live` unconditionally returns `AuthenticatedBillingAndWireGuardRequired`
@@ -27,8 +31,12 @@ The optional Rust `private-acceptance` build provides one process-wide TCP
 quota, an immutable deadline of at most 8000 ms, cancellation during connect,
 and shutdown of registered idle sockets. Pending-connect cancellation still
 requires its future to be polled; a stalled runtime requires an external
-supervisor to terminate and await the dedicated process. Guarded UDP, OS resolver lookups and
-the separate physical-download path fail closed. A parent must reserve the
+supervisor to terminate and await the dedicated process. Guarded UDP, OS
+resolver lookups and the separate physical-download path fail closed. Native
+TUN start, gateway preparation/activation (including DHCP preflight), broker
+startup and restricted packet-worker startup also reject an installed quota
+before system-network activity or helper creation. Validation, status and
+cleanup remain available. A parent must reserve the
 full byte limit plus 1 MiB for each permitted connection attempt before launch.
 Socket reads/writes include TLS and protocol framing, but do not measure IP
 headers, retransmissions or unread kernel data. These controls do not establish

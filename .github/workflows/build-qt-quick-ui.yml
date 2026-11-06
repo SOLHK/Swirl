@@ -993,13 +993,39 @@ jobs:
         env:
           SWIRL_DISPOSABLE_INSTALL_TEST: '1'
         run: |
-          ./scripts/tests/Test-WindowsNormalInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/normal-installer-lifecycle
+          ./scripts/tests/Test-WindowsNormalInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/normal-installer-lifecycle -NodeStoreHelper build/swirl-quick/Release/SwirlPrivateSubscriptionAcceptance.exe
           $lifecycle = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/lifecycle.json' -Raw -Encoding UTF8 | ConvertFrom-Json
           $runner = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/standard-user-runner.json' -Raw -Encoding UTF8 | ConvertFrom-Json
           if ($lifecycle.schema -ne 1 -or -not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA -or -not $lifecycle.normal_user_installation -or -not $lifecycle.non_admin_token_verified -or -not $lifecycle.negative_control.required_assertion_failed) { throw 'Actual normal standard-user installer lifecycle evidence is incomplete.' }
           if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination) { throw 'The installer left temporary standard-user processes, accounts or native resources behind.' }
+          $dpapi = $lifecycle.same_package_dpapi_store
+          $upgrade = @($lifecycle.cases | Where-Object { $_.case.scenario -ceq 'upgrade' -and -not $_.case.negative })
+          if ($null -eq $dpapi -or -not $dpapi.verified -or -not $dpapi.parent_host_scope_forwarded -or -not $dpapi.existing_store_create_refused -or
+              $dpapi.scope -cne 'same-package-reinstall-synthetic-v1-node-store' -or $dpapi.previous_release_migration -ne $false -or
+              $dpapi.helper_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $dpapi.rust_build_id -cnotmatch '^[0-9a-f]{64}$' -or
+              @($dpapi.stages).Count -ne 4 -or $upgrade.Count -ne 1) { throw 'Same-package synthetic DPAPI preservation evidence is missing or has the wrong scope.' }
+          $baseline = $dpapi.stages[0].receipt
+          foreach ($phase in @('before-reinstall','after-reinstall','after-normal-close','after-uninstall')) {
+            $stage = @($dpapi.stages | Where-Object { $_.stage -ceq $phase })
+            if ($stage.Count -ne 1) { throw "Missing exact DPAPI preservation phase: $phase" }
+            $receipt = $stage[0].receipt
+            if ($receipt.schema -ne 1 -or $receipt.kind -cne 'installer-node-store-fixture' -or $receipt.success -ne $true -or
+                $receipt.scope -cne $dpapi.scope -or $receipt.operation -cne 'verify' -or $receipt.source_sha -cne $env:GITHUB_SHA -or
+                $receipt.user_sid -cne $upgrade[0].case.user_sid -or $receipt.rust_build_id -cne $dpapi.rust_build_id -or
+                $receipt.ordinary_profile -ne $true -or $receipt.host_scope_verified -ne $true -or $receipt.store_format -cne 'SWIRLNODE1' -or $receipt.store_write_attempted -ne $false -or
+                $receipt.network_requests -ne 0 -or $receipt.engine_started -ne $false -or $receipt.dpapi_roundtrip_verified -ne $true -or
+                $receipt.node_count -ne 2 -or $receipt.subscription_count -ne 1 -or $receipt.node_parameters_match -ne $true -or
+                $receipt.selection_matches -ne $true -or $receipt.disabled_subscription_matches -ne $true -or
+                $receipt.network_configuration_matches -ne $true -or $receipt.plaintext_absent -ne $true -or $receipt.read_only_reload -ne $true -or
+                $receipt.ciphertext_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $receipt.selection_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+                $receipt.ciphertext_sha256 -cne $baseline.ciphertext_sha256 -or $receipt.selection_sha256 -cne $baseline.selection_sha256) {
+              throw "DPAPI semantics, identity or exact preservation failed: $phase"
+            }
+          }
           $delivery = Get-Content -LiteralPath out/delivery.json -Raw -Encoding UTF8 | ConvertFrom-Json
           $delivery | Add-Member -NotePropertyName normal_standard_user_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $delivery | Add-Member -NotePropertyName normal_standard_user_same_package_dpapi_preservation -NotePropertyValue 'passed-synthetic-v1-only' -Force
+          $delivery | Add-Member -NotePropertyName previous_release_configuration_upgrade -NotePropertyValue 'not-run' -Force
           $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
