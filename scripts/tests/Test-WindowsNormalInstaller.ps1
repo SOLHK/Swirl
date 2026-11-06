@@ -255,11 +255,26 @@ $report.dpapi_store_preservation=[ordered]@{requested=($Scenario -in @('upgrade'
 if($crossVersion){
     $report.cross_version_upgrade=[ordered]@{scope='actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data';baseline_source_sha=$old.source_sha;baseline_version=$old.version;baseline_installer_sha256=$old.exe_sha256;candidate_source_sha=$ExpectedSourceSha;candidate_version=$ProductVersion;candidate_installer_sha256=$report.installer_sha256;current_helper_is_fixture_writer=$true;historical_application_writer_verified=$false;identical_persistence_sources=$crossInput.identical_persistence_sources;old_installed_manifest_sha256=$null;old_application_sha256=$null;old_rust_build_id=$null;old_normal_ui_closed_normally=$false;new_normal_ui_closed_normally=$false;system_proxy_settings_unchanged=$false;verified=$false}
     $profileProxyBefore=Profile-ProxyFingerprint
+    # Stage diagnostics only read raw registry bytes. Do not prime WinINet
+    # before the real applications or alter the original comparison baseline.
+    . (Join-Path $PSScriptRoot 'WindowsProxyDiagnostics.ps1')
+    $proxyStages=New-Object 'System.Collections.Generic.List[object]'
+    $proxyDiagnostic=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;scope='Raw-only redacted observations in the actual cross-version standard-user profile; original raw-fingerprint assertion remains unchanged.';original_fingerprint_before=$profileProxyBefore;original_fingerprint_after=$null;raw_baseline=$null;stages=$proxyStages;raw_final=$null;final_difference=$null;final_diagnostic_error=$null;post_assertion_query=$null;post_assertion_query_ran=$false;post_assertion_query_error=$null;post_assertion_query_scope='Runs only after the original fingerprint decision; never contributes to that decision or to the case success result.'}
+    $report.cross_version_upgrade.proxy_diagnostics='proxy-diagnostics.json'
 }
 $nodeStorePath=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SOLHK/Swirl/nodes.dpapi'
 $storeBaseline=$null
 
 function Require([string]$Name,[bool]$Passed){$checks.Add([ordered]@{name=$Name;passed=$Passed});if(-not $Passed){throw ('Normal installer regression failed: '+$Name)}}
+function Record-ProfileProxyObservation([string]$Stage) {
+    $raw=Get-SwirlProxyRegistryDiagnostic
+    $entry=[ordered]@{stage=$Stage;observation_mode='raw-registry-only';raw=$raw;difference_from_original_baseline=(Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $raw);difference_since_previous_observation=$null}
+    if($proxyStages.Count -gt 0){$entry.difference_since_previous_observation=Compare-SwirlProxyRegistryDiagnostic $proxyStages[$proxyStages.Count-1].raw $raw}
+    $proxyStages.Add($entry)
+    # Save every stage before the disposable account is removed, including when
+    # a later installer assertion fails. Only names, types, lengths and hashes.
+    $proxyDiagnostic|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'proxy-diagnostics.json') -Encoding UTF8
+}
 function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$Seconds,[int]$ExpectedExit=0) {
     $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null;created_handle_retained=$false;output_drains_completed=$false;failure_receipts=@()};$processes.Add($entry)
     $capture=$null;$timer=[Diagnostics.Stopwatch]::StartNew()
@@ -367,6 +382,10 @@ function Original-Preserved([hashtable]$Expected) {
     return $true
 }
 try {
+    if($crossVersion){
+        $proxyDiagnostic.raw_baseline=Get-SwirlProxyRegistryDiagnostic
+        $proxyDiagnostic|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'proxy-diagnostics.json') -Encoding UTF8
+    }
     Require 'fresh-default-user-install-directory' (-not (Test-Path -LiteralPath $target))
     $original=Capture-States
     Require 'fresh-account-has-no-existing-swirl-integration' (@($original.Values|Where-Object {$_.exists}).Count -eq 0)
@@ -383,7 +402,9 @@ try {
     $crossVersionExtras=@()
     if($crossVersion) {
         Require 'cross-version-child-has-the-explicit-scenario' ($Scenario -ceq 'cross-version' -and $ProductVersion -ceq $crossInput.candidate_version)
+        Record-ProfileProxyObservation 'before-old-install'
         Run-Process 'baseline-install-0239' $oldSetup '/S' 120
+        Record-ProfileProxyObservation 'after-old-install'
         $oldManifestPath=Join-Path $target 'package-manifest.json'
         Require 'baseline-installed-manifest-matches-reviewed-old-package' ((Get-SwirlIntegrationHash $oldManifestPath) -ceq $old.package_manifest_sha256)
         $oldManifest=Read-Json $oldManifestPath
@@ -404,7 +425,9 @@ try {
         $report.dpapi_store_preservation.existing_store_create_refused=$true
         $null=Invoke-NodeStoreFixture 'before-old-start'
         $env:PATH=$target+';'+$env:WINDIR+'\System32;'+$env:WINDIR
+        Record-ProfileProxyObservation 'before-old-normal-ui'
         Invoke-NormalUi 'baseline-0239-normal-ui'
+        Record-ProfileProxyObservation 'after-old-normal-ui'
         $report.cross_version_upgrade.old_normal_ui_closed_normally=$report.normal_ui_closed_normally
         $null=Invoke-NodeStoreFixture 'after-old-close'
         $report.normal_ui_no_test_arguments=$false;$report.normal_ui_closed_normally=$false;$report.normal_ui_inherited_standard_user_profile=$false
@@ -417,7 +440,9 @@ try {
         [IO.File]::WriteAllText((Join-Path $target 'data/user-store.dpapi'),'Synthetic bytes only; no private credential')
         $crossVersionExtras=@('user-notes.txt','data/user-store.dpapi')
     }
+    if($crossVersion){Record-ProfileProxyObservation 'before-new-install'}
     Run-Process 'install' $setup '/S' 120
+    if($crossVersion){Record-ProfileProxyObservation 'after-new-install'}
     Assert-Payload $crossVersionExtras
     if($crossVersion) {
         Require 'actual-new-version-is-registered' (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'display-version') (New-SwirlRegistryValueState 'String' ($ProductVersion+'.0')))
@@ -465,7 +490,9 @@ try {
     $diagnostics=Join-Path $target 'Swirl-diagnostics.txt'
     if([IO.File]::Exists($diagnostics)){[IO.File]::Delete($diagnostics)}
     if($crossVersion) {
+        Record-ProfileProxyObservation 'before-new-normal-ui'
         Invoke-NormalUi 'candidate-0240-normal-ui'
+        Record-ProfileProxyObservation 'after-new-normal-ui'
         $report.cross_version_upgrade.new_normal_ui_closed_normally=$report.normal_ui_closed_normally
         $null=Invoke-NodeStoreFixture 'after-new-normal-close'
     }
@@ -526,7 +553,9 @@ try {
         Require 'failed-integration-restore-retains-manifest-and-committed-receipt' ([IO.File]::Exists((Join-Path $target 'package-manifest.json')) -and (Read-SwirlIntegrationReceipt $context).phase -eq 'committed')
         $report.retry_after_restore_failure=$true
     }
+    if($crossVersion){Record-ProfileProxyObservation 'before-uninstall'}
     Run-Process 'uninstall' $uninstaller ('/S _?='+$target) 120
+    if($crossVersion){Record-ProfileProxyObservation 'after-uninstall'}
     $preserved=Original-Preserved $original
     $report.integration_restored_or_user_edits_preserved=$preserved
     $report.negative_control.observed_pass=$preserved
@@ -549,7 +578,9 @@ try {
     if($crossVersion) {
         $null=Invoke-NodeStoreFixture 'after-uninstall'
         Require 'all-five-cross-version-offline-preservation-phases-ran' ($storeStages.Count -eq 5 -and $report.cross_version_upgrade.old_normal_ui_closed_normally -and $report.cross_version_upgrade.new_normal_ui_closed_normally -and $report.normal_ui_inherited_standard_user_profile)
-        $report.cross_version_upgrade.system_proxy_settings_unchanged=(Profile-ProxyFingerprint) -ceq $profileProxyBefore
+        $profileProxyAfter=Profile-ProxyFingerprint
+        $proxyDiagnostic.original_fingerprint_after=$profileProxyAfter
+        $report.cross_version_upgrade.system_proxy_settings_unchanged=$profileProxyAfter -ceq $profileProxyBefore
         Require 'ordinary-standard-user-proxy-settings-unchanged-after-upgrade-and-uninstall' $report.cross_version_upgrade.system_proxy_settings_unchanged
         $report.dpapi_store_preservation.verified=$true
         $report.cross_version_upgrade.verified=$true
@@ -557,5 +588,24 @@ try {
     $report.user_data_preserved=$true
     $report.success=-not $report.forced_termination
 }catch{$report.error=$_.Exception.Message;$report.success=$false}
-finally{$report|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'case.json') -Encoding UTF8}
+finally{
+    if($crossVersion) {
+        try {
+            $proxyDiagnostic.raw_final=Get-SwirlProxyRegistryDiagnostic
+            if($null -ne $proxyDiagnostic.raw_baseline){$proxyDiagnostic.final_difference=Compare-SwirlProxyRegistryDiagnostic $proxyDiagnostic.raw_baseline $proxyDiagnostic.raw_final}
+        }catch{
+            $report.success=$false;$proxyDiagnostic.final_diagnostic_error=$_.Exception.Message
+            if($null -eq $report.error){$report.error='Final redacted proxy diagnostic failed; inspect proxy-diagnostics.json.'}
+        }
+        if($null -ne $proxyDiagnostic.original_fingerprint_after) {
+            try {
+                $proxyDiagnostic.post_assertion_query_ran=$true
+                $proxyDiagnostic.post_assertion_query=Get-SwirlProxyQueryDiagnostic
+                if(-not $proxyDiagnostic.post_assertion_query.query_success){$proxyDiagnostic.post_assertion_query_error='Both documented WinINet query variants failed; inspect numeric errors.'}
+            }catch{$proxyDiagnostic.post_assertion_query_error=$_.Exception.Message}
+        }
+        $proxyDiagnostic|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'proxy-diagnostics.json') -Encoding UTF8
+    }
+    $report|ConvertTo-Json -Depth 14|Set-Content -LiteralPath (Join-Path $evidence 'case.json') -Encoding UTF8
+}
 if(-not $report.success){throw ('Normal installer child failed: '+$report.error)}

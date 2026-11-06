@@ -2,10 +2,13 @@ param(
     [Parameter(Mandatory=$true)][string]$Script,
     [Parameter(Mandatory=$true)][string]$ArgumentsFile,
     [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
-    [ValidateRange(30,1800)][int]$TimeoutSeconds=600
+    [ValidateRange(30,1800)][int]$TimeoutSeconds=600,
+    [ValidateSet('x86','x64')][string]$PowerShellArchitecture='x86'
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
+$PowerShellArchitecture=$PowerShellArchitecture.ToLowerInvariant()
+$expected64BitProcess=$PowerShellArchitecture -ceq 'x64'
 if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
     $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:SWIRL_DISPOSABLE_INSTALL_TEST -ne '1' -or
     -not [Environment]::Is64BitProcess) {
@@ -299,6 +302,7 @@ $fileGrants=New-Object 'System.Collections.Generic.List[object]'
 $cleanupErrors=New-Object 'System.Collections.Generic.List[string]'
 $result=[ordered]@{schema=1;success=$false;scope='A real temporary local standard user on a disposable hosted Windows runner; not a physical Windows 11 desktop.'
     username=$userName;sid=$null;parent_sid=$parentIdentity.User.Value;token=$null;child_pid=$null;child_exit_code=$null
+    powershell_architecture=$PowerShellArchitecture;expected_64_bit_process=$expected64BitProcess;actual_64_bit_process=$null
     profile_loaded=$false;child_completed=$false;remaining_job_processes=$null;forced_termination=$false
     account_removed=$false;profile_removed=$false;desktop_access_removed=$false;window_station_access_removed=$false
     desktop_dacl_restored=$false;window_station_dacl_restored=$false
@@ -348,7 +352,7 @@ try {
         $parameters=[ordered]@{}
         foreach($property in $argumentObject.PSObject.Properties){$parameters[$property.Name]=$property.Value}
         $parameters.ExpectedUserSid=$userSid
-        $config=[ordered]@{script=$targetScript;parameters=$parameters;evidence=$evidence;expectedSid=$userSid;parentSid=$parentIdentity.User.Value}
+        $config=[ordered]@{script=$targetScript;parameters=$parameters;evidence=$evidence;expectedSid=$userSid;parentSid=$parentIdentity.User.Value;expected64BitProcess=$expected64BitProcess}
         $configPath=Join-Path $fixture 'request.json'
         [IO.File]::WriteAllText($configPath,($config|ConvertTo-Json -Depth 12),(New-Object Text.UTF8Encoding $false))
         $bootstrap=Join-Path $fixture 'run.ps1'
@@ -363,7 +367,7 @@ try {
     $receipt.sid=$identity.User.Value;$receipt.is_admin=$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $receipt.profile=[Environment]::GetFolderPath('UserProfile')
     $receipt.known_folders=@{desktop=[Environment]::GetFolderPath('Desktop');programs=[Environment]::GetFolderPath('Programs');local_app_data=[Environment]::GetFolderPath('LocalApplicationData')}
-    if($receipt.sid -cne $data.expectedSid -or $receipt.sid -ceq $data.parentSid -or $receipt.is_admin -or $receipt.is_64_bit_process){throw 'Expected actual standard-user x86 Windows PowerShell process.'}
+    if($receipt.sid -cne $data.expectedSid -or $receipt.sid -ceq $data.parentSid -or $receipt.is_admin -or ($receipt.is_64_bit_process -ne $data.expected64BitProcess)){throw 'Expected actual standard-user Windows PowerShell process with the requested architecture.'}
     if(-not $receipt.profile -or $env:USERPROFILE -ine $receipt.profile){throw 'Actual user profile/environment did not load.'}
     $parameters=@{};foreach($property in $data.parameters.PSObject.Properties){$parameters[$property.Name]=$property.Value}
     & $data.script @parameters *> (Join-Path $data.evidence 'standard-user-output.log')
@@ -373,8 +377,9 @@ finally {$receipt|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $d
 if(-not $receipt.success){exit 1}
 '@
         [IO.File]::WriteAllText($bootstrap,$bootstrapText,(New-Object Text.UTF8Encoding $true))
-        $powershell=Join-Path $env:WINDIR 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'
-        if(-not (Test-Path -LiteralPath $powershell -PathType Leaf)){throw 'Actual x86 Windows PowerShell 5.1 is required.'}
+        $powershellRelative=if($expected64BitProcess){'System32\WindowsPowerShell\v1.0\powershell.exe'}else{'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'}
+        $powershell=Join-Path $env:WINDIR $powershellRelative
+        if(-not (Test-Path -LiteralPath $powershell -PathType Leaf)){throw 'The requested architecture of Windows PowerShell 5.1 is unavailable.'}
         $command='"'+$powershell+'" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$bootstrap+'" -Request "'+$configPath+'"'
         if($command.Length -ge 1024){throw 'CreateProcessWithLogonW command exceeds its documented bound.'}
         $child=[SwirlDisposableUser.Native]::Start($userName,$password,$powershell,$command,$fixture,$userSid)
@@ -393,7 +398,8 @@ if(-not $receipt.success){exit 1}
     $childReceipt=Join-Path $evidence 'standard-user-child.json'
     if(-not (Test-Path -LiteralPath $childReceipt -PathType Leaf)){throw 'Standard-user completion receipt is missing.'}
     $receipt=Get-Content -LiteralPath $childReceipt -Raw|ConvertFrom-Json
-    if(-not $receipt.success -or $receipt.sid -cne $userSid -or $receipt.is_admin -or $receipt.is_64_bit_process){throw 'The actual child identity/result is invalid.'}
+    $result.actual_64_bit_process=$receipt.is_64_bit_process
+    if(-not $receipt.success -or $receipt.sid -cne $userSid -or $receipt.is_admin -or ($receipt.is_64_bit_process -ne $expected64BitProcess)){throw 'The actual child identity, architecture or result is invalid.'}
     $result.success=$true
 } catch {$result.error=$_.Exception.Message;$result['error_detail']=$_.Exception.ToString()}
 finally {
