@@ -17,6 +17,7 @@
 #include <QtQml/private/qqmlengine_p.h>
 #include <QtQml/private/qqmldata_p.h>
 #include <QtQml/private/qqmlcontextdata_p.h>
+#include <QtQml/private/qqmlvmemetaobject_p.h>
 #include <QElapsedTimer>
 #include <QScopedValueRollback>
 #include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
@@ -118,6 +119,7 @@ public:
 
 struct QmlVmeWarningCapture {
     const char *phase="setup-before-main-load";
+    QElapsedTimer runtime;
     QElapsedTimer firstMatch;
     QSet<const QObject *> observedObjects;
     bool reporting=false;
@@ -154,6 +156,12 @@ static QJsonObject qmlWarningObjectState(QObject *object)
         {"hasVMEMetaObject",bool(data->hasVMEMetaObject)},
         {"jsWrapperAllocated",data->jsWrapper.valueRef()!=nullptr},
         {"jsWrapperUndefined",data->jsWrapper.isUndefined()}});
+    if(const auto *vme=QQmlVMEMetaObject::get(object))result.insert("vme",QJsonObject{
+        {"memberStoragePresent",vme->propertyAndMethodStorageAsMemberData()!=nullptr},
+        {"qmlObjectId",vme->qmlObjectId()},
+        {"contextValid",vme->contextData()&&vme->contextData()->isValid()}});
+    if(const auto *item=qobject_cast<QQuickItem *>(object))
+        result.insert("visualParentAddress",qmlWarningAddress(item->parentItem()));
     return result;
 }
 
@@ -218,6 +226,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
             {"phase",QString::fromLatin1(capture.phase)},
             {"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
             {"elapsedMs",capture.firstMatch.elapsed()},
+            {"runtimeMs",capture.runtime.elapsed()},
             {"captureLimit",maximumObjects},{"clusterWindowMs",firstClusterMs},
             {"capturedObjects",static_cast<int>(capture.observedObjects.size())},
             {"description",description},{"url",url.scheme()==QStringLiteral("qrc")?url.toString():url.fileName()},
@@ -229,7 +238,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
             {"inProgressCreations",inProgressBefore},
             {"publicIncubators",controller?controller->incubatingObjectCount():0},
             {"inProgressAfterObservation",engineState->inProgressCreations},
-            {"scope",QStringLiteral("First matching warning cluster in isolated node UI checks; raw metadata only. No QML property evaluation or warning suppression.")}};
+            {"scope",QStringLiteral("First matching warning cluster in isolated node UI/smoke checks; raw metadata only. No QML property evaluation or warning suppression.")}};
         qInfo().noquote()<<"QML_VME_WARNING_CONTEXT"<<QJsonDocument(record).toJson(QJsonDocument::Compact);
     }
 }
@@ -557,6 +566,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     // Declared before the engine so warning callbacks cannot outlive this state.
     QmlVmeWarningCapture qmlVmeWarnings;
+    qmlVmeWarnings.runtime.start();
 #endif
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("fontManager", &fontManager);
@@ -581,7 +591,7 @@ int main(int argc, char *argv[])
                      ](const QList<QQmlError> &warnings) {
                          if (!warnings.isEmpty()) qmlWarnings = true;
 #ifdef SWIRL_UI_TESTS
-                         if(nodeTest)recordQmlVmeWarningContext(engine,qmlVmeWarnings,warnings);
+                         if(nodeTest || smoke)recordQmlVmeWarningContext(engine,qmlVmeWarnings,warnings);
 #endif
                      });
     const QStringList arguments = app.arguments();
