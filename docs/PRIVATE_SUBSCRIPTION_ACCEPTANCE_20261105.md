@@ -92,9 +92,15 @@ certificate-verified TLS and authenticated HTTP CONNECT to a fixed synthetic
 HEAD/204 origin. This is HTTP through a TLS proxy, not an HTTPS origin, private
 node or Qt UI test.
 
-`PrivateSubscriptionProcess.py` starts a Windows child suspended, assigns a
-non-inheritable kill-on-close Job with active-process limit one, then resumes
-it. The parent deadline is at most eight seconds, independent of Tokio polling.
+`PrivateSubscriptionProcess.py` creates a suspended Windows child with
+`STARTUPINFOEX` and `PROC_THREAD_ATTRIBUTE_JOB_LIST`, placing it in the existing
+non-inheritable kill-on-close Job with active-process limit one during process
+creation. The separate handle-list attribute contains only three child stdio
+handles; the Job is never inherited. The owner verifies actual Job membership
+and resumes the retained primary-thread handle exactly once. Unsupported or
+failed attributes reject creation; there is no post-create assignment fallback.
+See [Microsoft's explanation of the creation/assignment crash window](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812).
+The parent deadline is at most eight seconds, independent of Tokio polling.
 Windows exit proof requires both a signaled child handle and an empty Job.
 POSIX process groups support portable synthetic regression, not Windows proof.
 POSIX termination refreshes the owned child's actual status and records a
@@ -103,10 +109,17 @@ returning `EPERM` or `ESRCH` is not itself success: the bounded proof still
 requires reaping the owned child and independently observing that its group no
 longer exists. A live child, remaining group or denied absence query cannot
 produce an exit proof or release a reservation.
-Creation and Job assignment are not atomic: a parent killed in that narrow
-window may leave an unresumed child. No grant was sent and the hold remains;
-this is not zero-orphan proof. The Windows crash test kills the parent only
-after the actual authenticated socket is active and the Job owns the child.
+The added Windows gate pauses immediately after the real `CreateProcessW`
+returns, before the wrapper takes ownership or performs post-create work. It
+verifies the suspended synthetic Python child's Job membership and limit one, then
+kills the parent. Its observer retains only a real child process handle and
+requires termination, no first-user-code marker and preservation of the prepared
+reservation. It does not retain a Job handle that would defeat kill-on-close,
+does not claim a post-crash Job query, and does not issue an ExitProof. Normal
+owned termination still supplies the full process-signaled/Job-empty proof.
+The separate Rust-worker crash case still kills the parent after an authenticated
+socket becomes active. New atomic-creation, stdio/Unicode/exit-code and API-failure
+tests require actual Windows CI on their own source; prior passes do not cover them.
 Final socket counters must match the grant; child JSON is not exit proof.
 The coordinator checks OS exit, drains/joins output readers, closes child
 handles and all fixture sockets/tasks, and only then settles. Missing receipts,

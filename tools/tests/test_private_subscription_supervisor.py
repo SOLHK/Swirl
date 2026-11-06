@@ -133,6 +133,27 @@ class SyntheticLedgerTests(unittest.TestCase):
 
 
 class OwnedProcessTests(unittest.TestCase):
+    def test_windows_launch_requires_fully_qualified_unicode_arguments(self):
+        for arguments in ([], ["worker.exe"], [r"C:worker.exe"], [r"\worker.exe"],
+                          [r"C:\worker.exe", "PRIVATE_MARKER\0tail"], [r"C:\worker.exe", b"bytes"],
+                          [r"C:\worker.exe", "x" * 32767]):
+            with self.subTest(argument_count=len(arguments)), self.assertRaises(budget.BudgetError) as failure:
+                process._windows_launch_values(arguments, None)
+            self.assertNotIn("PRIVATE_MARKER", str(failure.exception))
+        application, command, block = process._windows_launch_values([r"C:\QA tools\worker.exe", ""], None)
+        self.assertEqual(application, r"C:\QA tools\worker.exe")
+        self.assertEqual(command, '"C:\\QA tools\\worker.exe" ""')
+        self.assertIsNone(block)
+
+    def test_windows_environment_rejects_ambiguous_or_embedded_null_fields(self):
+        for environment in ({"": "value"}, {"BAD=KEY": "value"}, {"KEY": "PRIVATE_MARKER\0tail"},
+                            {"Path": "first", "PATH": "second"}, {"KEY": 1}):
+            with self.subTest(keys=list(environment)), self.assertRaises(budget.BudgetError) as failure:
+                process._windows_launch_values([r"C:\worker.exe"], environment)
+            self.assertNotIn("PRIVATE_MARKER", str(failure.exception))
+        _, _, block = process._windows_launch_values([r"C:\worker.exe"], {"z": "last", "Alpha": "回环"})
+        self.assertEqual(block, "Alpha=回环\0z=last\0\0")
+
     def test_real_child_deadline_cannot_be_renewed_or_asserted_by_child(self):
         started = time.monotonic()
         with process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"], deadline=started + 0.4) as child:
@@ -252,6 +273,223 @@ class OwnedProcessTests(unittest.TestCase):
             self.assertEqual(child.stdout.read(128).strip(), b"DENIED")
             self.assertEqual(proof.record()["exitCode"], 0)
             self.assertEqual(proof.record()["backend"], "windows-single-process-job")
+
+    @unittest.skipUnless(os.name == "nt", "Windows atomic Job creation and real stdio")
+    def test_windows_atomic_stdio_unicode_environment_and_exit_259(self):
+        code = ("import json,os,sys\n"
+                "data=sys.stdin.buffer.read(5)\n"
+                "print(json.dumps({'args':sys.argv[1:],'value':os.environ['SWIRL_PRIVATE_TEST_TEXT'],"
+                "'input':data.decode('ascii')}))\n"
+                "sys.stderr.write('fixture-stderr')\n"
+                "sys.exit(259)\n")
+        arguments = ['空 格\\end\\"quoted"', ""]
+        environment = {**supervisor._environment(), "SWIRL_PRIVATE_TEST_TEXT": "回环值"}
+        child = process.OwnedProcess([sys.executable, "-c", code, *arguments],
+                                     deadline=time.monotonic() + 4, environment=environment)
+        try:
+            self.assertEqual(child.stdin.write(b"abcde"), 5)
+            child.stdin.close()
+            proof = child.wait(timeout=3)
+            self.assertEqual(proof.record()["exitCode"], 259)
+            self.assertTrue(proof.record()["ownedProcessSetEmpty"])
+            self.assertEqual(json.loads(child.stdout.read(4096)),
+                             {"args": arguments, "value": "回环值", "input": "abcde"})
+            self.assertEqual(child.stderr.read(128), b"fixture-stderr")
+            self.assertIsNone(child.process._thread)
+            self.assertEqual(child.process.abi, {"pointerSize": 8, "startupInfoSize": 104,
+                                                 "startupInfoExSize": 112, "processInformationSize": 24})
+            REPORTS.append({"test": self.id(), "scope": "synthetic Windows OS-child fixture only",
+                            "atomicJobCreation": True, "abi": child.process.abi, "exit": proof.record()})
+        finally:
+            child.close()
+        child.close()  # Native handle ownership is explicitly idempotent.
+        self.assertIsNone(child.process._handle)
+        self.assertIsNone(child.process._thread)
+        self.assertIsNone(child.job.handle)
+        self.assertTrue(all(stream.closed for stream in (child.stdin, child.stdout, child.stderr)))
+        for action in (lambda: child.job.verify_member(child.process),
+                       lambda: child.job.empty(child.process), child.job.terminate):
+            with self.assertRaises(budget.BudgetError):
+                action()  # A NULL handle must not query the runner's outer Job.
+
+    @unittest.skipUnless(os.name == "nt", "Windows atomic Job attribute failure")
+    def test_windows_atomic_attribute_or_create_failure_never_falls_back(self):
+        for stage in ("job_attribute", "create"):
+            with self.subTest(stage=stage):
+                job = process._WindowsJob()
+                c, w, kernel = job.c, job.w, job.kernel
+                update = kernel.UpdateProcThreadAttribute
+                update.restype = w.BOOL
+                update.argtypes = [c.c_void_p, w.DWORD, c.c_size_t, c.c_void_p,
+                                   c.c_size_t, c.c_void_p, c.POINTER(c.c_size_t)]
+                def update_or_reject(attributes, flags, key, value, size, previous, returned):
+                    if stage == "job_attribute" and key == 0x0002000D:
+                        return False
+                    return update(attributes, flags, key, value, size, previous, returned)
+                expected = "PrivateProcessAttributeUpdateFailed" if stage == "job_attribute" else "PrivateAtomicProcessCreateFailed"
+                try:
+                    with mock.patch.object(process, "_WindowsJob", return_value=job), \
+                         mock.patch.object(kernel, "UpdateProcThreadAttribute", side_effect=update_or_reject), \
+                         mock.patch.object(kernel, "CreateProcessW", return_value=False) as create, \
+                         mock.patch.object(kernel, "AssignProcessToJobObject", side_effect=AssertionError("post-create assignment")) as assign, \
+                         mock.patch.object(process.subprocess, "Popen", side_effect=AssertionError("uncontained fallback")) as fallback:
+                        with self.assertRaisesRegex(budget.BudgetError, expected):
+                            process.OwnedProcess([sys.executable, "-c", "raise SystemExit(0)"],
+                                                 deadline=time.monotonic() + 3)
+                        self.assertEqual(create.call_count, 0 if stage == "job_attribute" else 1)
+                        assign.assert_not_called()
+                        fallback.assert_not_called()
+                    self.assertIsNone(job.handle)
+                finally:
+                    job.close()
+
+    @unittest.skipUnless(os.name == "nt", "Windows post-create wrapping failure cleanup")
+    def test_windows_post_create_pipe_wrapping_failure_kills_and_closes_child(self):
+        job = process._WindowsJob()
+        c, w, kernel = job.c, job.w, job.kernel
+        create = kernel.CreateProcessW
+        create.restype = w.BOOL
+        create.argtypes = [w.LPCWSTR, w.LPWSTR, c.c_void_p, c.c_void_p, w.BOOL, w.DWORD,
+                           c.c_void_p, w.LPCWSTR, c.c_void_p, c.c_void_p]
+        kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [w.DWORD, w.BOOL, w.DWORD], w.HANDLE
+        observer, initial_wait, original_handles = None, None, []
+        def create_and_observe(*arguments):
+            nonlocal observer, initial_wait
+            result = create(*arguments)
+            if result:
+                information = arguments[-1]._obj
+                original_handles.extend((information.process, information.thread))
+                observer = kernel.OpenProcess(0x100000 | 0x0001, False, information.pid)
+                if observer:
+                    initial_wait = kernel.WaitForSingleObject(observer, 0)
+            return result
+        try:
+            with mock.patch.object(process, "_WindowsJob", return_value=job), \
+                 mock.patch.object(kernel, "CreateProcessW", side_effect=create_and_observe), \
+                 mock.patch.object(kernel, "ResumeThread", side_effect=AssertionError("resumed incomplete owner")) as resume, \
+                 mock.patch.object(process.os, "fdopen", side_effect=OSError("Injected CRT stream wrapping failure")) as wrapping, \
+                 mock.patch.object(process.subprocess, "Popen", side_effect=AssertionError("uncontained fallback")) as fallback:
+                with self.assertRaisesRegex(budget.BudgetError, "PrivateAtomicProcessLaunchFailed"):
+                    process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"],
+                                         deadline=time.monotonic() + 3)
+                resume.assert_not_called()
+                fallback.assert_not_called()
+                wrapping.assert_called_once()
+            self.assertTrue(observer)
+            self.assertEqual(initial_wait, 258)
+            self.assertEqual(kernel.WaitForSingleObject(observer, 2000), 0)
+            self.assertIsNone(job.handle)
+            for handle in original_handles:
+                flags = w.DWORD()
+                self.assertFalse(kernel.GetHandleInformation(handle, c.byref(flags)))
+            REPORTS.append({"test": self.id(), "scope": "synthetic Windows OS-child fixture only",
+                            "postCreateWrapFailureChildExitConfirmed": True,
+                            "originalProcessAndThreadHandlesClosed": True, "exitProofIssued": False})
+        finally:
+            if observer:
+                if kernel.WaitForSingleObject(observer, 0) == 258:
+                    kernel.TerminateProcess(observer, 125)
+                    kernel.WaitForSingleObject(observer, 2000)
+                kernel.CloseHandle(observer)
+            job.close()
+
+    @unittest.skipUnless(os.name == "nt", "Windows atomic Job before primary-thread resume")
+    def test_windows_pre_resume_parent_crash_kills_child_and_retains_prepared_hold(self):
+        # The observer keeps only a process handle across the parent's death.
+        # Keeping any Job handle would suppress its kill-on-last-close policy.
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve()
+            ledger_path, ready, marker = directory / "budget", directory / "ready.json", directory / "executed.txt"
+            code = ("import hashlib,json,sys,time\nfrom pathlib import Path\nfrom unittest import mock\n"
+                    "sys.path.insert(0,sys.argv[1])\n"
+                    "from PrivateSubscriptionBudget import Ledger\n"
+                    "import PrivateSubscriptionProcess as owned\n"
+                    "fixture=\"from pathlib import Path;import sys,time;Path(sys.argv[1]).write_text('executed');time.sleep(30)\"\n"
+                    "def pause_at_creation(*arguments):\n"
+                    " native_create.restype=pause_at_creation.restype;native_create.argtypes=pause_at_creation.argtypes\n"
+                    " result=native_create(*arguments)\n"
+                    " if not result:return result\n"
+                    " child=arguments[-1]._obj;startup=arguments[-2]._obj\n"
+                    " member=job.w.BOOL()\n"
+                    " assert arguments[5]&4\n"
+                    " assert job.kernel.IsProcessInJob(child.process,job.handle,job.c.byref(member)) and member.value\n"
+                    " info=job.Accounting();limits=job.ExtendedLimits()\n"
+                    " assert job.kernel.QueryInformationJobObject(job.handle,1,job.c.byref(info),job.c.sizeof(info),None)\n"
+                    " assert job.kernel.QueryInformationJobObject(job.handle,9,job.c.byref(limits),job.c.sizeof(limits),None)\n"
+                    " assert info.activeProcesses==1 and limits.basic.activeProcesses==1 and limits.basic.flags==0x2008\n"
+                    " with Path(sys.argv[3]).open('x',encoding='utf-8') as out:\n"
+                    "  json.dump({'pid':child.pid,'inJob':True,'activeProcesses':info.activeProcesses,"
+                    "'activeProcessLimit':limits.basic.activeProcesses,'jobFlags':limits.basic.flags,"
+                    "'pauseBoundary':'CreateProcessW-success-before-wrapper-ownership',"
+                    "'abi':{'pointerSize':job.c.sizeof(job.c.c_void_p),'startupInfoSize':job.c.sizeof(startup),"
+                    "'startupInfoExSize':startup.cb,'processInformationSize':job.c.sizeof(child)}},out)\n"
+                    " time.sleep(15)\n"
+                    " raise RuntimeError('observer did not terminate fixture parent')\n"
+                    "with Ledger(sys.argv[2]) as ledger:\n"
+                    " ledger.initialize_synthetic()\n"
+                    " ticket=ledger.reserve_supervised(1,65536,1,8000,config_fingerprint=hashlib.sha256(fixture.encode()).hexdigest(),"
+                    "source_sha='1'*40,worker_sha256=hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),"
+                    "build_id='python-os-fixture',nonce='2'*64,workload='stall_runtime_after_connect')\n"
+                    " ledger.bind_supervised_grant(ticket,hashlib.sha256(b'pre-resume-no-grant-fixture').hexdigest())\n"
+                    " job=owned._WindowsJob();native_create=job.kernel.CreateProcessW\n"
+                    " with mock.patch.object(owned,'_WindowsJob',return_value=job),mock.patch.object(job.kernel,'CreateProcessW',pause_at_creation):\n"
+                    "  owned.OwnedProcess([sys.executable,'-c',fixture,sys.argv[4]],deadline=time.monotonic()+8)\n")
+            outer = subprocess.Popen([sys.executable, "-c", code, str(TOOLS), str(ledger_path), str(ready), str(marker)],
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            handle = None
+            try:
+                stop, observation = time.monotonic() + 5, None
+                while time.monotonic() < stop:
+                    try:
+                        observation = json.loads(ready.read_text())
+                        break
+                    except (OSError, ValueError):
+                        time.sleep(0.01)
+                self.assertIsNotNone(observation)
+                self.assertTrue(observation["inJob"])
+                self.assertEqual(observation["activeProcesses"], 1)
+                self.assertEqual(observation["activeProcessLimit"], 1)
+                self.assertEqual(observation["jobFlags"], 0x2008)
+                self.assertEqual(observation["pauseBoundary"], "CreateProcessW-success-before-wrapper-ownership")
+                import ctypes as c
+                from ctypes import wintypes as w
+                kernel = c.WinDLL("kernel32", use_last_error=True)
+                kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [w.DWORD, w.BOOL, w.DWORD], w.HANDLE
+                kernel.WaitForSingleObject.argtypes, kernel.WaitForSingleObject.restype = [w.HANDLE, w.DWORD], w.DWORD
+                kernel.TerminateProcess.argtypes, kernel.TerminateProcess.restype = [w.HANDLE, w.UINT], w.BOOL
+                kernel.CloseHandle.argtypes, kernel.CloseHandle.restype = [w.HANDLE], w.BOOL
+                handle = kernel.OpenProcess(0x100000 | 0x1000 | 0x0001, False, observation["pid"])
+                self.assertTrue(handle)
+                self.assertEqual(kernel.WaitForSingleObject(handle, 0), 258)
+                self.assertFalse(marker.exists())
+                outer.kill()
+                outer.wait(timeout=2)
+                self.assertEqual(kernel.WaitForSingleObject(handle, 2000), 0)
+                self.assertFalse(marker.exists())
+                with budget.Ledger(ledger_path) as ledger:
+                    self.assertEqual(ledger.summary()["heldBytes"], 65536 + budget.TCP_RECEIVE_RESERVATION)
+                    self.assertEqual(ledger.summary()["attempts"], 1)
+                    history = ledger.data["history"]["1"]
+                    self.assertEqual(history["phase"], "prepared")
+                    self.assertIsNone(history["receipt"])
+                    self.assertIsNone(history["pid"])
+                REPORTS.append({"test": self.id(), "scope": "synthetic Python OS-child; no grant or worker workload",
+                                "preResumeMembershipConfirmed": True, "preResumeParentCrashChildExitConfirmed": True,
+                                "primaryUserCodeMarkerAbsent": True, "preparedHoldRetained": True, "abi": observation["abi"],
+                                "pauseBoundary": observation["pauseBoundary"],
+                                "postCrashJobEmptyQuery": "not-available-after-last-job-handle-close",
+                                "exitProofIssued": False})
+            finally:
+                if outer.poll() is None:
+                    outer.kill()
+                    outer.wait(timeout=2)
+                if handle:
+                    if kernel.WaitForSingleObject(handle, 0) == 258:
+                        # Cleanup a failed negative outcome without turning it
+                        # into a successful crash/exit assertion.
+                        kernel.TerminateProcess(handle, 125)
+                        kernel.WaitForSingleObject(handle, 2000)
+                    kernel.CloseHandle(handle)
 
 
 class WorkerIdentityAdmissionTests(unittest.TestCase):
