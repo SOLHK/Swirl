@@ -297,6 +297,12 @@ impl Resolver {
         // Ordinary (TUN-off) probes retain the existing system lookup path.
         if self.servers.is_empty()
             && self.tls_servers.is_empty()
+            && swirl_transport::egress::private_acceptance_active()
+        {
+            return Err("DnsPrivateMeteredResolverRequired");
+        }
+        if self.servers.is_empty()
+            && self.tls_servers.is_empty()
             && swirl_transport::egress::physical_probe_active()
         {
             return Err("DnsPhysicalResolverRequired");

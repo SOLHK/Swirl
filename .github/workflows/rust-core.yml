@@ -388,6 +388,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Check Windows private budget storage and guarded loopback transport
+        shell: pwsh
+        run: |
+          python ../tools/tests/test_private_subscription_budget.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo check --locked -p swirl-api --features private-acceptance
       - name: Provision pinned official Windows Codex CLI
         working-directory: .
         shell: pwsh

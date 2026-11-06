@@ -10,10 +10,8 @@ use std::{
     task::Poll,
 };
 use swirl_dns::Resolver;
-use tokio::{
-    net::TcpStream,
-    time::{Duration, Instant, sleep_until, timeout_at},
-};
+use swirl_transport::TcpConnection;
+use tokio::time::{Duration, Instant, sleep_until, timeout_at};
 
 const ATTEMPT_DELAY: Duration = Duration::from_millis(250);
 const PENDING_LIMIT: usize = 2;
@@ -197,7 +195,7 @@ pub(super) async fn connect_tcp(
     resolver: &Resolver,
     target: &Target,
     deadline: Instant,
-) -> Result<TcpStream> {
+) -> Result<TcpConnection> {
     // Resolver returns a literal unchanged, including a route-pinned address.
     // Never re-resolve the original hostname or consult another route here.
     let addresses = within(
@@ -225,7 +223,10 @@ pub async fn connect_direct_resolved(
     Ok(Box::new(connect_tcp_addresses(addresses, deadline).await?))
 }
 
-async fn connect_tcp_addresses(addresses: Vec<SocketAddr>, deadline: Instant) -> Result<TcpStream> {
+async fn connect_tcp_addresses(
+    addresses: Vec<SocketAddr>,
+    deadline: Instant,
+) -> Result<TcpConnection> {
     let stream = timing::measure(
         Phase::TcpDial,
         dial_addresses(addresses, deadline, swirl_transport::connect_tcp),

@@ -6,7 +6,13 @@
 //! Existing sockets retain their interface. A lost interface must cancel old
 //! flows before the controller updates this lease. Dropping an unrecovered lease
 //! fails closed instead of letting new sockets follow the tunnel's own routes.
+#[cfg(feature = "private-acceptance")]
+pub mod budget;
 mod probe;
+#[cfg(feature = "private-acceptance")]
+pub use budget::TcpConnection;
+#[cfg(not(feature = "private-acceptance"))]
+pub type TcpConnection = TcpStream;
 pub use probe::{physical_probe_active, with_physical_probe};
 use std::{io, net::SocketAddr, sync::Mutex};
 use tokio::net::{TcpSocket, TcpStream, UdpSocket};
@@ -236,9 +242,37 @@ pub fn release_orphan_after_routes_restored() -> io::Result<()> {
     }
 }
 
-pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpStream> {
+pub fn private_acceptance_active() -> bool {
+    #[cfg(feature = "private-acceptance")]
+    return budget::active();
+    #[cfg(not(feature = "private-acceptance"))]
+    false
+}
+
+pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpConnection> {
+    #[cfg(feature = "private-acceptance")]
+    {
+        let admission = budget::admit_connection()?;
+        let socket = admission
+            .as_ref()
+            .map(|guard| guard.socket(address))
+            .transpose()?;
+        let stream = connect_tcp_inner(address, socket).await?;
+        TcpConnection::new(stream, admission)
+    }
+    #[cfg(not(feature = "private-acceptance"))]
+    connect_tcp_inner(address, None).await
+}
+
+async fn connect_tcp_inner(
+    address: SocketAddr,
+    prepared: Option<TcpSocket>,
+) -> io::Result<TcpStream> {
     if address.ip().is_loopback() {
-        return TcpStream::connect(address).await;
+        return match prepared {
+            Some(socket) => socket.connect(address).await,
+            None => TcpStream::connect(address).await,
+        };
     }
     let interface = select(
         EGRESS
@@ -255,12 +289,15 @@ pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpStream> {
         ));
     }
     let Some(interface) = physical.map(|binding| binding.interface).or(interface) else {
-        return TcpStream::connect(address).await;
+        return match prepared {
+            Some(socket) => socket.connect(address).await,
+            None => TcpStream::connect(address).await,
+        };
     };
-    let socket = if address.is_ipv6() {
-        TcpSocket::new_v6()?
-    } else {
-        TcpSocket::new_v4()?
+    let socket = match prepared {
+        Some(socket) => socket,
+        None if address.is_ipv6() => TcpSocket::new_v6()?,
+        None => TcpSocket::new_v4()?,
     };
     #[cfg(windows)]
     {
@@ -287,7 +324,14 @@ pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpStream> {
 }
 
 pub(crate) fn outbound_udp_bind_address(address: SocketAddr) -> io::Result<SocketAddr> {
+    check_private_udp()?;
     probe::udp_bind_address(address)
+}
+
+pub(crate) fn check_private_udp() -> io::Result<()> {
+    #[cfg(feature = "private-acceptance")]
+    budget::check_udp()?;
+    Ok(())
 }
 
 pub(crate) fn pin_udp(socket: &UdpSocket, local: SocketAddr) -> io::Result<()> {

@@ -3,6 +3,8 @@ name = "swirl-api"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+[features]
+private-acceptance = ["swirl-transport/private-acceptance"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 [dependencies]
