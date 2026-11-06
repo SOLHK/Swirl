@@ -97,6 +97,12 @@ non-inheritable kill-on-close Job with active-process limit one, then resumes
 it. The parent deadline is at most eight seconds, independent of Tokio polling.
 Windows exit proof requires both a signaled child handle and an empty Job.
 POSIX process groups support portable synthetic regression, not Windows proof.
+POSIX termination refreshes the owned child's actual status and records a
+successful group kill so concurrent cleanup does not signal it again. A signal
+returning `EPERM` or `ESRCH` is not itself success: the bounded proof still
+requires reaping the owned child and independently observing that its group no
+longer exists. A live child, remaining group or denied absence query cannot
+produce an exit proof or release a reservation.
 Creation and Job assignment are not atomic: a parent killed in that narrow
 window may leave an unresumed child. No grant was sent and the hold remains;
 this is not zero-orphan proof. The Windows crash test kills the parent only

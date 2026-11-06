@@ -2,12 +2,14 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import contextlib
+import errno
 import hashlib
 import io
 import json
 import os
 from pathlib import Path
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -145,6 +147,100 @@ class OwnedProcessTests(unittest.TestCase):
         with mock.patch.object(process.subprocess, "Popen", side_effect=AssertionError("spawned")):
             with self.assertRaisesRegex(budget.BudgetError, "InvalidProcessDeadline"):
                 process.OwnedProcess([sys.executable], deadline=time.monotonic() + 8.1)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process-group lifecycle")
+    def test_signal_eperm_requires_real_reaping_and_absent_group(self):
+        child = process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"],
+                                     deadline=time.monotonic() + 4)
+        killpg = os.killpg
+        signals = []
+        def exiting_group(group, sig):
+            result = killpg(group, sig)
+            if group == child.pid and sig == signal.SIGKILL:
+                signals.append(sig)
+                # Model Darwin's exited-but-unreaped group errno. The child
+                # really dies; poll and the subsequent group query stay real.
+                raise PermissionError(errno.EPERM, "Injected exiting group")
+            return result
+        try:
+            with mock.patch.object(process.os, "killpg", exiting_group):
+                proof = child.terminate_and_wait(timeout=1)
+            self.assertEqual(signals, [signal.SIGKILL])
+            self.assertEqual(proof.record()["exitCode"], -signal.SIGKILL)
+            self.assertTrue(proof.record()["ownedProcessSetEmpty"])
+            with self.assertRaises(ProcessLookupError):
+                killpg(child.pid, 0)
+        finally:
+            child.close()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process-group lifecycle")
+    def test_denied_signal_to_live_child_never_proves_exit_and_can_retry(self):
+        child = process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"],
+                                     deadline=time.monotonic() + 4)
+        killpg = os.killpg
+        def denied_signal(group, sig):
+            if group == child.pid and sig == signal.SIGKILL:
+                raise PermissionError(errno.EPERM, "Injected live group denial")
+            return killpg(group, sig)
+        try:
+            with mock.patch.object(process.os, "killpg", denied_signal):
+                with self.assertRaisesRegex(budget.BudgetError, "ChildExitUnconfirmed"):
+                    child.terminate_and_wait(timeout=0.05)
+                self.assertIsNone(child._proof)
+                self.assertIsNone(child.process.poll())
+            # A denied first signal must not suppress a later real stop.
+            proof = child.terminate_and_wait(timeout=1)
+            self.assertEqual(proof.record()["exitCode"], -signal.SIGKILL)
+        finally:
+            child.close()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process-group lifecycle")
+    def test_exited_child_with_denied_group_query_never_proves_empty(self):
+        child = process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"],
+                                     deadline=time.monotonic() + 4)
+        killpg = os.killpg
+        def denied_query(group, sig):
+            if group == child.pid and sig == 0:
+                raise PermissionError(errno.EPERM, "Injected group query denial")
+            return killpg(group, sig)
+        try:
+            with mock.patch.object(process.os, "killpg", denied_query):
+                with self.assertRaisesRegex(budget.BudgetError, "OwnedProcessSetNotEmpty"):
+                    child.terminate_and_wait(timeout=0.05)
+                self.assertIsNone(child._proof)
+                self.assertEqual(child.process.returncode, -signal.SIGKILL)
+            self.assertTrue(child.wait(timeout=1).record()["ownedProcessSetEmpty"])
+        finally:
+            child.close()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process-group lifecycle")
+    def test_concurrent_termination_sends_one_successful_group_signal(self):
+        child = process.OwnedProcess([sys.executable, "-c", "import time;time.sleep(30)"],
+                                     deadline=time.monotonic() + 4)
+        killpg, prove = os.killpg, child._prove
+        signals = []
+        both_terminators = threading.Barrier(2)
+        def count_signals(group, sig):
+            if group == child.pid and sig == signal.SIGKILL:
+                signals.append(sig)
+            return killpg(group, sig)
+        def wait_for_other_terminator(timeout):
+            # Hold the first caller at the proof boundary so the second stop
+            # decision runs before the first proof completes. Actual child
+            # polling and group-absence checks remain unchanged.
+            both_terminators.wait(timeout=2)
+            return prove(timeout)
+        try:
+            with mock.patch.object(process.os, "killpg", count_signals), \
+                 mock.patch.object(child, "_prove", wait_for_other_terminator), \
+                 ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(child.terminate_and_wait, 1) for _ in range(2)]
+                proofs = [future.result(timeout=3) for future in futures]
+            self.assertEqual(signals, [signal.SIGKILL])
+            self.assertIs(proofs[0], proofs[1])
+            self.assertTrue(proofs[0].record()["ownedProcessSetEmpty"])
+        finally:
+            child.close()
 
     @unittest.skipUnless(os.name == "nt", "Windows Job active-process limit")
     def test_windows_job_prevents_a_second_process(self):

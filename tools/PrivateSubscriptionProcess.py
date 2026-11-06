@@ -8,6 +8,7 @@ No caller-supplied JSON or `exited=True` can construct an ExitProof.
 """
 from __future__ import annotations
 
+import errno
 import os
 import secrets
 import signal
@@ -169,6 +170,7 @@ class OwnedProcess:
         self.process = None
         self.job = None
         self._proof = None
+        self._posix_kill_sent = False
         self._lock = threading.RLock()
         self._done = threading.Event()
         self.timed_out = False
@@ -275,13 +277,20 @@ class OwnedProcess:
             if self.job:
                 self.job.terminate()
             else:
-                if self.process.returncode is None:
+                if self.process.poll() is None and not self._posix_kill_sent:
                     try:
                         os.killpg(self.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                elif not self._empty():
-                    raise BudgetError("PosixOwnerAlreadyReaped")
+                    except OSError as error:
+                        if error.errno not in {errno.EPERM, errno.ESRCH}:
+                            raise BudgetError("PosixGroupSignalFailed") from None
+                        # Darwin can report EPERM for an exited, unreaped group.
+                        # Neither errno proves exit: the bounded poll + absent-
+                        # group check below must still succeed. A denied signal
+                        # remains retryable if the child is actually alive.
+                    else:
+                        # Concurrent deadline/cleanup callers share one signal
+                        # and the same proof, rather than re-killing a zombie.
+                        self._posix_kill_sent = True
         return self._prove(timeout)
 
     def _close_pipes(self):
