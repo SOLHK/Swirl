@@ -88,40 +88,6 @@ jobs:
           }
           # Compile only; no WinINET query or settings access in the host profile.
           . ./scripts/tests/WindowsProxyDiagnostics.ps1
-      - name: Observe WinINET queries in a fresh actual standard-user profile
-        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
-        shell: pwsh
-        env:
-          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
-        run: |
-          foreach ($architecture in @('x86','x64')) {
-            $evidence = Join-Path $env:GITHUB_WORKSPACE ('build-evidence/proxy-query-only/'+$architecture)
-            New-Item -ItemType Directory -Force -Path $evidence | Out-Null
-            $arguments = Join-Path $evidence 'child-arguments.json'
-            [ordered]@{ExpectedSourceSha=$env:GITHUB_SHA;EvidenceDirectory=$evidence;ExpectedPowerShellArchitecture=$architecture} |
-              ConvertTo-Json | Set-Content -LiteralPath $arguments -Encoding UTF8
-            ./scripts/tests/Invoke-DisposableWindowsUser.ps1 `
-              -Script scripts/tests/Test-WindowsProxyQueryOnly.ps1 `
-              -ArgumentsFile $arguments -EvidenceDirectory $evidence -TimeoutSeconds 180 -PowerShellArchitecture $architecture
-            $query = Get-Content -LiteralPath (Join-Path $evidence 'proxy-query-only.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            $runner = Get-Content -LiteralPath (Join-Path $evidence 'standard-user-runner.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($query.schema -ne 1 -or -not $query.success -or $query.source_sha -cne $env:GITHUB_SHA -or
-                -not $query.actual_non_admin_token -or -not $query.actual_standard_user_powershell -or
-                $query.architecture -cne $architecture -or -not $query.negative_controls.success) {
-              throw 'Fresh-profile query observation or its comparator controls are incomplete.'
-            }
-            if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination -or
-                $runner.remaining_job_processes -ne 0 -or $runner.powershell_architecture -cne $architecture) {
-              throw 'The query-only standard-user process or its native resources were not cleanly released.'
-            }
-          }
-      - name: Preserve early fresh-profile WinINET observation
-        if: always() && env.SWIRL_CI_NETWORK_CHANGE == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-WindowsProxy-Query-Observation
-          path: build-evidence/proxy-query-only/
-          if-no-files-found: error
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
@@ -1520,235 +1486,50 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Temporary diagnosis of the already failed 5cf3/5301 source. Remove this job
-  # after collecting its evidence; it cannot qualify a later candidate source.
-  diagnose-pinned-5cf3-d3d:
-    if: ${{ github.event_name == 'pull_request' && github.repository == 'SOLHK/Swirl' && github.event.pull_request.number == 61 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'work/node-probe-render-20261105' && github.base_ref == 'test' }}
+  observe-fresh-windows-proxy:
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x86, x64]
     permissions:
       contents: read
-      actions: read
     steps:
-      - name: Checkout the immutable source that produced the failed native case
+      - name: Checkout the current diagnostic source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: 5301eb88fa54b83095bfda1ba3a6e25296eb7278
           persist-credentials: false
-      - name: Record the separate workflow and replay source identities
-        id: replay_identity
+      - name: Observe WinINET queries in a fresh actual standard-user profile
         shell: pwsh
         env:
-          SWIRL_EXECUTING_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+          SWIRL_QUERY_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Path 'build-evidence/d3d-5cf3-replay' -Force | Out-Null
-          $source = (& git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $source -cne '5301eb88fa54b83095bfda1ba3a6e25296eb7278') { throw 'Pinned replay checkout differs from the failed source.' }
-          . ./scripts/Assert-BuildSource.ps1
-          Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $source
-          [ordered]@{
-            schema = 1
-            scope = 'Old-source diagnostic only; not acceptance of the executing workflow source.'
-            original_failure_retained = $true
-            replaces_critical_result = $false
-            executing_workflow_sha = $env:GITHUB_SHA
-            executing_pr_head_sha = $env:SWIRL_EXECUTING_PR_HEAD
-            executing_run_id = $env:GITHUB_RUN_ID
-            executing_run_attempt = $env:GITHUB_RUN_ATTEMPT
-            tested_source_sha = $source
-            tested_development_head_sha = '5cf3f9f23790a50981926b249aea44e6a620d09b'
-            original_run_id = 42257737059
-            original_job_id = 128029377234
-            original_workflow_conclusion = 'failure'
-            original_artifact_id = 13527859294
-            original_artifact_zip_expected_sha256 = '78c7153183d26ab1b391ced496ed4ce20f77d08e74df44a42225a5e1d5226929'
-            original_artifact_zip_independently_hashed_by_this_job = $false
-            planned_repetitions = 3
-            cases_per_repetition = @(2, 1)
-            original_native_deadline_ms = 90000
-            original_submission_limit_ms = 40
-            started_utc = [DateTime]::UtcNow.ToString('o')
-          } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath 'build-evidence/d3d-5cf3-replay/identity.json' -Encoding utf8
-      - name: Prepare the same native Windows display fixture
-        shell: pwsh
-        run: ./scripts/Set-CiDisplayResolution.ps1
-      - name: Restore only the exact already compiled 5301 cache
-        id: replay_cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-            build/swirl-quick
-            build/swirl-product
-          key: apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-082b4956bfe1f416398b268e050cb933a8b0b72160d0c2bec1827df3045f0f2c-5301eb88fa54b83095bfda1ba3a6e25296eb7278
-          fail-on-cache-miss: true
-      - name: Require the exact cache key before any cached executable runs
-        shell: pwsh
-        env:
-          SWIRL_REPLAY_CACHE_HIT: ${{ steps.replay_cache.outputs.cache-hit }}
-          SWIRL_REPLAY_CACHE_KEY: ${{ steps.replay_cache.outputs.cache-matched-key }}
-        run: |
-          if ($env:SWIRL_REPLAY_CACHE_HIT -cne 'true' -or $env:SWIRL_REPLAY_CACHE_KEY -cne 'apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-082b4956bfe1f416398b268e050cb933a8b0b72160d0c2bec1827df3045f0f2c-5301eb88fa54b83095bfda1ba3a6e25296eb7278') { throw 'The immutable failed-source compiler cache is unavailable; no replay is admitted.' }
-      - name: Read the original failed run's independent runtime inventory
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          artifact-ids: '13527859294'
-          run-id: '42257737059'
-          repository: SOLHK/Swirl
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: ${{ runner.temp }}/swirl-5cf3-original-engine
-      - name: Admit exact cached bytes and reconstruct the clean old runtime
-        id: replay_admission
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Set-StrictMode -Version Latest
-          function Replay-Hash([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
-          function Replay-PlainPath([string]$Path) {
-            $current = [IO.Path]::GetFullPath($Path)
-            while ($current) {
-              if (Test-Path -LiteralPath $current) {
-                if ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'A linked replay input or output is not admitted.' }
-              }
-              $parent = [IO.Path]::GetDirectoryName($current.TrimEnd('\', '/'))
-              if ($parent -eq $current) { break }
-              $current = $parent
-            }
+          $architecture = $env:SWIRL_QUERY_ARCHITECTURE
+          $evidence = Join-Path $env:GITHUB_WORKSPACE ('build-evidence/proxy-query-only/'+$architecture)
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $arguments = Join-Path $evidence 'child-arguments.json'
+          [ordered]@{ExpectedSourceSha=$env:GITHUB_SHA;EvidenceDirectory=$evidence;ExpectedPowerShellArchitecture=$architecture} |
+            ConvertTo-Json | Set-Content -LiteralPath $arguments -Encoding UTF8
+          ./scripts/tests/Invoke-DisposableWindowsUser.ps1 `
+            -Script scripts/tests/Test-WindowsProxyQueryOnly.ps1 `
+            -ArgumentsFile $arguments -EvidenceDirectory $evidence -TimeoutSeconds 180 -PowerShellArchitecture $architecture
+          $query = Get-Content -LiteralPath (Join-Path $evidence 'proxy-query-only.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath (Join-Path $evidence 'standard-user-runner.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($query.schema -ne 1 -or -not $query.success -or $query.source_sha -cne $env:GITHUB_SHA -or
+              -not $query.actual_non_admin_token -or -not $query.actual_standard_user_powershell -or
+              $query.architecture -cne $architecture -or -not $query.negative_controls.success) {
+            throw 'Fresh-profile query observation or its comparator controls are incomplete.'
           }
-          function Replay-RelativePath([string]$Relative, [string]$Root) {
-            if ([string]::IsNullOrWhiteSpace($Relative) -or [IO.Path]::IsPathRooted($Relative) -or $Relative.Contains('\') -or $Relative.Contains(':')) { throw 'Invalid relative runtime path.' }
-            foreach ($part in $Relative.Split('/')) {
-              if ($part -in @('', '.', '..') -or $part -match '[. ]$' -or $part -match '^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') { throw 'Ambiguous relative runtime path.' }
-            }
-            $target = [IO.Path]::GetFullPath((Join-Path $Root $Relative))
-            if (-not $target.StartsWith($Root.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime path escapes its exact root.' }
-            Replay-PlainPath $target
-            return $target
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination -or
+              $runner.remaining_job_processes -ne 0 -or $runner.powershell_architecture -cne $architecture) {
+            throw 'The query-only standard-user process or its native resources were not cleanly released.'
           }
-          $original = Join-Path $env:RUNNER_TEMP 'swirl-5cf3-original-engine/build-evidence/d3d11-frame-latency'
-          $manifestPath = Join-Path $original 'runtime-manifest.json'
-          $receiptPath = Join-Path $original 'receipt.json'
-          foreach ($path in @($manifestPath, $receiptPath)) { Replay-PlainPath $path }
-          $manifestHash = Replay-Hash $manifestPath
-          $receiptHash = Replay-Hash $receiptPath
-          if ($manifestHash -cne '019184294a40aa6f7879c46be720a084d48984093eca9a6b776a96e2a89b0d32' -or $receiptHash -cne '82ca9cf8832b76b3a7e5c678c6402f931336f5e029ec8cf8bd605e0019364d9d') { throw 'Original runtime evidence differs from the separately downloaded failed-run artifact.' }
-          $originalReceipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json
-          if ($originalReceipt.sourceSha -cne '5301eb88fa54b83095bfda1ba3a6e25296eb7278' -or $originalReceipt.pullRequestHeadSha -cne '5cf3f9f23790a50981926b249aea44e6a620d09b' -or $originalReceipt.runId -cne '42257737059' -or $originalReceipt.status -cne 'failed' -or $originalReceipt.executableSha256 -cne 'e0071368506836cf2169e91252041e9e3ccf9315f55472870322a41461f669ee' -or $originalReceipt.qtCoreVersion -cne '6.12.0.0') { throw 'Original evidence does not identify the expected failed native source.' }
-          foreach ($entry in $originalReceipt.sourceFileSha256.PSObject.Properties) {
-            $sourcePath = Replay-RelativePath $entry.Name $env:GITHUB_WORKSPACE
-            if ((Replay-Hash $sourcePath) -cne [string]$entry.Value) { throw 'Pinned diagnostic source differs from its original receipt.' }
-          }
-          $cache = [IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/Release'))
-          $runtime = [IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE 'replay-runtime-5cf3'))
-          Replay-PlainPath $cache
-          Replay-PlainPath $runtime
-          if (Test-Path -LiteralPath $runtime) { throw 'The fresh replay runtime already exists.' }
-          New-Item -ItemType Directory -Path $runtime | Out-Null
-          $excluded = @('Swirl-Settings-preview.png', 'Swirl-Inspector-preview.png', 'Swirl-input-diagnostics.txt', 'Swirl-diagnostics.txt', 'Swirl-Compact-preview.png', 'Swirl-Activity-preview.png', 'Swirl-Activity-200-preview.png')
-          $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-          $omitted = [Collections.Generic.List[string]]::new()
-          $copied = [Collections.Generic.List[object]]::new()
-          $manifest = @(Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json)
-          if ($manifest.Count -ne 1586) { throw 'Unexpected pinned runtime inventory length.' }
-          foreach ($entry in $manifest) {
-            if ($entry.path -ceq '.' -and $entry.kind -ceq 'directory') { continue }
-            if (-not $seen.Add([string]$entry.path)) { throw 'Duplicate runtime path.' }
-            $sourceFile = Replay-RelativePath ([string]$entry.path) $cache
-            $targetFile = Replay-RelativePath ([string]$entry.path) $runtime
-            if ($entry.kind -ceq 'directory') { New-Item -ItemType Directory -Path $targetFile -Force | Out-Null; continue }
-            if ($entry.kind -cne 'file' -or [string]$entry.sha256 -cnotmatch '^[0-9a-f]{64}$' -or [long]$entry.bytes -lt 0) { throw 'Malformed pinned runtime file.' }
-            if ($excluded -ccontains [string]$entry.path) { $omitted.Add([string]$entry.path); continue }
-            if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { throw "Pinned cached runtime file is missing: $($entry.path)" }
-            $sourceItem = Get-Item -LiteralPath $sourceFile -Force
-            if ($sourceItem.Length -ne [long]$entry.bytes -or (Replay-Hash $sourceFile) -cne [string]$entry.sha256) { throw "Pinned cached runtime bytes differ: $($entry.path)" }
-            New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($targetFile)) -Force | Out-Null
-            Copy-Item -LiteralPath $sourceFile -Destination $targetFile
-            (Get-Item -LiteralPath $targetFile).LastWriteTimeUtc = $sourceItem.LastWriteTimeUtc
-            if ((Get-Item -LiteralPath $targetFile).Length -ne [long]$entry.bytes -or (Replay-Hash $targetFile) -cne [string]$entry.sha256) { throw 'Copied replay runtime bytes differ from the admitted cache.' }
-            $copied.Add([ordered]@{path=[string]$entry.path;bytes=[long]$entry.bytes;sha256=[string]$entry.sha256})
-          }
-          if ($copied.Count -ne 1511 -or $omitted.Count -ne 7 -or @(Compare-Object $excluded $omitted.ToArray() -CaseSensitive).Count) { throw 'The exact runtime inventory or explicit generated-output omissions changed.' }
-          $rust = Get-Content -LiteralPath (Join-Path $runtime 'swirl-rust-build.json') -Raw -Encoding utf8 | ConvertFrom-Json
-          if ($rust.source_sha -cne '5301eb88fa54b83095bfda1ba3a6e25296eb7278' -or $rust.build_id -cne 'c35bb19fdd5c9a1649405b119aec6444254a22abccf443fa08d8b43762334a4e' -or $rust.abi_version -ne 1 -or $rust.target -cne 'x86_64-pc-windows-msvc') { throw 'The admitted Rust identity does not match the failed source.' }
-          . ./scripts/Assert-BuildSource.ps1
-          Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha '5301eb88fa54b83095bfda1ba3a6e25296eb7278'
-          Copy-Item -LiteralPath $receiptPath -Destination 'build-evidence/d3d-5cf3-replay/original-failure-receipt.json'
-          Copy-Item -LiteralPath $manifestPath -Destination 'build-evidence/d3d-5cf3-replay/original-runtime-manifest.json'
-          [ordered]@{
-            schema=1; admitted=$true; tested_source_sha='5301eb88fa54b83095bfda1ba3a6e25296eb7278'; executing_workflow_sha=$env:GITHUB_SHA
-            original_manifest_sha256=$manifestHash; original_receipt_sha256=$receiptHash
-            cache_key='apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-082b4956bfe1f416398b268e050cb933a8b0b72160d0c2bec1827df3045f0f2c-5301eb88fa54b83095bfda1ba3a6e25296eb7278'
-            runtime_files_verified=$copied.Count; excluded_generated_outputs=$omitted.ToArray(); rust=$rust; source_file_sha256=$originalReceipt.sourceFileSha256
-            compile_performed=$false; sdk_or_tls_redeployment_performed=$false; original_failure_retained=$true; replaces_critical_result=$false
-            copied_files=$copied.ToArray()
-          } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath 'build-evidence/d3d-5cf3-replay/admission.json' -Encoding utf8
-      - name: Collect all three bounded old-source repetitions with unchanged gates
-        id: replay_cases
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $results = [Collections.Generic.List[object]]::new()
-          $failed = $false
-          foreach ($repeat in 1..3) {
-            $output = Join-Path $env:GITHUB_WORKSPACE ('build-evidence/d3d-5cf3-replay/repeat-{0:00}' -f $repeat)
-            $errorText = $null
-            try {
-              & ./scripts/Test-QtD3D11FrameLatency.ps1 `
-                -RepositoryRoot $env:GITHUB_WORKSPACE `
-                -RuntimeDirectory (Join-Path $env:GITHUB_WORKSPACE 'replay-runtime-5cf3') `
-                -ReferenceExecutable (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/Release/Swirl.exe') `
-                -OutputDirectory $output `
-                -ScratchRoot $env:RUNNER_TEMP `
-                -WorkflowSha '5301eb88fa54b83095bfda1ba3a6e25296eb7278' `
-                -PullRequestHeadSha '5cf3f9f23790a50981926b249aea44e6a620d09b'
-            } catch { $errorText = $_.Exception.Message }
-            $receiptFile = Join-Path $output 'receipt.json'
-            $receipt = $null
-            if (Test-Path -LiteralPath $receiptFile -PathType Leaf) {
-              try { $receipt = Get-Content -LiteralPath $receiptFile -Raw -Encoding utf8 | ConvertFrom-Json }
-              catch { $errorText = 'The repetition receipt could not be parsed.' }
-            } else { $errorText = 'The repetition did not produce a receipt.' }
-            $valid = $null -ne $receipt -and $receipt.sourceSha -ceq '5301eb88fa54b83095bfda1ba3a6e25296eb7278' -and
-              $receipt.executableSha256 -ceq 'e0071368506836cf2169e91252041e9e3ccf9315f55472870322a41461f669ee' -and
-              $receipt.runId -ceq $env:GITHUB_RUN_ID -and $receipt.diagnosticOnly -eq $true -and $receipt.replacesCriticalResult -eq $false -and
-              $receipt.originalEvidenceUnchanged -eq $true -and @($receipt.cases).Count -eq 2
-            $passed = $valid -and -not $errorText -and $receipt.status -ceq 'passed'
-            if (-not $passed) { $failed = $true }
-            $results.Add([ordered]@{ repetition=$repeat; receipt_valid=$valid; passed=$passed; error=$errorText; receipt=$receipt })
-          }
-          [ordered]@{
-            schema=1; scope='Three prespecified old-source diagnostic repetitions; every outcome retained.'
-            executing_workflow_sha=$env:GITHUB_SHA; tested_source_sha='5301eb88fa54b83095bfda1ba3a6e25296eb7278'
-            planned_repetitions=3; completed_repetitions=$results.Count; replaces_critical_result=$false; original_failure_retained=$true
-            all_replays_passed=(-not $failed); repetitions=$results.ToArray()
-          } | ConvertTo-Json -Depth 50 | Set-Content -LiteralPath 'build-evidence/d3d-5cf3-replay/repetitions.json' -Encoding utf8
-          if ($failed) { throw 'At least one prespecified old-source repetition failed; all repetitions and the original failure are retained.' }
-      - name: Record replay step outcomes even when admission or a case fails
-        if: always()
-        shell: pwsh
-        env:
-          SWIRL_REPLAY_IDENTITY: ${{ steps.replay_identity.outcome }}
-          SWIRL_REPLAY_CACHE: ${{ steps.replay_cache.outcome }}
-          SWIRL_REPLAY_ADMISSION: ${{ steps.replay_admission.outcome }}
-          SWIRL_REPLAY_CASES: ${{ steps.replay_cases.outcome }}
-        run: |
-          New-Item -ItemType Directory -Path 'build-evidence/d3d-5cf3-replay' -Force | Out-Null
-          [ordered]@{
-            schema=1; executing_workflow_sha=$env:GITHUB_SHA; tested_source_sha='5301eb88fa54b83095bfda1ba3a6e25296eb7278'
-            identity_step=$env:SWIRL_REPLAY_IDENTITY; cache_step=$env:SWIRL_REPLAY_CACHE
-            admission_step=$env:SWIRL_REPLAY_ADMISSION; case_step=$env:SWIRL_REPLAY_CASES
-            source_scope='Old source only; current-source critical UI and D3D gates remain independent.'
-            finished_utc=[DateTime]::UtcNow.ToString('o')
-          } | ConvertTo-Json | Set-Content -LiteralPath 'build-evidence/d3d-5cf3-replay/step-outcomes.json' -Encoding utf8
-      - name: Preserve every old-source diagnostic result independently
+      - name: Preserve the fresh-profile WinINET observation and cleanup result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Swirl-Pinned-5cf3-D3D11-Diagnosis
-          path: build-evidence/d3d-5cf3-replay/
+          name: Swirl-WindowsProxy-Query-Observation-${{ matrix.architecture }}
+          path: build-evidence/proxy-query-only/
           if-no-files-found: error
-          retention-days: 14
