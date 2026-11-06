@@ -34,6 +34,12 @@ static quint16 freePort(){
     return ports.proxyPort();
 }
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
+struct FixturePortOwner {
+    explicit FixturePortOwner(int &count):live(&count){++*live;}
+    ~FixturePortOwner(){--*live;}
+    int *live;
+};
+using FixtureOwner=std::unique_ptr<FixturePortOwner>;
 class NodeTests:public QObject {
     Q_OBJECT
     EngineStartOptions options() {
@@ -58,6 +64,61 @@ class NodeTests:public QObject {
 private slots:
     void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
     void init(){QSettings().clear();}
+    void fixturePortExclusionTablesFailClosed(){
+        QSet<quint16> ports;QString error;
+        const auto localized=QStringLiteral("协议 udp 端口排除范围\n起始端口 结束端口\n---------- ----------\n50000 50031\n51000 51001 *\n* - 管理的端口排除。\n").toUtf8();
+        QVERIFY2(SwirlFixturePorts::parseExclusions(localized,ports,error),qPrintable(error));
+        QCOMPARE(ports.size(),34);QVERIFY(ports.contains(50031));QVERIFY(ports.contains(51001));QVERIFY(!ports.contains(50032));
+        QVERIFY(SwirlFixturePorts::parseExclusions("--- ---\n51000 51001*\n",ports,error));QCOMPARE(ports.size(),2);
+        QVERIFY(SwirlFixturePorts::parseExclusions("heading\n--- ---\n",ports,error));QVERIFY(ports.isEmpty());
+        for(const auto &invalid:QList<QByteArray>{"","1 10","--- ---\n0 10","--- ---\n2 1","--- ---\n1 65536",
+                                                "--- ---\n1 2 extra","--- ---\n+1 2","--- ---\n1 +2",
+                                                "--- ---\n1 2**","--- ---\nunrecognized data","--- ---\n5 6\n7 bad"}){
+            QVERIFY2(!SwirlFixturePorts::parseExclusions(invalid,ports,error),invalid.constData());
+            QVERIFY(ports.isEmpty());QVERIFY(!error.isEmpty());
+        }
+    }
+    void fixtureExcludedBlockKeepsEveryCandidateOwned(){
+        QSet<quint16> excluded;for(int port=50000;port<50064;++port)excluded.insert(quint16(port));
+        int live=0,created=0,bindCalls=0;quint16 next=50000;bool allHeld=true;quint16 bound=0;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>(excluded,49999,[&]{
+            allHeld=allHeld&&live==created;
+            ++created;
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16 port){
+            ++bindCalls;bound=port;
+            return SwirlFixturePorts::BindResult{true,QAbstractSocket::UnknownSocketError,{}};
+        },result);
+        QVERIFY(owner);QVERIFY(allHeld);QCOMPARE(created,65);QCOMPARE(bindCalls,1);QCOMPARE(bound,quint16(50064));
+        QCOMPARE(result.filtered,64);QCOMPARE(result.collisions,0);QCOMPARE(result.heldOwners,64);
+        QCOMPARE(result.filteredSample.size(),32);QCOMPARE(live,1);owner.reset();QCOMPARE(live,0);
+    }
+    void fixtureUnknownAccessDenialStopsAfterCollision(){
+        int live=0,bindCalls=0;quint16 next=50000;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>({},49999,[&]{
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16){
+            ++bindCalls;
+            return SwirlFixturePorts::BindResult{false,bindCalls==1?QAbstractSocket::AddressInUseError:QAbstractSocket::SocketAccessError,
+                                                 QStringLiteral("Controlled denial")};
+        },result);
+        QVERIFY(!owner);QCOMPARE(bindCalls,2);QCOMPARE(result.candidates,2);QCOMPARE(result.collisions,1);
+        QCOMPARE(result.candidate,quint16(50001));QCOMPARE(result.stage,QStringLiteral("tcp-listen"));
+        QCOMPARE(result.error,QAbstractSocket::SocketAccessError);QCOMPARE(live,0);
+    }
+    void fixtureAddressCollisionLimitRemainsBounded(){
+        int live=0,bindCalls=0;quint16 next=50000;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>({},49999,[&]{
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16){
+            ++bindCalls;
+            return SwirlFixturePorts::BindResult{false,QAbstractSocket::AddressInUseError,QStringLiteral("Controlled collision")};
+        },result);
+        QVERIFY(!owner);QCOMPARE(bindCalls,32);QCOMPARE(result.candidates,32);QCOMPARE(result.collisions,32);QCOMPARE(live,0);
+    }
     void probesNeverInheritNetworkOwnership(){
         auto source=options();source.tunEnabled=true;source.gatewayForwarding=true;source.allowLan=true;source.meteredNetwork=true;
         source.meteredAllowlist={"Codex.exe"};source.lanUsername="private";source.lanPassword="private";

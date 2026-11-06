@@ -119,6 +119,34 @@ function Read-ProbeSession($Case,[string]$Name,[string]$Phase) {
     $Case.session_queries.Add($entry)
     return $entry
 }
+function Read-ProbeOwnedCollectorMetadata($Case,$Details) {
+    $entry=[ordered]@{
+        status='not-admitted';wpr_stdout_file=$Details.record.stdout_file
+        wpr_ownership_confirmed=$Case.ownership_confirmed;actual_collector_name=$null
+        session_identity_verified=$false;query_attempted=$false;query_ok=$false;query_exit_code=$null
+        stdout_file=$null;stderr_file=$null;fields_verified=$false
+        provider_guid=$null;level=$null;match_any_keyword=$null;match_all_keyword=$null
+        field_scope='Raw same-session query only; its output format has not yet been verified.'
+    }
+    $Case.logman_session_metadata=$entry
+    if ($Case.component -eq 'System') { $entry.status='metadata-not-collected-system';return }
+    if (-not $Case.ownership_confirmed -or -not $Details.ok) { return }
+    $names=@($Details.stdout -split '\r?\n' | ForEach-Object {
+        if ($_ -cmatch '^\s*Collector Name\s*:\s*(.+?)\s*$') { $Matches[1] }
+    })
+    if ($names.Count -ne 1) { $entry.status='ambiguous-collector-name';return }
+    $entry.actual_collector_name=$names[0]
+    # Microsoft documents EventCollector names as WPR_initiated_<instance>_<collector>:
+    # https://devblogs.microsoft.com/performance-diagnostics/controlling-the-event-session-name-with-the-instance-name/
+    $expected='WPR_initiated_'+$Case.instance_name+'_'+$Case.collector_token
+    if ($names[0] -cne $expected) { $entry.status='collector-name-not-owned';return }
+    $entry.session_identity_verified=$true;$entry.query_attempted=$true
+    $tool=Invoke-ProbeTool ($Case.id+'-logman-owned-collector') $logman @('query',$names[0],'-ets') 5000
+    $entry.query_ok=$tool.ok;$entry.query_exit_code=$tool.record.exit_code
+    $entry.stdout_file=$tool.record.stdout_file;$entry.stderr_file=$tool.record.stderr_file
+    $entry.status=if ($tool.ok) {'captured-unparsed'} else {'query-failed'}
+    # Do not derive any provider/keyword field or a passing verdict from this raw output.
+}
 function Test-ProbeCollector($Case,[string]$Text) {
     $collectors=[Collections.Generic.List[string]]::new()
     $keywords=[Collections.Generic.List[string]]::new(); $stacks=[Collections.Generic.List[string]]::new()
@@ -169,7 +197,7 @@ function Invoke-EnablementProbe([string]$Id,[string]$Component,[bool]$NonPaged,[
         profile_name=('SwirlEtwProbe'+$nonce);instance_name=('SwirlEtwInstance'+$nonce);collector_token=('SwirlEtwCollector'+$nonce)
         profile_sha256=$null;start_attempted=$false;start_exit_code=$null;enablement_status='not-run'
         ownership_confirmed=$false;collector_details_verified=$false;collector_names=@();retirement_confirmed=$false
-        actual_provider=$null;actual_system_keywords=@();actual_system_stacks=@()
+        actual_provider=$null;actual_system_keywords=@();actual_system_stacks=@();logman_session_metadata=$null
         cancel_requested=$false;cancel_request_elapsed_ms=$null;retirement_observed_elapsed_ms=$null
         before_sessions=@();after_sessions=@();session_queries=[Collections.Generic.List[object]]::new();errors=[Collections.Generic.List[string]]::new()
     }
@@ -212,6 +240,8 @@ function Invoke-EnablementProbe([string]$Id,[string]$Component,[bool]$NonPaged,[
         elseif (-not $state.owned) { throw 'WPR returned success without the uniquely owned recording.' }
         else {
             $details=Invoke-ProbeTool ($Id+'-collectors') $wpr @('-status','collectors','-details','-instancename',$case.instance_name)
+            # Preserve the owned session's raw query before strict WPR validation can throw.
+            Read-ProbeOwnedCollectorMetadata $case $details
             if (-not $details.ok -or -not (Test-ProbeCollector $case $details.stdout)) { $case.enablement_status='unknown'; throw 'The actual collector configuration could not be matched to this probe.' }
             $case.collector_details_verified=$true; $case.enablement_status='enabled'
             foreach ($name in $case.collector_names) { $null=Read-ProbeSession $case $name 'active' }

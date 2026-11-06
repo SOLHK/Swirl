@@ -176,7 +176,7 @@ class Capture:
 
 def child_environment():
     # This is the launcher's own environment, never another process's environment.
-    names = {"SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "TEMP", "TMP", "USERPROFILE",
+    names = {"OS", "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "TEMP", "TMP", "USERPROFILE",
              "APPDATA", "LOCALAPPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432",
              "GITHUB_ACTIONS", "RUNNER_ENVIRONMENT", "SWIRL_DISPOSABLE_INSTALL_TEST", "GITHUB_SHA"}
     return {key: value for key, value in os.environ.items() if key.upper() in names}

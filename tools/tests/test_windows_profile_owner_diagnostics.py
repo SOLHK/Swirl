@@ -28,6 +28,16 @@ def request_fixture():
 
 
 class OwnerDiagnosticAdmissionTests(unittest.TestCase):
+    def test_child_environment_preserves_worker_entry_contract(self):
+        required = {"OS": "Windows_NT", "GITHUB_ACTIONS": "true",
+                    "RUNNER_ENVIRONMENT": "github-hosted", "SWIRL_DISPOSABLE_INSTALL_TEST": "1",
+                    "GITHUB_SHA": "1" * 40}
+        with mock.patch.dict(diagnostic.os.environ,
+                             dict(required, UNRELATED_ENV_MARKER="must-not-be-forwarded"), clear=True):
+            child = diagnostic.child_environment()
+        self.assertEqual(child, required)
+        self.assertNotIn("UNRELATED_ENV_MARKER", child)
+
     def rejected(self, value):
         with self.assertRaises(diagnostic.ObservationError):
             diagnostic.validate_request(value)

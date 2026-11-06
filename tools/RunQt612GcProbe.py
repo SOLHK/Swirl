@@ -120,6 +120,8 @@ def run_case(name, arguments, output, runtime, source_sha, qt_identity):
                QT_QPA_FONTDIR=str(runtime / "lib/fonts"),
                QT_PLUGIN_PATH=str(runtime), QML_IMPORT_PATH=str(runtime / "qml"),
                QML2_IMPORT_PATH=str(runtime / "qml"), QML_DISABLE_DISK_CACHE="1",
+               # OwnedProcess has no console; keep Qt's default messages in the captured stderr pipe.
+               QT_FORCE_STDERR_LOGGING="1",
                QT_MESSAGE_PATTERN="[%{type}] %{message}",
                QT_LOGGING_RULES="*.warning=true\n*.critical=true",
                TEMP=str(case / "temp"), TMP=str(case / "temp"),

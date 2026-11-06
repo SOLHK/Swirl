@@ -739,6 +739,7 @@ jobs:
           }
           if (-not $pagesObserved) { throw 'Deployed all-pages smoke did not record the required 61 routes.' }
       - name: Exercise deployed QA routes with normal animation and VME context diagnostics
+        if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
         shell: pwsh
         run: |
           ./scripts/tests/Test-WindowsFullMotionSmoke.ps1 `
