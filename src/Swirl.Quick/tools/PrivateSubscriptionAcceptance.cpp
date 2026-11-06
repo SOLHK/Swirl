@@ -17,6 +17,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
 #include <QNetworkReply>
+#include <QProcess>
 #include <QQueue>
 #include <QRegularExpression>
 #include <QSaveFile>
@@ -321,6 +322,27 @@ int selfTest() {
     check(!validWindow(now.addSecs(-601), now.addSecs(1), now));
     check(!validWindow(now.addSecs(-10), now, now));
     check(!validWindow(now.addSecs(1), now.addSecs(2), now));
+    // Exercise the actual CLI boundary. Even a fresh authorization window
+    // cannot replace authenticated billing and enforced wire accounting.
+    const auto refusedOutput = temporary.filePath("refused-live-output");
+    const auto absentManifest = temporary.filePath("absent-manifest.dpapi");
+    const QList<QStringList> liveCommands{
+        {"--live", absentManifest, now.addSecs(-1).toString(Qt::ISODateWithMs),
+            now.addSecs(60).toString(Qt::ISODateWithMs), refusedOutput},
+        {"--live", absentManifest, now.addSecs(-60).toString(Qt::ISODateWithMs),
+            now.addSecs(-1).toString(Qt::ISODateWithMs), refusedOutput},
+        {"--live"}
+    };
+    for (const auto &arguments : liveCommands) {
+        QProcess process;
+        process.start(QCoreApplication::applicationFilePath(), arguments);
+        const bool finished = process.waitForFinished(5000);
+        if (!finished) { process.kill(); process.waitForFinished(1000); }
+        const auto response = QJsonDocument::fromJson(process.readAllStandardOutput()).object();
+        check(finished && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 2
+            && response == QJsonObject{{"errorCode", "AuthenticatedBillingAndWireGuardRequired"}, {"networkStarted", false}}
+            && !QFileInfo::exists(refusedOutput));
+    }
     const QJsonObject privateFixture{{"secret", "synthetic-private-value"}};
     check(writePrivate(temporary.filePath("receipt.dpapi"), privateFixture));
     check(QJsonDocument::fromJson(readPrivate(temporary.filePath("receipt.dpapi"))).object() == privateFixture);
@@ -443,6 +465,10 @@ int main(int argc, char **argv) {
         QTextStream(stdout) << QJsonDocument(QJsonObject{{"errorCode", code}, {"networkStarted", false}})
             .toJson(QJsonDocument::Compact) << Qt::endl; return 2;
     };
+    // The legacy live harness has no authenticated provider accounting,
+    // persistent transport reservation or enforced wire-byte cancellation.
+    // Refuse before reading private inputs or creating any network runtime.
+    if (args.size() > 1 && args[1] == "--live") return fail("AuthenticatedBillingAndWireGuardRequired");
     if (args.size() == 2 && args[1] == "--self-test") return selfTest();
     if (args.size() == 4 && args[1] == "--offline-body") {
         if (!newPrivateDirectory(args[3])) return fail("NewPrivateDirectoryRequired");
