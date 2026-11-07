@@ -270,6 +270,29 @@ class CurrentReaderTests(unittest.TestCase):
         self.assertNotIn("snapshot/out/delivery.json", selected)
         self.assertIn("out/delivery.json", missing)
 
+    def test_cross_version_proxy_diagnostics_requires_exact_path_and_original_bytes(self):
+        expected = "build-evidence/cross-version-installer-lifecycle/proxy-diagnostics.json"
+        alternatives = (
+            "proxy-diagnostics.json",
+            "snapshot/" + expected,
+            "build-evidence/normal-installer-lifecycle/proxy-diagnostics.json",
+            "build-evidence/cross-version-installer-lifecycle/nested/proxy-diagnostics.json",
+        )
+        raw = b'\xef\xbb\xbf{\r\n  "schema": 1, "synthetic_control": true\r\n}\r\n'
+        entries = [(expected, raw)] + [(name, b'{}') for name in alternatives]
+        report, originals, _ = self.scan(entries, kind="package")
+        self.assertTrue(report["all_members_crc_verified"])
+        self.assertNotIn(expected, report["selection_errors"])
+        self.assertEqual(originals, {expected: raw})
+        self.assertEqual(report["selected_members"], [
+            {"path": expected, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}])
+        for name in (*alternatives, "unrelated.json"):
+            with self.subTest(missing_expected_with=name):
+                report, originals, _ = self.scan([(name, raw)], kind="package")
+                self.assertTrue(report["all_members_crc_verified"])
+                self.assertIn(expected, report["selection_errors"])
+                self.assertEqual(originals, {})
+
     def test_producer_merge_is_verified_separately_from_reader_merge(self):
         qt_data = json.dumps({"source_sha": PRODUCER, "status": "complete"}).encode()
         delivery = {"source_sha": PRODUCER, "pr_head_sha": HEAD, "source_tree_sha": TREE,

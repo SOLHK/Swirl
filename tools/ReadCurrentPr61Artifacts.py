@@ -311,6 +311,7 @@ def choose_members(kind, names):
                      "build-evidence/normal-installer-lifecycle/lifecycle.json",
                      "build-evidence/normal-installer-lifecycle/standard-user-runner.json",
                      "build-evidence/cross-version-installer-lifecycle/cross-version.json",
+                     "build-evidence/cross-version-installer-lifecycle/proxy-diagnostics.json",
                      "build-evidence/d3d11-frame-latency/receipt.json",
                      "build-evidence/d3d11-frame-latency/runtime-manifest.json",
                      "build-evidence/d3d11-frame-latency/protected-changes.json",
