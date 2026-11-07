@@ -326,7 +326,7 @@ jobs:
             cmake @configureArgs
           }
           if ($LASTEXITCODE -ne 0) { throw 'Qt UI configuration failed.' }
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase configured --evidence build-evidence/qt-product-qa-configured
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-configured"
           if ($LASTEXITCODE -ne 0) { throw 'Actual QA Qt target does not match the selected SDK.' }
       - name: Build UI
         id: ui_build
@@ -340,7 +340,7 @@ jobs:
       - name: Bundle UI runtime
         shell: pwsh
         run: |
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase pre-deploy --evidence build-evidence/qt-product-qa-pre-deploy
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase pre-deploy --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-pre-deploy"
           if ($LASTEXITCODE -ne 0) { throw 'QA Qt source, linkage or SDK changed before deployment.' }
           $windeployqt = Join-Path $env:QT_ROOT_DIR 'bin/windeployqt.exe'
           $qtpaths = Join-Path $env:QT_ROOT_DIR 'bin/qtpaths.exe'
@@ -376,9 +376,9 @@ jobs:
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
           & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase post-deploy --runtime-dir dist --evidence build-evidence/qt-product-qa-dist
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist"
           if ($LASTEXITCODE -ne 0) { throw 'Deployed QA Qt runtime differs from the selected SDK.' }
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase post-deploy --runtime-dir build/swirl-quick/Release --evidence build-evidence/qt-product-qa-ctest
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/build/swirl-quick/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest"
           if ($LASTEXITCODE -ne 0) { throw 'CTest Qt runtime differs from the selected SDK.' }
           # Validate only the clean deployment. The test build also contains
           # intentionally invalid loader fixtures and is not a product payload.
@@ -987,7 +987,7 @@ jobs:
           Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
           cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_PRIVATE_UI_QUOTA=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target" "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-product --phase configured --evidence build-evidence/qt-product-release-configured
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-product" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-release-configured"
           if ($LASTEXITCODE -ne 0) { throw 'Actual Release Qt target does not match the selected SDK.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
@@ -1008,7 +1008,7 @@ jobs:
             if (Test-Path -LiteralPath $saved) { Remove-Item -LiteralPath $saved -Force }
           }
           try {
-            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -QtEvidenceDirectory build-evidence/qt-product-release-deployment -QtSourceDirectory out/qt-corresponding-source -QtSourceCacheDirectory "$env:RUNNER_TEMP/swirl-qt-6.12.0-source-cache"
+            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -QtEvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-release-deployment" -QtSourceDirectory out/qt-corresponding-source -QtSourceCacheDirectory "$env:RUNNER_TEMP/swirl-qt-6.12.0-source-cache"
             ./scripts/tests/Test-WindowsMsvcRuntimePackage.ps1 -ApplicationDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory out/package-evidence/msvc-runtime-policy
             $crt = Get-Content -LiteralPath 'out/package-evidence/msvc-runtime-policy/msvc-runtime-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($crt.schema -ne 1 -or $crt.source_sha -cne $env:GITHUB_SHA -or -not $crt.success -or -not $crt.candidate_unchanged -or -not $crt.fixture_removed -or $crt.forced_termination -or @($crt.negative_controls).Count -ne 5 -or @($crt.negative_controls | Where-Object { -not $_.expected_assertion_failed }).Count) { throw 'The actual app-local CRT dependency and fallback rejection evidence is incomplete.' }
@@ -1681,6 +1681,12 @@ jobs:
             build-evidence/
             dist/msvc-runtime.json
             build/swirl-quick/font-*.xml
+            build/swirl-quick/swirl-selected-qt-Release.txt
+            build/swirl-quick/CMakeCache.txt
+            build/swirl-quick/CMakeFiles/*/CMakeCXXCompiler.cmake
+            build/swirl-product/swirl-selected-qt-Release.txt
+            build/swirl-product/CMakeCache.txt
+            build/swirl-product/CMakeFiles/*/CMakeCXXCompiler.cmake
             out/package-evidence/
             out/delivery.json
             out/qt-corresponding-source/qt-source-bundle.json

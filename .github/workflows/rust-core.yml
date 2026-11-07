@@ -996,7 +996,7 @@ jobs:
           }
           cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/rust-qt --phase configured --evidence build-evidence/qt-product-rust-configured
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/rust-qt" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-configured"
           if ($LASTEXITCODE -ne 0) { throw 'Actual Qt to Rust target differs from the selected SDK.' }
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
       - name: Preserve the selected Qt SDK and actual control-adapter target identity
@@ -1008,6 +1008,9 @@ jobs:
             build-evidence/qt-sdk.json
             build-evidence/qt-product-sdk/
             build-evidence/qt-product-rust-configured/
+            build/rust-qt/swirl-selected-qt-Release.txt
+            build/rust-qt/CMakeCache.txt
+            build/rust-qt/CMakeFiles/*/CMakeCXXCompiler.cmake
           if-no-files-found: warn
           retention-days: 14
       - name: Reject the removed runtime build option
