@@ -39,6 +39,16 @@ function Owner-Hash([byte[]]$Bytes) {
     try{return ([BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-','').ToLowerInvariant()}
     finally{$sha.Dispose()}
 }
+function Read-OwnerUtc([object]$Value) {
+    # ConvertFrom-Json may materialize ISO dates as DateTime on PowerShell 7.
+    # The launcher has already checked the exact serialized UTC representation.
+    if($Value -is [DateTime] -and $Value.Kind -eq [DateTimeKind]::Utc){$Value=$Value.ToString('o',[Globalization.CultureInfo]::InvariantCulture)}
+    [DateTime]$parsed=[DateTime]::MinValue
+    if($Value -isnot [string] -or $Value -cnotmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{7}Z$' -or
+       -not [DateTime]::TryParseExact($Value,'o',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind,[ref]$parsed) -or
+       $parsed.Kind -ne [DateTimeKind]::Utc){throw 'OwnerDiagnosticEventWindowInvalid'}
+    return $parsed
+}
 function Save-OwnerObservation {
     [void](Assert-OwnerPlainPath $script:ownerOutput $false $true)
     $temporary=$script:ownerOutput+'.tmp'
@@ -89,6 +99,18 @@ try {
        [IO.Path]::GetFileName($profile.TrimEnd('\','/')) -ine $request.username -or
        $profile -ieq [Environment]::GetFolderPath('UserProfile') -or
        $ownerOutput.StartsWith($profile.TrimEnd('\','/')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'OwnerDiagnosticProfileBindingInvalid'}
+    $lifecycleTimes=New-Object 'System.Collections.Generic.List[DateTime]'
+    foreach($name in @('account_creation_started','account_creation_returned','profile_creation_started','profile_loaded_observed','cleanup_decision_frozen')){
+        $lifecycleTimes.Add((Read-OwnerUtc $request.profile_lifecycle_utc.$name))
+    }
+    for($index=1;$index -lt $lifecycleTimes.Count;$index++){
+        if($lifecycleTimes[$index] -lt $lifecycleTimes[$index-1]){throw 'OwnerDiagnosticEventWindowInvalid'}
+    }
+    $eventStart=Read-OwnerUtc $request.event_window_start_utc;$eventEnd=Read-OwnerUtc $request.event_window_end_utc
+    if($eventStart -ne $lifecycleTimes[0] -or $eventEnd -ne $lifecycleTimes[4] -or
+       $eventEnd -le $eventStart -or ($eventEnd-$eventStart).TotalSeconds -gt 3600){throw 'OwnerDiagnosticEventWindowInvalid'}
+    $eventStartUtc=$eventStart.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
+    $eventEndUtc=$eventEnd.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
     $entries=@($request.files)
     if($entries.Count -lt 1 -or $entries.Count -gt 32){throw 'OwnerDiagnosticFileLimit'}
     $files=New-Object 'System.Collections.Generic.List[string]'
@@ -111,11 +133,11 @@ try {
     $observation=[ordered]@{schema=1;source_sha=[string]$request.source_sha;request_sha256=$RequestSha256
         worker_script_sha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
         powershell_major=$PSVersionTable.PSVersion.Major;powershell_version=$PSVersionTable.PSVersion.ToString();process_bits=64
-        scope='Observed residual files and ancestors within the verified disposable profile, plus exact-SID process metadata; no contents, target shutdown, deletion, hive unload or command-line/environment reads.'
+        scope='Observed residual files and ancestors within the verified disposable profile, exact-SID process metadata and exact-identity profile event metadata; no file contents, formatted event messages, target shutdown, deletion, hive unload or command-line/environment reads.'
         rm_internal_registry_writes=$true;resource_attribution_scope='Batch union: an owner uses at least one registered path; per-file ownership is not inferred.'
         no_owner_result_proves_unlocked=$false;query_after_frozen_cleanup_failure=$true;original_profile_removed=$false
         original_child_authentication_id=$originalAuthenticationId;original_child_authentication_id_known=($null -ne $originalAuthenticationId)
-        rm_observation_completed=$false;exact_sid_process_snapshot=$null;residual_path_observation=$null
+        rm_observation_completed=$false;exact_sid_process_snapshot=$null;residual_path_observation=$null;profile_events=$null;event_filter_controls=$null
         files=@($fileEvidence.ToArray());file_count=$files.Count;file_limit=32;owner_limit=64;get_list_call_limit=2
         rm_start_attempted=$false;rm_start_return=$null;rm_register_return=$null;rm_get_list_calls=@();rm_end_return=$null
         session_started=$false;session_end_confirmed=$false;session_end_error=$null;listing_complete=$false;owners=@();owners_identity_complete=$false
@@ -125,12 +147,15 @@ try {
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace SwirlProfileOwners {
   [StructLayout(LayoutKind.Sequential)] public struct FileTime { public uint Low,High; }
@@ -194,7 +219,288 @@ namespace SwirlProfileOwners {
     public string scope="Metadata and access-open observations only. No file contents, deletion, disposition, ACL change or privilege adjustment. Open success is not deletion success.";
     public List<ResidualPathEvidence> paths=new List<ResidualPathEvidence>();
   }
+  [StructLayout(LayoutKind.Explicit,Size=16)] public struct EventVariant {
+    [FieldOffset(0)] public int Boolean;
+    [FieldOffset(8)] public uint Count;
+    [FieldOffset(12)] public uint Type;
+  }
+  public sealed class ProfileEventEvidence {
+    public string channel,provider,time_utc,record_id,activity_id,related_activity_id;
+    public ushort event_id;
+    public List<string> identity_matches=new List<string>();
+    public Dictionary<string,string> numeric_error_fields=new Dictionary<string,string>();
+    public bool numeric_fields_truncated;
+  }
+  public sealed class ProfileEventFilterResult {
+    public string reason;public ProfileEventEvidence record;
+  }
+  public sealed class ProfileEventControls {
+    public bool success;public int total,passed;public List<string> failures=new List<string>();
+    public string scope="Synthetic XML through the actual collector filter; no log access or native APIs.";
+  }
+  public sealed class ProfileEventLogEvidence {
+    public string channel,state="not-started",query_sha256,error_operation,limit_reason;
+    public bool? enabled;public bool query_exhausted,truncated,budget_exhausted,handles_closed_confirmed=true;
+    public int? win32_error,exception_hresult,next_terminal_win32;
+    public int returned_records,rejected_records,handles_opened,handles_closed;
+    public List<int> close_errors=new List<int>();
+    public List<ProfileEventEvidence> records=new List<ProfileEventEvidence>();
+    public double elapsed_ms;
+  }
+  public sealed class ProfileEventObservation {
+    public string state="starting",source_sha,request_sha256,window_start_utc,window_end_utc;
+    public string provider="Microsoft-Windows-User Profiles Service";
+    public string scope="Only the fixed provider, frozen UTC window and exact SID or profile-root field equality; no formatted message, raw XML or arbitrary event-data strings are retained. Zero records do not establish a cause or successful cleanup.";
+    public string query_coverage="System Security UserID, EventData Data and immediate UserData payload fields. Message-only identities, deeper payloads and nonexact path spellings are outside coverage; no broad fallback.";
+    public string byte_budget_basis="Before XML rendering, reserve at most three UTF-8 bytes per non-NUL UTF-16 code unit; actual rendered UTF-8 bytes are counted, never persisted.";
+    public string deadline_scope="Two-second cooperative work budget, checked between native calls. Only EvtNext receives a native timeout; EvtQuery, EvtRender and handle closing can overrun it. The existing external eight-second owned-worker cancellation trigger remains unchanged; OS exit is confirmed separately.";
+    public int work_budget_ms=2000,record_limit=32,event_xml_utf8_byte_limit=16384,total_xml_utf8_byte_limit=65536;
+    public int native_render_buffer_byte_limit=10924,returned_records,retained_records,rendered_xml_utf8_bytes;
+    public bool collection_complete,budget_exhausted,truncated,handles_closed_confirmed=true;
+    public bool? zero_matching_records;public bool cleanup_decision_changed=false,log_configuration_changed=false;
+    public double elapsed_ms;public List<ProfileEventLogEvidence> logs=new List<ProfileEventLogEvidence>();
+  }
   public static partial class Native {
+    const string ProfileProvider="Microsoft-Windows-User Profiles Service";
+    const string ProfileOperational="Microsoft-Windows-User Profile Service/Operational";
+    const string EventNamespace="http://schemas.microsoft.com/win/2004/08/events/event";
+    [DllImport("wevtapi.dll",CharSet=CharSet.Unicode,ExactSpelling=true,SetLastError=true)] static extern IntPtr EvtOpenChannelConfig(IntPtr session,string channel,uint flags);
+    [DllImport("wevtapi.dll",ExactSpelling=true,SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] static extern bool EvtGetChannelConfigProperty(IntPtr channel,int property,uint flags,uint bytes,out EventVariant value,out uint used);
+    [DllImport("wevtapi.dll",CharSet=CharSet.Unicode,ExactSpelling=true,SetLastError=true)] static extern IntPtr EvtQuery(IntPtr session,string path,string query,uint flags);
+    [DllImport("wevtapi.dll",ExactSpelling=true,SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] static extern bool EvtNext(IntPtr query,uint capacity,[Out] IntPtr[] events,uint timeout,uint flags,out uint returned);
+    [DllImport("wevtapi.dll",ExactSpelling=true,SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] static extern bool EvtRender(IntPtr context,IntPtr item,uint flags,uint bytes,IntPtr buffer,out uint used,out uint properties);
+    [DllImport("wevtapi.dll",ExactSpelling=true,SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] static extern bool EvtClose(IntPtr handle);
+    static DateTime EventUtc(string text) {
+      DateTime value;
+      if(text==null||!Regex.IsMatch(text,@"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{7}Z$")||
+         !DateTime.TryParseExact(text,"o",CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out value)||value.Kind!=DateTimeKind.Utc)
+        throw new ArgumentException("EventWindowInvalid");
+      return value;
+    }
+    static XmlElement EventChild(XmlElement parent,string name) {
+      XmlElement found=null;
+      foreach(XmlNode node in parent.ChildNodes) {
+        var element=node as XmlElement;
+        if(element!=null&&element.LocalName==name&&element.NamespaceURI==EventNamespace) {
+          if(found!=null)throw new FormatException("DuplicateEventElement");found=element;
+        }
+      }
+      return found;
+    }
+    static string EventText(XmlElement parent,string name) {
+      var child=EventChild(parent,name);if(child==null)throw new FormatException("MissingEventElement");return child.InnerText;
+    }
+    static string EventGuid(XmlElement correlation,string name) {
+      if(correlation==null||!correlation.HasAttribute(name))return null;
+      Guid value;if(!Guid.TryParse(correlation.GetAttribute(name),out value))throw new FormatException("EventGuidInvalid");
+      return value.ToString("D");
+    }
+    static void EventPayloadField(ProfileEventEvidence result,XmlElement field,string name,string kind,string sid,string profile) {
+      foreach(XmlNode child in field.ChildNodes)if(child is XmlElement)return;
+      string value=field.InnerText;
+      if(value==sid&&!result.identity_matches.Contains(kind+"-sid"))result.identity_matches.Add(kind+"-sid");
+      if(value==profile&&!result.identity_matches.Contains(kind+"-profile-root"))result.identity_matches.Add(kind+"-profile-root");
+      string numericName=(name??"").ToLowerInvariant();
+      if(numericName!="error"&&numericName!="errorcode"&&numericName!="errorvalue"&&numericName!="status"&&
+         numericName!="result"&&numericName!="hresult"&&numericName!="win32error"&&numericName!="dwerror"&&numericName!="resultcode")return;
+      long number;
+      if(Regex.IsMatch(value,@"^0[xX][0-9a-fA-F]{1,8}$"))number=Convert.ToInt64(value.Substring(2),16);
+      else if(!Regex.IsMatch(value,@"^-?[0-9]{1,10}$")||!Int64.TryParse(value,NumberStyles.AllowLeadingSign,CultureInfo.InvariantCulture,out number))return;
+      if(number<Int32.MinValue||number>UInt32.MaxValue)return;
+      string key=kind+"."+numericName;
+      if(result.numeric_error_fields.Count>=8||result.numeric_error_fields.ContainsKey(key)){result.numeric_fields_truncated=true;return;}
+      result.numeric_error_fields.Add(key,unchecked((uint)number).ToString("x8"));
+    }
+    // This pure function is also the implementation exercised by the controls.
+    // Never return the input XML, arbitrary payload values or a formatted message.
+    public static ProfileEventFilterResult FilterProfileEvent(string xml,string channel,string sid,string profile,string start,string end) {
+      var decision=new ProfileEventFilterResult();
+      try {
+        if(xml==null||new UTF8Encoding(false,true).GetByteCount(xml)>16384){decision.reason="xml-byte-limit";return decision;}
+        var settings=new XmlReaderSettings { DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=16384,IgnoreComments=true,IgnoreProcessingInstructions=true };
+        var document=new XmlDocument { XmlResolver=null };
+        using(var input=new StringReader(xml))using(var reader=XmlReader.Create(input,settings))document.Load(reader);
+        var root=document.DocumentElement;
+        if(root==null||root.LocalName!="Event"||root.NamespaceURI!=EventNamespace)throw new FormatException("EventRootInvalid");
+        var system=EventChild(root,"System");if(system==null)throw new FormatException("EventSystemMissing");
+        var provider=EventChild(system,"Provider");var created=EventChild(system,"TimeCreated");
+        if((channel!="Application"&&channel!=ProfileOperational)||provider==null||provider.GetAttribute("Name")!=ProfileProvider||EventText(system,"Channel")!=channel){decision.reason="provider-or-channel-mismatch";return decision;}
+        string systemTime=created==null?null:created.GetAttribute("SystemTime");
+        if(systemTime==null||!Regex.IsMatch(systemTime,@"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,7})?Z$"))
+          throw new FormatException("EventUtcFormatUnknown");
+        DateTime when=XmlConvert.ToDateTime(systemTime,XmlDateTimeSerializationMode.Utc);
+        if(when<EventUtc(start)||when>EventUtc(end)){decision.reason="outside-frozen-window";return decision;}
+        var result=new ProfileEventEvidence { channel=channel,provider=ProfileProvider,time_utc=when.ToString("o",CultureInfo.InvariantCulture) };
+        ushort eventId;ulong recordId;
+        if(!UInt16.TryParse(EventText(system,"EventID"),NumberStyles.None,CultureInfo.InvariantCulture,out eventId)||
+           !UInt64.TryParse(EventText(system,"EventRecordID"),NumberStyles.None,CultureInfo.InvariantCulture,out recordId))throw new FormatException("EventIdentityInvalid");
+        result.event_id=eventId;result.record_id=recordId.ToString(CultureInfo.InvariantCulture);
+        var correlation=EventChild(system,"Correlation");result.activity_id=EventGuid(correlation,"ActivityID");result.related_activity_id=EventGuid(correlation,"RelatedActivityID");
+        var security=EventChild(system,"Security");if(security!=null&&security.GetAttribute("UserID")==sid)result.identity_matches.Add("system-security-sid");
+        var data=EventChild(root,"EventData");
+        if(data!=null)foreach(XmlNode node in data.ChildNodes) {
+          var field=node as XmlElement;
+          if(field!=null&&field.LocalName=="Data"&&field.NamespaceURI==EventNamespace)EventPayloadField(result,field,field.GetAttribute("Name"),"event-data",sid,profile);
+        }
+        var userData=EventChild(root,"UserData");
+        if(userData!=null)foreach(XmlNode container in userData.ChildNodes)if(container is XmlElement)
+          foreach(XmlNode node in container.ChildNodes) {var field=node as XmlElement;if(field!=null)EventPayloadField(result,field,field.LocalName,"user-data",sid,profile);}
+        if(result.identity_matches.Count==0){decision.reason="exact-identity-absent";return decision;}
+        decision.record=result;decision.reason="accepted";
+      }catch(Exception){decision.reason="invalid-structured-event";}
+      return decision;
+    }
+    static void CloseEventHandle(ref IntPtr handle,ProfileEventLogEvidence log) {
+      if(handle==IntPtr.Zero)return;
+      try {
+        bool closed=EvtClose(handle);int error=closed?0:Marshal.GetLastWin32Error();
+        if(closed)log.handles_closed++;else {log.handles_closed_confirmed=false;if(log.close_errors.Count<8)log.close_errors.Add(error);}
+      }catch(Exception error){log.handles_closed_confirmed=false;log.error_operation=log.error_operation??"EvtCloseException";log.exception_hresult=error.HResult;}
+      finally{handle=IntPtr.Zero;}
+    }
+    static bool EventBudgetExpired(ProfileEventObservation result,ProfileEventLogEvidence log,Stopwatch watch) {
+      if(watch.ElapsedMilliseconds<result.work_budget_ms)return false;
+      result.budget_exhausted=true;log.budget_exhausted=true;log.state="time-budget-exhausted";return true;
+    }
+    static void EventNativeError(ProfileEventLogEvidence log,string operation,int error) {
+      log.error_operation=operation;log.win32_error=error;
+      log.state=error==5?"access-denied":error==1460?"native-timeout":"native-error";
+    }
+    static void EventLimit(ProfileEventObservation result,ProfileEventLogEvidence log,string reason) {
+      result.truncated=true;log.truncated=true;log.limit_reason=reason;log.state="truncated";
+    }
+    public static string ProfileEventQuery(string sid,string profile,string start,string end) {
+      DateTime from=EventUtc(start),to=EventUtc(end);
+      if(to<=from||(to-from).TotalSeconds>3600||sid==null||!Regex.IsMatch(sid,@"^S-1-5-21-(?:[0-9]+-){3}[0-9]+$")||
+         profile==null||!Regex.IsMatch(profile,@"^[A-Za-z]:\\")||profile.IndexOf('"')>=0||profile.Length>2048)
+        throw new ArgumentException("EventScopeInvalid");
+      // A raw XPath query, not QueryList XML: backslashes and ampersands remain
+      // literal. A double-quoted profile literal permits apostrophes; the
+      // previously verified ordinary Windows path cannot contain double quotes.
+      return "*[System[Provider[@Name='"+ProfileProvider+"'] and TimeCreated[@SystemTime >= '"+start+"' and @SystemTime <= '"+end+"']] and (System[Security[@UserID='"+sid+"']] or EventData[Data='"+sid+"' or Data=\""+profile+"\"] or UserData[*[*='"+sid+"' or *=\""+profile+"\"]])]";
+    }
+    static void ReadProfileEventLog(ProfileEventObservation result,ProfileEventLogEvidence log,string sid,string profile,Stopwatch watch) {
+      IntPtr config=IntPtr.Zero,query=IntPtr.Zero;var logWatch=Stopwatch.StartNew();
+      try {
+        if(EventBudgetExpired(result,log,watch))return;
+        log.state="opening-existing-log";config=EvtOpenChannelConfig(IntPtr.Zero,log.channel,0);
+        if(config==IntPtr.Zero){EventNativeError(log,"EvtOpenChannelConfig",Marshal.GetLastWin32Error());return;}log.handles_opened++;
+        EventVariant enabled;uint used;
+        try {
+          if(EventBudgetExpired(result,log,watch))return;
+          if(!EvtGetChannelConfigProperty(config,0,0,16,out enabled,out used)){EventNativeError(log,"EvtGetChannelConfigProperty",Marshal.GetLastWin32Error());return;}
+          if(used!=16||enabled.Type!=13){log.error_operation="ChannelEnabledVariantInvalid";log.state="unknown-log-state";return;}
+          log.enabled=enabled.Boolean!=0;
+        }finally{CloseEventHandle(ref config,log);}
+        if(log.enabled!=true){log.state="disabled";return;}
+        if(EventBudgetExpired(result,log,watch))return;
+        string filter=ProfileEventQuery(sid,profile,result.window_start_utc,result.window_end_utc);
+        log.query_sha256=Hash(filter);
+        query=EvtQuery(IntPtr.Zero,log.channel,filter,0x201); // channel path, reverse chronological order; no tolerant/fallback query.
+        if(query==IntPtr.Zero){EventNativeError(log,"EvtQuery",Marshal.GetLastWin32Error());return;}log.handles_opened++;log.state="reading";
+        while(!EventBudgetExpired(result,log,watch)) {
+          if(result.returned_records>=result.record_limit){EventLimit(result,log,"record-limit");break;}
+          var items=new IntPtr[1];uint count=0;
+          try {
+            uint remaining=(uint)Math.Max(1,result.work_budget_ms-watch.ElapsedMilliseconds);
+            bool next=EvtNext(query,1,items,remaining,0,out count);int nextError=next?0:Marshal.GetLastWin32Error();
+            if(items[0]!=IntPtr.Zero)log.handles_opened++;
+            if(!next) {
+              log.next_terminal_win32=nextError;
+              if(nextError==259){log.query_exhausted=true;log.state=log.records.Count==0?"no-matching-records":"observed";}
+              else EventNativeError(log,"EvtNext",nextError);
+              break;
+            }
+            if(count!=1||items[0]==IntPtr.Zero){log.error_operation="EventHandleCountInvalid";log.state="invalid-native-result";break;}
+            result.returned_records++;log.returned_records++;
+            if(EventBudgetExpired(result,log,watch))break;
+            uint needed,properties;
+            bool sized=EvtRender(IntPtr.Zero,items[0],1,0,IntPtr.Zero,out needed,out properties);
+            int sizeError=sized?0:Marshal.GetLastWin32Error();
+            if(sized||sizeError!=122){EventNativeError(log,"EvtRenderSize",sizeError);break;}
+            if(needed<2||(needed&1)!=0||needed>result.native_render_buffer_byte_limit){EventLimit(result,log,"render-buffer-limit");break;}
+            int reservedUtf8=3*((int)needed/2-1);
+            if(reservedUtf8>result.event_xml_utf8_byte_limit||result.rendered_xml_utf8_bytes+reservedUtf8>result.total_xml_utf8_byte_limit){EventLimit(result,log,"xml-utf8-byte-limit");break;}
+            if(EventBudgetExpired(result,log,watch))break;
+            IntPtr buffer=Marshal.AllocHGlobal((int)needed);
+            try {
+              uint written;
+              if(!EvtRender(IntPtr.Zero,items[0],1,needed,buffer,out written,out properties)){EventNativeError(log,"EvtRender",Marshal.GetLastWin32Error());break;}
+              if(written<2||written>needed||(written&1)!=0||Marshal.ReadInt16(buffer,(int)written-2)!=0){log.error_operation="EventRenderLengthInvalid";log.state="invalid-native-result";break;}
+              string xml=Marshal.PtrToStringUni(buffer,(int)written/2-1);
+              int utf8=new UTF8Encoding(false,true).GetByteCount(xml);result.rendered_xml_utf8_bytes+=utf8;
+              var filtered=FilterProfileEvent(xml,log.channel,sid,profile,result.window_start_utc,result.window_end_utc);
+              if(filtered.record==null){log.rejected_records++;}
+              else {log.records.Add(filtered.record);result.retained_records++;if(filtered.record.numeric_fields_truncated)EventLimit(result,log,"numeric-field-limit");}
+            }finally{Marshal.FreeHGlobal(buffer);}
+            if(log.truncated)break;
+          }finally{CloseEventHandle(ref items[0],log);}
+        }
+      }catch(Exception error){log.error_operation="ProfileEventObservationFailed";log.exception_hresult=error.HResult;log.state="exception";}
+      finally{CloseEventHandle(ref query,log);CloseEventHandle(ref config,log);logWatch.Stop();log.elapsed_ms=logWatch.Elapsed.TotalMilliseconds;}
+    }
+    public static ProfileEventObservation ObserveProfileEvents(string sid,string profile,string start,string end,string source,string requestHash) {
+      var result=new ProfileEventObservation { source_sha=source,request_sha256=requestHash,window_start_utc=start,window_end_utc=end };
+      ProfileEventQuery(sid,profile,start,end); // Reject query-boundary mistakes before any log API.
+      var watch=Stopwatch.StartNew();
+      foreach(string channel in new string[]{"Application",ProfileOperational}) {
+        var log=new ProfileEventLogEvidence { channel=channel };result.logs.Add(log);ReadProfileEventLog(result,log,sid,profile,watch);
+      }
+      watch.Stop();result.elapsed_ms=watch.Elapsed.TotalMilliseconds;result.collection_complete=true;
+      foreach(var log in result.logs) {
+        result.handles_closed_confirmed&=log.handles_closed_confirmed;
+        result.collection_complete&=log.enabled==true&&log.query_exhausted&&!log.truncated&&!log.budget_exhausted&&log.error_operation==null&&log.rejected_records==0&&log.handles_closed_confirmed;
+      }
+      result.collection_complete&=!result.truncated&&!result.budget_exhausted&&result.elapsed_ms<=result.work_budget_ms;
+      if(result.collection_complete)result.zero_matching_records=result.retained_records==0;
+      result.state=result.collection_complete?"completed":"incomplete";return result;
+    }
+    static string ControlEvent(string payload,string security) {
+      return "<Event xmlns='"+EventNamespace+"'><System><Provider Name='"+ProfileProvider+"'/><EventID>1500</EventID><TimeCreated SystemTime='2026-11-07T00:00:30.0000000Z'/><EventRecordID>123</EventRecordID><Correlation ActivityID='{01234567-89ab-cdef-0123-456789abcdef}'/><Channel>Application</Channel><Security UserID='"+security+"'/></System>"+payload+"</Event>";
+    }
+    public static ProfileEventControls RunEventFilterControls() {
+      var result=new ProfileEventControls();string sid="S-1-5-21-1-2-3-1001",profile=@"C:\Users\swci_012345abcdef";
+      string start="2026-11-07T00:00:00.0000000Z",end="2026-11-07T00:01:00.0000000Z";
+      string identity="<EventData><Data Name='UserSid'>"+sid+"</Data></EventData>";
+      var cases=new List<Tuple<string,string,bool>> {
+        Tuple.Create("system-security-exact-sid",ControlEvent("",sid),true),
+        Tuple.Create("event-data-exact-sid",ControlEvent(identity,"S-1-5-18"),true),
+        Tuple.Create("event-data-exact-profile",ControlEvent("<EventData><Data Name='ProfilePath'>"+profile+"</Data></EventData>","S-1-5-18"),true),
+        Tuple.Create("user-data-exact-sid",ControlEvent("<UserData><Profile xmlns='urn:profile'><UserSid>"+sid+"</UserSid></Profile></UserData>","S-1-5-18"),true),
+        Tuple.Create("user-data-exact-profile",ControlEvent("<UserData><Profile xmlns='urn:profile'><ProfilePath>"+profile+"</ProfilePath></Profile></UserData>","S-1-5-18"),true),
+        Tuple.Create("other-sid",ControlEvent(identity.Replace(sid,sid+"0"),"S-1-5-18"),false),
+        Tuple.Create("profile-prefix-not-equality",ControlEvent("<EventData><Data Name='ProfilePath'>"+profile+"_other</Data></EventData>","S-1-5-18"),false),
+        Tuple.Create("descendant-not-root-equality",ControlEvent("<EventData><Data Name='ProfilePath'>"+profile+"\\AppData</Data></EventData>","S-1-5-18"),false),
+        Tuple.Create("message-substring-not-identity",ControlEvent("<EventData><Data Name='Detail'>message "+sid+" "+profile+"</Data></EventData>","S-1-5-18"),false),
+        Tuple.Create("wrong-provider",ControlEvent(identity,"S-1-5-18").Replace(ProfileProvider,"OtherProvider"),false),
+        Tuple.Create("wrong-channel",ControlEvent(identity,"S-1-5-18").Replace("<Channel>Application</Channel>","<Channel>Security</Channel>"),false),
+        Tuple.Create("before-window",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:00:00.0000000Z").Replace("2026-11-07T00:00:00","2026-11-06T23:59:59"),false),
+        Tuple.Create("after-window",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:01:00.0000001Z"),false),
+        Tuple.Create("missing-timezone-rejected",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:00:30.0000000"),false),
+        Tuple.Create("explicit-offset-not-windows-z",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:00:30.0000000+00:00"),false),
+        Tuple.Create("exact-window-start",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:00:00.0000000Z"),true),
+        Tuple.Create("exact-window-end",ControlEvent(identity,"S-1-5-18").Replace("00:00:30.0000000Z","00:01:00.0000000Z"),true),
+        Tuple.Create("wrong-namespace",ControlEvent(identity,"S-1-5-18").Replace(EventNamespace,"urn:untrusted"),false),
+        Tuple.Create("dtd-prohibited","<!DOCTYPE Event [<!ENTITY identity '"+sid+"'>]>"+ControlEvent(identity.Replace(sid,"&identity;"),"S-1-5-18"),false),
+        Tuple.Create("utf8-byte-limit",ControlEvent(identity+"<Padding>"+new string('\u00e9',9000)+"</Padding>","S-1-5-18"),false)
+      };
+      foreach(var item in cases) {
+        bool passed=(FilterProfileEvent(item.Item2,"Application",sid,profile,start,end).record!=null)==item.Item3;
+        result.total++;if(passed)result.passed++;else result.failures.Add(item.Item1);
+      }
+      var numeric=FilterProfileEvent(ControlEvent("<EventData><Data Name='UserSid'>"+sid+"</Data><Data Name='ErrorValue'>0x80070020</Data><Data Name='Detail'>PRIVATE_MARKER</Data></EventData>","S-1-5-18"),"Application",sid,profile,start,end).record;
+      result.total++;if(numeric!=null&&numeric.numeric_error_fields.Count==1&&numeric.numeric_error_fields.ContainsKey("event-data.errorvalue")&&numeric.numeric_error_fields["event-data.errorvalue"]=="80070020")result.passed++;else result.failures.Add("numeric-error-only-no-arbitrary-detail");
+      result.total++;
+      if(FilterProfileEvent(ControlEvent(identity,"S-1-5-18").Replace("<Channel>Application</Channel>","<Channel>"+ProfileOperational+"</Channel>"),ProfileOperational,sid,profile,start,end).record!=null)result.passed++;
+      else result.failures.Add("operational-channel-exact-identity");
+      result.total++;
+      try {System.Xml.XPath.XPathExpression.Compile(ProfileEventQuery(sid,@"C:\Users\a'b&c\swci_012345abcdef",start,end));result.passed++;}
+      catch(Exception){result.failures.Add("raw-xpath-backslash-apostrophe-ampersand-syntax");}
+      result.total++;
+      try {ProfileEventQuery(sid,"C:\\Users\\bad\"path",start,end);result.failures.Add("double-quote-profile-rejected");}
+      catch(ArgumentException){result.passed++;}
+      result.success=result.total==result.passed;return result;
+    }
     [DllImport("kernel32.dll",SetLastError=true)] static extern bool K32EnumProcesses([Out] uint[] pids,uint bytes,out uint returned);
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr CreateFileW(string path,uint access,uint share,IntPtr security,uint disposition,uint flags,IntPtr template);
     [DllImport("kernel32.dll",SetLastError=true,EntryPoint="GetFileInformationByHandleEx")] static extern bool ReadFileAttributes(IntPtr file,int type,out FileAttributeTag value,uint bytes);
@@ -454,9 +760,15 @@ namespace SwirlProfileOwners {
 }
 '@
     $observation['native_sizes']=[ordered]@{unique_process=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.UniqueProcess]);process_info=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.ProcessInfo])
-        token_statistics=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.TokenStatistics]);file_attribute_tag=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileAttributeTag]);file_identity=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileIdentity])}
+        token_statistics=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.TokenStatistics]);file_attribute_tag=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileAttributeTag]);file_identity=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileIdentity]);event_variant=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.EventVariant])}
     if($observation.native_sizes.unique_process -ne 12 -or $observation.native_sizes.process_info -ne 668 -or
-       $observation.native_sizes.token_statistics -ne 56 -or $observation.native_sizes.file_attribute_tag -ne 8 -or $observation.native_sizes.file_identity -ne 24){throw 'OwnerDiagnosticNativeLayoutMismatch'}
+       $observation.native_sizes.token_statistics -ne 56 -or $observation.native_sizes.file_attribute_tag -ne 8 -or $observation.native_sizes.file_identity -ne 24 -or $observation.native_sizes.event_variant -ne 16){throw 'OwnerDiagnosticNativeLayoutMismatch'}
+    $observation.event_filter_controls=[SwirlProfileOwners.Native]::RunEventFilterControls()
+    $observation['event_api_binding']=[ordered]@{native_library='wevtapi.dll';native_library_scope='Static DllImport of the Windows event-log API; no managed EventLog assembly dependency.'
+        xml_document_assembly=[Xml.XmlDocument].Assembly.FullName;xml_reader_assembly=[Xml.XmlReader].Assembly.FullName
+        compilation_reference_mode='Existing Add-Type default references, including PowerShell 7 $PSHOME/ref; no custom ReferencedAssemblies.'}
+    Save-OwnerObservation
+    if(-not $observation.event_filter_controls.success){throw 'OwnerDiagnosticEventFilterControlFailed'}
     $key=New-Object Text.StringBuilder 33
     $observation.rm_start_attempted=$true;Save-OwnerObservation
     $code=[SwirlProfileOwners.Native]::RmStartSession([ref]$session,0,$key)
@@ -517,11 +829,18 @@ try {
     $observation.residual_path_observation=[ordered]@{state='starting';completed=$false;handles_closed_confirmed=$null;work_budget_ms=2000;path_limit=16}
     Save-OwnerObservation
     $observation.residual_path_observation=[SwirlProfileOwners.Native]::ObserveResidualPaths($profile,$files.ToArray())
+    Save-OwnerObservation
+    $observation.profile_events=[ordered]@{state='starting';collection_complete=$false;handles_closed_confirmed=$null;work_budget_ms=2000;record_limit=32
+        source_sha=[string]$request.source_sha;request_sha256=$RequestSha256;window_start_utc=$eventStartUtc;window_end_utc=$eventEndUtc
+        event_xml_utf8_byte_limit=16384;total_xml_utf8_byte_limit=65536;zero_matching_records=$null;cleanup_decision_changed=$false}
+    Save-OwnerObservation
+    $observation.profile_events=[SwirlProfileOwners.Native]::ObserveProfileEvents([string]$request.sid,$profile,$eventStartUtc,$eventEndUtc,[string]$request.source_sha,$RequestSha256)
     $observation.observation_completed=$observation.rm_observation_completed -and
         $observation.exact_sid_process_snapshot.scan_attempts_complete -and $observation.exact_sid_process_snapshot.handles_closed_confirmed -and
         $null -eq $observation.exact_sid_process_snapshot.error_operation -and
         $observation.residual_path_observation.completed -and $observation.residual_path_observation.handles_closed_confirmed -and
-        $null -eq $observation.residual_path_observation.error_operation
+        $null -eq $observation.residual_path_observation.error_operation -and
+        $observation.profile_events.collection_complete -and $observation.profile_events.handles_closed_confirmed
     if(-not $observation.observation_completed){$observation.error='OwnerDiagnosticSupplementalIncomplete'}
 }catch{$observation.error='OwnerDiagnosticSupplementalFailed';$observation.observation_completed=$false}
 finally{Save-OwnerObservation}

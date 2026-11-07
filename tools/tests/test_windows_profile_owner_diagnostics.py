@@ -20,6 +20,15 @@ def request_fixture():
         "sid": "S-1-5-21-101-202-303-1001", "username": "swci_012345abcdef",
         "profile_path": r"C:\Users\swci_012345abcdef",
         "token_profile_path": r"C:\Users\swci_012345abcdef",
+        "profile_lifecycle_utc": {
+            "account_creation_started": "2026-11-07T00:00:00.0000000Z",
+            "account_creation_returned": "2026-11-07T00:00:00.1000000Z",
+            "profile_creation_started": "2026-11-07T00:00:00.2000000Z",
+            "profile_loaded_observed": "2026-11-07T00:00:01.0000000Z",
+            "cleanup_decision_frozen": "2026-11-07T00:01:00.0000000Z",
+        },
+        "event_window_start_utc": "2026-11-07T00:00:00.0000000Z",
+        "event_window_end_utc": "2026-11-07T00:01:00.0000000Z",
         "final_state": {"profile_path_exists": True, "profile_key_exists": False,
                         "user_hive_loaded": False, "user_classes_hive_loaded": False},
         "files": [{"relative_path": "AppData/Local/probe.dat", "kind": "file",
@@ -73,6 +82,37 @@ class OwnerDiagnosticAdmissionTests(unittest.TestCase):
                     value = request_fixture()
                     value["final_state"][key] = invalid
                     self.rejected(value)
+
+    def test_event_window_rejects_missing_non_utc_invalid_and_reordered_times(self):
+        for invalid in (None, True, 0, "", "2026-11-07T00:00:00Z",
+                        "2026-11-07T00:00:00.0000000+00:00", "2026-11-07T00:00:00.0000000z",
+                        "2026-02-30T00:00:00.0000000Z", "2026-11-07T24:00:00.0000000Z",
+                        "2026-11-07T00:00:00.00000000Z"):
+            with self.subTest(value=invalid):
+                value = request_fixture()
+                value["profile_lifecycle_utc"]["profile_creation_started"] = invalid
+                self.rejected(value)
+        for change in ("absent", "different_start", "different_end", "reordered", "too_long"):
+            with self.subTest(change=change):
+                value = request_fixture()
+                if change == "absent":
+                    del value["profile_lifecycle_utc"]
+                elif change == "different_start":
+                    value["event_window_start_utc"] = "2026-11-06T23:59:59.9999999Z"
+                elif change == "different_end":
+                    value["event_window_end_utc"] = "2026-11-07T00:01:00.0000001Z"
+                elif change == "reordered":
+                    value["profile_lifecycle_utc"]["account_creation_returned"] = "2026-11-07T00:00:00.2000001Z"
+                else:
+                    value["profile_lifecycle_utc"]["cleanup_decision_frozen"] = value["event_window_end_utc"] = "2026-11-07T01:00:00.0000001Z"
+                self.rejected(value)
+
+    def test_event_window_preserves_sub_microsecond_order_and_exact_hour_bound(self):
+        self.assertEqual(diagnostic.event_utc_ticks("2026-11-07T00:00:00.0000001Z")
+                         - diagnostic.event_utc_ticks("2026-11-07T00:00:00.0000000Z"), 1)
+        value = request_fixture()
+        value["profile_lifecycle_utc"]["cleanup_decision_frozen"] = value["event_window_end_utc"] = "2026-11-07T01:00:00.0000000Z"
+        self.assertIs(diagnostic.validate_request(value), value)
 
     def test_requires_fresh_scope_and_source_identity(self):
         for key, invalid in (("sid", "S-1-5-18"), ("username", "runneradmin"),

@@ -385,6 +385,7 @@ $cleanupErrors=New-Object 'System.Collections.Generic.List[string]'
 $result=[ordered]@{schema=1;success=$false;scope='A real temporary local standard user on a disposable hosted Windows runner; not a physical Windows 11 desktop.'
     username=$userName;sid=$null;parent_sid=$parentIdentity.User.Value;token=$null;child_pid=$null;child_exit_code=$null
     powershell_architecture=$PowerShellArchitecture;expected_64_bit_process=$expected64BitProcess;actual_64_bit_process=$null
+    profile_lifecycle_utc=[ordered]@{account_creation_started=$null;account_creation_returned=$null;profile_creation_started=$null;profile_loaded_observed=$null;cleanup_decision_frozen=$null}
     profile_loaded=$false;child_completed=$false;remaining_job_processes=$null;forced_termination=$false
     account_removed=$false;profile_removed=$false;desktop_access_removed=$false;window_station_access_removed=$false
     desktop_dacl_restored=$false;window_station_dacl_restored=$false
@@ -405,8 +406,10 @@ try {
         # Only a successful NetUserAdd establishes ownership. Existence alone
         # must never authorize deleting an account created by another process.
         if ([SwirlDisposableUser.Native]::UserExists($userName)) {throw 'Random disposable username already exists.'}
+        $result.profile_lifecycle_utc.account_creation_started=[DateTime]::UtcNow.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
         [SwirlDisposableUser.Native]::CreateUser($userName,$password)
         $created=$true
+        $result.profile_lifecycle_utc.account_creation_returned=[DateTime]::UtcNow.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
         $userSid=(New-Object Security.Principal.NTAccount ($env:COMPUTERNAME,$userName)).Translate([Security.Principal.SecurityIdentifier]).Value
         [SwirlDisposableUser.Native]::AddToUsers($userName)
         $result.sid=$userSid
@@ -464,11 +467,13 @@ if(-not $receipt.success){exit 1}
         if(-not (Test-Path -LiteralPath $powershell -PathType Leaf)){throw 'The requested architecture of Windows PowerShell 5.1 is unavailable.'}
         $command='"'+$powershell+'" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$bootstrap+'" -Request "'+$configPath+'"'
         if($command.Length -ge 1024){throw 'CreateProcessWithLogonW command exceeds its documented bound.'}
+        $result.profile_lifecycle_utc.profile_creation_started=[DateTime]::UtcNow.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
         $child=[SwirlDisposableUser.Native]::Start($userName,$password,$powershell,$command,$fixture,$userSid)
     } finally {$password=$null;if($null -ne $random){[Array]::Clear($random,0,$random.Length)}}
     $result.child_pid=$child.ProcessId;$result.token=$child.TokenInfo
     $result.profile_loaded=Test-Path -LiteralPath ('Registry::HKEY_USERS\'+$userSid)
     if(-not $result.profile_loaded){throw 'The new account HKCU hive is not loaded.'}
+    $result.profile_lifecycle_utc.profile_loaded_observed=[DateTime]::UtcNow.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
     $child.Resume()
     $watch=[Diagnostics.Stopwatch]::StartNew()
     while(-not $child.Wait(100)) {if($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds){throw 'Standard-user child exceeded its bounded timeout.'}}
@@ -624,6 +629,9 @@ finally {
             }
         }catch{$cleanupErrors.Add('profile: '+$_.Exception.Message)}
     }
+    # Observation timestamps bound this fresh account only. They are not native
+    # event timestamps and never extend or change the original cleanup decision.
+    $result.profile_lifecycle_utc.cleanup_decision_frozen=[DateTime]::UtcNow.ToString('o',[Globalization.CultureInfo]::InvariantCulture)
     if($created -and $null -ne $result.profile_cleanup -and -not $result.profile_removed){
         # Freeze the unchanged 30-second profile decision before querying.
         # Observe before account deletion can change external owner lifetimes.
@@ -653,6 +661,8 @@ finally {
                 profile_removed=$result.profile_removed;frozen_scope='Profile cleanup at its original deadline; account and fixture cleanup are still pending.'
                 profile_path=$profilePath;token_profile_path=$tokenProfilePath;path_verified=$cleanup.path_verified;token_path_verified=$cleanup.token_path_verified
                 cleanup_deadline_ms=[int]$cleanup.deadline_ms;cleanup_elapsed_ms=$cleanup.elapsed_ms;final_state=$cleanup.final_state
+                profile_lifecycle_utc=$result.profile_lifecycle_utc
+                event_window_start_utc=$result.profile_lifecycle_utc.account_creation_started;event_window_end_utc=$result.profile_lifecycle_utc.cleanup_decision_frozen
                 original_child_authentication_id=$(if($null -ne $result.token){$result.token.AuthenticationId}else{$null})
                 original_child_authentication_id_error=$(if($null -ne $result.token){$result.token.AuthenticationIdObservationError}else{'TokenStatisticsUnavailable'})
                 original_child_authentication_id_win32_error=$(if($null -ne $result.token){$result.token.AuthenticationIdWin32Error}else{$null})

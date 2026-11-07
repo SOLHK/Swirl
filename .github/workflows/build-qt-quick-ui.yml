@@ -88,6 +88,41 @@ jobs:
           }
           # Compile only; no WinINET query or settings access in the host profile.
           . ./scripts/tests/WindowsProxyDiagnostics.ps1
+      - name: Compile the actual residual-event filter and run its pure controls
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path -LiteralPath 'scripts/tests/Get-WindowsResidualProfileOwners.ps1').Path
+          $tokens = $null; $errors = $null
+          $ast = [Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if ($errors.Count) { throw 'The actual residual-owner collector did not parse in PowerShell 7.' }
+          $definitions = @($ast.FindAll({ param($node)
+            $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -ceq 'Add-Type'
+          },$true))
+          if ($definitions.Count -ne 1 -or $definitions[0].CommandElements.Count -ne 3 -or
+              $definitions[0].CommandElements[1] -isnot [Management.Automation.Language.CommandParameterAst] -or
+              $definitions[0].CommandElements[1].ParameterName -cne 'TypeDefinition' -or
+              $definitions[0].CommandElements[2] -isnot [Management.Automation.Language.StringConstantExpressionAst] -or
+              $definitions[0].CommandElements[2].StringConstantType -ne [Management.Automation.Language.StringConstantType]::SingleQuotedHereString) {
+            throw 'The collector native-source boundary changed; do not execute the collector as a fallback.'
+          }
+          # Compile the same literal used by the real worker. The called method
+          # parses synthetic XML only; it does not call Windows event-log APIs.
+          Add-Type -TypeDefinition $definitions[0].CommandElements[2].Value
+          $controls = [SwirlProfileOwners.Native]::RunEventFilterControls()
+          $size = [Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.EventVariant])
+          $receipt = [ordered]@{schema=1; source_sha=$env:GITHUB_SHA
+            collector_sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            powershell_major=$PSVersionTable.PSVersion.Major; powershell_version=$PSVersionTable.PSVersion.ToString()
+            event_variant_size=$size; controls=$controls; native_event_apis_called=$false
+            scope='Actual collector C# compilation and synthetic XML controls only; no event log or profile access.'}
+          $null = New-Item -ItemType Directory -Path 'build-evidence/profile-event-controls' -Force
+          $output = 'build-evidence/profile-event-controls/receipt.json'
+          if (Test-Path -LiteralPath $output) { throw 'Refusing to replace an existing filter-control receipt.' }
+          $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $output -Encoding UTF8
+          if ($size -ne 16 -or -not $controls.success -or $controls.total -ne 24 -or $controls.passed -ne 24) {
+            throw 'The actual residual-event filter controls or ABI failed.'
+          }
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
@@ -1437,6 +1472,7 @@ jobs:
             build-evidence/full-motion-qa/
             build-evidence/full-motion-release/
             build-evidence/ctest-inventory.json
+            build-evidence/profile-event-controls/
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml
             build/swirl-quick/policy-configuration.xml

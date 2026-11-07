@@ -8,6 +8,7 @@ OS-confirmed exit and Restart Manager session cleanup are reported separately.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import math
@@ -63,6 +64,17 @@ def validate_request(data):
         raise ObservationError("OwnerDiagnosticProfileBindingInvalid")
     local_path_text(profile)
     local_path_text(token_profile)
+    lifecycle = data.get("profile_lifecycle_utc")
+    time_keys = ("account_creation_started", "account_creation_returned", "profile_creation_started",
+                 "profile_loaded_observed", "cleanup_decision_frozen")
+    if not isinstance(lifecycle, dict):
+        raise ObservationError("OwnerDiagnosticEventWindowInvalid")
+    ticks = [event_utc_ticks(lifecycle.get(key)) for key in time_keys]
+    if (data.get("event_window_start_utc") != lifecycle[time_keys[0]]
+            or data.get("event_window_end_utc") != lifecycle[time_keys[-1]]
+            or any(right < left for left, right in zip(ticks, ticks[1:]))
+            or not 0 < ticks[-1] - ticks[0] <= 3600 * 10000000):
+        raise ObservationError("OwnerDiagnosticEventWindowInvalid")
     files = data.get("files")
     if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES:
         raise ObservationError("OwnerDiagnosticFileLimit")
@@ -81,6 +93,18 @@ def validate_request(data):
             raise ObservationError("OwnerDiagnosticFileRecordInvalid")
         seen.add(relative.casefold())
     return data
+
+
+def event_utc_ticks(value):
+    """Validate the caller's fixed UTC format without losing the seventh digit."""
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{7}Z", value):
+        raise ObservationError("OwnerDiagnosticEventWindowInvalid")
+    try:
+        instant = datetime.datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        raise ObservationError("OwnerDiagnosticEventWindowInvalid") from None
+    return ((instant.toordinal() * 86400 + instant.hour * 3600 + instant.minute * 60 + instant.second)
+            * 10000000 + int(value[20:27]))
 
 
 def local_path_text(path):
