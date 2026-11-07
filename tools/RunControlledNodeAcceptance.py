@@ -415,6 +415,8 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
             thread.join(timeout=1)
         if any(thread.is_alive() for thread in captures) or watchdog.is_alive():
             raise ValueError("ChildReaderRetirementUnconfirmed")
+        # The child's native watchdog can fire before the parent terminates its Job.
+        guard["timedOut"] = guard["timedOut"] or process.returncode == 124
         return dict(exitCode=process.returncode,processSignaled=True,ownedJobEmpty=True,
                     elapsedMs=round((time.monotonic()-started)*1000),**guard)
     finally:

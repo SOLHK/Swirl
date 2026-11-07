@@ -412,7 +412,8 @@ jobs:
             if (!$summary.fixtureOnly -or !$summary.fixture.tasksReleased -or !$case.retirement.processSignaled -or !$case.retirement.ownedJobEmpty -or $case.retirement.error) { throw "Incomplete synthetic UI retirement: $mode" }
             if ($mode -eq 'positive' -and ($exitCode -ne 0 -or !$summary.passed)) { throw 'Selected-node UI HTTP/HTTPS positive control failed.' }
             if ($mode -eq 'wrong-ca' -and ($exitCode -ne 2 -or $summary.passed -or !@($case.result.proxyRequests | Where-Object tlsRejected).Count)) { throw 'Actual UI TLS rejection control failed.' }
-            if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut)) { throw 'Actual UI hard-stop control failed.' }
+            if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut -or
+                !$case.retirement.requestPhaseObserved -or $case.retirement.exitCode -notin @(124,125))) { throw 'Actual UI hard-stop control failed.' }
             if ($mode -in $admissionModes -and ($exitCode -ne 2 -or $summary.passed -or !$summary.admissionRefused -or
                 $case.retirement.exitCode -ne 64 -or $case.retirement.timedOut -or
                 $case.result -isnot [pscustomobject] -or @($case.result.psobject.Properties).Count -ne 0 -or

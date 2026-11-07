@@ -246,6 +246,11 @@ class WindowsProcessTests(unittest.TestCase):
         self.assertTrue(result["processSignaled"] and result["ownedJobEmpty"])
         self.assertFalse(result["timedOut"])
 
+    def test_native_deadline_exit_is_recorded_after_owned_process_retirement(self):
+        result=self.run_real_child("raise SystemExit(124)")
+        self.assertEqual(result["exitCode"],124)
+        self.assertTrue(result["timedOut"] and result["processSignaled"] and result["ownedJobEmpty"])
+
     def test_stalled_request_is_killed_without_renewing_its_deadline(self):
         body="""import json,pathlib,sys,time
 root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text());state['phase']='requests'
