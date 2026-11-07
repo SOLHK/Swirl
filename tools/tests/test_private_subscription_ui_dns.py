@@ -235,7 +235,7 @@ class ActualUiDnsTests(unittest.TestCase):
         return record, completed.returncode, state
 
     def assert_owner(self, record):
-        self.assertEqual(record["sourceSha"], self.source)
+        self.assertEqual(record["source_sha"], self.source)
         self.assertFalse(record["liveReady"])
         self.assertFalse(record["providerStatisticsAuthenticated"])
         self.assertEqual((record["providerRequests"], record["realNodeRequests"]), (0, 0))

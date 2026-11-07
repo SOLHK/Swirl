@@ -255,7 +255,7 @@ class ActualUiImportTests(unittest.TestCase):
         self.assertNotIn(b"Traceback", completed.stderr)
         record = json.loads(completed.stdout)
         REPORTS.append({"test": self.id(), "record": record, "actualCliExit": completed.returncode})
-        self.assertEqual(record["sourceSha"], self.source)
+        self.assertEqual(record["source_sha"], self.source)
         self.assertFalse(record["liveReady"])
         self.assertEqual(record["providerRequests"], 0)
         self.assertEqual(record["realNodeRequests"], 0)
