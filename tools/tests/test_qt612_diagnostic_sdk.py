@@ -4,6 +4,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -25,6 +26,18 @@ comparison = load("comparison_boundary_tests", "RunQt612RuntimeComparison.py")
 
 
 class DiagnosticBoundaryTests(unittest.TestCase):
+    def test_compiler_opt_out_is_scoped_and_cannot_forward_parent_secrets(self):
+        original = {"PATH": "synthetic-toolchain", "VCTIP_NO_TELEMETRY": "0",
+                    "GITHUB_TOKEN": "synthetic-secret", "HTTPS_PROXY": "synthetic-proxy",
+                    "CL": "/Zi", "_CL_": "/Zi"}
+        with patch.dict(os.environ, original, clear=True):
+            environment = sdk.tool_environment()
+            self.assertEqual(environment["VCTIP_NO_TELEMETRY"], "1")
+            self.assertEqual(environment["PATH"], original["PATH"])
+            for name in ("GITHUB_TOKEN", "HTTPS_PROXY", "CL", "_CL_"):
+                self.assertNotIn(name, environment)
+            self.assertEqual(dict(os.environ), original)
+
     def test_patch_lock_matches_exact_retained_production_patch(self):
         lock = json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
         self.assertEqual(lock["patch"]["sha256"], sdk.digest(TOOLS.parent / lock["patch"]["path"]))

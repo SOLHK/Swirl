@@ -314,6 +314,9 @@ def tool_environment():
     env.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never", GIT_CONFIG_NOSYSTEM="1",
                GIT_CONFIG_GLOBAL=os.devnull, VSLANG="1033", PYTHONUTF8="1",
                QT_FORCE_STDERR_LOGGING="1", QT_MESSAGE_PATTERN="[%{type}] %{message}")
+    # Invocation-local compiler opt-out, not a promise that no helper starts.
+    # The unchanged owned-Job retirement check still decides acceptance.
+    env["VCTIP_NO_TELEMETRY"] = "1"
     return env
 
 
@@ -951,6 +954,8 @@ def verify_configuration(source, build, stock, tools, evidence, lock, pinned_cma
     cmake = verify_cmake_executable(cache, pinned_cmake)
     expected = {"CMAKE_BUILD_TYPE": "Release", "CMAKE_GENERATOR": "Ninja",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
+                "CMAKE_POLICY_DEFAULT_CMP0141": "NEW",
+                "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
                 "QT_BUILD_TESTS": "OFF", "QT_BUILD_EXAMPLES": "OFF",
                 "QT_BUILD_TOOLS_BY_DEFAULT": "OFF"}
     require(all(cache.get(k) == v for k, v in expected.items()), "UnexpectedBuildConfiguration")
@@ -1210,6 +1215,12 @@ def main():
             cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
             cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
+            # CMP0141 must apply before the first project(); this variable is
+            # propagated to try_compile. /Z7 avoids compiler-PDB servers in
+            # debug probes while leaving Release without an added debug flag.
+            # https://cmake.org/cmake/help/v3.31/variable/CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.html
+            "-DCMAKE_POLICY_DEFAULT_CMP0141=NEW",
+            "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
             "-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
         ]
@@ -1220,6 +1231,12 @@ def main():
         env = tool_environment()
         env.update(PATH=str(stock / "bin") + os.pathsep + env["PATH"],
                    CMAKE_PREFIX_PATH=str(stock), QT_ROOT_DIR=str(stock))
+        report["compiler_process_policy"] = {
+            "invocation_environment": {"VCTIP_NO_TELEMETRY": env["VCTIP_NO_TELEMETRY"]},
+            "debug_information_format": "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
+            "telemetry_opt_out_effect_verified": False,
+            "acceptance": "Unchanged native exit, no forced cleanup and empty owned Job required.",
+        }
         run("10-configure", [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive",
                              "-File", configure], cwd=build, seconds=180, env=env)
         for name in ("CMakeCache.txt", "config.opt", "config.summary", "compile_commands.json"):
