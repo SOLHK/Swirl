@@ -84,7 +84,7 @@ jobs:
               'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1',
               'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1',
               'scripts/tests/Test-PrivateQtQuotaProfile.ps1','scripts/Select-Qt612ProductSdk.ps1',
-              'scripts/Stage-WindowsRustProduct.ps1')) {
+              'scripts/Stage-WindowsRustProduct.ps1','scripts/Copy-QtSdkShaderRuntime.ps1')) {
             $tokens = $null; $errors = $null
             $null = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$errors)
             if ($errors.Count) { throw ('PowerShell parser rejected '+$path+': '+($errors.Message -join ' ')) }
@@ -370,12 +370,14 @@ jobs:
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory dist -Target VC-WIN64A
-          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
           # CTest executes these binaries in the build directory, not dist.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
-          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory dist
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory build/swirl-quick/Release
           python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist"
           if ($LASTEXITCODE -ne 0) { throw 'Deployed QA Qt runtime differs from the selected SDK.' }
           python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/build/swirl-quick/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest"

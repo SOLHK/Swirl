@@ -109,8 +109,9 @@ foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
 if (-not $OpenSslRoot) { throw 'An explicitly verified OpenSSL runtime root is required.' }
 & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $OpenSslRoot `
     -ApplicationDirectory $stage -Target VC-WIN64A -Python $Python
-& $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
+& $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
+& (Join-Path $PSScriptRoot 'Copy-QtSdkShaderRuntime.ps1') -QtRoot $qtRoot -ApplicationDirectory $stage
 if ($QtSdkReceipt) {
     & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify --receipt $QtSdkReceipt `
         --build-dir $build --phase post-deploy --runtime-dir $stage `

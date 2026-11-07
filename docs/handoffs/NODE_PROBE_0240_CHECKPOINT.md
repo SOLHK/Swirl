@@ -2,6 +2,14 @@
 
 Continue on `work/node-probe-render-20261105` in [PR #61](https://github.com/SOLHK/Swirl/pull/61), targeting `test`. Fetch the current head before editing. This is a development checkpoint. Release acceptance and promotion remain open.
 
+## Selected shader runtime deployment after `24f141e9`
+
+The Windows takeover preserved the eight concurrent commits from `84c3c75a` through `24f141e95c31ddec554a31f0cb9df96c6512ffea`. The latter's PR merge source is `aa412320b965285a1629b67e6b57726a52623d0a`, with unchanged `test` base `acd7005c99a99c4f81b62d328fcc15883d51b62a`. Its [UI run 42362762960](https://github.com/SOLHK/Swirl/actions/runs/42362762960) compiled the application but failed post-deployment validation with `DeployedQtFileMismatch:d3dcompiler_47.dll`. Qt's deployment tool selected the Windows system shader compiler instead of the selected SDK's copy. The strict check correctly retained this failure.
+
+QA, Release and private-QA deployment now skip automatic system D3D compiler deployment and explicitly copy the selected SDK's shader compiler files, recording and comparing their source/deployed SHA256 values. The existing complete selected-SDK verification still runs afterward. A local Windows control started with the system DLL, performed this copy from the actual Qt 6.12 kit, and confirmed that the deployed bytes matched that kit. The edited PowerShell scripts parsed and workflow lint passed. Actual MSVC deployment and all downstream UI/installer checks require the resulting commit's CI.
+
+The earlier local `48b50459` product comparison recovered 1,918 manifest-verified files by nonexecuting NSIS extraction, then ran identical Release EXEs with runtime trees differing only in `Qt6Qml.dll`. All four normal-motion rapid/ready runs passed. Actual module observations bound the stock and patched DLL hashes. The stock run's successful traversal leaves that local application comparison inconclusive about intermittent VME causality. Later hosted comparison and current product SDK evidence remain attributed to their recorded sources.
+
 ## Source-bound integration after 282f42c6 (2026-11-07)
 
 The parent development source is `282f42c6f536d34c76c5bbb90752f2d9859caaf3`; its GitHub PR merge source is `301aee92a1c8dbff0b8f19bc194ce7e18147d422`. Both have tree `f13649f39472f844fcbe4f5afbd324c2f371cd0b`, with the unchanged `test` base `acd7005c99a99c4f81b62d328fcc15883d51b62a`. These identities describe the preceding source, not the new SDK/billing integration in this checkout. Re-read the resulting remote head, merge SHA, every workflow's final conclusion and actual downloaded artifacts before delivery.
