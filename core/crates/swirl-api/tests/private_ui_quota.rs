@@ -143,7 +143,12 @@ fn accept(listener: &TcpListener) -> TcpStream {
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
         match listener.accept() {
-            Ok((peer, _)) => return peer,
+            Ok((peer, _)) => {
+                // Accepted sockets may inherit the listener's nonblocking mode.
+                // The fixture uses blocking reads with its original deadlines.
+                peer.set_nonblocking(false).unwrap();
+                return peer;
+            }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 assert!(Instant::now() < deadline, "actual Core did not connect");
                 thread::sleep(Duration::from_millis(2));

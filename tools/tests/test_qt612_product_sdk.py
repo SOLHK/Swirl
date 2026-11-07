@@ -302,6 +302,124 @@ class ProductSdkBoundaries(unittest.TestCase):
             self.assertEqual([p.name for p in existing.iterdir()], ["original"])
 
 
+class InstalledEnvironmentBoundaries(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name).resolve()
+        self.stock_root = r"D:\a\_temp\swirl-qt-6.12.0\6.12.0\msvc2022_64"
+
+        class KitView:
+            # Files are harmless test data on the current OS. Only the recorded
+            # Windows installation path is represented separately; no image runs.
+            def __init__(self, local, recorded):
+                self.local, self.recorded = local, recorded
+            def __str__(self):
+                return self.recorded
+            def __fspath__(self):
+                return str(self.local)
+            def __truediv__(self, name):
+                return self.local / name
+
+        self.stock = KitView(root / "stock", self.stock_root)
+        self.selected = KitView(root / "selected", r"D:\a\_temp\swirl-qt-6.12.0-product")
+        self.raw = product.qtenv2_bytes(self.stock_root)
+        for kit in (self.stock, self.selected):
+            (kit / "bin").mkdir(parents=True)
+            (kit / "bin/qtenv2.bat").write_bytes(self.raw)
+            (kit / "bin/Qt6Qml.dll").write_bytes(minimal_pe())
+            (kit / "unchanged-header.h").write_bytes(b"fixed header\r\n")
+        before, derived = SDK.inventory(self.stock), SDK.inventory(self.selected)
+        for inventory in (before, derived):
+            inventory["bin/qtenv2.bat"] = copy.deepcopy(LOCK["installation_qtenv2"]["producer_file"])
+        pe = product.pe_interface(minimal_pe())
+        self.artifact = {"stock_files": before, "derived_files": derived,
+                         "receipt": {"stock_root": LOCK["installation_qtenv2"]["producer_kit_root"]},
+                         "interface": {key: pe[key] for key in ("exports", "dependencies")}}
+
+    def check(self):
+        return product.actual_kit_check(self.stock, self.selected, self.artifact, LOCK, SDK)
+
+    def test_exact_template_reproduces_both_independent_ci_inventory_hashes(self):
+        self.assertEqual(product.byte_id(product.qtenv2_bytes(LOCK["installation_qtenv2"]["producer_kit_root"])),
+                         {"bytes": 276, "sha256": "91e5545f0e77a2e07f914d6f24660611c2c4d7d944b2f4cb6af470ec383f1d8f"})
+        self.assertEqual(product.byte_id(self.raw),
+                         {"bytes": 244, "sha256": "41aa852760cdc69ea031be1a6401c934816e4d453129c4227331c983cb68e0fe"})
+        self.assertEqual(self.raw.count(b"\r\n"), 5)
+
+    def test_actual_whole_inventory_and_unchanged_stock_are_bound(self):
+        original = copy.deepcopy(self.artifact)
+        before, actual, binding = self.check()
+        self.assertEqual(self.artifact, original)
+        self.assertEqual(binding["stock_content_id"], product.canonical(SDK.inventory(self.stock)))
+        self.assertEqual(binding["selected_content_id"], product.canonical(SDK.inventory(self.selected)))
+        self.assertNotEqual(binding["selected_content_id"], LOCK["content"]["derived"])
+        self.assertEqual((self.stock / "bin/qtenv2.bat").read_bytes(), self.raw)
+        self.assertEqual((self.selected / "bin/qtenv2.bat").read_bytes(), self.raw)
+        self.assertFalse(binding["qtenv2_executed"])
+        self.assertEqual(before, actual)
+
+    def test_line_endings_bom_extra_bytes_wrong_root_and_partial_replacement_rejected(self):
+        old_root = LOCK["installation_qtenv2"]["producer_kit_root"].encode()
+        mutations = (self.raw.replace(b"\r\n", b"\n"), b"\xef\xbb\xbf" + self.raw,
+                     self.raw + b"\r\n", self.raw.replace(self.stock_root.encode(), old_root),
+                     self.raw.replace(self.stock_root.encode(), old_root, 1),
+                     self.raw.replace(b";%PATH%", b";C:\\untrusted;%PATH%"))
+        for kit in (self.stock, self.selected):
+            for data in mutations:
+                with self.subTest(kit=str(kit), data=product.byte_id(data)):
+                    (kit / "bin/qtenv2.bat").write_bytes(data)
+                    with self.assertRaisesRegex(product.Rejected, "(?:InstalledOfficial|Selected)KitContentMismatch"):
+                        self.check()
+                    (kit / "bin/qtenv2.bat").write_bytes(self.raw)
+
+    def test_second_changed_missing_or_extra_file_is_still_rejected(self):
+        for kit in (self.stock, self.selected):
+            path = kit / "unchanged-header.h"
+            original = path.read_bytes()
+            for mode in ("changed", "missing", "extra"):
+                with self.subTest(kit=str(kit), mode=mode):
+                    if mode == "changed":
+                        path.write_bytes(original + b"changed")
+                    elif mode == "missing":
+                        path.unlink()
+                    else:
+                        (kit / "extra-file").write_bytes(b"unexpected")
+                    with self.assertRaisesRegex(product.Rejected, "(?:InstalledOfficial|Selected)KitContentMismatch"):
+                        self.check()
+                    path.write_bytes(original)
+                    if (kit / "extra-file").exists():
+                        (kit / "extra-file").unlink()
+
+    def test_producer_qtenv_root_and_original_file_identity_remain_pinned(self):
+        for mutation in (lambda a: a["receipt"].update(stock_root=self.stock_root),
+                         lambda a: a["stock_files"]["bin/qtenv2.bat"].update(bytes=244),
+                         lambda a: a["derived_files"].pop("bin/qtenv2.bat")):
+            artifact = copy.deepcopy(self.artifact)
+            mutation(artifact)
+            with self.assertRaisesRegex(product.Rejected, "ProducerQtEnvironmentIdentityRejected"):
+                product.installation_inventories(self.stock_root, artifact, LOCK)
+
+    def test_forged_actual_content_receipts_cannot_replace_recomputed_inventory(self):
+        before, actual, binding = self.check()
+        receipt = {key: binding[key] for key in ("stock_content_id", "selected_content_id",
+                                                "producer_stock_content_id", "producer_selected_content_id")}
+        receipt["installation_binding"] = binding
+        product.validate_installed_identity(receipt, before, actual, binding, LOCK)
+        for key in ("stock_content_id", "selected_content_id", "producer_stock_content_id", "producer_selected_content_id"):
+            forged = copy.deepcopy(receipt)
+            forged[key] = "f" * 64
+            forged["installation_binding"][key] = "f" * 64
+            with self.subTest(key=key), self.assertRaisesRegex(product.Rejected, "InstalledReceiptContentBindingRejected"):
+                product.validate_installed_identity(forged, before, actual, binding, LOCK)
+
+    def test_batch_metacharacters_ambiguous_and_non_windows_roots_rejected(self):
+        for root in ("relative", "/tmp/kit", r"C:\Qt\..\other", "C:\\Qt\\", r"C:\Qt.",
+                     r"C:\Qt%PATH%", r"C:\Qt&echo", r"\\server\share\Qt", "C:\\Qt\r\necho injected"):
+            with self.subTest(root=root), self.assertRaisesRegex(product.Rejected, "QtEnvironmentRootRejected"):
+                product.qtenv2_bytes(root)
+
+
 class CmakeObservationBoundaries(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -321,15 +439,17 @@ class CmakeObservationBoundaries(unittest.TestCase):
         self.context = {"source_sha": "a" * 40}
         self.lock = copy.deepcopy(LOCK)
         self.lock["content"]["producer_compiler_binary"] = product.file_id(self.compiler)
+        self.installed_content_id = "d" * 64
         self.hook = root / "selected-qt.cmake"
-        self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.lock["content"]["derived"]))
-        self.receipt = {"cmake_capture_hook": {"path": str(self.hook), **product.file_id(self.hook)}}
+        self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.installed_content_id))
+        self.receipt = {"cmake_capture_hook": {"path": str(self.hook), **product.file_id(self.hook)},
+                        "selected_content_id": self.installed_content_id}
         self.cache = {"CMAKE_BUILD_TYPE": "Release", "CMAKE_CXX_COMPILER": str(self.compiler),
                       "CMAKE_COMMAND": str(self.cmake), "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": self.hook.as_posix(),
                       "CMAKE_CACHE_MAJOR_VERSION": "3", "CMAKE_CACHE_MINOR_VERSION": "31", "CMAKE_CACHE_PATCH_VERSION": "6"}
         self.cache.update({name + "_DIR": str(self.selected / "lib/cmake" / name)
                            for name in ("Qt6", "Qt6Qml", "Qt6QmlPrivate")})
-        self.capture = {"schema": "1", "source_sha": "a" * 40, "content_id": self.lock["content"]["derived"],
+        self.capture = {"schema": "1", "source_sha": "a" * 40, "content_id": self.installed_content_id,
             "configuration": "Release", "qml_dll": str(self.selected / "bin/Qt6Qml.dll"),
             "qml_import_library": str(self.selected / "lib/Qt6Qml.lib"),
             "qml_private_includes": ";".join(str(self.selected / n) for n in ("include/QtQml/6.12.0", "include/QtQml/6.12.0/QtQml")),
@@ -354,6 +474,13 @@ class CmakeObservationBoundaries(unittest.TestCase):
         result = self.check()
         self.assertEqual(result["actual_target"]["qml_dll"], str(self.selected / "bin/Qt6Qml.dll"))
         self.assertIsNone(result["application"])
+
+    def test_producer_content_id_cannot_replace_actual_installed_capture(self):
+        self.assertNotEqual(self.receipt["selected_content_id"], self.lock["content"]["derived"])
+        self.check()
+        self.capture["content_id"] = self.lock["content"]["derived"]
+        with self.assertRaisesRegex(product.Rejected, "CmakeCaptureSourceChanged"):
+            self.check()
 
     def test_stale_qt_cache_path_rejected(self):
         stale = self.root / "stock/lib/cmake/Qt6Qml"
@@ -388,7 +515,7 @@ class CmakeObservationBoundaries(unittest.TestCase):
         self.hook.write_bytes(self.hook.read_bytes() + b"# mutated\n")
         with self.assertRaisesRegex(product.Rejected, "CmakeCaptureHookChanged"):
             self.check()
-        self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.lock["content"]["derived"]))
+        self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.installed_content_id))
         self.compiler.write_bytes(b"changed compiler")
         with self.assertRaisesRegex(product.Rejected, "ProductCompilerDiffers"):
             self.check()

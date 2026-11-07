@@ -13,7 +13,7 @@ import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import shutil
 import struct
@@ -675,16 +675,68 @@ def query_tools(selected, evidence, sdk):
     return output
 
 
-def actual_kit_check(stock, selected, artifact, sdk):
+def qtenv2_bytes(kit_root):
+    # aqtinstall 3.3.0 Updater.make_qtenv2 writes exactly these five lines.
+    # The two absolute paths are installer output, not invariant archive bytes.
+    # Do not normalize the input file, execute it, or accept other substitutions.
+    require(isinstance(kit_root, str) and len(kit_root) <= 240
+            and re.fullmatch(r"[A-Za-z]:\\[A-Za-z0-9_. \\-]+", kit_root),
+            "QtEnvironmentRootRejected")
+    root = PureWindowsPath(kit_root)
+    require(root.is_absolute() and str(root) == kit_root
+            and all(part not in (".", "..") and not part.endswith((" ", "."))
+                    for part in root.parts[1:]), "QtEnvironmentRootRejected")
+    return ("@echo off\r\n"
+            "echo Setting up environment for Qt usage...\r\n"
+            "set PATH=" + kit_root + "\\bin;%PATH%\r\n"
+            "cd /D " + kit_root + "\r\n"
+            "echo Remember to call vcvarsall.bat to complete environment setup!\r\n").encode("ascii")
+
+
+def installation_inventories(stock_root, artifact, lock):
+    rule = lock["installation_qtenv2"]
+    name = rule["path"]
+    require(name == "bin/qtenv2.bat"
+            and artifact["receipt"]["stock_root"] == rule["producer_kit_root"]
+            and byte_id(qtenv2_bytes(rule["producer_kit_root"])) == rule["producer_file"]
+            == artifact["stock_files"].get(name) == artifact["derived_files"].get(name),
+            "ProducerQtEnvironmentIdentityRejected")
+    installed = byte_id(qtenv2_bytes(str(stock_root)))
+    before, derived = dict(artifact["stock_files"]), dict(artifact["derived_files"])
+    before[name] = derived[name] = installed
+    binding = {"schema": 1, "rule": rule, "stock_kit_root": str(stock_root),
+               "installed_file": installed, "producer_stock_content_id": lock["content"]["stock"],
+               "producer_selected_content_id": lock["content"]["derived"],
+               "stock_content_id": canonical(before), "selected_content_id": canonical(derived),
+               "selected_qtenv2_copied_from_stock": True, "qtenv2_executed": False,
+               "scope": "Only the two exact installer path fields differ from the producer; "
+                        "the cloned batch file still targets stock and is not a selected-kit launcher. "
+                        "Product tools and CMake targets use verified absolute selected-kit paths."}
+    return before, derived, binding
+
+
+def validate_installed_identity(receipt, before, actual, binding, lock):
+    require(receipt.get("stock_content_id") == canonical(before) == binding["stock_content_id"]
+            and receipt.get("selected_content_id") == canonical(actual) == binding["selected_content_id"]
+            and receipt.get("producer_stock_content_id") == lock["content"]["stock"]
+            and receipt.get("producer_selected_content_id") == lock["content"]["derived"]
+            and receipt.get("installation_binding") == binding,
+            "InstalledReceiptContentBindingRejected")
+
+
+def actual_kit_check(stock, selected, artifact, lock, sdk):
+    expected_stock, expected_selected, binding = installation_inventories(stock, artifact, lock)
     before = sdk.inventory(stock)
-    require(before == artifact["stock_files"], "InstalledOfficialKitContentMismatch")
+    require(before == expected_stock, "InstalledOfficialKitContentMismatch")
     actual = sdk.inventory(selected)
-    require(actual == artifact["derived_files"], "SelectedKitContentMismatch")
+    require(actual == expected_selected, "SelectedKitContentMismatch")
+    require((stock / "bin/qtenv2.bat").read_bytes() == (selected / "bin/qtenv2.bat").read_bytes()
+            == qtenv2_bytes(str(stock)), "InstalledQtEnvironmentBytesChanged")
     old_pe = pe_interface((stock / "bin/Qt6Qml.dll").read_bytes())
     new_pe = pe_interface((selected / "bin/Qt6Qml.dll").read_bytes())
     require(old_pe == new_pe and {k: old_pe[k] for k in ("exports", "dependencies")} == artifact["interface"],
             "ActualStockPatchedPeMismatch")
-    return before, actual
+    return before, actual, binding
 
 
 def compose(args, lock, sdk, transport, report):
@@ -716,21 +768,28 @@ def compose(args, lock, sdk, transport, report):
     report["original_artifact_verification"] = artifact["verification"]
     before = sdk.inventory(stock)
     write_json(evidence / "stock-files-before.json", before)
-    require(before == artifact["stock_files"], "InstalledOfficialKitContentMismatch")
+    expected_stock, expected_selected, installation = installation_inventories(stock, artifact, lock)
+    write_json(evidence / "expected-installation-identity.json", installation)
+    require(before == expected_stock, "InstalledOfficialKitContentMismatch")
+    raw_environment = (stock / "bin/qtenv2.bat").read_bytes()
+    require(raw_environment == qtenv2_bytes(str(stock)), "InstalledQtEnvironmentBytesChanged")
+    (evidence / "stock-qtenv2.bat.raw").write_bytes(raw_environment)
     stage = extracted / "sdk/module-install-output"
     staged, changes, retained = sdk.verify_module_stage(stage, stock, artifact["headers"])
     require(staged == artifact["module_files"] and sorted(retained) == sorted(artifact["retained_headers"])
             and sorted(changes) == sorted(artifact["receipt"]["module_install"]["approved_changes"]),
             "ActualModuleInstallClosureChanged")
     derived = sdk.compose_derived_kit(stock, stage, selected, before, staged, retained)
-    require(derived == artifact["derived_files"], "ComposedKitContentMismatch")
+    require(derived == expected_selected, "ComposedKitContentMismatch")
     tools = query_tools(selected, evidence / "tool-queries", sdk)
-    unchanged, actual = actual_kit_check(stock, selected, artifact, sdk)
+    unchanged, actual, checked_installation = actual_kit_check(stock, selected, artifact, lock, sdk)
+    require(unchanged == before and checked_installation == installation, "InstallationChangedDuringComposition")
     write_json(evidence / "stock-files-after.json", unchanged)
     write_json(evidence / "selected-files.json", actual)
+    (evidence / "selected-qtenv2.bat.raw").write_bytes((selected / "bin/qtenv2.bat").read_bytes())
     require(current_context(repository, lock, sdk) == context, "ConsumerSourceChangedDuringComposition")
     hook = evidence / "selected-qt.cmake"
-    hook.write_bytes(capture_hook(selected, context, lock["content"]["derived"]))
+    hook.write_bytes(capture_hook(selected, context, canonical(actual)))
     dlls = {name: sdk.file_identity(selected / name) for name in ("bin/Qt6Qml.dll", "lib/Qt6Qml.lib")}
     pdb = {name: sdk.file_identity(selected / name) if (selected / name).is_file() else None
            for name in ("bin/Qt6Qml.pdb", "lib/Qt6Qml.pdb")}
@@ -740,7 +799,9 @@ def compose(args, lock, sdk, transport, report):
         "stock_negative_preserved": True, "qt_version": lock["qt_version"],
         "qt_source": lock["recipe"]["source"], "qt_patch": lock["recipe"]["patch"],
         "stock_kit_root": str(stock), "kit_root": str(selected),
-        "stock_content_id": lock["content"]["stock"], "selected_content_id": lock["content"]["derived"],
+        "stock_content_id": canonical(before), "selected_content_id": canonical(actual),
+        "producer_stock_content_id": lock["content"]["stock"],
+        "producer_selected_content_id": lock["content"]["derived"], "installation_binding": installation,
         "derivation_id": lock["content"]["derivation"], "content_delta": lock["content"]["delta"],
         "sdk_evidence_dir": str(extracted / "sdk"), "artifact_root": str(extracted),
         "artifact_archive": str(archive), "member_inventory": str(evidence / "original-member-inventory.json"),
@@ -756,7 +817,7 @@ def compose(args, lock, sdk, transport, report):
         "created_utc": datetime.now(timezone.utc).isoformat()}
     write_json(evidence / "selected-sdk.json", selected_receipt)
     report.update({"success": True, "selected_receipt": sdk.file_identity(evidence / "selected-sdk.json"),
-                   "selected_content_id": lock["content"]["derived"], "stock_unchanged": True})
+                   "selected_content_id": canonical(actual), "stock_unchanged": True})
 
 
 def capture_values(text):
@@ -775,6 +836,8 @@ def capture_values(text):
 
 
 def validate_configuration(build, selected, repository, context, receipt, lock, sdk, *, require_application):
+    content_id = receipt.get("selected_content_id")
+    require(isinstance(content_id, str) and SHA.fullmatch(content_id), "InstalledContentIdentityMissing")
     cache_path = sdk.plain_path(build / "CMakeCache.txt", root=build)
     cache = sdk.cache_values(cache_path.read_text(encoding="utf-8-sig"))
     require(cache.get("CMAKE_BUILD_TYPE") == "Release" or "Release" in cache.get("CMAKE_CONFIGURATION_TYPES", "").split(";"),
@@ -794,12 +857,12 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
     hook = Path(receipt["cmake_capture_hook"]["path"])
     require(cache.get("CMAKE_PROJECT_TOP_LEVEL_INCLUDES", "").replace("\\", "/") == hook.as_posix(),
             "ActualCmakeCaptureHookMissing")
-    require(hook.read_bytes() == capture_hook(selected, context, lock["content"]["derived"])
+    require(hook.read_bytes() == capture_hook(selected, context, content_id)
             and sdk.file_identity(hook) == {k: receipt["cmake_capture_hook"][k] for k in ("bytes", "sha256")},
             "CmakeCaptureHookChanged")
     capture_path = sdk.plain_path(build / "swirl-selected-qt-Release.txt", root=build)
     values = capture_values(capture_path.read_text(encoding="utf-8-sig"))
-    require(values["source_sha"] == context["source_sha"] and values["content_id"] == lock["content"]["derived"],
+    require(values["source_sha"] == context["source_sha"] and values["content_id"] == content_id,
             "CmakeCaptureSourceChanged")
     for key, expected in (("qml_dll", selected / "bin/Qt6Qml.dll"),
                           ("qml_import_library", selected / "lib/Qt6Qml.lib"),
@@ -879,8 +942,8 @@ def verify(args, lock, sdk, transport, report):
     require(receipt.get("schema") == 1 and receipt.get("kind") == "swirl-selected-qt612-product-sdk"
             and receipt.get("success") is True and receipt.get("consumer") == context
             and receipt.get("lock") == sdk.file_identity(LOCK_PATH)
-            and receipt.get("producer") == lock["producer"] and receipt.get("artifact") == lock["artifact"]
-            and receipt.get("selected_content_id") == lock["content"]["derived"], "SelectedReceiptBindingRejected")
+            and receipt.get("producer") == lock["producer"] and receipt.get("artifact") == lock["artifact"],
+            "SelectedReceiptBindingRejected")
     stock = sdk.plain_path(Path(receipt["stock_kit_root"]))
     selected = sdk.plain_path(Path(receipt["kit_root"]))
     evidence = sdk.plain_path(Path(args.evidence), exists=False)
@@ -895,7 +958,8 @@ def verify(args, lock, sdk, transport, report):
     for name in inventory:
         member(extracted, inventory, name, sdk)
     artifact = verify_artifact(extracted, inventory, lock, sdk, transport)
-    before, actual = actual_kit_check(stock, selected, artifact, sdk)
+    before, actual, installation = actual_kit_check(stock, selected, artifact, lock, sdk)
+    validate_installed_identity(receipt, before, actual, installation, lock)
     build = sdk.plain_path(Path(args.build_dir))
     require_disjoint((stock, selected, build, evidence))
     configuration = validate_configuration(build, selected, repository, context, receipt, lock, sdk,

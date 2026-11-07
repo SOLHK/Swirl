@@ -103,6 +103,23 @@
     "expanded_bytes": 139661307,
     "member_inventory_sha256": "a4e29512de626954c498c7d3a4657f3596d74eb6670818f4093f792c17dfb74c"
   },
+  "installation_qtenv2": {
+    "path": "bin/qtenv2.bat",
+    "generator": {
+      "distribution": "aqtinstall==3.3.0",
+      "source_url": "https://github.com/miurahr/aqtinstall/blob/v3.3.0/aqt/updater.py",
+      "source_bytes": 16166,
+      "source_sha256": "421046f246a0dee2f743e29a18ba9bbd2c12f9268af46c0b06c64887d80dda2b",
+      "function": "Updater.make_qtenv2",
+      "encoding": "ASCII without BOM; five CRLF-terminated lines"
+    },
+    "producer_kit_root": "D:\\a\\_temp\\qt612-patch-42338365419-1\\stock\\6.12.0\\msvc2022_64",
+    "producer_file": {
+      "bytes": 276,
+      "sha256": "91e5545f0e77a2e07f914d6f24660611c2c4d7d944b2f4cb6af470ec383f1d8f"
+    },
+    "policy": "Regenerate the exact expected bytes for the actual stock root; compare the whole inventories with only this one expected leaf changed. Preserve stock and its cloned batch file byte-for-byte. Never execute qtenv2 or treat it as selected-kit environment setup."
+  },
   "critical_members": {
     "step-outcomes.json": {
       "bytes": 636,
