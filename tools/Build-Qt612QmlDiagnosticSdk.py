@@ -317,7 +317,139 @@ def tool_environment():
     return env
 
 
-def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,)):
+def executable_inventory(toolchain, tools):
+    result = {}
+    for directory, files in toolchain.items():
+        for relative, identity in files.items():
+            if relative.lower().endswith(".exe"):
+                path = str(Path(directory) / relative)
+                result[path.replace("\\", "/").casefold()] = {"path": path, **identity}
+    for value in tools.values():
+        result[value["path"].replace("\\", "/").casefold()] = value
+    return result
+
+
+def owned_pid_snapshot(k, c, w, job, known_executables):
+    """One bounded Job PID query; inspect only handles re-confirmed in this exact Job."""
+    class PidList(c.Structure):
+        _fields_ = [("assigned", w.DWORD), ("count", w.DWORD), ("pids", c.c_size_t * 256)]
+    class FileTime(c.Structure):
+        _fields_ = [("low", w.DWORD), ("high", w.DWORD)]
+    require(c.sizeof(PidList) == 2056 and c.sizeof(FileTime) == 8, "OwnedPidSnapshotAbiMismatch")
+    result = {"utc": utc(), "capacity": 256, "query_count": 1, "complete_pid_list": False,
+              "processes": [], "errors": [], "command_line_or_environment_read": False,
+              "actual_process_module_sampling": False}
+    values = PidList()
+    if not k.QueryInformationJobObject(job, 3, c.byref(values), c.sizeof(values), None):
+        result["errors"].append("OwnedPidQueryFailed:" + str(c.get_last_error()))
+        return result
+    result.update(assigned_count=values.assigned, listed_count=values.count)
+    if values.count > 256 or values.assigned != values.count:
+        result["errors"].append("OwnedPidListIncompleteOrInvalid")
+        return result
+    result["complete_pid_list"] = True
+    deadline, hashed_bytes = time.monotonic() + 1, 0
+    for pid in values.pids[:values.count]:
+        item = {"pid": pid, "state": "not-inspected"}
+        result["processes"].append(item)
+        if not 0 < pid <= 0xffffffff:
+            item["state"] = "invalid-pid-list-entry"
+            result["errors"].append("OwnedPidListEntryInvalid")
+            continue
+        if time.monotonic() >= deadline:
+            item["state"] = "snapshot-time-budget-exhausted"
+            continue
+        handle = k.OpenProcess(0x1000 | 0x100000, False, pid)  # Query-limited + synchronize.
+        if not handle:
+            item.update(state="cannot-open; exit-not-proved", win32_error=c.get_last_error())
+            continue
+        try:
+            member = w.BOOL()
+            if not k.IsProcessInJob(handle, job, c.byref(member)):
+                item.update(state="membership-unconfirmed", win32_error=c.get_last_error())
+                continue
+            if not member.value:
+                item["state"] = "not-in-owned-job; no-further-inspection"
+                continue
+            item["owned_job_membership_confirmed"] = True
+            state = k.WaitForSingleObject(handle, 0)
+            item["state"] = "exited-before-inspection" if state == 0 else (
+                "still-active" if state == 258 else "wait-failed")
+            creation, exit_time, kernel, user = FileTime(), FileTime(), FileTime(), FileTime()
+            if k.GetProcessTimes(handle, c.byref(creation), c.byref(exit_time),
+                                 c.byref(kernel), c.byref(user)):
+                item["creation_filetime"] = (creation.high << 32) | creation.low
+            else:
+                item["creation_time_error"] = c.get_last_error()
+            size, buffer = w.DWORD(32768), c.create_unicode_buffer(32768)
+            if not k.QueryFullProcessImageNameW(handle, 0, buffer, c.byref(size)):
+                item["image_query_error"] = c.get_last_error()
+                continue
+            normalized = buffer.value.replace("\\", "/").casefold()
+            item.update(executable_basename=Path(buffer.value).name,
+                        absolute_path_sha256=hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+                        path_hash_encoding="forward-slash/casefold/UTF-8")
+            known = known_executables.get(normalized)
+            if known is not None:
+                item["matched_inventory_path"] = known["path"]  # Already public in tool inventory.
+                expected = {key: known[key] for key in ("bytes", "sha256")}
+                item["inventory_identity"] = expected
+                if (time.monotonic() < deadline and expected["bytes"] <= 16 * 1024**2
+                        and hashed_bytes + expected["bytes"] <= 32 * 1024**2):
+                    image_path = plain_path(Path(buffer.value))
+                    with image_path.open("rb") as stream:
+                        data = stream.read(expected["bytes"] + 1)
+                    hashed_bytes += len(data)
+                    if len(data) != expected["bytes"]:
+                        item.update(observed_read_bytes=len(data), inventory_hash_matches=False,
+                                    file_hash_status="size-mismatch; no-full-file-hash-claim")
+                    else:
+                        actual = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                        item.update(observed_file_identity=actual, inventory_hash_matches=actual == expected)
+                    if not item["inventory_hash_matches"]:
+                        result["errors"].append("OwnedProcessExecutableChanged:" + item["executable_basename"])
+                else:
+                    item["file_hash_status"] = "snapshot-time-or-byte-budget-exhausted"
+        except Exception as error:
+            item["inspection_error"] = type(error).__name__ + ":" + str(error)
+        finally:
+            if not k.CloseHandle(handle):
+                result["errors"].append("OwnedPidHandleCloseFailed:" + str(c.get_last_error()))
+    return result
+
+
+def command_completion_allowed(record, accepted):
+    first = record.get("root_first_signal") or {}
+    return (record["atomic_job_membership"] and record["process_signaled"] and record["owned_job_empty"]
+            and not record["errors"] and not record["timed_out"]
+            and first.get("before_any_termination") is True
+            and first.get("exit_code") == record["exit_code"]
+            and record["exit_code"] in accepted
+            and not (record["forced_cleanup"] and record["exit_code"] == 0))
+
+
+def close_command_resources(operations, record):
+    """A failed stream or handle close must not skip the remaining owned handles."""
+    for label, close in operations:
+        try:
+            result = close()
+            if result is not None and not result:
+                record["errors"].append(label + ":ReturnedFalse")
+        except Exception as error:
+            record["errors"].append(label + ":" + type(error).__name__ + ":" + str(error))
+
+
+def collect_command_output_evidence(paths, record):
+    record["outputs"] = {}
+    for path in paths:
+        try:
+            record["outputs"][path.name] = file_identity(path)
+        except Exception as error:
+            record["errors"].append("CommandOutputEvidenceFailed:" + path.name + ":"
+                                    + type(error).__name__ + ":" + str(error))
+
+
+def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,), known_executables=None):
     """Public build commands have their own kill-on-close Job, allowing compiler children.
 
     This does not reuse or weaken PrivateSubscriptionProcess's one-process/eight-second
@@ -368,6 +500,9 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
         ("GetExitCodeProcess", w.BOOL, [w.HANDLE, c.POINTER(w.DWORD)]),
         ("TerminateJobObject", w.BOOL, [w.HANDLE, w.UINT]),
         ("TerminateProcess", w.BOOL, [w.HANDLE, w.UINT]),
+        ("OpenProcess", w.HANDLE, [w.DWORD, w.BOOL, w.DWORD]),
+        ("GetProcessTimes", w.BOOL, [w.HANDLE, ptr, ptr, ptr, ptr]),
+        ("QueryFullProcessImageNameW", w.BOOL, [w.HANDLE, w.DWORD, w.LPWSTR, c.POINTER(w.DWORD)]),
         ("CloseHandle", w.BOOL, [w.HANDLE]),
     ]
     for function, result, types in signatures:
@@ -392,10 +527,48 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
     stdout_path, stderr_path = evidence / (name + ".stdout.log"), evidence / (name + ".stderr.log")
     record = {"schema": 1, "arguments": args, "cwd": str(cwd), "started_utc": utc(),
               "timeout_seconds": timeout, "atomic_job_membership": False, "timed_out": False,
-              "process_signaled": False, "owned_job_empty": False, "exit_code": None, "errors": []}
+              "process_signaled": False, "owned_job_empty": False, "exit_code": None, "errors": [],
+              "root_first_signal": None, "forced_cleanup": False, "termination_reason": None,
+              "retirement_grace_seconds": 2, "termination_proof_seconds": 5,
+              "owned_pid_snapshot": None, "actual_process_module_sampling": False}
     job, attrs, info = None, None, Information()
     streams, inherited = [], []
-    started, terminated = time.monotonic(), False
+    started, terminated, retirement_deadline = time.monotonic(), False, None
+
+    def start_termination_proof():
+        nonlocal retirement_deadline
+        if retirement_deadline is None:
+            retirement_deadline = time.monotonic() + 5
+            record.update(termination_proof_started_utc=utc(),
+                          termination_proof_deadline_elapsed_seconds=round(retirement_deadline - started, 6))
+
+    def observe_root(state, accounting, observed_by):
+        record.update(process_signaled=state == 0, owned_job_empty=accounting.active == 0,
+                      last_job_accounting={"active": accounting.active, "total": accounting.total,
+                                           "terminated": accounting.terminated})
+        if state == 0:
+            code = w.DWORD()
+            require(k.GetExitCodeProcess(info.process, c.byref(code)), "CommandExitCodeFailed")
+            if record["root_first_signal"] is None:
+                record["exit_code"] = code.value
+                record["root_first_signal"] = {
+                    "utc": utc(), "elapsed_seconds": round(time.monotonic() - started, 6),
+                    "exit_code": code.value, "job_active_count": accounting.active,
+                    "job_total_count": accounting.total, "job_terminated_count": accounting.terminated,
+                    "before_any_termination": not terminated, "observed_by": observed_by}
+                if not terminated and record["root_first_signal"]["elapsed_seconds"] > timeout:
+                    record["timed_out"] = True
+                    record["errors"].append("RootExitObservedAfterCommandDeadline")
+            else:
+                require(record["exit_code"] == code.value, "RootExitCodeChanged")
+
+    def snapshot_once():
+        if record["owned_pid_snapshot"] is None:
+            record["owned_pid_snapshot"] = {"attempted_utc": utc(), "query_count_maximum": 1,
+                                             "completed": False}
+            result = owned_pid_snapshot(k, c, w, job, known_executables or {})
+            record["owned_pid_snapshot"] = result
+            record["errors"].extend(result["errors"])
     try:
         job = k.CreateJobObjectW(None, None)
         require(bool(job), "CommandJobCreateFailed")
@@ -436,59 +609,102 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
         require(k.ResumeThread(info.thread) == 1, "CommandResumeFailed")
         require(k.CloseHandle(info.thread), "CommandThreadCloseFailed")
         info.thread = None
-        deadline, retirement_deadline = started + timeout, None
+        deadline, grace_deadline = started + timeout, None
         while True:
             state, accounting = k.WaitForSingleObject(info.process, 100), Accounting()
             require(state in (0, 258), "CommandWaitFailed")
             require(k.QueryInformationJobObject(job, 1, c.byref(accounting), c.sizeof(accounting), None),
                     "CommandJobQueryFailed")
-            record.update(process_signaled=state == 0, owned_job_empty=accounting.active == 0)
-            if state == 0 and accounting.active == 0:
-                code = w.DWORD()
-                require(k.GetExitCodeProcess(info.process, c.byref(code)), "CommandExitCodeFailed")
-                record["exit_code"] = code.value
-                break
+            observe_root(state, accounting, "command-loop")
+            now = time.monotonic()
+            require(retirement_deadline is None or now < retirement_deadline,
+                    "CommandRetirementUnconfirmed")
             excessive = sum(p.stat().st_size for p in (stdout_path, stderr_path)) > MAX_LOG_BYTES
-            if not terminated and (time.monotonic() >= deadline or excessive):
-                record["timed_out"] = not excessive
-                record["errors"].append("OutputLimitExceeded" if excessive else "CommandDeadlineExceeded")
+            if state == 0 and grace_deadline is None:
+                grace_deadline = now + 2
+            if state == 0 and accounting.active == 0:
+                if excessive:
+                    record["errors"].append("OutputLimitExceeded")
+                break
+            if not terminated and (excessive or (state != 0 and now >= deadline)
+                                   or (state == 0 and now >= grace_deadline)):
+                if excessive:
+                    reason = "output-limit"
+                    record["errors"].append("OutputLimitExceeded")
+                elif state != 0:
+                    reason = "work-deadline-root-not-exited"
+                    record["timed_out"] = True
+                    record["errors"].append("CommandDeadlineExceeded")
+                else:
+                    reason = "root-exited-descendants-after-grace"
+                snapshot_once()
+                # Root/child exit can race with the snapshot; observe both before termination.
+                state = k.WaitForSingleObject(info.process, 0)
+                require(state in (0, 258), "PreTerminationRootWaitFailed")
+                require(k.QueryInformationJobObject(job, 1, c.byref(accounting), c.sizeof(accounting), None),
+                        "PreTerminationJobQueryFailed")
+                observe_root(state, accounting, "pre-termination")
+                if state == 0 and accounting.active == 0:
+                    record["owned_job_empty"] = True
+                    continue
+                record.update(forced_cleanup=True, termination_reason=reason,
+                              termination_utc=utc(), active_at_termination=accounting.active)
+                if state == 0 and record["exit_code"] == 0:
+                    record["errors"].append("UnexpectedDescendantsAfterSuccessfulRoot")
+                start_termination_proof()
                 require(k.TerminateJobObject(job, 125), "CommandJobTerminationFailed")
-                terminated, retirement_deadline = True, time.monotonic() + 5
+                terminated = True
             require(retirement_deadline is None or time.monotonic() < retirement_deadline,
                     "CommandRetirementUnconfirmed")
+            if state == 0:
+                time.sleep(0.025)  # A signaled root handle otherwise spins while children retire.
     except BaseException as error:
         record["errors"].append(type(error).__name__ + ":" + str(error))
     finally:
         if info.process and not (record["process_signaled"] and record["owned_job_empty"]):
+            if job and record["atomic_job_membership"] and record["owned_pid_snapshot"] is None:
+                try:
+                    snapshot_once()
+                except Exception as error:
+                    record["errors"].append("CleanupSnapshot:" + type(error).__name__ + ":" + str(error))
+            record["forced_cleanup"] = True
+            record["termination_reason"] = record["termination_reason"] or "exception-cleanup"
+            terminated = True
+            start_termination_proof()
             if not record["atomic_job_membership"] and not k.TerminateProcess(info.process, 125):
                 record["errors"].append("UnconfirmedMembershipProcessTerminationFailed")
             if job and not k.TerminateJobObject(job, 125):
                 record["errors"].append("CleanupJobTerminationFailed:" + str(c.get_last_error()))
-            end = time.monotonic() + 5
-            while job and time.monotonic() < end:
+            while job and time.monotonic() < retirement_deadline:
                 accounting = Accounting()
                 state = k.WaitForSingleObject(info.process, 100)
                 if not k.QueryInformationJobObject(job, 1, c.byref(accounting), c.sizeof(accounting), None):
                     record["errors"].append("CleanupJobQueryFailed")
                     break
+                try:
+                    observe_root(state, accounting, "exception-cleanup")
+                except Exception as error:
+                    record["errors"].append("CleanupObservation:" + type(error).__name__ + ":" + str(error))
                 if state == 0 and accounting.active == 0:
                     record.update(process_signaled=True, owned_job_empty=True)
                     break
+                if state == 0:
+                    time.sleep(0.025)
         if attrs:
             k.DeleteProcThreadAttributeList(attrs)
         for handle in inherited:
             if not k.SetHandleInformation(handle, 1, 0):
                 record["errors"].append("StdioInheritanceResetFailed")
-        for stream in streams:
-            stream.close()
-        for handle in (info.thread, info.process, job):
-            if handle and not k.CloseHandle(handle):
-                record["errors"].append("CommandHandleCloseFailed")
+        closes = [("CommandStreamCloseFailed:" + str(index), stream.close)
+                  for index, stream in enumerate(streams)]
+        closes.extend(("CommandHandleCloseFailed:" + name, lambda handle=handle: k.CloseHandle(handle))
+                      for name, handle in (("thread", info.thread), ("process", info.process), ("job", job))
+                      if handle)
+        close_command_resources(closes, record)
         record.update(finished_utc=utc(), elapsed_seconds=round(time.monotonic() - started, 3))
-        record["outputs"] = {p.name: file_identity(p) for p in (stdout_path, stderr_path) if p.exists()}
+        collect_command_output_evidence((stdout_path, stderr_path), record)
         write_json(evidence / (name + ".json"), record)
-    require(record["process_signaled"] and record["owned_job_empty"] and not record["errors"]
-            and record["exit_code"] in accepted, "CommandFailed:" + name)
+    require(command_completion_allowed(record, accepted), "CommandFailed:" + name)
     return record
 
 
@@ -593,6 +809,14 @@ def cmake_quote(path):
     return '"' + value + '"'
 
 
+def cmake_path_definition(name, path, kind):
+    require(re.fullmatch(r"[A-Z][A-Z0-9_]+", name) and kind in ("FILEPATH", "PATH"),
+            "InvalidCmakePathDefinition")
+    value = str(path).replace("\\", "/")
+    require(value and not any(c in value for c in '\0\r\n";$[]'), "UnsafeCmakePathDefinition")
+    return "-D" + name + ":" + kind + "=" + value
+
+
 def ps_quote(value):
     require("\0" not in str(value) and "\r" not in str(value) and "\n" not in str(value),
             "UnsafePowerShellArgument")
@@ -658,7 +882,7 @@ def version_tuple(value):
     return tuple(map(int, value.split(".")))
 
 
-def module_platform(metadata):
+def module_platform(metadata, expected_targets):
     require(metadata.get("schema_version") == 3 and metadata.get("name") == "Qml"
             and metadata.get("repository") == "qtdeclarative"
             and metadata.get("version") == "6.12.0", "UnexpectedQmlMetadata")
@@ -666,14 +890,65 @@ def module_platform(metadata):
     require(isinstance(platforms, list) and len(platforms) == 1, "AmbiguousModulePlatform")
     platform = platforms[0]
     require(platform.get("name") == "Windows" and platform.get("compiler_id") == "MSVC"
-            and platform.get("targets") == [{"architecture": "x86_64", "abi": "x86_64-little_endian-llp64"}],
+            and platform.get("targets") == expected_targets,
             "UnexpectedModuleCompilerOrAbi")
     require(version_tuple(platform["compiler_version"])[0] == 19, "UnexpectedMsvcFamily")
     return platform
 
 
-def verify_configuration(source, build, stock, tools, evidence):
+def verify_stock_qml_metadata(lock, path):
+    expected = lock["stock"]["qml_module_json"]
+    require(file_identity(path) == {k: expected[k] for k in ("bytes", "sha256")},
+            "OfficialQmlMetadataFilePinMismatch")
+    metadata = read_json(path, 65536)
+    platform = module_platform(metadata, expected["targets"])
+    require(platform["compiler_id"] == expected["compiler_id"]
+            and platform["compiler_version"] == expected["compiler_version"],
+            "OfficialQmlCompilerMetadataPinMismatch")
+    return metadata
+
+
+def verify_cmake_executable(cache, pinned):
+    path = plain_path(Path(cache.get("CMAKE_COMMAND", "")))
+    require(path == plain_path(Path(pinned["path"])), "ConfiguredCmakePathMismatch")
+    actual = file_identity(path)
+    require(actual == {k: pinned[k] for k in ("bytes", "sha256")}, "ConfiguredCmakeBytesChanged")
+    return {"path": str(path), **actual,
+            "cache_version": ".".join(cache.get("CMAKE_CACHE_" + part + "_VERSION", "?")
+                                     for part in ("MAJOR", "MINOR", "PATCH"))}
+
+
+def preserve_configuration_snapshot(build, evidence):
+    candidates = [build / name for name in
+                  ("CMakeCache.txt", "config.opt", "config.summary", "compile_commands.json",
+                   "CMakeFiles/CMakeConfigureLog.yaml", "CMakeFiles/CMakeError.log",
+                   "CMakeFiles/CMakeOutput.log")]
+    for name in ("CMakeCCompiler.cmake", "CMakeCXXCompiler.cmake", "CMakeRCCompiler.cmake"):
+        candidates.extend((build / "CMakeFiles").glob("*/" + name))
+    destination = fresh_directory(evidence / "configuration-at-exit", root=evidence)
+    result, total = {"files": {}, "absent_optional": []}, 0
+    for path in candidates:
+        relative = path.relative_to(build).as_posix()
+        if not path.exists():
+            result["absent_optional"].append(relative)
+            continue
+        plain_path(path, root=build)
+        before = file_identity(path)
+        total += before["bytes"]
+        require(before["bytes"] <= 32 * 1024**2 and total <= 64 * 1024**2,
+                "ConfigurationEvidenceSizeExceeded")
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+        require(file_identity(target) == before and file_identity(path) == before,
+                "ConfigurationEvidenceChangedDuringCopy")
+        result["files"][relative] = before
+    return result
+
+
+def verify_configuration(source, build, stock, tools, evidence, lock, pinned_cmake):
     cache = cache_values((build / "CMakeCache.txt").read_text(encoding="utf-8"))
+    cmake = verify_cmake_executable(cache, pinned_cmake)
     expected = {"CMAKE_BUILD_TYPE": "Release", "CMAKE_GENERATOR": "Ninja",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "QT_BUILD_TESTS": "OFF", "QT_BUILD_EXAMPLES": "OFF",
@@ -698,7 +973,8 @@ def verify_configuration(source, build, stock, tools, evidence):
             and compiler.get("MSVC_CXX_ARCHITECTURE_ID") == "x64"
             and Path(compiler.get("CMAKE_CXX_COMPILER", "")).resolve() == Path(tools["cl.exe"]).resolve(),
             "ConfiguredCompilerIdentityMismatch")
-    stock_platform = module_platform(read_json(stock / "modules/Qml.json", 65536))
+    stock_platform = module_platform(verify_stock_qml_metadata(lock, stock / "modules/Qml.json"),
+                                     lock["stock"]["qml_module_json"]["targets"])
     actual_version = version_tuple(compiler["CMAKE_CXX_COMPILER_VERSION"])
     require(actual_version[0] == 19 and actual_version >= version_tuple(stock_platform["compiler_version"]),
             "ConfiguredMsvcPredatesStockLibrary")
@@ -712,7 +988,7 @@ def verify_configuration(source, build, stock, tools, evidence):
             and not re.search(r"(?:^|\s)[/-](?:MDd|MTd?)(?:\s|$)", command),
             "UnexpectedAllocatorRuntimeLibrary")
     require(re.search(r"(?:^|\s)[/-]DNDEBUG(?:\s|$)", command), "AllocatorIsNotRelease")
-    result = {"compiler": compiler, "compiler_file": file_identity(configurations[0]),
+    result = {"compiler": compiler, "compiler_file": file_identity(configurations[0]), "cmake": cmake,
               "required_configuration": expected, "qt_directories": qt_dirs,
               "stock_qml_platform": stock_platform, "allocator_compile_command": qv4[0],
               "compile_command_count": len(commands),
@@ -811,7 +1087,7 @@ def main():
               "source_sha": args.expected_source_sha, "pr_head_sha": args.expected_pr_head_sha,
               "product_workflow_modified": False, "actual_process_module_sampling": False,
               "real_provider_requests": 0}
-    evidence = None
+    evidence, build = None, None
     try:
         inputs = admit(repo, args.expected_source_sha, args.expected_pr_head_sha)
         evidence = fresh_directory(args.evidence_directory.absolute(), root=repo)
@@ -831,6 +1107,7 @@ def main():
         tools = tool_paths()
         report["tools"] = {name: {"path": path, **file_identity(Path(path))} for name, path in tools.items()}
         toolchain_before = native_toolchain_files(tools)
+        known_executables = executable_inventory(toolchain_before, report["tools"])
         write_json(evidence / "native-toolchain-files.json", toolchain_before)
         report["native_toolchain_content_id"] = canonical_digest(toolchain_before)
         report["tool_environment"] = {name: os.environ.get(name) for name in
@@ -838,7 +1115,8 @@ def main():
         require(os.environ.get("VSCMD_ARG_TGT_ARCH", "").lower() == "x64", "MsvcX64EnvironmentRequired")
         commands = evidence / "commands"
         def run(name, arguments, cwd=work, seconds=120, env=None, accepted=(0,)):
-            return run_logged(arguments, cwd, commands, name, seconds, env=env, accepted=accepted)
+            return run_logged(arguments, cwd, commands, name, seconds, env=env, accepted=accepted,
+                              known_executables=known_executables)
         report["stage"] = "fresh-stock"
         private_cache = fresh_directory(work / "archives", root=work)
         cache_entries = []
@@ -875,7 +1153,9 @@ def main():
         write_json(evidence / "stock-sdk-receipt.json", sdk_receipt)
         write_json(evidence / "stock-files-before.json", stock_before)
         report.update(stock_root=str(stock), stock_content_id=canonical_digest(stock_before))
-        report["stock_module_metadata"] = read_json(stock / "modules/Qml.json", 65536)
+        report["stock_module_metadata"] = verify_stock_qml_metadata(lock, stock / "modules/Qml.json")
+        shutil.copyfile(stock / "modules/Qml.json", evidence / "stock-Qml.json")
+        report["stock_module_metadata_file"] = file_identity(evidence / "stock-Qml.json")
         report["stage"] = "pinned-source"
         source = fresh_directory(work / "source", root=work)
         git = tools["git.exe"]
@@ -920,11 +1200,16 @@ def main():
         configure = work / "configure-module.ps1"
         configure_args = [
             stock / "bin/qt-configure-module.bat", source, "--", "-G", "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_INSTALL_PREFIX=" + str(module_stage),
-            "-DCMAKE_C_COMPILER=" + tools["cl.exe"], "-DCMAKE_CXX_COMPILER=" + tools["cl.exe"],
-            "-DCMAKE_LINKER=" + tools["link.exe"], "-DCMAKE_AR=" + tools["lib.exe"],
-            "-DCMAKE_RC_COMPILER=" + tools["rc.exe"], "-DCMAKE_MT=" + tools["mt.exe"],
-            "-DCMAKE_MAKE_PROGRAM=" + tools["ninja.exe"], "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
+            cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
+            "-DCMAKE_BUILD_TYPE=Release", cmake_path_definition("CMAKE_INSTALL_PREFIX", module_stage, "PATH"),
+            cmake_path_definition("CMAKE_C_COMPILER", tools["cl.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_CXX_COMPILER", tools["cl.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_LINKER", tools["link.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_AR", tools["lib.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_RC_COMPILER", tools["rc.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
+            cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
             "-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
         ]
@@ -941,7 +1226,8 @@ def main():
             candidate = build / name
             require(candidate.is_file(), "MissingConfigurationEvidence:" + name)
             shutil.copyfile(candidate, evidence / name)
-        report["configuration"] = verify_configuration(source, build, stock, tools, evidence)
+        report["configuration"] = verify_configuration(
+            source, build, stock, tools, evidence, lock, report["tools"]["cmake.exe"])
         run("11-qml-build", [tools["cmake.exe"], "--build", build, "--target", "Qml", "BuiltinsOutput",
                             "--parallel", "2"], seconds=1200, env=env)
         report["stage"] = "headers-and-install-closure"
@@ -978,7 +1264,8 @@ def main():
                 for path in (source, build, module_stage):
                     require(str(path).replace("\\", "/") not in data.replace("\\", "/"),
                             "NonRelocatableModuleMetadata:" + relative)
-        patched_platform = module_platform(read_json(module_stage / "modules/Qml.json", 65536))
+        patched_platform = module_platform(read_json(module_stage / "modules/Qml.json", 65536),
+                                           report["configuration"]["stock_qml_platform"]["targets"])
         require(patched_platform["compiler_version"]
                 == report["configuration"]["compiler"]["CMAKE_CXX_COMPILER_VERSION"],
                 "ModuleMetadataCompilerMismatch")
@@ -1072,9 +1359,17 @@ def main():
     except BaseException as error:
         report["errors"].append(type(error).__name__ + ":" + str(error))
     finally:
-        report["finished_utc"] = utc()
         if evidence is not None:
+            if build is not None:
+                try:
+                    report["configuration_snapshot"] = preserve_configuration_snapshot(build, evidence)
+                except Exception as error:
+                    report["success"] = False
+                    report["errors"].append("ConfigurationEvidence:" + type(error).__name__ + ":" + str(error))
+            report["finished_utc"] = utc()
             write_json(evidence / "receipt.json", report)
+        else:
+            report["finished_utc"] = utc()
         print(json.dumps({"success": report["success"], "stage": report["stage"], "errors": report["errors"]}))
     return 0 if report["success"] else 1
 

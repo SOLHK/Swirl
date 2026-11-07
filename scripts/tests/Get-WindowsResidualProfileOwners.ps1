@@ -78,6 +78,12 @@ try {
        $request.sid -cnotmatch '^S-1-5-21-(?:[0-9]+-){3}[0-9]+$' -or $request.username -cnotmatch '^swci_[0-9a-f]{12}$' -or
        $request.final_state.profile_path_exists -ne $true -or $request.final_state.profile_key_exists -ne $false -or
        $request.final_state.user_hive_loaded -ne $false -or $request.final_state.user_classes_hive_loaded -ne $false){throw 'OwnerDiagnosticFrozenFailureRequired'}
+    $originalAuthenticationId=$null
+    $authenticationProperty=$request.PSObject.Properties['original_child_authentication_id']
+    if($null -ne $authenticationProperty -and $null -ne $authenticationProperty.Value){
+        if($authenticationProperty.Value -isnot [string] -or $authenticationProperty.Value -cnotmatch '^[0-9a-f]{16}$'){throw 'OwnerDiagnosticLogonIdentityInvalid'}
+        $originalAuthenticationId=[string]$authenticationProperty.Value
+    }
     $profile=Assert-OwnerPlainPath ([string]$request.profile_path) $true $false
     if(-not [IO.Directory]::Exists($profile) -or $profile -ine [IO.Path]::GetFullPath([string]$request.token_profile_path) -or
        [IO.Path]::GetFileName($profile.TrimEnd('\','/')) -ine $request.username -or
@@ -105,9 +111,11 @@ try {
     $observation=[ordered]@{schema=1;source_sha=[string]$request.source_sha;request_sha256=$RequestSha256
         worker_script_sha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
         powershell_major=$PSVersionTable.PSVersion.Major;powershell_version=$PSVersionTable.PSVersion.ToString();process_bits=64
-        scope='Only the observed ordinary files inside the verified disposable profile; no target shutdown, deletion, hive unload or command-line/environment reads.'
+        scope='Observed residual files and ancestors within the verified disposable profile, plus exact-SID process metadata; no contents, target shutdown, deletion, hive unload or command-line/environment reads.'
         rm_internal_registry_writes=$true;resource_attribution_scope='Batch union: an owner uses at least one registered path; per-file ownership is not inferred.'
         no_owner_result_proves_unlocked=$false;query_after_frozen_cleanup_failure=$true;original_profile_removed=$false
+        original_child_authentication_id=$originalAuthenticationId;original_child_authentication_id_known=($null -ne $originalAuthenticationId)
+        rm_observation_completed=$false;exact_sid_process_snapshot=$null;residual_path_observation=$null
         files=@($fileEvidence.ToArray());file_count=$files.Count;file_limit=32;owner_limit=64;get_list_call_limit=2
         rm_start_attempted=$false;rm_start_return=$null;rm_register_return=$null;rm_get_list_calls=@();rm_end_return=$null
         session_started=$false;session_end_confirmed=$false;session_end_error=$null;listing_complete=$false;owners=@();owners_identity_complete=$false
@@ -115,8 +123,11 @@ try {
     Save-OwnerObservation
     Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
@@ -139,7 +150,247 @@ namespace SwirlProfileOwners {
     public bool pid_and_creation_match; public bool? owned_job_membership=null;
     public string owned_job_membership_scope="The acceptance Job was already disposed; no membership claim is made.";
   }
-  public static class Native {
+  [StructLayout(LayoutKind.Sequential)] public struct Luid { public uint Low; public int High; }
+  [StructLayout(LayoutKind.Sequential)] public struct TokenStatistics {
+    public Luid TokenId,AuthenticationId;public long ExpirationTime;
+    public uint TokenType,ImpersonationLevel,DynamicCharged,DynamicAvailable,GroupCount,PrivilegeCount;
+    public Luid ModifiedId;
+  }
+  public sealed class SidProcessEvidence {
+    public uint pid,observed_pid;public string creation_filetime,token_user_sid,authentication_id,image_name,image_path_sha256;
+    public bool? running,same_logon_as_original_child,token_handle_closed,process_handle_closed;
+    public bool identity_from_one_process_handle;public string error_operation,statistics_error_operation,image_error_operation;
+    public int? win32_error,statistics_error,image_query_error,token_close_error,process_close_error;
+  }
+  public sealed class SidProcessSnapshot {
+    public int pid_capacity=4096,match_limit=32,work_budget_ms=2000,enumerated,attempted,other_sid,skipped_pid_zero,unidentified,unattempted;
+    public int handles_opened,handles_closed,close_failures,error_bucket_limit=32,other_error_count;
+    public bool enumeration_complete,scan_attempts_complete,identity_coverage_complete,budget_exhausted,truncated;
+    public bool handles_closed_confirmed=true;public double elapsed_ms;public string state="starting",error_operation;
+    public int? win32_error,exception_hresult;
+    public string scope="Primary-token SID snapshot only; a match does not prove file ownership. SYSTEM services or impersonating threads are outside this attribution.";
+    public Dictionary<string,int> errors=new Dictionary<string,int>();
+    public List<SidProcessEvidence> matches=new List<SidProcessEvidence>();
+  }
+  [StructLayout(LayoutKind.Sequential)] public struct FileAttributeTag { public uint Attributes,Tag; }
+  [StructLayout(LayoutKind.Sequential)] public struct FileIdentity { public ulong Volume,Low,High; }
+  public sealed class FileOpenEvidence {
+    public uint desired_access,share_mode=7,creation_disposition=3,flags;
+    public bool attempted,opened;public bool? path_scope_confirmed,regular_kind_confirmed,handle_closed;
+    public string error_operation,volume_serial,file_id,final_path_sha256;public uint? attributes,reparse_tag;
+    public int? win32_error,close_error,exception_hresult;public double elapsed_ms;
+  }
+  public sealed class ResidualPathEvidence {
+    public string relative_path;public bool expected_directory;public FileOpenEvidence metadata_open,delete_access_open;
+    public bool? same_file_object_for_delete_open;public string security_sddl,security_sddl_sha256,security_owner_sid,security_error;
+    public int? security_win32_error,security_descriptor_bytes,security_sddl_characters;
+    public bool security_sddl_truncated;public bool delete_operation_performed=false;
+  }
+  public sealed class ResidualPathObservation {
+    public int path_limit=16,work_budget_ms=2000,requested_paths,attempted_paths,unattempted_paths;
+    public int descriptor_byte_limit=16384,sddl_character_limit=2048;
+    public bool completed,budget_exhausted,truncated,metadata_coverage_complete,handles_closed_confirmed=true;
+    public double elapsed_ms;public string state="starting",error_operation;public int? exception_hresult;
+    public string scope="Metadata and access-open observations only. No file contents, deletion, disposition, ACL change or privilege adjustment. Open success is not deletion success.";
+    public List<ResidualPathEvidence> paths=new List<ResidualPathEvidence>();
+  }
+  public static partial class Native {
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool K32EnumProcesses([Out] uint[] pids,uint bytes,out uint returned);
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr CreateFileW(string path,uint access,uint share,IntPtr security,uint disposition,uint flags,IntPtr template);
+    [DllImport("kernel32.dll",SetLastError=true,EntryPoint="GetFileInformationByHandleEx")] static extern bool ReadFileAttributes(IntPtr file,int type,out FileAttributeTag value,uint bytes);
+    [DllImport("kernel32.dll",SetLastError=true,EntryPoint="GetFileInformationByHandleEx")] static extern bool ReadFileIdentity(IntPtr file,int type,out FileIdentity value,uint bytes);
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern uint GetFinalPathNameByHandleW(IntPtr file,StringBuilder path,uint capacity,uint flags);
+    [DllImport("advapi32.dll",SetLastError=true)] static extern bool GetKernelObjectSecurity(IntPtr handle,uint information,byte[] descriptor,uint bytes,out uint needed);
+    static string AuthenticationId(IntPtr token,out int? error,out string operation) {
+      error=null;operation=null;uint size=(uint)Marshal.SizeOf(typeof(TokenStatistics));
+      if(size!=56){operation="TokenStatisticsLayoutUnknown";return null;}
+      IntPtr data=Marshal.AllocHGlobal((int)size);
+      try {
+        uint returned;if(!GetTokenInformation(token,10,data,size,out returned)){error=Marshal.GetLastWin32Error();operation="GetTokenInformation";return null;}
+        if(returned!=size){operation="TokenStatisticsLengthUnknown";return null;}
+        var value=(TokenStatistics)Marshal.PtrToStructure(data,typeof(TokenStatistics));
+        return (((ulong)(uint)value.AuthenticationId.High<<32)|value.AuthenticationId.Low).ToString("x16");
+      }finally{Marshal.FreeHGlobal(data);}
+    }
+    static void CountError(SidProcessSnapshot result,string operation,int error) {
+      string key=operation+":"+error.ToString();int count;
+      if(result.errors.TryGetValue(key,out count))result.errors[key]=count+1;
+      else if(result.errors.Count<result.error_bucket_limit)result.errors.Add(key,1);else result.other_error_count++;
+    }
+    public static SidProcessSnapshot ObserveExactSid(string expectedSid,string originalAuthenticationId) {
+      var result=new SidProcessSnapshot();var watch=Stopwatch.StartNew();
+      try {
+        var pids=new uint[result.pid_capacity];uint returned;
+        if(!K32EnumProcesses(pids,(uint)(pids.Length*4),out returned)){result.error_operation="K32EnumProcesses";result.win32_error=Marshal.GetLastWin32Error();return result;}
+        if(returned%4!=0||returned>pids.Length*4){result.error_operation="ProcessEnumerationLengthInvalid";return result;}
+        result.enumerated=(int)(returned/4);result.enumeration_complete=returned<pids.Length*4;result.truncated=!result.enumeration_complete;
+        for(int index=0;index<result.enumerated;index++) {
+          if(watch.ElapsedMilliseconds>=result.work_budget_ms){result.budget_exhausted=true;break;}
+          if(result.matches.Count>=result.match_limit){result.truncated=true;break;}
+          result.attempted++;uint pid=pids[index];if(pid==0){result.skipped_pid_zero++;continue;}
+          IntPtr process=IntPtr.Zero,token=IntPtr.Zero;SidProcessEvidence match=null;
+          try {
+            process=OpenProcess(0x1000|0x00100000,false,pid);
+            if(process==IntPtr.Zero){result.unidentified++;CountError(result,"OpenProcess",Marshal.GetLastWin32Error());continue;}
+            result.handles_opened++;
+            if(!OpenProcessToken(process,0x0008,out token)){result.unidentified++;CountError(result,"OpenProcessToken",Marshal.GetLastWin32Error());continue;}
+            result.handles_opened++;uint needed;bool sized=GetTokenInformation(token,1,IntPtr.Zero,0,out needed);
+            int sizeError=sized?0:Marshal.GetLastWin32Error();
+            if((!sized&&sizeError!=122)||needed==0||needed>16384){result.unidentified++;CountError(result,"TokenUserSizeQuery",sizeError);continue;}
+            IntPtr data=Marshal.AllocHGlobal((int)needed);string sid;
+            try {
+              if(!GetTokenInformation(token,1,data,needed,out needed)){result.unidentified++;CountError(result,"TokenUser",Marshal.GetLastWin32Error());continue;}
+              sid=new SecurityIdentifier(Marshal.ReadIntPtr(data)).Value;
+            }finally{Marshal.FreeHGlobal(data);}
+            // Retain no unrelated PID, SID, image, command line or environment.
+            if(sid!=expectedSid){result.other_sid++;continue;}
+            match=new SidProcessEvidence {pid=pid,token_user_sid=expectedSid};result.matches.Add(match);
+            match.observed_pid=GetProcessId(process);
+            if(match.observed_pid==0){match.error_operation="GetProcessId";match.win32_error=Marshal.GetLastWin32Error();continue;}
+            if(match.observed_pid!=pid){match.error_operation="ProcessIdentityChanged";continue;}
+            FileTime created,exited,kernel,user;
+            if(!GetProcessTimes(process,out created,out exited,out kernel,out user)){match.error_operation="GetProcessTimes";match.win32_error=Marshal.GetLastWin32Error();continue;}
+            match.creation_filetime=Hex(created);match.identity_from_one_process_handle=true;
+            uint wait=WaitForSingleObject(process,0);
+            if(wait==0)match.running=false;else if(wait==258)match.running=true;
+            else {match.error_operation="WaitForSingleObject";match.win32_error=Marshal.GetLastWin32Error();}
+            int? statisticsError;string statisticsOperation;
+            match.authentication_id=AuthenticationId(token,out statisticsError,out statisticsOperation);match.statistics_error=statisticsError;match.statistics_error_operation=statisticsOperation;
+            if(match.authentication_id!=null&&!String.IsNullOrEmpty(originalAuthenticationId))match.same_logon_as_original_child=match.authentication_id==originalAuthenticationId;
+            uint capacity=4096;var image=new StringBuilder((int)capacity);
+            if(QueryFullProcessImageNameW(process,0,image,ref capacity)) {
+              string path=image.ToString(),name=Path.GetFileName(path);match.image_path_sha256=Hash(path);
+              if(name.Length<=260)match.image_name=name;else match.image_error_operation="ImageBasenameLimit";
+            }else {match.image_query_error=Marshal.GetLastWin32Error();match.image_error_operation="QueryFullProcessImageNameW";}
+          }catch(Exception error){result.unidentified++;CountError(result,"ProcessObservationException",error.HResult);if(match!=null)match.error_operation="ProcessObservationException";}
+          finally {
+            if(token!=IntPtr.Zero) {
+              bool closed=CloseHandle(token);int error=closed?0:Marshal.GetLastWin32Error();
+              if(closed)result.handles_closed++;else{result.close_failures++;CountError(result,"CloseToken",error);}
+              if(match!=null){match.token_handle_closed=closed;if(!closed)match.token_close_error=error;}
+            }
+            if(process!=IntPtr.Zero) {
+              bool closed=CloseHandle(process);int error=closed?0:Marshal.GetLastWin32Error();
+              if(closed)result.handles_closed++;else{result.close_failures++;CountError(result,"CloseProcess",error);}
+              if(match!=null){match.process_handle_closed=closed;if(!closed)match.process_close_error=error;}
+            }
+          }
+        }
+        if(watch.ElapsedMilliseconds>=result.work_budget_ms)result.budget_exhausted=true;
+        result.scan_attempts_complete=result.enumeration_complete&&!result.truncated&&!result.budget_exhausted&&result.attempted==result.enumerated;
+        result.identity_coverage_complete=result.scan_attempts_complete&&result.unidentified==0;
+        foreach(var match in result.matches)if(!match.identity_from_one_process_handle||match.error_operation!=null||match.statistics_error_operation!=null||match.image_error_operation!=null)result.identity_coverage_complete=false;
+      }catch(Exception error){result.error_operation="ProcessSnapshotFailed";result.exception_hresult=error.HResult;}
+      finally {
+        watch.Stop();result.elapsed_ms=watch.Elapsed.TotalMilliseconds;result.unattempted=result.enumerated-result.attempted;
+        result.handles_closed_confirmed=result.handles_opened==result.handles_closed&&result.close_failures==0;
+        result.state=result.scan_attempts_complete&&result.handles_closed_confirmed?"completed":"partial";
+      }
+      return result;
+    }
+  }
+  public static partial class Native {
+    static IntPtr OpenResidualPath(string path,string profile,bool directory,uint access,FileOpenEvidence evidence) {
+      var watch=Stopwatch.StartNew();evidence.attempted=true;evidence.desired_access=access;
+      evidence.flags=0x00200000u|(directory?0x02000000u:0u);
+      IntPtr handle=CreateFileW(path,access,7,IntPtr.Zero,3,evidence.flags,IntPtr.Zero);
+      try {
+        if(handle==new IntPtr(-1)){evidence.error_operation="CreateFileW";evidence.win32_error=Marshal.GetLastWin32Error();return IntPtr.Zero;}
+        evidence.opened=true;FileAttributeTag attributes;
+        if(!ReadFileAttributes(handle,9,out attributes,(uint)Marshal.SizeOf(typeof(FileAttributeTag)))){evidence.error_operation="FileAttributeTagInfo";evidence.win32_error=Marshal.GetLastWin32Error();return handle;}
+        evidence.attributes=attributes.Attributes;evidence.reparse_tag=attributes.Tag;
+        evidence.regular_kind_confirmed=(attributes.Attributes&0x400)==0&&((attributes.Attributes&0x10)!=0)==directory;
+        if(evidence.regular_kind_confirmed!=true){evidence.error_operation="ResidualPathKindChanged";return handle;}
+        var finalPath=new StringBuilder(32768);uint length=GetFinalPathNameByHandleW(handle,finalPath,(uint)finalPath.Capacity,0);
+        if(length==0){evidence.error_operation="GetFinalPathNameByHandleW";evidence.win32_error=Marshal.GetLastWin32Error();return handle;}
+        if(length>=finalPath.Capacity){evidence.error_operation="FinalPathLengthExceeded";return handle;}
+        string actual=finalPath.ToString();evidence.final_path_sha256=Hash(actual);
+        string extendedPrefix=new string((char)92,2)+"?"+(char)92;
+        if(actual.StartsWith(extendedPrefix,StringComparison.Ordinal))actual=actual.Substring(4);
+        evidence.path_scope_confirmed=String.Equals(actual,path,StringComparison.OrdinalIgnoreCase)&&
+          (String.Equals(actual,profile,StringComparison.OrdinalIgnoreCase)||actual.StartsWith(profile+"\\",StringComparison.OrdinalIgnoreCase));
+        if(evidence.path_scope_confirmed!=true){evidence.error_operation="ResidualPathScopeChanged";return handle;}
+        FileIdentity identity;
+        if(!ReadFileIdentity(handle,18,out identity,(uint)Marshal.SizeOf(typeof(FileIdentity)))){evidence.error_operation="FileIdInfo";evidence.win32_error=Marshal.GetLastWin32Error();return handle;}
+        evidence.volume_serial=identity.Volume.ToString("x16");evidence.file_id=identity.High.ToString("x16")+identity.Low.ToString("x16");
+        return handle;
+      }catch(Exception error){evidence.error_operation="ResidualPathObservationFailed";evidence.exception_hresult=error.HResult;return handle==new IntPtr(-1)?IntPtr.Zero:handle;}
+      finally{watch.Stop();evidence.elapsed_ms=watch.Elapsed.TotalMilliseconds;}
+    }
+    static void CloseObservedFile(IntPtr handle,FileOpenEvidence evidence) {
+      if(handle==IntPtr.Zero)return;
+      evidence.handle_closed=CloseHandle(handle);if(evidence.handle_closed!=true)evidence.close_error=Marshal.GetLastWin32Error();
+    }
+    static void ReadResidualSecurity(IntPtr handle,ResidualPathEvidence evidence,ResidualPathObservation phase) {
+      uint needed;bool sized=GetKernelObjectSecurity(handle,7,null,0,out needed);int sizeError=sized?0:Marshal.GetLastWin32Error();
+      evidence.security_descriptor_bytes=(int)needed;
+      if((!sized&&sizeError!=122)||needed==0||needed>phase.descriptor_byte_limit){evidence.security_error="SecurityDescriptorSizeUnavailable";evidence.security_win32_error=sizeError;return;}
+      var bytes=new byte[needed];
+      if(!GetKernelObjectSecurity(handle,7,bytes,needed,out needed)){evidence.security_error="GetKernelObjectSecurity";evidence.security_win32_error=Marshal.GetLastWin32Error();return;}
+      var descriptor=new RawSecurityDescriptor(bytes,0);
+      string sddl=descriptor.GetSddlForm(AccessControlSections.Owner|AccessControlSections.Group|AccessControlSections.Access);
+      evidence.security_sddl_characters=sddl.Length;evidence.security_sddl_sha256=Hash(sddl);
+      evidence.security_owner_sid=descriptor.Owner==null?null:descriptor.Owner.Value;
+      if(sddl.Length<=phase.sddl_character_limit)evidence.security_sddl=sddl;
+      else{evidence.security_sddl_truncated=true;evidence.security_error="SecurityDescriptorTextLimit";}
+    }
+    public static ResidualPathObservation ObserveResidualPaths(string profile,string[] files) {
+      var result=new ResidualPathObservation();var watch=Stopwatch.StartNew();
+      try {
+        profile=Path.GetFullPath(profile).TrimEnd('\\');
+        var paths=new SortedDictionary<string,bool>(StringComparer.OrdinalIgnoreCase);paths.Add(profile,true);
+        foreach(string file in files) {
+          string path=Path.GetFullPath(file);
+          if(!path.StartsWith(profile+"\\",StringComparison.OrdinalIgnoreCase)){result.error_operation="ResidualPathOutsideProfile";return result;}
+          bool directory=false;
+          while(!String.Equals(path,profile,StringComparison.OrdinalIgnoreCase)) {
+            bool previous;
+            if(paths.TryGetValue(path,out previous)){if(previous!=directory){result.error_operation="ResidualPathKindConflict";return result;}break;}
+            if(paths.Count>=result.path_limit){result.truncated=true;result.error_operation="ResidualPathLimit";result.requested_paths=paths.Count+1;return result;}
+            paths.Add(path,directory);path=Path.GetDirectoryName(path);directory=true;
+          }
+        }
+        result.requested_paths=paths.Count;
+        foreach(var path in paths) {
+          if(watch.ElapsedMilliseconds>=result.work_budget_ms){result.budget_exhausted=true;break;}
+          var item=new ResidualPathEvidence {relative_path=String.Equals(path.Key,profile,StringComparison.OrdinalIgnoreCase)?".":path.Key.Substring(profile.Length+1).Replace('\\','/'),expected_directory=path.Value};
+          result.paths.Add(item);result.attempted_paths++;item.metadata_open=new FileOpenEvidence();
+          IntPtr metadata=IntPtr.Zero,deletion=IntPtr.Zero;
+          try {
+            metadata=OpenResidualPath(path.Key,profile,path.Value,0x00020080,item.metadata_open);
+            if(metadata!=IntPtr.Zero&&item.metadata_open.error_operation==null)ReadResidualSecurity(metadata,item,result);
+            if(!path.Value) {
+              if(watch.ElapsedMilliseconds>=result.work_budget_ms){result.budget_exhausted=true;break;}
+              item.delete_access_open=new FileOpenEvidence();
+              // DELETE | FILE_READ_ATTRIBUTES is only an access-open probe.
+              // Keep the metadata handle alive while comparing the second
+              // handle's volume/file ID. Never set disposition or DELETE_ON_CLOSE.
+              deletion=OpenResidualPath(path.Key,profile,false,0x00010080,item.delete_access_open);
+              if(item.metadata_open.file_id!=null&&item.delete_access_open.file_id!=null)
+                item.same_file_object_for_delete_open=item.metadata_open.file_id==item.delete_access_open.file_id&&item.metadata_open.volume_serial==item.delete_access_open.volume_serial;
+            }
+          }catch(Exception error){item.security_error="ResidualPathObservationFailed";item.metadata_open.exception_hresult=error.HResult;}
+          finally{CloseObservedFile(deletion,item.delete_access_open);CloseObservedFile(metadata,item.metadata_open);}
+        }
+        if(watch.ElapsedMilliseconds>=result.work_budget_ms)result.budget_exhausted=true;
+        result.completed=!result.truncated&&!result.budget_exhausted&&result.attempted_paths==result.requested_paths;
+        result.metadata_coverage_complete=result.completed;
+        foreach(var item in result.paths) {
+          if(item.metadata_open==null||!item.metadata_open.attempted||(!item.expected_directory&&item.delete_access_open==null))result.completed=false;
+          if(item.metadata_open==null||item.metadata_open.error_operation!=null||item.security_sddl==null)result.metadata_coverage_complete=false;
+          if(item.metadata_open!=null&&item.metadata_open.opened&&item.metadata_open.handle_closed!=true)result.handles_closed_confirmed=false;
+          if(!item.expected_directory) {
+            if(item.delete_access_open==null||item.delete_access_open.error_operation!=null||item.same_file_object_for_delete_open!=true)result.metadata_coverage_complete=false;
+            if(item.delete_access_open!=null&&item.delete_access_open.opened&&item.delete_access_open.handle_closed!=true)result.handles_closed_confirmed=false;
+          }
+        }
+      }catch(Exception error){result.completed=false;result.error_operation="ResidualPathPhaseFailed";result.exception_hresult=error.HResult;}
+      finally {
+        watch.Stop();result.elapsed_ms=watch.Elapsed.TotalMilliseconds;result.unattempted_paths=result.requested_paths-result.attempted_paths;
+        result.state=result.completed&&result.handles_closed_confirmed?"completed":"partial";
+      }
+      return result;
+    }
     // https://learn.microsoft.com/windows/win32/api/restartmanager/nf-restartmanager-rmgetlist
     [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] public static extern uint RmStartSession(out uint session,uint flags,StringBuilder key);
     [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] public static extern uint RmRegisterResources(uint session,uint count,[In,MarshalAs(UnmanagedType.LPArray,ArraySubType=UnmanagedType.LPWStr,SizeParamIndex=1)] string[] files,uint applications,IntPtr processes,uint services,IntPtr serviceNames);
@@ -202,8 +453,10 @@ namespace SwirlProfileOwners {
   }
 }
 '@
-    $observation['native_sizes']=[ordered]@{unique_process=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.UniqueProcess]);process_info=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.ProcessInfo])}
-    if($observation.native_sizes.unique_process -ne 12 -or $observation.native_sizes.process_info -ne 668){throw 'OwnerDiagnosticNativeLayoutMismatch'}
+    $observation['native_sizes']=[ordered]@{unique_process=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.UniqueProcess]);process_info=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.ProcessInfo])
+        token_statistics=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.TokenStatistics]);file_attribute_tag=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileAttributeTag]);file_identity=[Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.FileIdentity])}
+    if($observation.native_sizes.unique_process -ne 12 -or $observation.native_sizes.process_info -ne 668 -or
+       $observation.native_sizes.token_statistics -ne 56 -or $observation.native_sizes.file_attribute_tag -ne 8 -or $observation.native_sizes.file_identity -ne 24){throw 'OwnerDiagnosticNativeLayoutMismatch'}
     $key=New-Object Text.StringBuilder 33
     $observation.rm_start_attempted=$true;Save-OwnerObservation
     $code=[SwirlProfileOwners.Native]::RmStartSession([ref]$session,0,$key)
@@ -248,9 +501,29 @@ namespace SwirlProfileOwners {
         }catch{$observation.session_end_confirmed=$false;$observation.session_end_error='OwnerDiagnosticSessionEndUnconfirmed'}
     }
     if($null -ne $observation){
-        $observation.observation_completed=$observation.listing_complete -and $observation.session_end_confirmed -and $null -eq $observation.error
+        $observation.rm_observation_completed=$observation.listing_complete -and $observation.session_end_confirmed -and $null -eq $observation.error
         Save-OwnerObservation
     }
 }
+if($null -eq $observation -or -not $observation.rm_observation_completed){exit 2}
+# Close and persist RM before any supplemental work. The existing external
+# eight-second deadline still owns retirement; native calls can overrun a local
+# work budget. An interrupted phase remains explicitly incomplete on disk.
+try {
+    $observation.exact_sid_process_snapshot=[ordered]@{state='starting';scan_attempts_complete=$false;handles_closed_confirmed=$null;work_budget_ms=2000}
+    Save-OwnerObservation
+    $observation.exact_sid_process_snapshot=[SwirlProfileOwners.Native]::ObserveExactSid([string]$request.sid,$originalAuthenticationId)
+    Save-OwnerObservation
+    $observation.residual_path_observation=[ordered]@{state='starting';completed=$false;handles_closed_confirmed=$null;work_budget_ms=2000;path_limit=16}
+    Save-OwnerObservation
+    $observation.residual_path_observation=[SwirlProfileOwners.Native]::ObserveResidualPaths($profile,$files.ToArray())
+    $observation.observation_completed=$observation.rm_observation_completed -and
+        $observation.exact_sid_process_snapshot.scan_attempts_complete -and $observation.exact_sid_process_snapshot.handles_closed_confirmed -and
+        $null -eq $observation.exact_sid_process_snapshot.error_operation -and
+        $observation.residual_path_observation.completed -and $observation.residual_path_observation.handles_closed_confirmed -and
+        $null -eq $observation.residual_path_observation.error_operation
+    if(-not $observation.observation_completed){$observation.error='OwnerDiagnosticSupplementalIncomplete'}
+}catch{$observation.error='OwnerDiagnosticSupplementalFailed';$observation.observation_completed=$false}
+finally{Save-OwnerObservation}
 if($null -eq $observation -or -not $observation.observation_completed){exit 2}
 exit 0

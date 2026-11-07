@@ -119,6 +119,57 @@ function Read-ProbeSession($Case,[string]$Name,[string]$Phase) {
     $Case.session_queries.Add($entry)
     return $entry
 }
+function ConvertFrom-ProbeLogmanCollector([string]$Text,[string]$ExpectedCollector,[string]$ExpectedProvider,[guid]$ExpectedGuid,[UInt64]$ExpectedAny) {
+    # The public a399 G1 receipt establishes this English logman -ets layout.
+    # Accept one complete collector/provider only; never infer blank masks.
+    $lines=@($Text -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $layout=@(
+        @('session','^Name:\s+([^\r\n]+?)\s*$'),
+        @('status','^Status:\s+(Running)\s*$'),
+        @('root','^Root Path:\s+([^\r\n]+?)\s*$'),
+        @('segment','^Segment:\s+(On|Off)\s*$'),
+        @('schedules','^Schedules:\s+(On|Off)\s*$'),
+        @('trace','^Name:\s+([^\r\n]+?)\s*$'),
+        @('type','^Type:\s+(Trace)\s*$'),
+        @('append','^Append:\s+(On|Off)\s*$'),
+        @('circular','^Circular:\s+(On|Off)\s*$'),
+        @('overwrite','^Overwrite:\s+(On|Off)\s*$'),
+        @('buffer_size','^Buffer Size:\s+([0-9]+)\s*$'),
+        @('buffers_lost','^Buffers Lost:\s+([0-9]+)\s*$'),
+        @('buffers_written','^Buffers Written:\s+([0-9]+)\s*$'),
+        @('flush_timer','^Buffer Flush Timer:\s+([0-9]+)\s*$'),
+        @('clock','^Clock Type:\s+(Performance)\s*$'),
+        @('mode','^File Mode:\s+(Buffering)\s*$'),
+        @('provider_marker','^(Provider:)\s*$'),
+        @('provider','^Name:\s+([^\r\n]+?)\s*$'),
+        @('guid','^Provider Guid:\s+\{([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\}\s*$'),
+        @('level','^Level:\s+([0-9]+)\s*$'),
+        @('all','^KeywordsAll:\s+(0x[0-9a-fA-F]{1,16})\s*$'),
+        @('any','^KeywordsAny:\s+(0x[0-9a-fA-F]{1,16})(?:\s+\([^()\r\n]*\))?\s*$'),
+        @('properties','^Properties:\s+([0-9]+)\s*$'),
+        @('filter_type','^Filter Type:\s+([0-9]+)\s*$'),
+        @('completed','^(The command completed successfully\.)\s*$')
+    )
+    if ($lines.Count -ne $layout.Count) { throw 'LogmanCollectorFieldCountMismatch' }
+    $fields=@{}
+    for ($index=0;$index -lt $layout.Count;$index++) {
+        if ($lines[$index] -cnotmatch $layout[$index][1]) { throw ('LogmanCollectorUnknownFormat:'+ $layout[$index][0]) }
+        $fields[$layout[$index][0]]=$Matches[1]
+    }
+    if ([string]::IsNullOrWhiteSpace($ExpectedCollector) -or $fields.session -cne $ExpectedCollector -or $fields.trace -cne ($ExpectedCollector+'\'+$ExpectedCollector)) { throw 'LogmanCollectorIdentityMismatch' }
+    $guid=[guid]$fields.guid
+    $level=[UInt32]::Parse($fields.level,[Globalization.CultureInfo]::InvariantCulture)
+    $any=[Convert]::ToUInt64($fields.any.Substring(2),16)
+    $all=[Convert]::ToUInt64($fields.all.Substring(2),16)
+    foreach ($numeric in @('buffer_size','buffers_lost','buffers_written','flush_timer','properties','filter_type')) { $null=[UInt32]::Parse($fields[$numeric],[Globalization.CultureInfo]::InvariantCulture) }
+    if ($fields.provider -cne $ExpectedProvider -or $guid -ne $ExpectedGuid -or $level -ne 5 -or $any -ne $ExpectedAny -or $all -ne 0) { throw 'LogmanProviderConfigurationMismatch' }
+    return [ordered]@{
+        collector_name=$fields.session;trace_name=$fields.trace;provider_name=$fields.provider
+        provider_guid=$guid.ToString();level=$level
+        match_any_keyword=('0x'+$any.ToString('x16'));match_all_keyword=('0x'+$all.ToString('x16'))
+        properties=[UInt32]$fields.properties;filter_type=[UInt32]$fields.filter_type
+    }
+}
 function Read-ProbeOwnedCollectorMetadata($Case,$Details) {
     $entry=[ordered]@{
         status='not-admitted';wpr_stdout_file=$Details.record.stdout_file
@@ -126,7 +177,8 @@ function Read-ProbeOwnedCollectorMetadata($Case,$Details) {
         session_identity_verified=$false;query_attempted=$false;query_ok=$false;query_exit_code=$null
         stdout_file=$null;stderr_file=$null;fields_verified=$false
         provider_guid=$null;level=$null;match_any_keyword=$null;match_all_keyword=$null
-        field_scope='Raw same-session query only; its output format has not yet been verified.'
+        provider_name=$null;trace_name=$null;properties=$null;filter_type=$null;parse_error=$null
+        field_scope='Strict same-owned-session collector/provider identity, level and numeric Any/All keywords; properties and filter type are recorded without claiming filter semantics.'
     }
     $Case.logman_session_metadata=$entry
     if ($Case.component -eq 'System') { $entry.status='metadata-not-collected-system';return }
@@ -144,8 +196,15 @@ function Read-ProbeOwnedCollectorMetadata($Case,$Details) {
     $tool=Invoke-ProbeTool ($Case.id+'-logman-owned-collector') $logman @('query',$names[0],'-ets') 5000
     $entry.query_ok=$tool.ok;$entry.query_exit_code=$tool.record.exit_code
     $entry.stdout_file=$tool.record.stdout_file;$entry.stderr_file=$tool.record.stderr_file
-    $entry.status=if ($tool.ok) {'captured-unparsed'} else {'query-failed'}
-    # Do not derive any provider/keyword field or a passing verdict from this raw output.
+    $entry.status='query-failed'
+    if ($tool.ok -and [string]::IsNullOrWhiteSpace($tool.stderr)) {
+        try {
+            $provider='Microsoft-Windows-'+$Case.component
+            $actual=ConvertFrom-ProbeLogmanCollector $tool.stdout $expected $provider ([guid]$providerGuids[$provider]) ([Convert]::ToUInt64($Case.keywords.Substring(2),16))
+            foreach ($key in @('provider_name','provider_guid','level','match_any_keyword','match_all_keyword','trace_name','properties','filter_type')) { $entry[$key]=$actual[$key] }
+            $entry.fields_verified=$true;$entry.status='verified-owned-provider-fields'
+        } catch { $entry.status='parse-rejected';$entry.parse_error=$_.Exception.Message }
+    }
 }
 function Test-ProbeCollector($Case,[string]$Text) {
     $collectors=[Collections.Generic.List[string]]::new()
@@ -162,6 +221,10 @@ function Test-ProbeCollector($Case,[string]$Text) {
             $extra=if ($Matches.ContainsKey(4)) { $Matches[4].Trim() } else {''}
             $providers.Add(@{display=$Matches[1].Trim();keywords=[Convert]::ToUInt64($Matches[2],16);level=[Convert]::ToUInt32($Matches[3],16);extra=$extra})
         }
+        elseif ($Case.component -ne 'System' -and $section -eq 'Providers' -and $line -cmatch '^\s*([^:]+?)\s*:\s*:\s*0x([0-9a-fA-F]+)\s*$') {
+            $providers.Add(@{display=$Matches[1].Trim();keywords=$null;level=[Convert]::ToUInt32($Matches[2],16);extra=''})
+        }
+        elseif ($Case.component -ne 'System' -and $section -eq 'Providers') { return $false }
         else { $section='' }
     }
     if ($collectors.Count -ne 1) { return $false }
@@ -176,14 +239,25 @@ function Test-ProbeCollector($Case,[string]$Text) {
         if ($stacks.Count -ne $expectedStacks.Count -or @($stacks | Where-Object { $_ -cnotin $expectedStacks }).Count) { return $false }
         foreach ($expected in $expectedStacks) { if ($stacks -cnotcontains $expected) { return $false } }
     } else {
-        if (-not $name.Contains($Case.collector_token)) { return $false }
+        $metadata=$Case.logman_session_metadata
+        $expectedName='WPR_initiated_'+$Case.instance_name+'_'+$Case.collector_token
+        if (-not $Case.ownership_confirmed -or $null -eq $metadata -or -not $metadata.wpr_ownership_confirmed -or -not $metadata.session_identity_verified -or -not $metadata.query_ok -or $metadata.query_exit_code -ne 0 -or -not $metadata.fields_verified -or $metadata.status -cne 'verified-owned-provider-fields' -or $name -cne $expectedName -or $name -cne $metadata.actual_collector_name -or $metadata.trace_name -cne ($expectedName+'\'+$expectedName)) { return $false }
         $provider='Microsoft-Windows-'+$Case.component
         if ($providers.Count -ne 1) { return $false }
         $actual=$providers[0]; $resolvedGuid=[guid]::Empty; $identityMode='unknown'
         if ($actual.display -ceq $provider) { $resolvedGuid=[guid]$providerGuids[$provider]; $identityMode='name-resolved-by-preflight-logman-guid' }
         elseif ([guid]::TryParse($actual.display,[ref]$resolvedGuid)) { $identityMode='guid-in-collector-status' }
-        $Case.actual_provider=[ordered]@{display=$actual.display;resolved_guid=$resolvedGuid.ToString();identity_mode=$identityMode;keywords=('0x'+$actual.keywords.ToString('x16'));level=$actual.level;extra=$actual.extra}
-        if ($resolvedGuid -ne [guid]$providerGuids[$provider] -or $actual.level -ne 5 -or $actual.keywords -ne [Convert]::ToUInt64($Case.keywords.Substring(2),16) -or $actual.extra -or $keywords.Count -or $stacks.Count) { return $false }
+        $logmanAny=[Convert]::ToUInt64($metadata.match_any_keyword.Substring(2),16)
+        $logmanAll=[Convert]::ToUInt64($metadata.match_all_keyword.Substring(2),16)
+        $missingKeywords=$null -eq $actual.keywords
+        if ($resolvedGuid -ne [guid]$providerGuids[$provider] -or $resolvedGuid -ne [guid]$metadata.provider_guid -or $metadata.provider_name -cne $provider -or $actual.level -ne 5 -or $actual.level -ne $metadata.level -or $logmanAll -ne 0 -or $logmanAny -ne [Convert]::ToUInt64($Case.keywords.Substring(2),16) -or (-not $missingKeywords -and $actual.keywords -ne $logmanAny) -or $actual.extra -or $keywords.Count -or $stacks.Count) { return $false }
+        $Case.actual_provider=[ordered]@{
+            display=$actual.display;resolved_guid=$resolvedGuid.ToString();identity_mode=$identityMode
+            keywords=('0x'+$logmanAny.ToString('x16'));level=$actual.level;extra=$actual.extra
+            keyword_source=if ($missingKeywords) {'verified-same-session-logman-for-blank-wpr'} else {'nonempty-wpr-crosschecked-with-same-session-logman'}
+            wpr_keywords=if ($missingKeywords) {$null} else {('0x'+$actual.keywords.ToString('x16'))}
+            logman_keywords_all=('0x'+$logmanAll.ToString('x16'))
+        }
     }
     $Case.collector_names=@($name)
     return $true

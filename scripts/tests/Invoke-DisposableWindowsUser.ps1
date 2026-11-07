@@ -282,6 +282,13 @@ namespace SwirlDisposableUser {
     [StructLayout(LayoutKind.Sequential)] struct Accounting {public long UserTime,KernelTime,PeriodUser,PeriodKernel;public uint PageFaults,TotalProcesses,ActiveProcesses,TerminatedProcesses;}
     public sealed class TokenEvidence {
       public string Sid,IntegritySid,ProfilePath;public bool Administrator,Elevated,System;
+      public string AuthenticationId,AuthenticationIdObservationError;public int? AuthenticationIdWin32Error;
+    }
+    [StructLayout(LayoutKind.Sequential)] struct Luid { public uint Low; public int High; }
+    [StructLayout(LayoutKind.Sequential)] struct TokenStatistics {
+      public Luid TokenId,AuthenticationId;public long ExpirationTime;
+      public uint TokenType,ImpersonationLevel,DynamicCharged,DynamicAvailable,GroupCount,PrivilegeCount;
+      public Luid ModifiedId;
     }
     static TokenEvidence Token(IntPtr process) {
       // WindowsPrincipal.IsInRole duplicates a primary token for its native
@@ -301,7 +308,27 @@ namespace SwirlDisposableUser {
         finally {Marshal.FreeHGlobal(data);}
         length=32768;var path=new StringBuilder((int)length);
         if(!GetUserProfileDirectoryW(token,path,ref length))throw new Win32Exception(Marshal.GetLastWin32Error(),"GetUserProfileDirectory");
-        result.ProfilePath=path.ToString();return result;
+        result.ProfilePath=path.ToString();
+        // Diagnostic-only logon identity, read from the original child token
+        // before Resume. Missing statistics never changes the existing gate.
+        IntPtr statistics=IntPtr.Zero;
+        try {
+          uint size=(uint)Marshal.SizeOf(typeof(TokenStatistics));
+          if(size!=56)result.AuthenticationIdObservationError="TokenStatisticsLayoutUnknown";
+          else {
+            statistics=Marshal.AllocHGlobal((int)size);
+            if(!GetTokenInformation(token,10,statistics,size,out length)) {
+              result.AuthenticationIdWin32Error=Marshal.GetLastWin32Error();
+              result.AuthenticationIdObservationError="TokenStatisticsQueryFailed";
+            }else if(length!=size)result.AuthenticationIdObservationError="TokenStatisticsLengthUnknown";
+            else {
+              var value=(TokenStatistics)Marshal.PtrToStructure(statistics,typeof(TokenStatistics));
+              result.AuthenticationId=(((ulong)(uint)value.AuthenticationId.High<<32)|value.AuthenticationId.Low).ToString("x16");
+            }
+          }
+        }catch {result.AuthenticationIdObservationError="TokenStatisticsObservationFailed";}
+        finally {if(statistics!=IntPtr.Zero)Marshal.FreeHGlobal(statistics);}
+        return result;
       } finally {CloseHandle(token);}
     }
     public sealed class Child : IDisposable {
@@ -626,6 +653,9 @@ finally {
                 profile_removed=$result.profile_removed;frozen_scope='Profile cleanup at its original deadline; account and fixture cleanup are still pending.'
                 profile_path=$profilePath;token_profile_path=$tokenProfilePath;path_verified=$cleanup.path_verified;token_path_verified=$cleanup.token_path_verified
                 cleanup_deadline_ms=[int]$cleanup.deadline_ms;cleanup_elapsed_ms=$cleanup.elapsed_ms;final_state=$cleanup.final_state
+                original_child_authentication_id=$(if($null -ne $result.token){$result.token.AuthenticationId}else{$null})
+                original_child_authentication_id_error=$(if($null -ne $result.token){$result.token.AuthenticationIdObservationError}else{'TokenStatisticsUnavailable'})
+                original_child_authentication_id_win32_error=$(if($null -ne $result.token){$result.token.AuthenticationIdWin32Error}else{$null})
                 files=$ownerFiles;original_cleanup=$cleanup}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ownerRequest -Encoding UTF8
             $ownerDiagnostic.frozen_request_sha256=(Get-FileHash -LiteralPath $ownerRequest -Algorithm SHA256).Hash.ToLowerInvariant()
             $ownerLauncher=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../tools/ObserveWindowsProfileResidualOwners.py'))

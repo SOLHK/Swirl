@@ -69,7 +69,21 @@
         "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.addons.qtshadertools.win64_msvc2022_64/6.12.0-0-202609280346qtshadertools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
         "sha256": "dfceb86842d60a81ff75c1c2c98d49d186efc5c6cc49f0225b3b2ed699beca4b"
       }
-    ]
+    ],
+    "qml_module_json": {
+      "path": "modules/Qml.json",
+      "bytes": 538,
+      "sha256": "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f",
+      "compiler_id": "MSVC",
+      "compiler_version": "19.44.35227.0",
+      "targets": [
+        {
+          "architecture": "x86_64",
+          "abi": "x86_64-little_endian-lp64"
+        }
+      ],
+      "scope": "Exact metadata label from pinned official Windows package; not an assertion about C++ long size."
+    }
   },
   "source": {
     "repository": "https://github.com/qt/qtdeclarative.git",

@@ -123,7 +123,7 @@ def run_case(name, arguments, output, runtime, source_sha, qt_identity):
                # OwnedProcess has no console; keep Qt's default messages in the captured stderr pipe.
                QT_FORCE_STDERR_LOGGING="1",
                QT_MESSAGE_PATTERN="[%{type}] %{message}",
-               QT_LOGGING_RULES="*.warning=true\n*.critical=true",
+               QT_LOGGING_RULES="*.warning=true;*.critical=true",
                TEMP=str(case / "temp"), TMP=str(case / "temp"),
                APPDATA=str(case / "appdata"), LOCALAPPDATA=str(case / "localappdata"))
     record = {"name": name, "source_sha": source_sha, "arguments": arguments,

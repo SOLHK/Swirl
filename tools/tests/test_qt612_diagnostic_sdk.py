@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 TOOLS = Path(__file__).resolve().parents[1]
@@ -42,6 +43,143 @@ class DiagnosticBoundaryTests(unittest.TestCase):
         receipt["archives"][2]["sha256"] = "0" * 64
         with self.assertRaisesRegex(RuntimeError, "StockArchivePinMismatch"):
             sdk.check_receipt(lock, receipt)
+
+    def test_cmake_windows_paths_are_typed_and_do_not_create_escapes(self):
+        path = r"C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\rc.exe"
+        self.assertEqual(sdk.cmake_path_definition("CMAKE_RC_COMPILER", path, "FILEPATH"),
+                         "-DCMAKE_RC_COMPILER:FILEPATH=C:/Program Files (x86)/Windows Kits/10/bin/"
+                         "10.0.26100.0/x64/rc.exe")
+        for name in ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_LINKER", "CMAKE_AR",
+                     "CMAKE_RC_COMPILER", "CMAKE_MT", "CMAKE_MAKE_PROGRAM"):
+            self.assertNotIn("\\", sdk.cmake_path_definition(name, path, "FILEPATH"))
+        self.assertEqual(sdk.cmake_path_definition("CMAKE_INSTALL_PREFIX", r"D:\stage", "PATH"),
+                         "-DCMAKE_INSTALL_PREFIX:PATH=D:/stage")
+        for bad in ("", "D:/one;D:/two", 'D:/bad"name', "D:/bad\nname", "D:/${untrusted}"):
+            with self.assertRaisesRegex(RuntimeError, "UnsafeCmakePathDefinition"):
+                sdk.cmake_path_definition("CMAKE_PREFIX_PATH", bad, "PATH")
+        with self.assertRaisesRegex(RuntimeError, "InvalidCmakePathDefinition"):
+            sdk.cmake_path_definition("CMAKE_PREFIX_PATH", path, "STRING")
+
+    def test_official_qml_metadata_uses_exact_observed_abi_label_and_raw_bytes(self):
+        lock = json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
+        pinned = lock["stock"]["qml_module_json"]
+        self.assertEqual(pinned["targets"],
+                         [{"architecture": "x86_64", "abi": "x86_64-little_endian-lp64"}])
+        self.assertEqual(pinned["sha256"],
+                         "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f")
+        metadata = {"schema_version": 3, "name": "Qml", "repository": "qtdeclarative",
+                    "version": "6.12.0", "platforms": [{"name": "Windows", "compiler_id": "MSVC",
+                    "compiler_version": pinned["compiler_version"], "targets": copy.deepcopy(pinned["targets"])}]}
+        sdk.module_platform(metadata, pinned["targets"])
+        for field, invalid in (("abi", "x86_64-little_endian-llp64"), ("architecture", "arm64")):
+            changed = copy.deepcopy(metadata)
+            changed["platforms"][0]["targets"][0][field] = invalid
+            with self.assertRaisesRegex(RuntimeError, "UnexpectedModuleCompilerOrAbi"):
+                sdk.module_platform(changed, pinned["targets"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "Qml.json"
+            data = json.dumps(metadata, sort_keys=True).encode()
+            path.write_bytes(data)
+            synthetic_lock = copy.deepcopy(lock)
+            synthetic_lock["stock"]["qml_module_json"].update(
+                bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+            self.assertEqual(sdk.verify_stock_qml_metadata(synthetic_lock, path), metadata)
+            path.write_bytes(data + b"\n")  # Semantically identical JSON still has different original bytes.
+            with self.assertRaisesRegex(RuntimeError, "OfficialQmlMetadataFilePinMismatch"):
+                sdk.verify_stock_qml_metadata(synthetic_lock, path)
+
+    def test_actual_cmake_command_cannot_use_another_path_or_changed_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            original, other = root / "cmake.exe", root / "other-cmake.exe"
+            original.write_bytes(b"synthetic executable identity; never executed")
+            other.write_bytes(original.read_bytes())
+            pinned = {"path": str(original), **sdk.file_identity(original)}
+            cache = {"CMAKE_COMMAND": str(original), "CMAKE_CACHE_MAJOR_VERSION": "3",
+                     "CMAKE_CACHE_MINOR_VERSION": "31", "CMAKE_CACHE_PATCH_VERSION": "6"}
+            self.assertEqual(sdk.verify_cmake_executable(cache, pinned)["cache_version"], "3.31.6")
+            with self.assertRaisesRegex(RuntimeError, "ConfiguredCmakePathMismatch"):
+                sdk.verify_cmake_executable({**cache, "CMAKE_COMMAND": str(other)}, pinned)
+            original.write_bytes(b"changed bytes at the original absolute path")
+            with self.assertRaisesRegex(RuntimeError, "ConfiguredCmakeBytesChanged"):
+                sdk.verify_cmake_executable(cache, pinned)
+
+    def test_failed_configuration_retains_original_cache_and_generated_rc_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            build, evidence = root / "build", root / "evidence"
+            compiler = build / "CMakeFiles/3.31.6/CMakeRCCompiler.cmake"
+            compiler.parent.mkdir(parents=True)
+            evidence.mkdir()
+            raw = b'set(CMAKE_RC_COMPILER "C:\\Program Files (x86)\\rc.exe")\r\n'
+            compiler.write_bytes(raw)
+            (build / "CMakeCache.txt").write_bytes(b"CMAKE_COMMAND:INTERNAL=C:/cmake.exe\r\n")
+            receipt = sdk.preserve_configuration_snapshot(build, evidence)
+            relative = compiler.relative_to(build).as_posix()
+            copied = evidence / "configuration-at-exit" / relative
+            self.assertEqual(copied.read_bytes(), raw)
+            self.assertEqual(receipt["files"][relative], sdk.file_identity(compiler))
+            self.assertIn("config.summary", receipt["absent_optional"])
+
+    def test_native_failure_is_preserved_and_forced_cleanup_cannot_make_success(self):
+        completed = {"atomic_job_membership": True, "process_signaled": True, "owned_job_empty": True,
+                     "errors": [], "timed_out": False, "exit_code": 0, "forced_cleanup": False,
+                     "root_first_signal": {"exit_code": 0, "before_any_termination": True}}
+        self.assertTrue(sdk.command_completion_allowed(completed, (0,)))
+        failed = copy.deepcopy(completed)
+        failed.update(exit_code=1, forced_cleanup=True)
+        failed["root_first_signal"]["exit_code"] = 1
+        self.assertFalse(sdk.command_completion_allowed(failed, (0,)))
+        self.assertTrue(sdk.command_completion_allowed(failed, (0, 1)))
+        self.assertEqual(failed["exit_code"], 1)  # Collection permission does not rewrite the native result.
+        for field, invalid in (("forced_cleanup", True), ("owned_job_empty", False),
+                               ("process_signaled", False), ("timed_out", True),
+                               ("atomic_job_membership", False), ("errors", ["UnconfirmedRetirement"])):
+            changed = {**completed, field: invalid}
+            self.assertFalse(sdk.command_completion_allowed(changed, (0, 1)))
+        for first in ({"exit_code": 1, "before_any_termination": True},
+                      {"exit_code": 0, "before_any_termination": False}):
+            self.assertFalse(sdk.command_completion_allowed({**completed, "root_first_signal": first}, (0, 1)))
+
+    def test_stream_close_error_does_not_skip_later_owned_handle_callbacks(self):
+        calls, record = [], {"errors": [], "exit_code": 1, "owned_job_empty": True}
+        class BrokenStream:
+            def close(self):
+                calls.append("broken-stream")
+                raise OSError("controlled stream flush failure")
+        operations = [("CommandStreamCloseFailed:0", BrokenStream().close),
+                      ("CommandStreamCloseFailed:1", lambda: calls.append("next-stream")),
+                      ("CommandHandleCloseFailed:process", lambda: calls.append("process-handle")),
+                      ("CommandHandleCloseFailed:job", lambda: calls.append("job-handle") or False)]
+        sdk.close_command_resources(operations, record)
+        self.assertEqual(calls, ["broken-stream", "next-stream", "process-handle", "job-handle"])
+        self.assertEqual(record["exit_code"], 1)
+        self.assertTrue(record["owned_job_empty"])
+        self.assertEqual(record["errors"], [
+            "CommandStreamCloseFailed:0:OSError:controlled stream flush failure",
+            "CommandHandleCloseFailed:job:ReturnedFalse"])
+
+    def test_output_read_failure_keeps_native_receipt_and_other_log_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stdout, stderr = root / "command.stdout.log", root / "command.stderr.log"
+            stdout.write_bytes(b"retained raw stdout"); stderr.write_bytes(b"retained raw stderr")
+            original_identity = sdk.file_identity
+            def fail_one(path):
+                if path == stdout:
+                    raise OSError("controlled evidence read failure")
+                return original_identity(path)
+            record = {"errors": [], "exit_code": 1, "process_signaled": True, "owned_job_empty": True}
+            with patch.object(sdk, "file_identity", side_effect=fail_one):
+                sdk.collect_command_output_evidence((stdout, stderr), record)
+            target = root / "command.json"
+            sdk.write_json(target, record)
+            actual = sdk.read_json(target)
+            self.assertEqual(actual["exit_code"], 1)
+            self.assertTrue(actual["process_signaled"] and actual["owned_job_empty"])
+            self.assertEqual(actual["outputs"], {stderr.name: original_identity(stderr)})
+            self.assertEqual(actual["errors"], [
+                "CommandOutputEvidenceFailed:command.stdout.log:OSError:controlled evidence read failure"])
 
     def test_wrong_preimage_is_rejected_before_patch_application(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -138,14 +138,17 @@ def main():
         for name, path in tools.items():
             sdk.require({"path": path, **sdk.file_identity(Path(path))} == receipt["tools"].get(name),
                         "ComparisonToolchainDiffersFromSdkBuild:" + name)
-        sdk.require(sdk.canonical_digest(sdk.native_toolchain_files(tools))
+        toolchain = sdk.native_toolchain_files(tools)
+        sdk.require(sdk.canonical_digest(toolchain)
                     == receipt["native_toolchain_content_id"], "ComparisonNativeToolchainChanged")
+        known_executables = sdk.executable_inventory(toolchain, receipt["tools"])
         report.update(source_inputs=inputs, sdk_receipt=sdk.file_identity(receipt_path),
                       derivation_id=receipt["derivation_id"], stock_content_id=receipt["stock_content_id"],
                       patched_content_id=receipt["derived_content_id"])
         commands = evidence / "commands"
         def run(name, arguments, cwd=work, seconds=120, env=None, accepted=(0,)):
-            return sdk.run_logged(arguments, cwd, commands, name, seconds, env=env, accepted=accepted)
+            return sdk.run_logged(arguments, cwd, commands, name, seconds, env=env, accepted=accepted,
+                                  known_executables=known_executables)
         report["stage"] = "build-identical-fixtures"
         build = sdk.fresh_directory(work / "fixtures", root=work)
         env = sdk.tool_environment()
@@ -153,12 +156,16 @@ def main():
                    CMAKE_PREFIX_PATH=str(stock), QT_ROOT_DIR=str(stock))
         repro = repo / "tools/repros/qt612-popup-gc"
         run("01-configure-fixtures", [tools["cmake.exe"], "-S", repro, "-B", build, "-G", "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_PREFIX_PATH=" + str(stock),
-            "-DCMAKE_CXX_COMPILER=" + tools["cl.exe"], "-DCMAKE_MAKE_PROGRAM=" + tools["ninja.exe"],
-            "-DCMAKE_LINKER=" + tools["link.exe"], "-DCMAKE_AR=" + tools["lib.exe"],
-            "-DCMAKE_RC_COMPILER=" + tools["rc.exe"], "-DCMAKE_MT=" + tools["mt.exe"],
+            "-DCMAKE_BUILD_TYPE=Release", sdk.cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
+            sdk.cmake_path_definition("CMAKE_CXX_COMPILER", tools["cl.exe"], "FILEPATH"),
+            sdk.cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
+            sdk.cmake_path_definition("CMAKE_LINKER", tools["link.exe"], "FILEPATH"),
+            sdk.cmake_path_definition("CMAKE_AR", tools["lib.exe"], "FILEPATH"),
+            sdk.cmake_path_definition("CMAKE_RC_COMPILER", tools["rc.exe"], "FILEPATH"),
+            sdk.cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL"], seconds=120, env=env)
         cache = sdk.cache_values((build / "CMakeCache.txt").read_text(encoding="utf-8"))
+        report["fixture_cmake"] = sdk.verify_cmake_executable(cache, receipt["tools"]["cmake.exe"])
         sdk.require(cache.get("CMAKE_BUILD_TYPE") == "Release" and cache.get("CMAKE_GENERATOR") == "Ninja"
                     and cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") == "MultiThreadedDLL",
                     "FixtureBuildConfigurationMismatch")
