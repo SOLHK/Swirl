@@ -659,29 +659,154 @@ class DiagnosticBoundaryTests(unittest.TestCase):
                                                b"old ABI", b"new ABI"))
         path = "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h"
         self.assertFalse(sdk.permitted_override(path, None, b"new"))
-        self.assertTrue(sdk.permitted_override(path, b'#line 10 "stock/path"\nint field;\n',
-                                              b'#line 10 "build/path"\nint field;\n'))
+        self.assertFalse(sdk.permitted_override(path, b'#line 10 "stock/path"\nint field;\n',
+                                               b'#line 10 "build/path"\nint field;\n'))
         self.assertFalse(sdk.permitted_override(path, b'#line 10 "stock/path"\nint field;\n',
                                                b'#line 10 "build/path"\nlong field;\n'))
 
     def test_windows_header_eol_does_not_hide_abi_or_non_header_changes(self):
+        # Preserve the concurrent 425b regression, but require the explicit
+        # source/parser contract: a generic overlay cannot authorize headers.
         path = "include/QtQml/6.12.0/QtQml/private/qv4mm_p.h"
         stock = b"struct MemberData {\r\n    int field;\r\n};\r\n"
         source = b"struct MemberData {\n    int field;\n};\n"
-        self.assertTrue(sdk.permitted_override(path, stock, source))
-        for changed in (source.replace(b"int", b"long"), source.replace(b"\n", b"\r"),
-                        source + b" ", source.replace(b"    ", b"\t")):
+        self.assertEqual(sdk.source_header_stock_bytes(source), stock)
+        self.assertFalse(sdk.permitted_override(path, stock, source))
+        for changed in (source.replace(b"int", b"long"), source + b" ",
+                        source.replace(b"    ", b"\t")):
             with self.subTest(changed=changed):
+                self.assertNotEqual(sdk.source_header_stock_bytes(changed), stock)
                 self.assertFalse(sdk.permitted_override(path, stock, changed))
+        with self.assertRaisesRegex(RuntimeError, "SourceHeaderMustBeCanonicalLf"):
+            sdk.source_header_stock_bytes(source.replace(b"\n", b"\r"))
         self.assertFalse(sdk.permitted_override(path, None, source))
         self.assertFalse(sdk.permitted_override("bin/Qt6Core.dll", stock, source))
         parser = "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h"
-        # qlalr's boilerplate is LF; inserted grammar-source snippets retain CRLF.
-        original = b'\n#line 10 "stock/path"\n' + stock
-        rebuilt = b'\n#line 10 "build/path"\n' + source
-        self.assertTrue(sdk.permitted_override(parser, original, rebuilt))
-        self.assertFalse(sdk.permitted_override(parser, original, rebuilt.replace(b"10", b"11")))
-        self.assertFalse(sdk.permitted_override(parser, original, rebuilt.replace(b"int", b"long")))
+        original = b'\n#line 154 "../../../qtdeclarative/src/qml/parser/qqmljs.g"\n' + stock
+        rebuilt = b'\n#line 154 "../../../source/src/qml/parser/qqmljs.g"\n' + source
+        contract = copy.deepcopy(json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
+                                 ["header_identity"]["parser"])
+        contract.update(stock_raw=sdk.byte_identity(original), stock_crlf_count=3,
+                        stock_lf_count=5, line_numbers=[154],
+                        expected_built_lf=sdk.byte_identity(rebuilt))
+        self.assertEqual(sdk.expected_parser_bytes(original, contract), rebuilt)
+        for changed in (rebuilt, rebuilt.replace(b"154", b"155"),
+                        rebuilt.replace(b"int", b"long")):
+            self.assertFalse(sdk.permitted_override(parser, original, changed))
+        for changed in (original.replace(b"154", b"155"), original.replace(b"int", b"long")):
+            with self.assertRaisesRegex(RuntimeError, "StockParserHeaderPinMismatch"):
+                sdk.expected_parser_bytes(changed, contract)
+
+    def test_source_header_conversion_is_one_way_and_preserves_every_other_byte(self):
+        canonical = b"#define FEATURE 1\nstruct A { int field; };\n"
+        expected = b"#define FEATURE 1\r\nstruct A { int field; };\r\n"
+        self.assertEqual(sdk.source_header_stock_bytes(canonical), expected)
+        for invalid in (expected, b"first\nsecond\r\n", b"bare\r", b"no-newline"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "SourceHeaderMustBeCanonicalLf"):
+                sdk.source_header_stock_bytes(invalid)
+        self.assertNotEqual(sdk.source_header_stock_bytes(canonical.replace(b"int field", b"long field")), expected)
+        self.assertNotEqual(sdk.source_header_stock_bytes(canonical + b"\n"), expected)
+
+    def test_parser_header_requires_pinned_raw_and_exact_expected_candidate(self):
+        stock_data = (b'\n#line 154 "../../../qtdeclarative/src/qml/parser/qqmljs.g"\nint field;\r\n'
+                      b'\n#line 2031 "../../../qtdeclarative/src/qml/parser/qqmljs.g"\n#define RULE 238\r\n')
+        expected = (b'\n#line 154 "../../../source/src/qml/parser/qqmljs.g"\nint field;\n'
+                    b'\n#line 2031 "../../../source/src/qml/parser/qqmljs.g"\n#define RULE 238\n')
+        lock = json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
+        contract = lock["header_identity"]["parser"]
+        contract.update(stock_raw=sdk.byte_identity(stock_data), stock_crlf_count=2, stock_lf_count=6,
+                        line_numbers=[154, 2031], expected_built_lf=sdk.byte_identity(expected))
+        self.assertEqual(sdk.expected_parser_bytes(stock_data, contract), expected)
+        with self.assertRaisesRegex(RuntimeError, "StockParserHeaderPinMismatch"):
+            sdk.expected_parser_bytes(stock_data + b" ", contract)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source, build, stock = root / "source", root / "build", root / "stock"
+            original = stock / contract["path"]
+            candidate = build / "src/qml/qqmljsparser_p.h"
+            original.parent.mkdir(parents=True)
+            candidate.parent.mkdir(parents=True)
+            (source / "src/qml/parser").mkdir(parents=True)
+            original.write_bytes(stock_data)
+            variants = [expected, expected.replace(b"int field", b"long field"),
+                        expected.replace(b"RULE 238", b"RULE 239"), expected + b"\n",
+                        expected.replace(b"int field", b"int  field"),
+                        expected.replace(b"#line 154", b"#line 155"),
+                        expected.replace(b"../../../source/", b"../../../other/"),
+                        expected.replace(b";\n", b";\r\n")]
+            for index, value in enumerate(variants):
+                with self.subTest(index=index):
+                    candidate.write_bytes(value)
+                    evidence = sdk.fresh_directory(root / ("evidence-" + str(index)))
+                    review = sdk.verify_headers(source, build, stock, lock, evidence)
+                    self.assertEqual(review[0]["matched"], index == 0)
+                    self.assertEqual(review[0]["candidate_raw"], sdk.byte_identity(value))
+                    self.assertEqual((evidence / "header-inputs/stock" / contract["path"]).read_bytes(), stock_data)
+                    self.assertEqual((evidence / "header-inputs/candidate" / contract["path"]).read_bytes(), value)
+                    self.assertEqual((evidence / "header-inputs/expected-candidate" / contract["path"]).read_bytes(), expected)
+
+    def test_generated_feature_header_still_requires_exact_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source, build, stock = root / "source", root / "build", root / "stock"
+            (source / "src").mkdir(parents=True)
+            relative = "include/QtQml/6.12.0/QtQml/private/qtqml-config_p.h"
+            original, candidate = stock / relative, build / "src/qml/qtqml-config_p.h"
+            original.parent.mkdir(parents=True)
+            candidate.parent.mkdir(parents=True)
+            original.write_bytes(b"#define FEATURE 1\n")
+            for index, data in enumerate((b"#define FEATURE 1\n", b"#define FEATURE 1\r\n", b"#define FEATURE 0\n")):
+                candidate.write_bytes(data)
+                review = sdk.verify_headers(source, build, stock, {}, sdk.fresh_directory(root / str(index)))
+                self.assertEqual(review[0]["matched"], index == 0)
+
+    def test_source_header_mapping_requires_the_exact_locked_set_and_hashes(self):
+        row = {"path": "include/QtQml/qsample.h", "source_path": "src/qml/qsample.h",
+               "stock": sdk.byte_identity(b"int field;\r\n"), "candidate_raw": sdk.byte_identity(b"int field;\n"),
+               "expected_stock": sdk.byte_identity(b"int field;\r\n"), "matched": True,
+               "method": "canonical-source-LF-to-stock-CRLF"}
+        mapping = [{k: row[k] for k in ("path", "source_path", "stock", "candidate_raw", "expected_stock")}]
+        lock = {"header_identity": {"header_review_count": 1, "source_headers": 1,
+                                    "source_header_mapping_sha256": sdk.canonical_digest(mapping)}}
+        self.assertEqual(sdk.verify_header_contract([row], lock)["source_headers"], 1)
+        changed = copy.deepcopy(row)
+        changed["candidate_raw"] = sdk.byte_identity(b"long field;\n")
+        with self.assertRaisesRegex(RuntimeError, "QmlSourceHeaderMappingPinMismatch"):
+            sdk.verify_header_contract([changed], lock)
+        with self.assertRaisesRegex(RuntimeError, "QmlHeaderCoverageChanged"):
+            sdk.verify_header_contract([row, row], lock)
+
+    def test_module_header_retention_preserves_stock_and_rejects_changed_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stock, stage, derived = root / "stock", root / "stage", root / "derived"
+            relative = "include/QtQml/qsample.h"
+            for base in (stock, stage):
+                for path in ("bin", "lib", "include/QtQml"):
+                    (base / path).mkdir(parents=True)
+                (base / "lib/Qt6Qml.lib").write_bytes(b"synthetic import library identity")
+            (stock / "bin/Qt6Qml.dll").write_bytes(b"synthetic original, never executed")
+            (stage / "bin/Qt6Qml.dll").write_bytes(b"synthetic modified, never executed")
+            original, candidate = b"int field;\r\n", b"int field;\n"
+            (stock / relative).write_bytes(original)
+            (stage / relative).write_bytes(candidate)
+            review = [{"path": relative, "matched": True, "stock": sdk.byte_identity(original),
+                       "candidate_raw": sdk.byte_identity(candidate)}]
+            staged, changes, retained = sdk.verify_module_stage(stage, stock, review)
+            self.assertEqual(retained, [relative])
+            before = sdk.inventory(stock)
+            sdk.compose_derived_kit(stock, stage, derived, before, staged, retained)
+            self.assertEqual((derived / relative).read_bytes(), original)
+            self.assertEqual((stage / relative).read_bytes(), candidate)
+            self.assertEqual((derived / "bin/Qt6Qml.dll").read_bytes(), (stage / "bin/Qt6Qml.dll").read_bytes())
+            self.assertEqual(sdk.inventory(stock), before)
+            (stage / relative).write_bytes(b"long field;\n")
+            with self.assertRaisesRegex(RuntimeError, "ModuleHeaderChangedAfterReview"):
+                sdk.verify_module_stage(stage, stock, review)
+            with self.assertRaisesRegex(RuntimeError, "UnexpectedModuleMetadataOrHeaderChange"):
+                sdk.verify_module_stage(stage, stock, [])
+            with self.assertRaisesRegex(RuntimeError, "InvalidRetainedHeaderSet"):
+                sdk.compose_derived_kit(stock, stage, root / "invalid-derived", before, staged, ["bin/Qt6Qml.dll"])
 
     def test_manifest_byte_change_cannot_pass_by_matching_filenames(self):
         expected = {"Qt6Qml.dll": {"bytes": 1, "sha256": "a" * 64}}

@@ -140,5 +140,36 @@
       "Public/Src/Engine/ProcessPipExecutor/SandboxedProcessPipExecutor.cs"
     ],
     "scope": "Explicit public compiler phases only. Natural root exit 0, held image-file/process identities, targeted owned vctip termination and actual exit/empty Job proof are required. This is not a graceful shutdown claim or an exception for private/runtime fixtures."
+  },
+  "header_identity": {
+    "source_headers": 286,
+    "source_header_mapping_sha256": "c3adbc969c9b8f418f52199256b6a4469c8b5fd86fe2cef2dd998684ee2b03dd",
+    "header_review_count": 290,
+    "parser": {
+      "path": "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h",
+      "stock_raw": {
+        "bytes": 9665,
+        "sha256": "36d412acb8f64114424faa0ee7452cd6592e4146f29b29a1e8a60d9ea91bcc7c"
+      },
+      "stock_grammar_path": "../../../qtdeclarative/src/qml/parser/qqmljs.g",
+      "build_grammar_path": "../../../source/src/qml/parser/qqmljs.g",
+      "line_numbers": [
+        154,
+        2031,
+        2043,
+        3647,
+        4313,
+        4865,
+        5140
+      ],
+      "stock_crlf_count": 305,
+      "stock_lf_count": 319,
+      "expected_built_lf": {
+        "bytes": 9311,
+        "sha256": "9cd08c14d9a348dfd969a83aa85b4bce9140c9e40626f28adf5134a8fbad7dd2"
+      },
+      "scope": "Expected build bytes derived from the pinned stock parser and official qlalr generation rules; not an observation of the missing 48b Windows rebuilt header. Only 305 CRLF pairs and these seven exact source-location directives may differ."
+    },
+    "scope": "Canonical source checkout remains byte-exact to the pinned Git blobs. Only the 286 fixed source headers may reproduce their pinned stock bytes through whole-file LF to CRLF; generated feature and other headers remain exact. Derived kit retains official stock headers."
   }
 }

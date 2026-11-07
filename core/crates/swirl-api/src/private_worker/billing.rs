@@ -19,6 +19,14 @@ const MAX_LINE_BYTES: usize = 1024;
 const MAX_COUNTER: u64 = i64::MAX as u64;
 const FAILURE: &str = "billing_snapshot_failed";
 
+#[derive(Default, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum ResponseContract {
+    #[default]
+    SyntheticQaV1,
+    SubscriptionUserinfoV1,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct BillingGrant {
@@ -28,6 +36,8 @@ pub(super) struct BillingGrant {
     account_id: String,
     period_id: String,
     request_nonce: String,
+    #[serde(default)]
+    response_contract: ResponseContract,
 }
 
 impl BillingGrant {
@@ -115,21 +125,32 @@ fn parse_headers(bytes: &[u8], expected: &BillingGrant) -> Result<Value> {
         }
         let (name, value) = line.split_once(": ").ok_or(FAILURE)?;
         let name = name.to_ascii_lowercase();
-        if !matches!(
-            name.as_str(),
-            "content-length"
-                | "connection"
-                | "subscription-userinfo"
-                | "x-swirl-qa-billing-schema"
-                | "x-swirl-qa-billing-domain"
-                | "x-swirl-qa-billing-authority"
-                | "x-swirl-qa-billing-account"
-                | "x-swirl-qa-billing-period"
-                | "x-swirl-qa-billing-nonce"
-                | "x-swirl-qa-billing-revision"
-                | "x-swirl-qa-billing-covered-sequence"
-        ) || headers.insert(name, value).is_some()
-        {
+        let allowed = match expected.response_contract {
+            ResponseContract::SyntheticQaV1 => matches!(
+                name.as_str(),
+                "content-length"
+                    | "connection"
+                    | "subscription-userinfo"
+                    | "x-swirl-qa-billing-schema"
+                    | "x-swirl-qa-billing-domain"
+                    | "x-swirl-qa-billing-authority"
+                    | "x-swirl-qa-billing-account"
+                    | "x-swirl-qa-billing-period"
+                    | "x-swirl-qa-billing-nonce"
+                    | "x-swirl-qa-billing-revision"
+                    | "x-swirl-qa-billing-covered-sequence"
+            ),
+            ResponseContract::SubscriptionUserinfoV1 => matches!(
+                name.as_str(),
+                "content-length"
+                    | "connection"
+                    | "subscription-userinfo"
+                    | "date"
+                    | "age"
+                    | "cache-control"
+            ),
+        };
+        if !allowed || headers.insert(name, value).is_some() {
             return Err(FAILURE);
         }
     }
@@ -138,7 +159,13 @@ fn parse_headers(bytes: &[u8], expected: &BillingGrant) -> Result<Value> {
         || headers
             .get("connection")
             .is_some_and(|value| *value != "close")
-        || get("x-swirl-qa-billing-schema")? != "1"
+    {
+        return Err(FAILURE);
+    }
+    if expected.response_contract == ResponseContract::SubscriptionUserinfoV1 {
+        return parse_http_observation(&headers, expected);
+    }
+    if get("x-swirl-qa-billing-schema")? != "1"
         || get("x-swirl-qa-billing-domain")? != DOMAIN
         || get("x-swirl-qa-billing-authority")? != expected.authority_id
         || get("x-swirl-qa-billing-account")? != expected.account_id
@@ -165,6 +192,49 @@ fn parse_headers(bytes: &[u8], expected: &BillingGrant) -> Result<Value> {
         "period_id":expected.period_id,"request_nonce":expected.request_nonce,
         "revision":revision,"covered_sequence":covered_sequence,
         "upload":upload,"download":download,"total":total,"expire":expire}))
+}
+
+fn parse_http_observation(
+    headers: &BTreeMap<String, &str>,
+    expected: &BillingGrant,
+) -> Result<Value> {
+    let mut counters = BTreeMap::new();
+    for field in headers
+        .get("subscription-userinfo")
+        .ok_or(FAILURE)?
+        .split(';')
+    {
+        let (name, value) = field.trim_matches(' ').split_once('=').ok_or(FAILURE)?;
+        let name = name.trim_matches(' ');
+        if !matches!(name, "upload" | "download" | "total" | "expire")
+            || counters
+                .insert(name, number(value.trim_matches(' '))?)
+                .is_some()
+        {
+            return Err(FAILURE);
+        }
+    }
+    let upload = *counters.get("upload").ok_or(FAILURE)?;
+    let download = *counters.get("download").ok_or(FAILURE)?;
+    let total = *counters.get("total").ok_or(FAILURE)?;
+    if total == 0 || upload.checked_add(download).is_none_or(|used| used > total) {
+        return Err(FAILURE);
+    }
+    let date = headers.get("date").copied();
+    let cache_control = headers.get("cache-control").copied();
+    if date.is_some_and(|value| value.is_empty() || value.len() > 128)
+        || cache_control.is_some_and(|value| value.is_empty() || value.len() > 512)
+    {
+        return Err(FAILURE);
+    }
+    let age = headers.get("age").map(|value| number(value)).transpose()?;
+    // This nonce is from the validated grant, NOT an echoed response nonce.
+    // TLS and these ordinary headers cannot establish an account identity,
+    // invoice freshness, period, attribution or post-exit coverage.
+    Ok(json!({"schema":1, "contract":"subscription_userinfo_v1",
+        "scope":"owned-synthetic-http-counter-observation-v1", "query_nonce":expected.request_nonce,
+        "counters":{"upload":upload, "download":download, "total":total, "expire":counters.get("expire")},
+        "http_metadata":{"date":date, "age":age, "cache_control":cache_control}}))
 }
 
 async fn read_headers(stream: &mut (impl AsyncRead + Unpin)) -> Result<Vec<u8>> {

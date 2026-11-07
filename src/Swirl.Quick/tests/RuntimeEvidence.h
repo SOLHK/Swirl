@@ -1,5 +1,6 @@
 #pragma once
 #include <QString>
+#include <QByteArray>
 #include <thread>
 class QQuickWindow;
 class EngineController;
@@ -7,13 +8,14 @@ class SystemDataProvider;
 class DiagnosticService;
 void startRuntimeEvidence(QQuickWindow *,EngineController *,SystemDataProvider *,DiagnosticService *,const QString &,const QString &);
 
-// One explicit node in a private, parent-owned QA process. The legacy runtime
-// command entrance stays closed; this plan admits no proxy/TUN write actions.
+// One generated synthetic node in a private, parent-owned QA process. Neither
+// this session nor its fixture proof authorizes provider traffic or a budget.
 struct ControlledNodeSession {
     QString root,storePath,sourceSha,nonce;
     int nodeOrdinal=0,proxyPort=0;
-    int fixtureHttpPort=0,fixtureHttpsPort=0;
-    QString fixtureCaPath;
+    int fixtureHttpPort=0,fixtureHttpsPort=0,fixtureSocksPort=0;
+    QString fixturePassword,fixtureNodeId;
+    QByteArray fixtureCa;
 };
 bool loadControlledNodeSession(const QString &,ControlledNodeSession *);
 void startControlledNodeSession(QQuickWindow *,EngineController *,const ControlledNodeSession &);

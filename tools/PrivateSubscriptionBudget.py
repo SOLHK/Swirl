@@ -547,9 +547,14 @@ class Ledger:
                     or type(h["node"]) is not int or not (h["node"] == 0 if is_control else 1 <= h["node"] <= 100000)):
                 raise BudgetError("InvalidSupervisedHistory")
             if is_control:
-                from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT
+                from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, HTTP_RESPONSE_CONTRACT
                 control_attempts += 1
-                if (set(billing) != {"kind", "purpose", "parentTicket"}
+                billing_fields = {"kind", "purpose", "parentTicket"}
+                if "responseContract" in billing:
+                    billing_fields.add("responseContract")
+                    if billing["responseContract"] != HTTP_RESPONSE_CONTRACT:
+                        raise BudgetError("InvalidSupervisedBilling")
+                if (set(billing) != billing_fields
                         or billing["purpose"] not in {"preflight", "reconcile"}
                         or h["phase"] in {"settled", "reconcile_pending"}
                         or (billing["purpose"] == "preflight") != (billing["parentTicket"] is None)
@@ -612,15 +617,20 @@ class Ledger:
             if h["phase"] in {"spawned", "guard_ready", "running", "active", "settled", "reconcile_pending", "control_consumed"} and (h["pid"] is None or h["planDigest"] is None):
                 raise BudgetError("InvalidSupervisedProcess")
             if h["phase"] == "control_consumed":
-                from PrivateSubscriptionBilling import validate_snapshot
+                from PrivateSubscriptionBilling import HTTP_RESPONSE_CONTRACT, validate_http_observation, validate_snapshot
                 receipt = h["receipt"]
+                receipt_fields = {"charge", "upload", "download", "exit", "guard", "guardDigest", "observation"}
+                http_contract = is_control and billing.get("responseContract") == HTTP_RESPONSE_CONTRACT
+                if http_contract:
+                    receipt_fields.add("httpObservation")
                 if (not is_control or ticket in d["reservations"] or not isinstance(receipt, dict)
-                        or set(receipt) != {"charge", "upload", "download", "exit", "guard", "guardDigest", "observation"}
+                        or set(receipt) != receipt_fields
                         or receipt["charge"] != plan["byteLimit"] + plan["receiveReservation"]):
                     raise BudgetError("InvalidControlSettlement")
                 _validate_exit_record(receipt["exit"], h["pid"])
                 if receipt["guard"] is None:
-                    if any(receipt[key] is not None for key in ("upload", "download", "guardDigest", "observation")):
+                    if (any(receipt[key] is not None for key in ("upload", "download", "guardDigest", "observation"))
+                            or receipt.get("httpObservation") is not None):
                         raise BudgetError("InvalidControlMeasurement")
                 else:
                     validate_guard_receipt(receipt["guard"], plan)
@@ -630,8 +640,14 @@ class Ledger:
                     control_up += integer(receipt["upload"])
                     control_down += integer(receipt["download"])
                 if receipt["observation"] is not None:
+                    if http_contract:
+                        raise BudgetError("InvalidControlMeasurement")
                     validate_snapshot(receipt["observation"], d["billing"]["registration"])
                     if receipt["observation"]["request_nonce"] != h["nonce"]:
+                        raise BudgetError("InvalidControlMeasurement")
+                if receipt.get("httpObservation") is not None:
+                    validate_http_observation(receipt["httpObservation"])
+                    if receipt["httpObservation"]["query_nonce"] != h["nonce"]:
                         raise BudgetError("InvalidControlMeasurement")
                 control_debit += integer(receipt["charge"])
             elif h["phase"] in {"settled", "reconcile_pending"}:
@@ -1123,11 +1139,15 @@ class Ledger:
                 "ownerToken": None, "outcome": None, "receipt": None, "billing": billing}
 
     def reserve_billing_control(self, session, *, purpose, parent_ticket=None, timeout_ms=2000,
+                                response_contract="synthetic_qa_v1",
                                 config_fingerprint, source_sha, worker_sha256, build_id, nonce):
-        from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, MAX_CONTROL_ATTEMPTS, WORKLOAD
+        from PrivateSubscriptionBilling import (BYTE_LIMIT, CONNECTION_LIMIT, MAX_CONTROL_ATTEMPTS, WORKLOAD,
+                                                HTTP_RESPONSE_CONTRACT, RESPONSE_CONTRACTS)
         with self.mutex:
             self._check_session()
             self._require_billing_session(session)
+            if not isinstance(response_contract, str) or response_contract not in RESPONSE_CONTRACTS:
+                raise BudgetError("BillingResponseContractRejected")
             if purpose not in {"preflight", "reconcile"} or (purpose == "preflight") != (parent_ticket is None):
                 raise BudgetError("InvalidBillingControlPurpose")
             if not 100 <= integer(timeout_ms) <= TIMEOUT_MS:
@@ -1157,9 +1177,11 @@ class Ledger:
             self.data["billing"]["controlAttempts"] += 1
             ticket = str(self.data["sequence"])
             self.data["reservations"][ticket] = {"node": 0, "held": amount, "sent": 0, "received": 0, "tcp": plan.copy()}
+            billing = {"kind": "control", "purpose": purpose, "parentTicket": parent_ticket}
+            if response_contract == HTTP_RESPONSE_CONTRACT:
+                billing["responseContract"] = response_contract
             self.data["history"][ticket] = self._execution_record(0, plan, config_fingerprint, source_sha,
-                worker_sha256, build_id, nonce, WORKLOAD,
-                {"kind": "control", "purpose": purpose, "parentTicket": parent_ticket})
+                worker_sha256, build_id, nonce, WORKLOAD, billing)
             self._save()
             return ticket
 
@@ -1171,19 +1193,35 @@ class Ledger:
             raise BudgetError("SyntheticBillingObservationRequired")
         snapshot = observation.require(session)
         history = self.data["history"].get(str(ticket))
-        if history is None or history.get("billing", {}).get("kind") != "control" or snapshot["request_nonce"] != history["nonce"]:
+        if (history is None or history.get("billing", {}).get("kind") != "control"
+                or "responseContract" in history["billing"] or snapshot["request_nonce"] != history["nonce"]):
             raise BudgetError("SyntheticBillingObservationMismatch")
         _, previous = self._billing_snapshots()
         self._check_billing_progress(previous, snapshot)
         return snapshot
 
-    def consume_billing_control(self, session, ticket, guard, exit_proof, outcome, observation=None):
+    def check_http_billing_observation(self, session, ticket, observation):
+        from PrivateSubscriptionBilling import HttpBillingObservation, HTTP_RESPONSE_CONTRACT
+        self._check_session()
+        self._require_billing_session(session)
+        if not isinstance(observation, HttpBillingObservation) or observation._query.ticket != str(ticket):
+            raise BudgetError("HttpBillingObservationRequired")
+        snapshot = observation.require(session)
+        history = self.data["history"].get(str(ticket))
+        if (history is None or history.get("billing", {}).get("kind") != "control"
+                or history["billing"].get("responseContract") != HTTP_RESPONSE_CONTRACT
+                or snapshot["query_nonce"] != history["nonce"]):
+            raise BudgetError("HttpBillingObservationMismatch")
+        return snapshot
+
+    def consume_billing_control(self, session, ticket, guard, exit_proof, outcome, observation=None, *, http_observation=None):
         """Spend ALL control escrow; never recursively refund it from its reply.
 
         Unknown socket measurements stay null. Confirmed local counts are
         separately recorded, not charged twice over the conservative full debit.
         Unconfirmed child/cleanup never reaches this method from Supervisor.
         """
+        from PrivateSubscriptionBilling import HTTP_RESPONSE_CONTRACT
         from PrivateSubscriptionProcess import ExitProof
         with self.mutex:
             self._check_session()
@@ -1201,9 +1239,14 @@ class Ledger:
                 validate_guard_receipt(guard, reservation["tcp"])
                 upload, download = guard["upload"], guard["download"]
                 guard_digest = hashlib.sha256(json.dumps(guard, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-            elif observation is not None:
+            elif observation is not None or http_observation is not None:
                 raise BudgetError("BillingTransportReceiptRequired")
+            http_contract = history["billing"].get("responseContract") == HTTP_RESPONSE_CONTRACT
+            if (http_contract and observation is not None) or (not http_contract and http_observation is not None):
+                raise BudgetError("BillingResponseContractRejected")
             snapshot = None if observation is None else self.check_billing_observation(session, ticket, observation)
+            http_snapshot = (None if http_observation is None
+                             else self.check_http_billing_observation(session, ticket, http_observation))
             charge = reservation["held"]
             b = self.data["billing"]
             b["controlDebitedBytes"] += charge
@@ -1218,6 +1261,8 @@ class Ledger:
             history["receipt"] = {"charge": charge, "upload": upload, "download": download,
                 "exit": exit_proof.record(), "guard": None if guard is None else guard.copy(),
                 "guardDigest": guard_digest, "observation": snapshot}
+            if http_contract:
+                history["receipt"]["httpObservation"] = http_snapshot
             del self.data["reservations"][ticket]
             self._save()
 

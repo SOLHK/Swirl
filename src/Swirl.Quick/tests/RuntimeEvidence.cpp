@@ -32,6 +32,12 @@
 #include <QNetworkRequest>
 #include <QRegularExpression>
 #include <QCryptographicHash>
+#include <QMessageAuthenticationCode>
+#include <QRandomGenerator>
+#include <QTcpSocket>
+#include <QHostAddress>
+#include <QUuid>
+#include <QSet>
 #include <QSslSocket>
 #include <QSslCertificate>
 #include <QSslConfiguration>
@@ -147,6 +153,105 @@ bool controlledSeal(const QString &path,QByteArray bytes) {
 #endif
 }
 
+bool controlledKeys(const QJsonObject &object,const QStringList &keys) {
+    if(object.size()!=keys.size())return false;
+    for(const auto &key:keys)if(!object.contains(key))return false;
+    return true;
+}
+bool controlledPort(const QJsonValue &value,int *port) {
+    if(!value.isDouble()||value.toDouble()!=value.toInt()||value.toInt()<1||value.toInt()>65535)return false;
+    *port=value.toInt();return true;
+}
+bool controlledFixtureCatalog(const ControlledNodeSession &session,QString *nodeId=nullptr) {
+    // This store was created below from fixed data after the live fixture proof;
+    // no caller-supplied ciphertext, subscription or native document is loaded.
+    NodeStore store(session.storePath);
+    const auto nodes=store.nodes();
+    if(!store.error().isEmpty()||store.saving()||!store.configurationAvailable()||store.configurationV2()
+        ||!store.subscriptions().isEmpty()||!store.networkConfiguration().isEmpty()||nodes.size()!=1)return false;
+    const auto &node=nodes.first();
+    if(QUuid(node.id).isNull()||(!session.fixtureNodeId.isEmpty()&&node.id!=session.fixtureNodeId)
+        ||(!store.selectedId().isEmpty()&&store.selectedId()!=node.id)
+        ||node.name!=QStringLiteral("Synthetic controlled SOCKS5")||node.protocol!=QStringLiteral("socks5")
+        ||node.host!=QStringLiteral("127.0.0.1")||node.port!=session.fixtureSocksPort
+        ||node.username!=QStringLiteral("fixture")||node.password!=session.fixturePassword
+        ||!node.cipher.isEmpty()||!node.serverName.isEmpty()||!node.sourceId.isEmpty()
+        ||!node.parameters.isEmpty()||!node.originalConfiguration.isEmpty()||!node.sourceFormat.isEmpty()
+        ||!node.providerAlias.isEmpty()||!node.conversionIssues.isEmpty()||node.certificateVerificationEnforced
+        ||!node.sourceDocument.isEmpty()||node.sourceNodeIndex!=-1||node.importSource!=QStringLiteral("manual")
+        ||!node.parameterState.isEmpty()||!node.transportType.isEmpty()||!node.securityType.isEmpty()
+        ||!node.sourceFingerprint.isEmpty()||!node.nativeOutbound.isEmpty()||!node.runtimeIssues.isEmpty()
+        ||node.nativeExecutable)return false;
+    if(nodeId)*nodeId=node.id;
+    return true;
+}
+bool controlledCreateFixtureCatalog(ControlledNodeSession *session) {
+    // An atomically new subdirectory avoids ever opening a supplied node store
+    // or its selection/network/recovery sidecars, including during reload.
+    const auto name=QStringLiteral("fixture-store-")+QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if(!QDir(session->root).mkdir(name))return false;
+    session->storePath=QDir(session->root).filePath(name+QStringLiteral("/nodes.dpapi"));
+    {
+        NodeStore store(session->storePath);
+        if(!store.error().isEmpty()||!store.nodes().isEmpty()||!store.subscriptions().isEmpty()
+            ||!store.networkConfiguration().isEmpty()||store.configurationV2()
+            ||!store.saveNode({{"name",QStringLiteral("Synthetic controlled SOCKS5")},{"protocol",QStringLiteral("socks5")},
+                {"host",QStringLiteral("127.0.0.1")},{"port",session->fixtureSocksPort},
+                {"username",QStringLiteral("fixture")},{"password",session->fixturePassword},{"options",QVariantMap{}}}))return false;
+    }
+    return controlledFixtureCatalog(*session,&session->fixtureNodeId);
+}
+#ifdef Q_OS_WIN
+bool controlledPrivateProof(QByteArray *proof) {
+    const auto input=GetStdHandle(STD_INPUT_HANDLE);
+    if(input==nullptr||input==INVALID_HANDLE_VALUE||GetFileType(input)!=FILE_TYPE_PIPE)return false;
+    const QByteArray prefix("SWIRL-FIXTURE-PROOF-1\n");
+    const auto expected=prefix.size()+96;
+    const auto deadline=std::min<std::int64_t>(controlledDeadlineNs.load(std::memory_order_acquire),controlledNowNs()+2'000'000'000LL);
+    QByteArray data;
+    while(controlledNowNs()<deadline){
+        DWORD available=0;
+        if(!PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)){
+            if(GetLastError()!=ERROR_BROKEN_PIPE)break;
+            if(data.size()==expected&&data.startsWith(prefix)){*proof=data.mid(prefix.size());data.fill('\0');return true;}
+            break;
+        }
+        if(available){
+            char buffer[256];DWORD received=0;
+            if(!ReadFile(input,buffer,std::min<DWORD>(available,sizeof(buffer)),&received,nullptr)||!received)break;
+            data.append(buffer,int(received));SecureZeroMemory(buffer,sizeof(buffer));
+            if(data.size()>expected)break;
+        }else Sleep(1);
+    }
+    data.fill('\0');return false;
+}
+bool controlledProveFixture(const ControlledNodeSession &session,const QByteArray &manifestDigest,const QByteArray &key) {
+    const QByteArray prefix("SWIRL-OWNED-FIXTURE-1\n");
+    const auto deadline=std::min<std::int64_t>(controlledDeadlineNs.load(std::memory_order_acquire),controlledNowNs()+2'000'000'000LL);
+    const auto remaining=[&]{return int(std::max<std::int64_t>(0,(deadline-controlledNowNs())/1'000'000));};
+    QByteArray challenge(32,Qt::Uninitialized);
+    for(qsizetype offset=0;offset<challenge.size();offset+=sizeof(quint32)){
+        const auto random=QRandomGenerator::system()->generate();std::memcpy(challenge.data()+offset,&random,sizeof(random));
+    }
+    const auto request=prefix+manifestDigest+challenge;
+    const auto expected=QMessageAuthenticationCode::hash(request,key,QCryptographicHash::Sha256);
+    QTcpSocket socket;socket.setProxy(QNetworkProxy::NoProxy);
+    socket.connectToHost(QHostAddress::LocalHost,quint16(session.fixtureSocksPort));
+    if(remaining()<=0||!socket.waitForConnected(remaining())||socket.write(request)!=request.size())return false;
+    while(socket.bytesToWrite()>0)if(remaining()<=0||!socket.waitForBytesWritten(remaining()))return false;
+    QByteArray reply;
+    while(reply.size()<expected.size()){
+        if(!socket.bytesAvailable()&&(remaining()<=0||!socket.waitForReadyRead(remaining())))return false;
+        reply+=socket.read(expected.size()+1-reply.size());
+    }
+    socket.abort();
+    if(reply.size()!=expected.size())return false;
+    unsigned char mismatch=0;
+    for(qsizetype index=0;index<expected.size();++index)mismatch|=static_cast<unsigned char>(reply[index]^expected[index]);
+    return mismatch==0;
+}
+#endif
+
 class ControlledNodeRun final : public QObject {
 public:
     ControlledNodeRun(QQuickWindow *window,EngineController *controller,ControlledNodeSession session)
@@ -162,9 +267,11 @@ public:
         auto &library=RustCoreLibrary::instance();
         if(!library.load()||library.expectedSourceSha()!=m_session.sourceSha){fail("PairedCoreIdentityRequired");return;}
         const auto nodes=m_controller->nodes();
-        if(m_session.nodeOrdinal>nodes.size()){fail("NodeOrdinalUnavailable");return;}
-        m_id=nodes[m_session.nodeOrdinal-1].toMap().value("id").toString();
-        if(m_id.isEmpty()||!m_controller->prepareRealAcceptance()){fail("IsolatedSessionUnavailable");return;}
+        if(m_session.nodeOrdinal!=1||nodes.size()!=1||!controlledFixtureCatalog(m_session)){
+            fail("OwnedSyntheticCatalogRequired");return;
+        }
+        m_id=nodes.first().toMap().value("id").toString();
+        if(m_id!=m_session.fixtureNodeId||!m_controller->prepareRealAcceptance()){fail("IsolatedSessionUnavailable");return;}
         m_controller->setProxyPort(m_session.proxyPort);
         if(!m_controller->chooseNode(m_id)){fail("NodeConfigurationRejected");return;}
         if(!publish("starting")){fail("PrivateReceiptWriteFailed");return;}
@@ -203,9 +310,9 @@ private:
         input.setTransferTimeout(8000);input.setRawHeader("Connection","close");
         input.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
         input.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);
-        if(!m_session.fixtureCaPath.isEmpty()&&url.scheme()==QStringLiteral("https")){
+        if(!m_session.fixtureCa.isEmpty()&&url.scheme()==QStringLiteral("https")){
             auto ssl=input.sslConfiguration();
-            ssl.setCaCertificates(QSslCertificate::fromPath(m_session.fixtureCaPath));
+            ssl.setCaCertificates(QSslCertificate::fromData(m_session.fixtureCa));
             ssl.setPeerVerifyMode(QSslSocket::VerifyPeer);input.setSslConfiguration(ssl);
         }
         auto *reply=m_network.get(input);m_replies.append(reply);
@@ -263,14 +370,12 @@ private:
             m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),quint16(m_session.proxyPort)));
             // All three requests use the same explicit selected node. There is
             // no direct-mode or alternative-node retry on any failed response.
-            const bool fixture=m_session.fixtureHttpPort>0;
             // The Rust HEAD fixture is HTTP on loopback; HTTPS is independently
             // exercised below with a fixture-only, peer-verified Qt trust set.
-            const auto probe=fixture?QUrl(QString("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort))
-                :QUrl(QStringLiteral("https://www.gstatic.com/generate_204"));
+            const auto probe=QUrl(QString("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort));
             m_controller->testSelectedNode(m_id,probe);
-            request("http",fixture?QUrl(QString("http://127.0.0.1:%1/").arg(m_session.fixtureHttpPort)):QUrl(QStringLiteral("http://example.com/")));
-            request("https",fixture?QUrl(QString("https://localhost:%1/trace").arg(m_session.fixtureHttpsPort)):QUrl(QStringLiteral("https://www.cloudflare.com/cdn-cgi/trace")));
+            request("http",QUrl(QString("http://127.0.0.1:%1/").arg(m_session.fixtureHttpPort)));
+            request("https",QUrl(QString("https://127.0.0.1:%1/trace").arg(m_session.fixtureHttpsPort)));
         }
         if(!m_probeCompleted&&!m_controller->tests()->busy()){
             const auto probe=m_controller->tests()->result(m_id);
@@ -304,6 +409,8 @@ private:
             {"probeSuccess",m_probeSuccess},{"uiHeadersMs",m_uiLatency},{"proxyRequests",m_http},
             {"probeHttpStatus",m_probeHttp},{"probePhase",m_probePhase},{"probeFailureCode",m_probeFailureCode},
             {"outboundConnectMs",m_outboundConnectMs},{"originTlsMs",m_originTlsMs},
+            {"fixtureOnly",true},{"liveReady",false},{"persistentBudgetGuardExercised",false},
+            {"uiSubscriptionImportExercised",false},{"uiPolicySelectionExercised",false},
             {"tasksReleased",true},{"systemNetworkChanged",false},{"requestDeadlineMs",8000},{"elapsedMs",m_clock.elapsed()}};
         const bool saved=controlledJson(m_session.root+"/result.json",result);publish("finished");
         QCoreApplication::exit(saved&&passed?0:2);
@@ -323,33 +430,47 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
         ||QDir::cleanPath(qEnvironmentVariable("SWIRL_TEST_ROOT"))!=QDir::cleanPath(root))return false;
     QFile manifest(root+"/session.json");
     if(!controlledPath(manifest.fileName())||!manifest.open(QIODevice::ReadOnly)||manifest.size()>4096)return false;
-    const auto document=QJsonDocument::fromJson(manifest.read(4097));
-    if(!document.isObject())return false;
+    const auto bytes=manifest.read(4097);
+    QJsonParseError parse;
+    const auto document=QJsonDocument::fromJson(bytes,&parse);
+    if(parse.error!=QJsonParseError::NoError||!document.isObject())return false;
     const auto input=document.object();
-    const bool fixture=input.contains("fixture");
-    if(input.size()!=(fixture?6:5)||input.value("schema")!=QJsonValue(1)
+    if(!controlledKeys(input,{"schema","sourceSha","nonce","nodeOrdinal","proxyPort","fixture"})
+        ||input.value("schema")!=QJsonValue(2)||input.value("nodeOrdinal")!=QJsonValue(1)
         ||input.value("sourceSha").toString()!=RustCoreLibrary::expectedSourceSha()
         ||!QRegularExpression("^[0-9a-f]{64}$").match(input.value("nonce").toString()).hasMatch())return false;
-    const auto ordinal=input.value("nodeOrdinal");const auto port=input.value("proxyPort");
-    if(!ordinal.isDouble()||ordinal.toDouble()!=ordinal.toInt()||ordinal.toInt()<1||ordinal.toInt()>10000
-        ||!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535)return false;
-    const auto store=QDir(root).filePath("nodes.dpapi");
-    if(!controlledPath(store)||QFileInfo(store).size()>32*1024*1024||QFileInfo::exists(root+"/result.json")
-        ||QFileInfo::exists(root+"/state.json"))return false;
-    *session={QDir::cleanPath(root),store,input.value("sourceSha").toString(),input.value("nonce").toString(),ordinal.toInt(),port.toInt()};
-    if(fixture){
-        const auto settings=input.value("fixture").toObject();
-        const auto http=settings.value("httpPort"),https=settings.value("httpsPort");
-        const auto caPath=root+"/fixture-ca.pem";
-        if(settings.size()!=3||!http.isDouble()||http.toDouble()!=http.toInt()||http.toInt()<1||http.toInt()>65535
-            ||!https.isDouble()||https.toDouble()!=https.toInt()||https.toInt()<1||https.toInt()>65535||http==https
-            ||!controlledPath(caPath))return false;
-        QFile ca(caPath);
-        if(!ca.open(QIODevice::ReadOnly)||ca.size()>16384
-            ||QString::fromLatin1(QCryptographicHash::hash(ca.read(16385),QCryptographicHash::Sha256).toHex())!=settings.value("caSha256").toString())return false;
-        session->fixtureHttpPort=http.toInt();session->fixtureHttpsPort=https.toInt();session->fixtureCaPath=caPath;
-    }
-    return true;
+    if(!input.value("fixture").isObject())return false;
+    const auto settings=input.value("fixture").toObject();
+    if(!controlledKeys(settings,{"httpPort","httpsPort","socksPort","caSha256"}))return false;
+    ControlledNodeSession candidate;
+    candidate.root=QDir::cleanPath(root);candidate.sourceSha=input.value("sourceSha").toString();
+    candidate.nonce=input.value("nonce").toString();candidate.nodeOrdinal=1;
+    if(!controlledPort(input.value("proxyPort"),&candidate.proxyPort)
+        ||!controlledPort(settings.value("httpPort"),&candidate.fixtureHttpPort)
+        ||!controlledPort(settings.value("httpsPort"),&candidate.fixtureHttpsPort)
+        ||!controlledPort(settings.value("socksPort"),&candidate.fixtureSocksPort)
+        ||QSet<int>{candidate.proxyPort,candidate.fixtureHttpPort,candidate.fixtureHttpsPort,candidate.fixtureSocksPort}.size()!=4
+        ||!QDir(root).entryList(QStringList{"nodes.dpapi*","fixture-store-*"},QDir::AllEntries|QDir::Hidden|QDir::System|QDir::NoDotAndDotDot).isEmpty()
+        ||QFileInfo::exists(root+"/result.json")||QFileInfo::exists(root+"/state.json"))return false;
+    const auto caHash=settings.value("caSha256").toString();
+    if(caHash!=QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311")
+        &&caHash!=QStringLiteral("e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b"))return false;
+    const auto caPath=root+"/fixture-ca.pem";
+    QFile ca(caPath);
+    if(!controlledPath(caPath)||!ca.open(QIODevice::ReadOnly)||ca.size()>16384)return false;
+    candidate.fixtureCa=ca.read(16385);
+    if(QString::fromLatin1(QCryptographicHash::hash(candidate.fixtureCa,QCryptographicHash::Sha256).toHex())!=caHash)return false;
+    QByteArray proof;
+    if(!controlledPrivateProof(&proof))return false;
+    const auto digest=QCryptographicHash::hash(bytes,QCryptographicHash::Sha256);
+    if(proof.left(32)!=digest){proof.fill('\0');return false;}
+    auto key=proof.mid(32,32);
+    const bool owned=controlledProveFixture(candidate,digest,key);
+    key.fill('\0');
+    if(!owned){proof.fill('\0');return false;}
+    candidate.fixturePassword=QString::fromLatin1(proof.mid(64,32).toHex());proof.fill('\0');
+    if(!controlledCreateFixtureCatalog(&candidate))return false;
+    *session=std::move(candidate);return true;
 #else
     Q_UNUSED(root);Q_UNUSED(session);return false;
 #endif

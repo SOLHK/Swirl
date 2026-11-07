@@ -534,7 +534,8 @@ class _ExecutionEvidence:
 
 
 class Supervisor:
-    def __init__(self, ledger, identity, billing=None):
+    def __init__(self, ledger, identity, billing=None, *, billing_response_contract="synthetic_qa_v1"):
+        from PrivateSubscriptionBilling import QA_RESPONSE_CONTRACT, RESPONSE_CONTRACTS
         ledger.require_synthetic()
         if not isinstance(identity, WorkerIdentity) or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
             raise BudgetError("WorkerIdentityRequired")
@@ -542,7 +543,11 @@ class Supervisor:
             ledger._require_billing_session(billing)
         elif billing is not None:
             raise BudgetError("SyntheticBillingSessionRequired")
+        if (not isinstance(billing_response_contract, str) or billing_response_contract not in RESPONSE_CONTRACTS
+                or (billing is None and billing_response_contract != QA_RESPONSE_CONTRACT)):
+            raise BudgetError("BillingResponseContractRejected")
         self.ledger, self.identity, self.billing = ledger, identity, billing
+        self.billing_response_contract = billing_response_contract
 
     def _identity_fields(self):
         return {"source_sha": self.identity.metadata["source_sha"], "worker_sha256": self.identity.sha256,
@@ -564,6 +569,20 @@ class Supervisor:
         started = time.monotonic()
         elapsed = 0
         timeout_ms = plan["timeoutMs"]
+        # Diagnostic observations only. All times share the existing deadline
+        # epoch; no event changes admission, timing, persistence or cleanup.
+        _diagnostic_phases = {key: None for key in (
+            "clock_started", "spawn_returned", "spawn_state_persisted", "grant_send_started", "grant_sent",
+            "ready_received", "ready_validated", "guard_ready_state_persisted", "running_state_persisted",
+            "start_send_started", "start_sent", "first_running_received", "active_state_persisted",
+            "cancel_send_started", "cancel_sent", "finished_received", "os_exit_proved", "readers_finished",
+            "child_closed", "fixture_closed", "cleanup_checked")}
+        _diagnostic_last_send = None
+
+        def _diagnostic_mark(name, observed=None):
+            if _diagnostic_phases["clock_started"] is not None:
+                _diagnostic_phases[name] = int(((time.monotonic() if observed is None else observed) - started) * 1000)
+
         try:
             fixture = _OwnedFixture(self.ledger.root, workload, plan["byteLimit"], challenge, nonce, billing_query)
             grant = {"task_id": TASK, "ledger_id": self.ledger.data["ledgerId"], "sequence": int(ticket),
@@ -579,22 +598,38 @@ class Supervisor:
             self.identity.recheck()
             started = time.monotonic()
             deadline = started + timeout_ms / 1000
+            _diagnostic_phases["clock_started"] = 0
             child = OwnedProcess([str(self.identity.path), "--internal-private-acceptance-worker"],
                                  deadline=deadline, environment=_environment())
+            _diagnostic_mark("spawn_returned")
             self.ledger.advance_supervised(ticket, "spawned", process=child)
+            _diagnostic_mark("spawn_state_persisted")
             frames = _Frames(child)
+            _diagnostic_last_send = "grant"
+            _diagnostic_mark("grant_send_started")
             frames.send({**envelope, "op": "grant", "grant": grant})
+            _diagnostic_mark("grant_sent")
             ready = frames.receive(deadline)
+            _diagnostic_mark("ready_received")
             _check_envelope(ready, envelope, self.identity, "ready")
             validate_guard_receipt(ready.get("guard"), plan, initial=True)
+            _diagnostic_mark("ready_validated")
             previous_guard = ready["guard"]
             self.ledger.advance_supervised(ticket, "guard_ready")
+            _diagnostic_mark("guard_ready_state_persisted")
             self.ledger.advance_supervised(ticket, "running")
+            _diagnostic_mark("running_state_persisted")
+            _diagnostic_last_send = "start"
+            _diagnostic_mark("start_send_started")
             frames.send({**envelope, "op": "start"})
+            _diagnostic_mark("start_sent")
             cancelled = False
             while True:
                 if cancel_event is not None and cancel_event.is_set() and not cancelled:
+                    _diagnostic_last_send = "cancel"
+                    _diagnostic_mark("cancel_send_started")
                     frames.send({**envelope, "op": "cancel"})
+                    _diagnostic_mark("cancel_sent")
                     cancelled = True
                 try:
                     reply = frames.receive(min(deadline, time.monotonic() + 0.025))
@@ -614,11 +649,14 @@ class Supervisor:
                 if operation == "running":
                     if observed_running or reply.get("fixture_verified") is not True:
                         raise BudgetError("InvalidRunningReceipt")
+                    _diagnostic_mark("first_running_received", received_at)
                     observed_running = True
                     self.ledger.advance_supervised(ticket, "active")
+                    _diagnostic_mark("active_state_persisted")
                     continue
                 if operation == "snapshot":
                     raise BudgetError("UnrequestedSnapshotReceipt")
+                _diagnostic_mark("finished_received", received_at)
                 if reply.get("outcome") not in OUTCOMES or type(reply.get("fixture_verified")) is not bool:
                     raise BudgetError("InvalidWorkerOutcome")
                 outcome = OUTCOMES[reply["outcome"]]
@@ -634,15 +672,15 @@ class Supervisor:
                 elif "metrics" in reply:
                     raise BudgetError("UnexpectedProbeMetrics")
                 if outcome == "BillingSnapshotSucceeded":
-                    from PrivateSubscriptionBilling import validate_snapshot
                     # Only the Rust success route can produce this typed
                     # exchange; the modeled response is never taken directly.
                     if billing_query is None or workload != "billing_snapshot":
                         raise BudgetError("UnexpectedBillingReceipt")
-                    validate_snapshot(reply.get("billing"), billing_query.session.binding)
+                    billing_query.validate_payload(reply.get("billing"))
                 elif "billing" in reply:
                     raise BudgetError("UnexpectedBillingReceipt")
                 exit_proof = child.wait(timeout=max(0.001, deadline - time.monotonic()))
+                _diagnostic_mark("os_exit_proved")
                 if (exit_proof.record()["exitCode"] != 0 or not reply["fixture_verified"]
                         or not observed_running or fixture.authenticated_connections != 1 or fixture.protocol_errors):
                     raise BudgetError("IncompleteSyntheticEvidence")
@@ -663,18 +701,21 @@ class Supervisor:
                 try:
                     if exit_proof is None:
                         exit_proof = child.terminate_and_wait()
+                        _diagnostic_mark("os_exit_proved")
                 except BudgetError:
                     outcome = "ProcessExitUnconfirmed"
                 if frames is not None:
                     try:
                         frames.finish()
                         frames_finished = True
+                        _diagnostic_mark("readers_finished")
                     except BudgetError as error:
                         if complete or outcome == "CoordinatorFailure":
                             outcome = str(error)
                 try:
                     child.close()
                     child_closed = True
+                    _diagnostic_mark("child_closed")
                 except BudgetError:
                     outcome = "ProcessExitUnconfirmed"
                 elapsed = int((time.monotonic() - started) * 1000)
@@ -682,10 +723,12 @@ class Supervisor:
                 try:
                     fixture.close()
                     fixture_closed = True
+                    _diagnostic_mark("fixture_closed")
                 except BudgetError:
                     outcome = "FixtureExitUnconfirmed"
         cleanup = exit_proof is not None and frames_finished and child_closed and fixture_closed
         complete = complete and cleanup
+        _diagnostic_mark("cleanup_checked")
         record = {"schema": 1, "scope": SYNTHETIC_DOMAIN, **self._identity_fields(),
                   "reservation_id": ticket, "config_fingerprint": fingerprint, "workload": workload,
                   "plan": plan, "outcome": outcome, "settled": False, "guard": final_guard,
@@ -693,6 +736,10 @@ class Supervisor:
                   "localMeasurement": "unknown-full-reservation-held", "cleanupConfirmed": cleanup,
                   "exit": None if exit_proof is None else exit_proof.record(), "parentElapsedMs": elapsed,
                   "fixture": None if fixture is None else fixture.report(),
+                  "diagnostics": {"clock": "existing-parent-deadline-monotonic-ms", "phaseMs": _diagnostic_phases,
+                      "lastSendOperation": _diagnostic_last_send,
+                      "frames": None if frames is None else {"stderrBytes": frames.stderr_bytes,
+                          "pendingFrames": frames.frames.qsize(), "liveReaders": sum(reader.is_alive() for reader in frames.readers)}},
                   "providerRequests": 0, "realNodeRequests": 0, "liveReady": False}
         return _ExecutionEvidence(_EXECUTION_ISSUER, record, exit_proof=exit_proof, guard=final_guard,
                                   receipt=final_receipt, received=received, query=billing_query,
@@ -720,34 +767,44 @@ class Supervisor:
         return {**evidence.record, "ledger": self.ledger.summary()}
 
     def _billing_query(self, purpose, parent_ticket=None, *, timeout_ms=2000):
-        from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, WORKLOAD
+        from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, WORKLOAD, HTTP_RESPONSE_CONTRACT
         self.ledger._require_billing_session(self.billing)
         self.identity.recheck()
         nonce = secrets.token_hex(32)
         fingerprint = digest({"domain": "synthetic-billing-control-v1", "nonce": nonce,
-                              "purpose": purpose, "parent": parent_ticket})
+                              "purpose": purpose, "parent": parent_ticket, "response_contract": self.billing_response_contract})
         ticket = self.ledger.reserve_billing_control(self.billing, purpose=purpose, parent_ticket=parent_ticket,
-            timeout_ms=timeout_ms, config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce)
+            timeout_ms=timeout_ms, config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce,
+            response_contract=self.billing_response_contract)
         query = self.billing.query(ticket, nonce)
         plan = tcp_plan(BYTE_LIMIT, CONNECTION_LIMIT, timeout_ms)
         evidence = self._execute_reserved(ticket, WORKLOAD, plan, nonce, fingerprint, billing_query=query)
-        observation = None
+        observation = http_observation = None
         if evidence.complete:
             try:
-                observation = self.billing.observation(query, evidence)
-                self.ledger.check_billing_observation(self.billing, ticket, observation)
+                if query.response_contract == HTTP_RESPONSE_CONTRACT:
+                    http_observation = self.billing.http_observation(query, evidence)
+                    self.ledger.check_http_billing_observation(self.billing, ticket, http_observation)
+                    evidence.record["outcome"] = "ProviderAccountBindingUnproven"
+                else:
+                    observation = self.billing.observation(query, evidence)
+                    self.ledger.check_billing_observation(self.billing, ticket, observation)
             except BudgetError as error:
-                observation = None
+                observation = http_observation = None
                 evidence.record["outcome"] = str(error)
         if evidence.cleanup:
             self.ledger.consume_billing_control(self.billing, ticket, evidence.guard, evidence.exit_proof,
-                                                evidence.record["outcome"], observation)
+                                                evidence.record["outcome"], observation, http_observation=http_observation)
             evidence.record.update(controlConsumed=True, controlDebit=plan["byteLimit"] + plan["receiveReservation"],
                                    localMeasurement="socket-counters" if evidence.guard is not None else "unknown")
         else:
             self.ledger.retain_supervised(ticket, evidence.record["outcome"])
             evidence.record.update(controlConsumed=False, controlDebit=0)
         evidence.record["billingObservationAccepted"] = observation is not None
+        if query.response_contract == HTTP_RESPONSE_CONTRACT:
+            evidence.record.update(httpObservationRecorded=http_observation is not None and evidence.cleanup,
+                                   httpObservation=None if http_observation is None else http_observation.record(),
+                                   providerAuthorization="account-history-and-coverage-unproven")
         evidence.record["controlDebitIsMeasuredTraffic"] = False
         return observation, evidence.record
 
@@ -842,8 +899,12 @@ def main(argv=None):
     parser.add_argument("--timeout-ms", type=int, default=2000)
     parser.add_argument("--synthetic-billing", action="store_true",
                         help="Use only the parent's owned TLS billing fixture; never an official provider")
+    parser.add_argument("--billing-response-contract", choices=("synthetic_qa_v1", "subscription_userinfo_v1"),
+                        default="synthetic_qa_v1", help="Owned fixture response shape; HTTP counters cannot authorize a node")
     try:
         args = parser.parse_args(argv)
+        if args.billing_response_contract != "synthetic_qa_v1" and not args.synthetic_billing:
+            raise BudgetError("SyntheticBillingSessionRequired")
         if args.synthetic_billing:
             Ledger.require_existing(args.state_dir)
         identity = WorkerIdentity.inspect(args.worker, args.expected_source, args.worker_sha256)
@@ -854,7 +915,8 @@ def main(argv=None):
             if args.synthetic_billing:
                 from PrivateSubscriptionBilling import BillingSession
                 billing_session = BillingSession.register(ledger)
-            report = Supervisor(ledger, identity, billing_session).run(args.workload, node=args.node,
+            report = Supervisor(ledger, identity, billing_session,
+                                billing_response_contract=args.billing_response_contract).run(args.workload, node=args.node,
                                                     byte_limit=args.byte_limit, timeout_ms=args.timeout_ms)
         print(json.dumps(report, sort_keys=True))
         return 0 if report["settled"] else 2
@@ -867,4 +929,10 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # Billing validates the exact sealed execution type through this canonical
+    # module name. Running the CLI must not create a second issuer/type when
+    # its late import resolves this file again under a different name.
+    if sys.modules.setdefault("PrivateSubscriptionSupervisor", sys.modules[__name__]) is not sys.modules[__name__]:
+        print('{"error":"PrivateSupervisorModuleIdentity","liveReady":false}')
+        raise SystemExit(2)
     raise SystemExit(main())

@@ -340,7 +340,7 @@ class BillingEndToEndTests(unittest.TestCase):
         storage = self.ledger.windows if self.ledger.windows else budget.os
         with mock.patch.object(storage, "replace", side_effect=OSError("injected reservation write")), \
              mock.patch.object(supervisor, "OwnedProcess", side_effect=AssertionError("spawn before durable reserve")):
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(OSError, "injected reservation write"):
                 self.runner.run("core_probe")
         with self.assertRaisesRegex(budget.BudgetError, "LedgerCommitUncertain"):
             self.ledger.summary()
@@ -356,7 +356,7 @@ class BillingEndToEndTests(unittest.TestCase):
                 raise OSError("injected pending write")
             return replace(source, target)
         with mock.patch.object(storage, "replace", side_effect=fail_pending):
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(OSError, "injected pending write"):
                 self.runner.run("core_probe", timeout_ms=3000)
         durable = json.loads(self.ledger.path.read_text())
         nodes = [h for h in durable["history"].values() if h["node"]]
@@ -375,7 +375,7 @@ class BillingEndToEndTests(unittest.TestCase):
                 raise OSError("injected settlement write")
             return replace(source, target)
         with mock.patch.object(storage, "replace", side_effect=fail_settle):
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(OSError, "injected settlement write"):
                 self.runner.run("core_probe", timeout_ms=3000)
         durable = self.ledger.path.read_bytes()
         self.ledger.__exit__()

@@ -1179,14 +1179,46 @@ def parse_dependents(text):
     return values
 
 
-def normalized_parser(data):
-    # Windows SDK source snippets use CRLF, while the pinned Git checkout uses
-    # LF. Preserve every other byte except generated source-location strings.
-    data = data.replace(b"\r\n", b"\n")
-    return re.sub(rb'(?m)^(#line [0-9]+ ")[^"\r\n]+(")\r?$', rb'\1<SOURCE_LOCATION>\2', data)
+def byte_identity(data):
+    return {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def verify_headers(source, build, stock):
+def source_header_stock_bytes(data):
+    # The source checkout is independently pinned to exact Git blob bytes. This
+    # one-way transform reconstructs the locked Windows archive, not arbitrary
+    # input normalization: bare CR, mixed EOL and any other byte change fail.
+    require(b"\r" not in data and b"\n" in data, "SourceHeaderMustBeCanonicalLf")
+    return data.replace(b"\n", b"\r\n")
+
+
+def expected_parser_bytes(stock_data, contract):
+    require(byte_identity(stock_data) == contract["stock_raw"], "StockParserHeaderPinMismatch")
+    require(stock_data.count(b"\r\n") == contract["stock_crlf_count"]
+            and stock_data.count(b"\n") == contract["stock_lf_count"], "StockParserEolShapeMismatch")
+    old_path = contract["stock_grammar_path"].encode("ascii")
+    new_path = contract["build_grammar_path"].encode("ascii")
+    expected_lines = [b'#line ' + str(n).encode("ascii") + b' "' + old_path + b'"\n'
+                      for n in contract["line_numbers"]]
+    require(re.findall(rb'(?m)^#line[^\n]*\n', stock_data) == expected_lines,
+            "StockParserLineDirectivesMismatch")
+    result = stock_data.replace(b"\r\n", b"\n")
+    require(b"\r" not in result, "StockParserUnexpectedCarriageReturn")
+    for old_line in expected_lines:
+        require(result.count(old_line) == 1, "ParserLineDirectiveNotUnique")
+        result = result.replace(old_line, old_line.replace(old_path, new_path))
+    require(byte_identity(result) == contract["expected_built_lf"], "ExpectedParserHeaderPinMismatch")
+    return result
+
+
+def preserve_header_input(evidence, flavor, relative, data):
+    target = evidence / "header-inputs" / flavor / relative
+    plain_path(target, root=evidence, exists=False)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(data)
+
+
+def verify_headers(source, build, stock, lock, evidence):
     result = []
     private = stock / "include/QtQml/6.12.0/QtQml/private"
     source_by_name = {}
@@ -1196,64 +1228,128 @@ def verify_headers(source, build, stock):
         "qtqml-config_p.h": build / "src/qml/qtqml-config_p.h",
         "qqmljsgrammar_p.h": build / "src/qml/qqmljsgrammar_p.h",
         "qqmljsparser_p.h": build / "src/qml/qqmljsparser_p.h",
+        "qtqml-config.h": build / "src/qml/qtqml-config.h",
     }
     require(private.is_dir(), "StockQmlPrivateHeadersMissing")
-    for path in sorted(private.glob("*.h")):
+    paths = list(private.glob("*.h"))
+    # Public source headers have the same observed archive EOL contract. Other
+    # generated public headers still require exact bytes at module installation.
+    paths += [p for p in (stock / "include/QtQml").glob("*.h")
+              if p.name in source_by_name or p.name == "qtqml-config.h"]
+    for path in sorted(paths):
+        relative = path.relative_to(stock).as_posix()
         data = path.read_bytes()
+        preserve_header_input(evidence, "stock", relative, data)
+        source_path = None
+        expected_stock = None
         if path.name in generated:
             candidate = generated[path.name]
             other = candidate.read_bytes()
-            okay = (normalized_parser(data) == normalized_parser(other)
-                    if path.name == "qqmljsparser_p.h" else data == other)
-            method = "source-location-and-crlf-normalization" if path.name == "qqmljsparser_p.h" else "exact-generated"
+            preserve_header_input(evidence, "candidate", relative, other)
+            expected = data
+            method = "exact-generated"
+            if path.name == "qqmljsparser_p.h":
+                contract = lock["header_identity"]["parser"]
+                require(relative == contract["path"], "UnexpectedParserHeaderPath")
+                actual_grammar_path = os.path.relpath(source / "src/qml/parser/qqmljs.g",
+                                                     build / "src/qml").replace("\\", "/")
+                require(actual_grammar_path == contract["build_grammar_path"],
+                        "UnexpectedParserGrammarLocation")
+                expected = expected_parser_bytes(data, contract)
+                method = "pinned-parser-CRLF-and-seven-exact-line-paths"
+            preserve_header_input(evidence, "expected-candidate", relative, expected)
+            okay = other == expected
         else:
             candidates = source_by_name.get(path.name, [])
-            matches = [p for p in candidates
-                       if p.read_bytes().replace(b"\r\n", b"\n") == data.replace(b"\r\n", b"\n")]
-            okay, candidate = bool(matches), matches[0] if matches else None
-            method = ("exact-source" if candidate and candidate.read_bytes() == data
-                      else "exact-source-after-crlf-to-lf")
-        result.append({"path": path.relative_to(stock).as_posix(), "stock": file_identity(path),
-                       "matched": okay, "candidate": str(candidate) if candidate else None,
-                       "candidate_identity": file_identity(candidate) if candidate else None, "method": method})
-    public = stock / "include/QtQml/qtqml-config.h"
-    rebuilt = build / "src/qml/qtqml-config.h"
-    result.append({"path": "include/QtQml/qtqml-config.h", "stock": file_identity(public),
-                   "matched": public.read_bytes() == rebuilt.read_bytes(),
-                   "candidate": str(rebuilt), "method": "exact-generated"})
-    require(len(result) >= 250, "PrivateHeaderCoverageIncomplete")
+            matches = [p for p in candidates if b"\r" not in p.read_bytes()
+                       and source_header_stock_bytes(p.read_bytes()) == data]
+            candidate = matches[0] if len(matches) == 1 else (candidates[0] if len(candidates) == 1 else None)
+            okay = len(matches) == 1
+            other = candidate.read_bytes() if candidate else None
+            expected = other
+            method = "canonical-source-LF-to-stock-CRLF"
+            if candidate:
+                source_path = candidate.relative_to(source).as_posix()
+                preserve_header_input(evidence, "candidate", relative, other)
+                expected_stock = source_header_stock_bytes(other)
+                preserve_header_input(evidence, "expected-stock", relative, expected_stock)
+        result.append({"path": relative, "stock": byte_identity(data), "matched": okay,
+                       "candidate": str(candidate) if candidate else None, "method": method,
+                       "source_path": source_path, "candidate_raw": byte_identity(other) if other is not None else None,
+                       "expected_candidate": byte_identity(expected) if expected is not None else None,
+                       "expected_stock": byte_identity(expected_stock) if expected_stock is not None else None})
     return result
+
+
+def verify_header_contract(review, lock):
+    contract = lock["header_identity"]
+    require(all(row["matched"] for row in review), "QtQmlPrivateHeaderOrFeatureMismatch")
+    mapping = [{k: row[k] for k in ("path", "source_path", "stock", "candidate_raw", "expected_stock")}
+               for row in review if row["method"] == "canonical-source-LF-to-stock-CRLF"]
+    require(len(review) == contract["header_review_count"] and len(mapping) == contract["source_headers"],
+            "QmlHeaderCoverageChanged")
+    mapping = sorted(mapping, key=lambda row: row["path"])
+    require(canonical_digest(mapping) == contract["source_header_mapping_sha256"],
+            "QmlSourceHeaderMappingPinMismatch")
+    return {"headers": len(review), "source_headers": len(mapping),
+            "source_header_mapping_sha256": canonical_digest(mapping),
+            "generated_feature_and_grammar_headers": "exact original bytes",
+            "parser": "exact expected bytes from pinned stock; no token or whitespace normalization"}
 
 
 def permitted_override(path, before, after):
     if before == after:
         return True
-    if path == "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h":
-        return before is not None and normalized_parser(before) == normalized_parser(after)
-    if re.fullmatch(r"include/QtQml/(?:6\.12\.0/QtQml/private/)?[A-Za-z0-9_]+\.h", path):
-        return before is not None and before.replace(b"\r\n", b"\n") == after.replace(b"\r\n", b"\n")
     return bool(re.fullmatch(
         r"(?:bin/Qt6Qml\.(?:dll|pdb)|lib/Qt6Qml\.(?:lib|prl|pdb|debug)"
         r"|modules/Qml\.json|lib/cmake/Qt6Qml(?:Private)?/[^/]+"
         r"|mkspecs/modules/qt_lib_qml(?:_private)?\.pri|lib/pkgconfig/Qt6Qml\.pc)", path))
 
 
-def verify_module_stage(stage, stock):
+def verify_module_stage(stage, stock, header_review):
     staged = inventory(stage)
     require("bin/Qt6Qml.dll" in staged and "lib/Qt6Qml.lib" in staged,
             "WindowsQmlModuleOutputsMissing")
-    changes = []
+    changes, retained = [], []
+    headers = {row["path"]: row for row in header_review}
     for relative in staged:
         original, changed = stock / relative, stage / relative
         old = original.read_bytes() if original.is_file() else None
         new = changed.read_bytes()
         require(old is not None or permitted_override(relative, None, new),
                 "UnexpectedNewModuleFile:" + relative)
-        require(permitted_override(relative, old, new), "UnexpectedModuleMetadataOrHeaderChange:" + relative)
+        if relative in headers:
+            row = headers[relative]
+            require(old is not None and row["matched"] and byte_identity(old) == row["stock"]
+                    and byte_identity(new) == row["candidate_raw"], "ModuleHeaderChangedAfterReview:" + relative)
+            if old != new:
+                retained.append(relative)
+        else:
+            require(permitted_override(relative, old, new), "UnexpectedModuleMetadataOrHeaderChange:" + relative)
         if old != new:
             changes.append(relative)
     require("bin/Qt6Qml.dll" in changes, "QmlRuntimeWasNotRebuilt")
-    return staged, changes
+    return staged, changes, retained
+
+
+def compose_derived_kit(stock, stage, derived, stock_before, staged, retained_headers):
+    require(not derived.exists(), "DerivedKitMustBeFresh")
+    require(len(set(retained_headers)) == len(retained_headers)
+            and all(path.startswith("include/QtQml/") and path in stock_before and path in staged
+                    for path in retained_headers), "InvalidRetainedHeaderSet")
+    shutil.copytree(stock, derived, copy_function=shutil.copy2)
+    for relative in staged:
+        if relative in retained_headers or stock_before.get(relative) == staged[relative]:
+            continue
+        target = derived / relative
+        plain_path(target, root=derived, exists=False)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(stage / relative, target)
+    derived_files = inventory(derived)
+    expected_files = dict(stock_before)
+    expected_files.update({path: item for path, item in staged.items() if path not in retained_headers})
+    assert_same_tree(expected_files, derived_files)
+    return derived_files
 
 
 def cmake_quote(path):
@@ -1697,9 +1793,10 @@ def main():
             work, commands, 1200, context=compile_context, lock=lock, tool_identities=report["tools"],
             known_executables=known_executables, env=env)
         report["stage"] = "headers-and-install-closure"
-        header_review = verify_headers(source, build, stock)
+        shutil.copyfile(build / "build.ninja", evidence / "build.ninja")
+        header_review = verify_headers(source, build, stock, lock, evidence)
         write_json(evidence / "header-alignment.json", header_review)
-        require(all(x["matched"] for x in header_review), "QtQmlPrivateHeaderOrFeatureMismatch")
+        report["header_contract"] = verify_header_contract(header_review, lock)
         install_script = build / "src/qml/cmake_install.cmake"
         text = install_script.read_text(encoding="utf-8")
         require(not re.search(r"(?m)^\s*include\s*\(", text), "ModuleInstallWouldRecurse")
@@ -1723,7 +1820,9 @@ def main():
             encoding="utf-8")
         shutil.copyfile(install_driver, evidence / "install-qml-only.cmake")
         run("12-install-qml-only", [tools["cmake.exe"], "-P", install_driver], seconds=120, env=env)
-        staged, changes = verify_module_stage(module_stage, stock)
+        staged, changes, retained_headers = verify_module_stage(module_stage, stock, header_review)
+        write_json(evidence / "module-header-retention.json",
+                   [row for row in header_review if row["path"] in retained_headers])
         for relative in staged:
             if relative.endswith((".cmake", ".pc", ".pri", ".prl")):
                 data = (module_stage / relative).read_text(encoding="utf-8")
@@ -1741,6 +1840,7 @@ def main():
         require(set(recorded) == set(staged), "ModuleInstallManifestMismatch")
         write_json(evidence / "module-files.json", staged)
         report["module_install"] = {"files": len(staged), "approved_changes": changes,
+                                    "retained_stock_headers": retained_headers,
                                     "duplicate_manifest_entries": len(recorded) - len(set(recorded))}
         report["stage"] = "exports-and-dependencies"
         for flavor, directory in (("stock", stock), ("patched", module_stage)):
@@ -1771,19 +1871,8 @@ def main():
                 require((stock / "bin" / name).is_file(), "UnresolvedQtQmlDependency:" + name)
         report["stage"] = "compose-complete-derived-kit"
         derived = work / "derived"
-        require(not derived.exists(), "DerivedKitMustBeFresh")
-        shutil.copytree(stock, derived, copy_function=shutil.copy2)
-        for relative in staged:
-            if stock_before.get(relative) == staged[relative]:
-                continue
-            target = derived / relative
-            plain_path(target, root=derived, exists=False)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(module_stage / relative, target)
-        derived_files = inventory(derived)
-        expected_files = dict(stock_before)
-        expected_files.update(staged)
-        assert_same_tree(expected_files, derived_files)
+        derived_files = compose_derived_kit(stock, module_stage, derived, stock_before,
+                                           staged, retained_headers)
         stock_after = inventory(stock)
         assert_same_tree(stock_before, stock_after)
         write_json(evidence / "derived-files.json", derived_files)
@@ -1792,6 +1881,8 @@ def main():
                       stock_unchanged=True, derived_delta=compare_tree(stock_before, derived_files))
         report["inherited_sdk_scope"] = (
             "Complete stock kit copy plus the inspected Qml Release install closure. "
+            "Headers with proven source EOL/parser source-location differences retain their "
+            "exact official stock bytes in the derived kit; raw build headers are preserved separately. "
             "Stock Debug binaries and original SDK SBOM files remain original; they do not "
             "attest the modified Release QtQml. This receipt/source/patch describe that derivation. "
             "No Rust Core or OpenSSL product pairing is changed or accepted by this fixture workflow.")

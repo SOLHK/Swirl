@@ -390,23 +390,39 @@ jobs:
           $fixture = (Resolve-Path 'src/Swirl.Quick/tests/fixtures').Path
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/controlled-node-sessions'
           New-Item -ItemType Directory -Path $evidence | Out-Null
-          foreach ($mode in @('positive','wrong-ca','stall')) {
+          $admissionModes = @('missing-proof','missing-fixture','preexisting-store','wrong-proof')
+          foreach ($mode in (@('positive','wrong-ca','stall') + $admissionModes)) {
             $output = Join-Path $env:RUNNER_TEMP ('swirl-controlled-' + $mode + '-' + [guid]::NewGuid().ToString('N'))
             $arguments = @('tools/RunControlledNodeAcceptance.py','--exe',$exe,'--exe-sha256',$exeHash,'--core-sha256',$coreHash,'--expected-source',$env:GITHUB_SHA,'--output-directory',$output,'--qt-root',$env:QT_ROOT_DIR,'--fixture-directory',$fixture)
             if ($mode -eq 'wrong-ca') { $arguments += '--fixture-wrong-ca' }
             if ($mode -eq 'stall') { $arguments += '--fixture-stall' }
+            if ($mode -in $admissionModes) { $arguments += @('--fixture-admission-control',$mode) }
             python @arguments
             $exitCode = $LASTEXITCODE
             $summaryPath = Join-Path $output 'summary.json'
             if (!(Test-Path -LiteralPath $summaryPath -PathType Leaf)) { throw "Missing synthetic UI receipt: $mode" }
             Copy-Item -LiteralPath $summaryPath -Destination (Join-Path $evidence ($mode + '.json'))
             $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if ($summary.cases.Count -ne 1 -or $summary.liveReady -ne $false -or
+                !$summary.trafficAccountingRequiredForLive -or $summary.persistentBudgetGuardExercised -ne $false -or
+                $summary.uiSubscriptionImportExercised -ne $false -or $summary.uiPolicySelectionExercised -ne $false) {
+              throw "Synthetic UI scope was not preserved: $mode"
+            }
             $case = $summary.cases[0]
-            if (!$summary.fixtureOnly -or !$summary.fixture.tasksReleased -or !$case.retirement.processSignaled -or !$case.retirement.ownedJobEmpty) { throw "Incomplete synthetic UI retirement: $mode" }
+            if (!$summary.fixtureOnly -or !$summary.fixture.tasksReleased -or !$case.retirement.processSignaled -or !$case.retirement.ownedJobEmpty -or $case.retirement.error) { throw "Incomplete synthetic UI retirement: $mode" }
             if ($mode -eq 'positive' -and ($exitCode -ne 0 -or !$summary.passed)) { throw 'Selected-node UI HTTP/HTTPS positive control failed.' }
             if ($mode -eq 'wrong-ca' -and ($exitCode -ne 2 -or $summary.passed -or !@($case.result.proxyRequests | Where-Object tlsRejected).Count)) { throw 'Actual UI TLS rejection control failed.' }
             if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut)) { throw 'Actual UI hard-stop control failed.' }
+            if ($mode -in $admissionModes -and ($exitCode -ne 2 -or $summary.passed -or !$summary.admissionRefused -or
+                $case.retirement.exitCode -ne 64 -or $case.retirement.timedOut -or
+                $case.result -isnot [pscustomobject] -or @($case.result.psobject.Properties).Count -ne 0 -or
+                $summary.fixture.socksConnections -ne 0 -or $summary.fixture.forwarded -ne 0)) {
+              throw "Synthetic UI admission control failed: $mode"
+            }
           }
+          # The negative controls intentionally return 2. Only after every
+          # native exit and actual receipt above is checked is this step done.
+          exit 0
       - name: Preserve controlled synthetic UI session receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

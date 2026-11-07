@@ -89,6 +89,19 @@ jobs:
           if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
               raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
           print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          # Ordinary HTTP counters are transport observations, never provider authority.
+          http_evidence = evidence / 'http-counter-observation'
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_http_billing.py', '--evidence', str(http_evidence)], env=process_env, check=True)
+          http_result = json.loads((http_evidence / 'http-billing-results.json').read_text(encoding='utf-8'))
+          http_expected = {'schema': 1, 'scope': 'owned-synthetic-http-counter-observation-v1',
+                           'collected': 11, 'failures': 0, 'errors': 0, 'skipped': 0,
+                           'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                           'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                           'officialAccountStatistics': None, 'providerAccountAuthorization': 'unimplemented',
+                           'externalHistoryAnchor': False}
+          if any(type(http_result.get(key)) is not type(value) or http_result.get(key) != value for key, value in http_expected.items()):
+              raise SystemExit('HTTP counter evidence identity or required refusal coverage did not match.')
+          print('Verified all 11 HTTP counter controls without skips; no provider authorization was issued.')
           PY
       - name: Preserve controlled TLS billing evidence
         if: always()
@@ -512,6 +525,19 @@ jobs:
           if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
               raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
           print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          # Ordinary HTTP counters are transport observations, never provider authority.
+          http_evidence = evidence / 'http-counter-observation'
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_http_billing.py', '--evidence', str(http_evidence)], env=process_env, check=True)
+          http_result = json.loads((http_evidence / 'http-billing-results.json').read_text(encoding='utf-8'))
+          http_expected = {'schema': 1, 'scope': 'owned-synthetic-http-counter-observation-v1',
+                           'collected': 11, 'failures': 0, 'errors': 0, 'skipped': 0,
+                           'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                           'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                           'officialAccountStatistics': None, 'providerAccountAuthorization': 'unimplemented',
+                           'externalHistoryAnchor': False}
+          if any(type(http_result.get(key)) is not type(value) or http_result.get(key) != value for key, value in http_expected.items()):
+              raise SystemExit('HTTP counter evidence identity or required refusal coverage did not match.')
+          print('Verified all 11 HTTP counter controls without skips; no provider authorization was issued.')
           PY
       - name: Preserve Windows controlled TLS billing evidence
         if: always()

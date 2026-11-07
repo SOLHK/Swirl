@@ -26,8 +26,13 @@ BYTE_LIMIT = 65536
 CONNECTION_LIMIT = 2
 MAX_CONTROL_ATTEMPTS = 36
 MAX_FRESHNESS_SECONDS = 2.0
+QA_RESPONSE_CONTRACT = "synthetic_qa_v1"
+HTTP_RESPONSE_CONTRACT = "subscription_userinfo_v1"
+HTTP_OBSERVATION_SCOPE = "owned-synthetic-http-counter-observation-v1"
+RESPONSE_CONTRACTS = {QA_RESPONSE_CONTRACT, HTTP_RESPONSE_CONTRACT}
 _SESSION_ISSUER = object()
 _OBSERVATION_ISSUER = object()
+_HTTP_OBSERVATION_ISSUER = object()
 _QUERY_ISSUER = object()
 _FIELDS = {"schema", "domain", "authority_id", "account_id", "period_id", "request_nonce",
            "revision", "covered_sequence", "upload", "download", "total", "expire"}
@@ -55,6 +60,33 @@ def validate_snapshot(value, binding=None):
         raise BudgetError("SyntheticBillingCountersRejected")
     if binding is not None and any(value[key] != binding[key] for key in ("authority_id", "account_id", "period_id")):
         raise BudgetError("SyntheticBillingIdentityMismatch")
+
+
+def validate_http_observation(value):
+    """Validate data shape only; this cannot establish account/coverage facts."""
+    if (not isinstance(value, dict)
+            or set(value) != {"schema", "contract", "scope", "query_nonce", "counters", "http_metadata"}
+            or type(value["schema"]) is not int or value["schema"] != 1
+            or value["contract"] != HTTP_RESPONSE_CONTRACT or value["scope"] != HTTP_OBSERVATION_SCOPE
+            or not isinstance(value["query_nonce"], str) or not re.fullmatch(r"[0-9a-f]{64}", value["query_nonce"])):
+        raise BudgetError("HttpBillingObservationRejected")
+    counters, metadata = value["counters"], value["http_metadata"]
+    if (not isinstance(counters, dict) or set(counters) != {"upload", "download", "total", "expire"}
+            or not isinstance(metadata, dict) or set(metadata) != {"date", "age", "cache_control"}):
+        raise BudgetError("HttpBillingObservationRejected")
+    for key in ("upload", "download", "total"):
+        integer(counters[key])
+    if counters["expire"] is not None:
+        integer(counters["expire"])
+    if not counters["total"] or counters["upload"] + counters["download"] > counters["total"]:
+        raise BudgetError("HttpBillingObservationRejected")
+    if metadata["age"] is not None:
+        integer(metadata["age"])
+    for key, limit in (("date", 128), ("cache_control", 512)):
+        item = metadata[key]
+        if item is not None and (not isinstance(item, str) or not 1 <= len(item) <= limit
+                                 or any(not 32 <= ord(char) <= 126 for char in item)):
+            raise BudgetError("HttpBillingObservationRejected")
 
 
 @dataclass(frozen=True, init=False)
@@ -89,6 +121,43 @@ class BillingObservation:
         return self.record()
 
 
+@dataclass(frozen=True, init=False)
+class HttpBillingObservation:
+    """Sealed transport observation; deliberately NOT a BillingObservation.
+
+    The monotonic bound links data to this completed exchange. It says nothing
+    about invoice freshness, account ownership, attribution or exit coverage.
+    JSON and this type cannot authorize a node or settle a pending reservation.
+    """
+
+    _session: object
+    _payload: bytes
+    _received: float
+    _query: object
+    _seal: object
+
+    def __init__(self, issuer, session, query, payload, received):
+        if issuer is not _HTTP_OBSERVATION_ISSUER:
+            raise BudgetError("HttpBillingObservationRequired")
+        object.__setattr__(self, "_session", session)
+        object.__setattr__(self, "_query", query)
+        object.__setattr__(self, "_payload", canonical(payload))
+        object.__setattr__(self, "_received", received)
+        object.__setattr__(self, "_seal", issuer)
+
+    def record(self):
+        return json.loads(self._payload)
+
+    def require(self, session):
+        if self._seal is not _HTTP_OBSERVATION_ISSUER or self._session is not session or session.closed:
+            raise BudgetError("HttpBillingObservationRequired")
+        now = time.monotonic()
+        if not (self._query.created_monotonic <= self._received <= now
+                and now - self._query.created_monotonic <= MAX_FRESHNESS_SECONDS):
+            raise BudgetError("HttpBillingObservationExpired")
+        return self.record()
+
+
 class SyntheticBillingAuthority:
     """Explicit test provider model. Never an original-account authority.
 
@@ -101,7 +170,8 @@ class SyntheticBillingAuthority:
     FAULTS = {None, "wrong_account", "wrong_period", "wrong_nonce", "old_revision",
               "counter_reset", "redirect", "duplicate_header", "bad_ca", "wrong_sni",
               "expired_certificate", "unauthorized", "delayed_response", "oversized_header",
-              "unknown_header", "extra_body", "transfer_encoding", "nonzero_content_length", "noncanonical_number"}
+              "unknown_header", "extra_body", "transfer_encoding", "nonzero_content_length", "noncanonical_number",
+              "missing_userinfo", "duplicate_parameter", "unknown_parameter", "forged_coverage"}
 
     def __init__(self, *, upload=1000, download=2000, total=200_000_000_000, auto_cover=True):
         for value in (upload, download, total):
@@ -114,7 +184,18 @@ class SyntheticBillingAuthority:
         self.covered_sequence = 0
         self.auto_cover = auto_cover
         self._fault = None
+        self._http_metadata = None
         self.lock = threading.RLock()
+
+    def http_metadata_next(self, *, date=None, age=None, cache_control=None, expire=None):
+        """Controlled headers on this parent's own fixture, never URL inputs."""
+        metadata = {"date": date, "age": age, "cache_control": cache_control}
+        with self.lock:
+            validate_http_observation({"schema": 1, "contract": HTTP_RESPONSE_CONTRACT,
+                "scope": HTTP_OBSERVATION_SCOPE, "query_nonce": "0" * 64,
+                "counters": {"upload": self.upload, "download": self.download, "total": self.total, "expire": expire},
+                "http_metadata": metadata})
+            self._http_metadata = {**metadata, "expire": expire}
 
     def add_other_client_usage(self, upload=0, download=0):
         with self.lock:
@@ -160,14 +241,36 @@ class _BillingQuery:
         if issuer is not _QUERY_ISSUER:
             raise BudgetError("OwnedBillingQueryRequired")
         self._seal, self.session, self.ticket, self.nonce = issuer, session, str(ticket), nonce
+        history = session.ledger.data["history"].get(self.ticket)
+        if (history is None or history["phase"] != "reserved" or history["nonce"] != nonce
+                or not isinstance(history.get("billing"), dict) or history["billing"].get("kind") != "control"):
+            raise BudgetError("OwnedBillingQueryRequired")
+        self.response_contract = history["billing"].get("responseContract", QA_RESPONSE_CONTRACT)
+        if self.response_contract not in RESPONSE_CONTRACTS:
+            raise BudgetError("BillingResponseContractRejected")
         self.created_monotonic = time.monotonic()
-        self.payload, self.fault = session.authority._response(nonce)
+        with session.authority.lock:
+            self.payload, self.fault = session.authority._response(nonce)
+            self.http_metadata = session.authority._http_metadata or {
+                "date": None, "age": None, "cache_control": None, "expire": None}
+            session.authority._http_metadata = None
         self.http_status = None
         self.request_received = False
         self.request_authenticated = False
 
     def grant(self):
-        return {"schema": 1, "domain": DOMAIN, **self.session.binding, "request_nonce": self.nonce}
+        value = {"schema": 1, "domain": DOMAIN, **self.session.binding, "request_nonce": self.nonce}
+        if self.response_contract == HTTP_RESPONSE_CONTRACT:
+            value["response_contract"] = self.response_contract
+        return value
+
+    def validate_payload(self, value):
+        if self.response_contract == HTTP_RESPONSE_CONTRACT:
+            validate_http_observation(value)
+            if value["query_nonce"] != self.nonce:
+                raise BudgetError("HttpBillingObservationMismatch")
+        else:
+            validate_snapshot(value, self.session.binding)
 
     def configure_tls(self, tls):
         if self.fault == "bad_ca":
@@ -232,11 +335,28 @@ class _BillingQuery:
                 self.http_status = 302
             else:
                 value = self.payload
-                headers = [("Subscription-Userinfo", ";".join(f"{key}={value[key]}" for key in ("upload", "download", "total", "expire"))),
-                           ("X-Swirl-QA-Billing-Schema", "1"), ("X-Swirl-QA-Billing-Domain", DOMAIN)]
-                for header, key in (("Authority", "authority_id"), ("Account", "account_id"), ("Period", "period_id"),
-                                    ("Nonce", "request_nonce"), ("Revision", "revision"), ("Covered-Sequence", "covered_sequence")):
-                    headers.append(("X-Swirl-QA-Billing-" + header, str(value[key])))
+                if self.response_contract == HTTP_RESPONSE_CONTRACT:
+                    fields = [f"{key} = {value[key]}" for key in ("total", "download", "upload")]
+                    if self.http_metadata["expire"] is not None:
+                        fields.append("expire = " + str(self.http_metadata["expire"]))
+                    headers = [("Subscription-Userinfo", " ; ".join(fields))]
+                    for header, key in (("Date", "date"), ("Age", "age"), ("Cache-Control", "cache_control")):
+                        if self.http_metadata[key] is not None:
+                            headers.append((header, str(self.http_metadata[key])))
+                else:
+                    headers = [("Subscription-Userinfo", ";".join(f"{key}={value[key]}" for key in ("upload", "download", "total", "expire"))),
+                               ("X-Swirl-QA-Billing-Schema", "1"), ("X-Swirl-QA-Billing-Domain", DOMAIN)]
+                    for header, key in (("Authority", "authority_id"), ("Account", "account_id"), ("Period", "period_id"),
+                                        ("Nonce", "request_nonce"), ("Revision", "revision"), ("Covered-Sequence", "covered_sequence")):
+                        headers.append(("X-Swirl-QA-Billing-" + header, str(value[key])))
+                if self.fault == "missing_userinfo":
+                    headers = [header for header in headers if header[0] != "Subscription-Userinfo"]
+                elif self.fault == "duplicate_parameter":
+                    headers[0] = (headers[0][0], headers[0][1] + ";upload=1000")
+                elif self.fault == "unknown_parameter":
+                    headers[0] = (headers[0][0], headers[0][1] + ";account=1000")
+                elif self.fault == "forged_coverage":
+                    headers.append(("X-Swirl-QA-Billing-Covered-Sequence", "999"))
                 if self.fault == "duplicate_header":
                     headers.append(("Subscription-Userinfo", "upload=0;download=0;total=200000000000;expire=0"))
                 if self.fault == "oversized_header":
@@ -280,6 +400,7 @@ class BillingSession:
         self.query_lock = threading.RLock()
         self._pending_exits = {}
         self._observations = {}
+        self._http_observations = {}
         self._checkpoint = None
         self._root_identity = None
 
@@ -328,6 +449,7 @@ class BillingSession:
         from PrivateSubscriptionSupervisor import _ExecutionEvidence
         self.require(self.ledger)
         if (not isinstance(query, _BillingQuery) or query._seal is not _QUERY_ISSUER or query.session is not self
+                or query.response_contract != QA_RESPONSE_CONTRACT
                 or not isinstance(exchange, _ExecutionEvidence)):
             raise BudgetError("SyntheticBillingObservationRequired")
         payload, received_monotonic = exchange.billing_snapshot(query)
@@ -340,6 +462,22 @@ class BillingSession:
             raise BudgetError("SyntheticBillingObservationMismatch")
         observation = BillingObservation(_OBSERVATION_ISSUER, self, query, payload, received_monotonic)
         self._observations[query.ticket] = observation
+        return observation
+
+    def http_observation(self, query, exchange):
+        from PrivateSubscriptionSupervisor import _ExecutionEvidence
+        self.require(self.ledger)
+        if (not isinstance(query, _BillingQuery) or query._seal is not _QUERY_ISSUER or query.session is not self
+                or query.response_contract != HTTP_RESPONSE_CONTRACT or not isinstance(exchange, _ExecutionEvidence)):
+            raise BudgetError("HttpBillingObservationRequired")
+        payload, received = exchange.billing_snapshot(query)
+        now = time.monotonic()
+        if (type(received) is not float or not query.created_monotonic <= received <= now
+                or now - query.created_monotonic > MAX_FRESHNESS_SECONDS):
+            raise BudgetError("HttpBillingObservationExpired")
+        query.validate_payload(payload)
+        observation = HttpBillingObservation(_HTTP_OBSERVATION_ISSUER, self, query, payload, received)
+        self._http_observations[query.ticket] = observation
         return observation
 
     def mark_exit(self, ticket, proof, coverage_sequence):
@@ -356,3 +494,4 @@ class BillingSession:
         self.closed = True
         self._pending_exits.clear()
         self._observations.clear()
+        self._http_observations.clear()

@@ -19,8 +19,8 @@ $receipt=[ordered]@{schema=1;source_sha=$env:GITHUB_SHA
     controls=$null;error=$null;success=$false}
 try {
     $receipt.controls=[SwirlOwnedProfileCleanup.Native]::RunNativeControls($fixture)
-    $receipt.success=$receipt.controls.success -and $receipt.controls.total -eq 12 -and $receipt.controls.passed -eq 12
+    $receipt.success=$receipt.controls.success -and $receipt.controls.total -eq 16 -and $receipt.controls.passed -eq 16
 }catch {$receipt.error=$_.Exception.ToString()}
 finally {$receipt|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding UTF8}
 if(-not $receipt.success){throw 'The actual Win32 disposable-profile cleanup controls failed; see receipt.json.'}
-Write-Host '12 actual Win32 scoped-cleanup controls passed; this is synthetic filesystem evidence only.'
+Write-Host '16 actual Win32 scoped-cleanup controls passed (12 original, 4 sharing-retry controls); this is synthetic filesystem evidence only.'

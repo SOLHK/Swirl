@@ -20,6 +20,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ERROR = b'{"errorCode":"AuthenticatedBillingAndWireGuardRequired","networkStarted":false}'
+CONTROLLED_ERROR = b'{"errorCode":"LiveAcceptanceRequiresPersistentBudgetAndRustWorker","networkStarted":false}'
 MARKER = "SWIRL_REFUSAL_PRIVATE_SENTINEL"
 OPTIONS = ("--runtime-store", "--runtime-commands", "--runtime-state")
 
@@ -137,7 +138,7 @@ def main():
         report.update({"source_sha": source, "executable_sha256": sha256(executable),
                        "checkout_changes": subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).splitlines(),
                        "input_sha256": {name: sha256(ROOT / name) for name in
-                           ("src/Swirl.Quick/main.cpp", "tools/Invoke-WindowsRustAcceptance.ps1",
+                           ("src/Swirl.Quick/main.cpp", "tools/Invoke-WindowsRustAcceptance.ps1", "tools/RunControlledNodeAcceptance.py",
                             "tools/tests/test_runtime_acceptance_refusal.py")}})
         with tempfile.TemporaryDirectory(prefix="swirl-runtime-refusal-") as temporary:
             private = Path(temporary).resolve()
@@ -163,6 +164,15 @@ def main():
                 report["cases"].append(row)
                 if not row["success"]:
                     raise RuntimeError("ControlledSessionRefusalFailed")
+            for flag in ("--live", "--store"):
+                for form, arguments in (("bare",[flag]),("empty",[flag+"="]),
+                                        ("value",[flag+"="+str(paths[0])]),("separate",[flag,str(paths[0])])):
+                    row=run_case("controlled-launcher-refusal-"+flag[2:]+"-"+form,
+                                 [sys.executable,str(ROOT/"tools/RunControlledNodeAcceptance.py"),*arguments],
+                                 private,environment,output,expected_error=CONTROLLED_ERROR)
+                    report["cases"].append(row)
+                    if not row["success"]:
+                        raise RuntimeError("ControlledLauncherLiveRefusalFailed")
             for index, host in enumerate(args.powershell):
                 host = Path(host).resolve(strict=True)
                 command = [str(host), "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",

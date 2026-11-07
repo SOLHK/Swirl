@@ -8,7 +8,121 @@ fn grant() -> BillingGrant {
         account_id: "b".repeat(64),
         period_id: "c".repeat(64),
         request_nonce: "d".repeat(64),
+        response_contract: ResponseContract::SyntheticQaV1,
     }
+}
+
+fn http_grant() -> BillingGrant {
+    BillingGrant {
+        response_contract: ResponseContract::SubscriptionUserinfoV1,
+        ..grant()
+    }
+}
+
+fn http_response(info: &str, metadata: &str) -> String {
+    format!(
+        "HTTP/1.1 200 OK\r\nSubscription-Userinfo: {info}\r\n{metadata}Content-Length: 0\r\nConnection: close\r\n\r\n"
+    )
+}
+
+#[test]
+fn http_counter_contract_has_no_account_identity_or_coverage_authority() {
+    let response = http_response(
+        "total = 200000000000 ; download=20; upload =10",
+        "Date: Sat, 07 Nov 2026 03:00:00 GMT\r\nAge: 0\r\nCache-Control: no-store\r\n",
+    );
+    let value = parse_headers(response.as_bytes(), &http_grant()).unwrap();
+    assert_eq!(value.as_object().unwrap().len(), 6);
+    assert_eq!(value["contract"], "subscription_userinfo_v1");
+    assert_eq!(
+        value["scope"],
+        "owned-synthetic-http-counter-observation-v1"
+    );
+    assert_eq!(value["query_nonce"], "d".repeat(64));
+    assert_eq!(
+        value["counters"],
+        json!({"upload":10,"download":20,"total":200000000000u64,"expire":null})
+    );
+    assert_eq!(value["http_metadata"]["age"], 0);
+    assert!(value.get("account_id").is_none());
+    assert!(value.get("covered_sequence").is_none());
+    assert!(parse_headers(response.as_bytes(), &grant()).is_err());
+    assert!(parse_headers(super::tests::response().as_bytes(), &http_grant()).is_err());
+}
+
+#[test]
+fn http_counter_contract_rejects_ambiguous_numbers_fields_and_framing() {
+    for info in [
+        "upload=1;download=2",
+        "upload=1;download=2;total=3;upload=1",
+        "upload=1;download=2;total=3;account=1",
+        "upload=01;download=2;total=3",
+        "upload=-1;download=2;total=3",
+        "upload=1;download=2;total=0",
+        "upload=1;download=3;total=3",
+        "upload=1;download=2;total=3;expire=",
+        "upload=9223372036854775808;download=2;total=3",
+        "upload=1;download=2;total=3;",
+        "upload=1;download=2;total=3=4",
+    ] {
+        assert!(
+            parse_headers(http_response(info, "").as_bytes(), &http_grant()).is_err(),
+            "{info}"
+        );
+    }
+    for metadata in [
+        "Age: 00\r\n",
+        "Date: \r\n",
+        "Cache-Control: \r\n",
+        "Age: 0\r\naGe: 0\r\n",
+        "Transfer-Encoding: chunked\r\n",
+        "X-Swirl-QA-Billing-Covered-Sequence: 1\r\n",
+        "Location: https://never-follow.fixture.invalid/\r\n",
+    ] {
+        assert!(
+            parse_headers(
+                http_response("upload=1;download=2;total=3", metadata).as_bytes(),
+                &http_grant()
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn http_counter_contract_retains_plain_metadata_without_interpreting_freshness() {
+    for date in [
+        "Thu, 01 Jan 1970 00:00:00 GMT",
+        "Fri, 01 Jan 2100 00:00:00 GMT",
+        "not-a-date",
+    ] {
+        let response = http_response(
+            "expire=0;download=2;total=3;upload=1",
+            &format!("Date: {date}\r\n"),
+        );
+        let value = parse_headers(response.as_bytes(), &http_grant()).unwrap();
+        assert_eq!(value["http_metadata"]["date"], date);
+        assert_eq!(value["http_metadata"]["age"], Value::Null);
+        assert_eq!(value["counters"]["expire"], 0);
+        assert_eq!(value.as_object().unwrap().len(), 6);
+    }
+}
+
+#[test]
+fn response_contract_is_closed_and_legacy_default_is_preserved() {
+    let base = json!({"schema":1,"domain":DOMAIN,"authority_id":"a".repeat(64),
+        "account_id":"b".repeat(64),"period_id":"c".repeat(64),"request_nonce":"d".repeat(64)});
+    let legacy: BillingGrant = serde_json::from_value(base.clone()).unwrap();
+    assert!(legacy.response_contract == ResponseContract::SyntheticQaV1);
+    for value in [json!("official"), json!(true), Value::Null] {
+        let mut invalid = base.clone();
+        invalid["response_contract"] = value;
+        assert!(serde_json::from_value::<BillingGrant>(invalid).is_err());
+    }
+    let mut current = base;
+    current["response_contract"] = json!("subscription_userinfo_v1");
+    let parsed: BillingGrant = serde_json::from_value(current).unwrap();
+    assert!(parsed.response_contract == ResponseContract::SubscriptionUserinfoV1);
 }
 
 fn response() -> String {
