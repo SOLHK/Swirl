@@ -7,19 +7,21 @@ import os
 from pathlib import Path
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 TOOLS=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(TOOLS))
 spec=importlib.util.spec_from_file_location("controlled_node_acceptance",TOOLS/"RunControlledNodeAcceptance.py")
 qa=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(qa)
+import ControlledNodeWatchdog as watchdog_receipt
 FIXTURES=TOOLS.parent/"src/Swirl.Quick/tests/fixtures"
 
 
@@ -222,6 +224,118 @@ class LoopbackTlsTests(unittest.TestCase):
                     self.assertFalse(any(thread.is_alive() for thread in self.fixture.threads))
 
 
+class NativeWatchdogReceiptTests(unittest.TestCase):
+    def setUp(self):
+        self.initial = watchdog_receipt.initial_record(123, {"nonce":"a"*64,"sourceSha":"b"*40}, 1000, 10_000_000)
+
+    def record(self, *, request=2_000_000_000, fired=10_000_000_001, committed=1):
+        data = bytearray(self.initial)
+        struct.pack_into("<5Q", data, 128, 1_000_000_000, 29_000_000_000, request,
+                         request+8_000_000_000 if request else 21_000_000_000, fired)
+        struct.pack_into("<Q", data, 176, 90_000_000)
+        struct.pack_into("<II", data, 192, 2 if request else 1, committed)
+        return bytes(data)
+
+    def verify(self, data, exit_code=124):
+        return watchdog_receipt.verify_record(data,initial=self.initial,exit_code=exit_code,exited_qpc=91_000_000)
+
+    def test_complete_native_request_receipt_has_exact_original_deadline(self):
+        result=self.verify(self.record())
+        self.assertTrue(result["triggered"])
+        self.assertEqual(result["phase"],"requests")
+        self.assertEqual(result["deadlineMs"],8000)
+        self.assertEqual(result["absoluteLimitMs"],28000)
+        self.assertEqual(result["deadlineOverrunNs"],"1")
+        self.assertEqual(len(result["receiptSha256"]),64)
+        self.assertNotIn("nonce",result)
+        self.assertTrue(self.verify(self.record(),exit_code=125)["triggered"])
+
+    def test_startup_deadline_remains_twenty_seconds(self):
+        result=self.verify(self.record(request=0,fired=21_000_000_000))
+        self.assertEqual((result["phase"],result["deadlineMs"]),("startup",20000))
+
+    def test_bare_exit_124_or_incomplete_record_cannot_assert_timeout(self):
+        for data in (self.initial,self.record(committed=0)):
+            with self.subTest(data=data is self.initial),self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
+                self.verify(data)
+            result=self.verify(data,exit_code=125)
+            self.assertFalse(result["triggered"])
+        self.assertFalse(self.verify(self.initial,exit_code=0)["triggered"])
+
+    def test_changed_process_nonce_source_or_parent_clock_is_rejected(self):
+        for offset in (0,16,20,24,88,168,184,200,255):
+            data=bytearray(self.record());data[offset]^=1
+            with self.subTest(offset=offset),self.assertRaisesRegex(ValueError,"IdentityMismatch"):
+                self.verify(bytes(data))
+
+    def test_early_trigger_forged_deadline_or_outside_process_clock_is_rejected(self):
+        for offset,value in ((128,0),(136,29_000_000_001),(144,21_000_000_000),
+                             (152,9_000_000_000),(160,9_999_999_999),(176,999),(176,91_000_001)):
+            data=bytearray(self.record());struct.pack_into("<Q",data,offset,value)
+            with self.subTest(offset=offset,value=value),self.assertRaisesRegex(ValueError,"DeadlineUnproven"):
+                self.verify(bytes(data))
+        for offset,value in ((192,1),(196,2)):
+            data=bytearray(self.record());struct.pack_into("<I",data,offset,value)
+            with self.subTest(offset=offset),self.assertRaises(ValueError):
+                self.verify(bytes(data))
+        for exit_code in (0,2,64):
+            with self.subTest(exit_code=exit_code),self.assertRaisesRegex(ValueError,"DeadlineUnproven"):
+                self.verify(self.record(),exit_code=exit_code)
+
+    def test_invalid_lengths_and_invalid_initial_identity_are_rejected(self):
+        for data in (b"",self.record()[:-1],self.record()+b"x"):
+            with self.subTest(length=len(data)),self.assertRaises(ValueError):
+                self.verify(data)
+        for pid in (0,-1,True,2**32):
+            with self.subTest(pid=pid),self.assertRaisesRegex(ValueError,"IdentityRejected"):
+                watchdog_receipt.initial_record(pid,{"nonce":"a"*64,"sourceSha":"b"*40},1000,1)
+
+
+class ControlledCleanupTests(unittest.TestCase):
+    def owners(self):
+        process, job, receipt = Mock(), Mock(), Mock()
+        process.poll.return_value=0
+        process.stdin=None
+        return process,job,receipt
+
+    def test_pipe_and_handle_close_failures_cannot_skip_mapping_or_job_close(self):
+        process,job,receipt=self.owners()
+        process.stdout.close.side_effect=OSError("SyntheticFirstCleanupFailure")
+        process.close_handles.side_effect=ValueError("SyntheticHandleFailure")
+        receipt.close.side_effect=ValueError("SyntheticMappingFailure")
+        with self.assertRaisesRegex(OSError,"SyntheticFirstCleanupFailure"):
+            qa._cleanup_controlled_owner(process,job,receipt,None)
+        process.stderr.close.assert_called_once()
+        process.close_handles.assert_called_once()
+        receipt.close.assert_called_once()
+        job.close.assert_called_once()
+
+    def test_primary_error_is_preserved_when_cleanup_also_fails(self):
+        process,job,receipt=self.owners()
+        receipt.close.side_effect=OSError("SyntheticMappingFailure")
+        with self.assertRaisesRegex(ValueError,"OriginalFailure") as caught:
+            try:
+                raise ValueError("OriginalFailure")
+            finally:
+                qa._cleanup_controlled_owner(process,job,receipt,sys.exception())
+        self.assertEqual(caught.exception.__notes__,["ControlledOwnerCleanupFailed:OSError"])
+        job.close.assert_called_once()
+
+    def test_unconfirmed_exit_still_closes_mapping_and_kill_on_close_job(self):
+        process,job,receipt=self.owners()
+        process.poll.return_value=None
+        process.wait.side_effect=TimeoutError("SyntheticExitUnconfirmed")
+        with self.assertRaisesRegex(TimeoutError,"SyntheticExitUnconfirmed"):
+            qa._cleanup_controlled_owner(process,job,receipt,None)
+        job.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=5)
+        process.stdout.close.assert_not_called()
+        process.stderr.close.assert_not_called()
+        process.close_handles.assert_called_once()
+        receipt.close.assert_called_once()
+        job.close.assert_called_once()
+
+
 @unittest.skipUnless(os.name=="nt","Windows atomic Job boundary required")
 class WindowsProcessTests(unittest.TestCase):
     def run_real_child(self,body):
@@ -245,11 +359,20 @@ class WindowsProcessTests(unittest.TestCase):
         self.assertEqual(result["exitCode"],0)
         self.assertTrue(result["processSignaled"] and result["ownedJobEmpty"])
         self.assertFalse(result["timedOut"])
+        self.assertFalse(result["nativeWatchdog"]["triggered"])
+        self.assertEqual(result["stopOrigin"],"natural-exit")
 
-    def test_native_deadline_exit_is_recorded_after_owned_process_retirement(self):
-        result=self.run_real_child("raise SystemExit(124)")
-        self.assertEqual(result["exitCode"],124)
-        self.assertTrue(result["timedOut"] and result["processSignaled"] and result["ownedJobEmpty"])
+    def test_actual_bare_exit_124_is_rejected_without_native_record(self):
+        with self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
+            self.run_real_child("import sys;sys.exit(124)")
+
+    def test_request_state_cannot_substitute_for_native_deadline_proof(self):
+        body="""import json,pathlib,sys
+root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text());state['phase']='requests'
+(root/'state.json').write_text(json.dumps(state));raise SystemExit(124)
+"""
+        with self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
+            self.run_real_child(body)
 
     def test_stalled_request_is_killed_without_renewing_its_deadline(self):
         body="""import json,pathlib,sys,time
@@ -261,6 +384,9 @@ root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text(
         self.assertTrue(result["timedOut"] and result["requestPhaseObserved"])
         self.assertTrue(result["processSignaled"] and result["ownedJobEmpty"])
         self.assertEqual(result["exitCode"],125)
+        self.assertTrue(result["parentTimedOut"])
+        self.assertFalse(result["nativeWatchdog"]["triggered"])
+        self.assertEqual(result["stopOrigin"],"parent-watchdog")
         self.assertLess(time.monotonic()-started,12)
 
 

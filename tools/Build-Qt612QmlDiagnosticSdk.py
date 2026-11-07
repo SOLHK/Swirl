@@ -852,6 +852,343 @@ def collect_command_output_evidence(paths, record):
                                     + type(error).__name__ + ":" + str(error))
 
 
+
+# Fixed-target product comparison. This capability cannot retire compiler helpers
+# or change generic/private completion rules. It only observes this Job.
+_PRODUCT_FACTORY = object()
+PRODUCT_HEAD = "d136505cb1ac8cfeb5b80c554daebbbb06ff1aa9"
+PRODUCT_MERGE = "e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab"
+PRODUCT_MANIFEST_PIN = {"bytes": 293662, "sha256": "c3f45626d9d07e87c8726794551f9bce6781e5894fcc3886dbe34a4cb08326be"}
+PRODUCT_EXE_PIN = {"bytes": 41496576, "sha256": "cbf97a6b3e41b360d324187e26a4737cda18813e476fef779384fde6c9fc6711"}
+PRODUCT_RUST_PIN = {"bytes": 14943232, "sha256": "c4dbee3124188ec265876e280ebd0a319ab36becc2bfbf8f501c50172c1751e4"}
+PRODUCT_QML_PINS = {
+    "stock": {"bytes": 5390136, "sha256": "2572e315c36d8cea89a5becb910ddccdcf5d34e5421eef1e033187a99b68f84b"},
+    "patched": {"bytes": 5377536, "sha256": "66d291c47770c366627cfd68f3e050e30dbb6f1747639f32c6ea812803ad1cb3"},
+}
+PRODUCT_SMOKE_PIN = {"bytes": 15636, "sha256": "737a840a3816b6599b911240fb47940e609b48f7d3e27030626219c2104b7a97"}
+PRODUCT_ASSERT_PIN = {"bytes": 715, "sha256": "6c1912a378711d723184cef60b4330e81931837fa0b11bc8714097a108d953cc"}
+
+
+def product_manifest(path):
+    require(file_identity(path) == PRODUCT_MANIFEST_PIN, "ProductOriginalManifestPinMismatch")
+    rows = read_json(path, 1024 * 1024)
+    require(type(rows) is list and len(rows) == 1516, "ProductOriginalManifestCount")
+    result, folded = {}, set()
+    for row in rows:
+        require(type(row) is dict and set(row) == {"path", "bytes", "sha256"}, "ProductManifestSchema")
+        name = row["path"]
+        require(type(name) is str and name and "\\" not in name and ":" not in name
+                and not any(ord(c) < 32 for c in name) and not PurePosixPath(name).is_absolute()
+                and ".." not in PurePosixPath(name).parts and PurePosixPath(name).as_posix() == name
+                and name.casefold() not in folded, "ProductManifestPath")
+        require(type(row["bytes"]) is int and 0 <= row["bytes"] <= 128 * 1024**2
+                and type(row["sha256"]) is str and SHA.fullmatch(row["sha256"]), "ProductManifestIdentity")
+        folded.add(name.casefold())
+        result[name] = {k: row[k] for k in ("bytes", "sha256")}
+    require(sum(v["bytes"] for v in result.values()) == 210603842, "ProductOriginalManifestBytes")
+    require(result.get("Swirl.exe") == PRODUCT_EXE_PIN and result.get("swirl_api.dll") == PRODUCT_RUST_PIN
+            and result.get("Qt6Qml.dll") == PRODUCT_QML_PINS["stock"], "ProductOriginalBinaryPins")
+    return result
+
+
+def product_runtime_identity(runtime, manifest, variant):
+    require(variant in PRODUCT_QML_PINS, "ProductVariantRejected")
+    expected = product_manifest(manifest)
+    expected["Qt6Qml.dll"] = PRODUCT_QML_PINS[variant]
+    actual = inventory(runtime)
+    require(actual == expected, "ProductRuntimeClosureMismatch")
+    return actual
+
+
+def product_case_plan(kind, variant, repository, work, evidence, powershell):
+    require(kind in ("full-motion", "node-offscreen", "node-native")
+            and variant in PRODUCT_QML_PINS, "ProductCaseRejected")
+    repository, work, evidence = map(plain_path, (repository, work, evidence))
+    require(repository == plain_path(Path(os.environ["GITHUB_WORKSPACE"]))
+            and work.is_relative_to(plain_path(Path(os.environ["RUNNER_TEMP"])))
+            and evidence == repository / "build-evidence/qt612-product-comparison",
+            "ProductOwnedRootsRequired")
+    require(subprocess.check_output(["git", "-C", str(repository), "rev-parse", "HEAD"],
+                                    text=True).strip() == PRODUCT_MERGE, "ProductTargetSourceMismatch")
+    subprocess.run(["git", "-C", str(repository), "diff", "--quiet", "HEAD", "--"], check=True)
+    unexpected = subprocess.check_output(["git", "-C", str(repository), "ls-files", "--others",
+                                         "--exclude-standard", "--", "src", "core", "scripts", "tools", ".github"],
+                                        text=True)
+    require(not unexpected.strip(), "ProductUntrackedInputs")
+    manifest = work / "inputs/runtime-before.json"
+    runtime = work / "runtimes" / variant
+    product_runtime_identity(runtime, manifest, variant)
+    reference = repository / "build/swirl-quick/Release/Swirl.exe"
+    require(file_identity(reference) == PRODUCT_EXE_PIN, "ProductCachedReferenceMismatch")
+    require(file_identity(repository / "scripts/tests/Test-WindowsFullMotionSmoke.ps1") == PRODUCT_SMOKE_PIN
+            and file_identity(repository / "scripts/Assert-BuildSource.ps1") == PRODUCT_ASSERT_PIN,
+            "ProductOriginalDriverChanged")
+    scratch = work / "processes" / (variant + "-" + kind)
+    require(not scratch.exists(), "ProductFreshProcessRootRequired")
+    scratch.mkdir(parents=True)
+    output = evidence / variant / kind
+    require(not output.exists(), "ProductFreshEvidenceRequired")
+    environment = tool_environment()
+    # The inherited host's proxy, private config, Qt choices and tokens are absent.
+    for key in list(environment):
+        if key.startswith(("QT_", "QML_", "QSG_", "SWIRL_")):
+            environment.pop(key)
+    environment.update(QT_FORCE_STDERR_LOGGING="1", QT_MESSAGE_PATTERN="[%{type}] %{message}")
+    inputs = {str(reference): PRODUCT_EXE_PIN, str(manifest): PRODUCT_MANIFEST_PIN}
+    if kind == "full-motion":
+        shell = plain_path(Path(powershell))
+        require(shell == plain_path(Path(os.environ["ProgramFiles"]) / "PowerShell/7/pwsh.exe"),
+                "ProductSystemPowerShell7Required")
+        script = repository / "scripts/tests/Test-WindowsFullMotionSmoke.ps1"
+        arguments = [str(shell), "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script),
+                     "-RepositoryRoot", str(repository), "-RuntimeDirectory", str(runtime),
+                     "-ReferenceExecutable", str(reference), "-OutputDirectory", str(output),
+                     "-ScratchRoot", str(scratch), "-WorkflowSha", PRODUCT_MERGE,
+                     "-PullRequestHeadSha", PRODUCT_HEAD, "-ExpectedFlavor", "qa"]
+        inputs[str(shell)] = file_identity(shell)
+        inputs[str(script)] = PRODUCT_SMOKE_PIN
+        inputs[str(repository / "scripts/Assert-BuildSource.ps1")] = PRODUCT_ASSERT_PIN
+        timeout, accepted, app = 240, (0, 1), None
+    else:
+        app = scratch / "app"
+        shutil.copytree(runtime, app)
+        product_runtime_identity(app, manifest, variant)
+        profile = scratch / "profile"
+        (profile / "tmp").mkdir(parents=True)
+        output.mkdir(parents=True)
+        arguments = [str(app / "Swirl.exe"), "--node-self-test"]
+        environment.update(SWIRL_TEST_ROOT=str(profile), SWIRL_UI_QA_DIRECTORY=str(output),
+                           TEMP=str(profile / "tmp"), TMP=str(profile / "tmp"), TMPDIR=str(profile / "tmp"),
+                           QML_DISK_CACHE_PATH=str(profile / "qml-cache"),
+                           QT_QPA_FONTDIR=str(app / "lib/fonts"))
+        if kind == "node-offscreen":
+            environment.update(QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
+        else:
+            environment.update(QT_QPA_PLATFORM="windows", QSG_RHI_BACKEND="d3d11",
+                               QT_SCALE_FACTOR="1.5", SWIRL_NODE_UI_REQUIRE_NATIVE="1")
+        inputs[str(app / "Swirl.exe")] = PRODUCT_EXE_PIN
+        inputs[str(app / "Qt6Qml.dll")] = PRODUCT_QML_PINS[variant]
+        timeout, accepted = 180, (0, 2)
+    return {"kind": kind, "variant": variant, "arguments": arguments, "cwd": str(repository),
+            "name": kind, "timeout": timeout, "accepted": list(accepted), "inputs": inputs,
+            "runtime": str(runtime), "manifest": str(manifest), "scratch": str(scratch),
+            "app": str(app) if app else None, "output": str(output)}, environment
+
+
+class _ProductPhase:
+    def __init__(self, token, plan, environment):
+        require(token is _PRODUCT_FACTORY, "LiveProductCapabilityRequired")
+        self.plan = json.loads(json.dumps(plan))
+        self.plan_id, self.environment_id = canonical_digest(plan), canonical_digest(environment)
+        self.accepted = tuple(plan["accepted"])
+        self.started, self.observations, self.handles, self.pins = False, {}, {}, []
+        self.root_creation, self.k, self.c, self.w = None, None, None, None
+        self.proof = {"scope": "Fixed d136 QA product in this owned Job only",
+                      "target_source_sha": PRODUCT_MERGE, "target_pr_head_sha": PRODUCT_HEAD,
+                      "case": plan["kind"], "variant": plan["variant"], "observations": [],
+                      "module_query_attempts": 0, "owned_job_queries": 0, "transient_errors": [],
+                      "actual_process_module_sampling": False, "memory_bytes_hashed": False,
+                      "complete": False, "font_file_uploaded": False}
+
+    def begin(self, k, c, w, arguments, cwd, name, environment):
+        require(not self.started and canonical_digest(self.plan) == self.plan_id
+                and canonical_digest(environment) == self.environment_id
+                and self.plan["arguments"] == arguments and self.plan["cwd"] == str(cwd)
+                and self.plan["name"] == name, "ProductCapabilityBindingChanged")
+        for path, expected in self.plan["inputs"].items():
+            require(file_identity(Path(path)) == expected, "ProductInputChangedBeforeLaunch:" + path)
+        product_runtime_identity(Path(self.plan["runtime"]), Path(self.plan["manifest"]), self.plan["variant"])
+        self.k, self.c, self.w, self.started = k, c, w, True
+        class PidList(c.Structure):
+            _fields_ = [("assigned", w.DWORD), ("count", w.DWORD), ("pids", c.c_size_t * 256)]
+        class FileTime(c.Structure):
+            _fields_ = [("low", w.DWORD), ("high", w.DWORD)]
+        class ModuleInfo(c.Structure):
+            _fields_ = [("base", c.c_void_p), ("size", w.DWORD), ("entry", c.c_void_p)]
+        require(c.sizeof(c.c_void_p) == 8 and c.sizeof(PidList) == 2056
+                and c.sizeof(FileTime) == 8 and c.sizeof(ModuleInfo) == 24
+                and ModuleInfo.size.offset == 8 and ModuleInfo.entry.offset == 16,
+                "ProductModuleObserverAbiMismatch")
+        self.PidList, self.FileTime, self.ModuleInfo = PidList, FileTime, ModuleInfo
+        self.psapi = c.WinDLL("psapi", use_last_error=True)
+        for name, result, types in (
+            ("EnumProcessModulesEx", w.BOOL, [w.HANDLE, c.POINTER(w.HMODULE), w.DWORD, c.POINTER(w.DWORD), w.DWORD]),
+            ("GetModuleFileNameExW", w.DWORD, [w.HANDLE, w.HMODULE, w.LPWSTR, w.DWORD]),
+            ("GetModuleInformation", w.BOOL, [w.HANDLE, w.HMODULE, c.POINTER(ModuleInfo), w.DWORD])):
+            function = getattr(self.psapi, name)
+            function.restype, function.argtypes = result, types
+
+    def creation(self, handle):
+        values = [self.FileTime() for _ in range(4)]
+        require(self.k.GetProcessTimes(handle, *[self.c.byref(v) for v in values]), "ProductProcessTimesFailed")
+        value = (values[0].high << 32) | values[0].low
+        require(value > 0, "ProductProcessCreationMissing")
+        return value
+
+    def bind_root(self, handle):
+        self.root_creation = self.creation(handle)
+        self.proof["root_creation_filetime"] = str(self.root_creation)
+
+    def image_path(self, handle):
+        buffer, size = self.c.create_unicode_buffer(32768), self.w.DWORD(32768)
+        require(self.k.QueryFullProcessImageNameW(handle, 0, buffer, self.c.byref(size)),
+                "ProductProcessImageUnavailable")
+        return plain_path(Path(_windows_image_path(buffer.value)))
+
+    def same_job(self, job, handle):
+        member = self.w.BOOL()
+        require(self.k.IsProcessInJob(handle, job, self.c.byref(member)) and member.value,
+                "ProductProcessOutsideOwnedJob")
+
+    def app_role(self, image):
+        scratch = plain_path(Path(self.plan["scratch"]))
+        relative = image.relative_to(scratch).as_posix() if image.is_relative_to(scratch) else ""
+        if self.plan["kind"] == "full-motion":
+            match = re.fullmatch(r"swirl-full-motion-[0-9a-f]{32}/(rapid|ready)/app/Swirl\.exe", relative)
+            require(match is not None, "ProductUnexpectedSmokeImagePath")
+            return match[1]
+        require(image == Path(self.plan["app"]) / "Swirl.exe", "ProductUnexpectedNodeImagePath")
+        return self.plan["kind"]
+
+    def note_transient(self, code, pid):
+        if len(self.proof["transient_errors"]) < 16:
+            self.proof["transient_errors"].append({"code": code, "pid": pid, "utc": utc()})
+
+    def pin_file(self, expected):
+        # Each pin owns ctypes function objects for its local FileInfo type.
+        # Sharing the runner's WinDLL would overwrite earlier pins' argtypes.
+        kernel = self.c.WinDLL("kernel32", use_last_error=True)
+        pin = _PinnedCompilerImage(kernel, self.c, self.w, expected)
+        self.pins.append(pin)
+        return pin
+
+    def inspect_modules(self, handle, item):
+        c, w = self.c, self.w
+        modules, needed = (w.HMODULE * 1024)(), w.DWORD()
+        self.proof["module_query_attempts"] += 1
+        if not self.psapi.EnumProcessModulesEx(handle, modules, c.sizeof(modules), c.byref(needed), 3):
+            self.note_transient("EnumProcessModulesEx:" + str(c.get_last_error()), item["pid"])
+            return
+        require(0 < needed.value <= c.sizeof(modules) and needed.value % c.sizeof(w.HMODULE) == 0,
+                "ProductModuleListIncomplete")
+        found = []
+        for module in modules[:needed.value // c.sizeof(w.HMODULE)]:
+            path_buffer = c.create_unicode_buffer(32768)
+            length = self.psapi.GetModuleFileNameExW(handle, module, path_buffer, len(path_buffer))
+            if not length:
+                self.note_transient("GetModuleFileNameExW:" + str(c.get_last_error()), item["pid"])
+                return
+            require(length < len(path_buffer), "ProductModulePathTruncated")
+            if Path(path_buffer.value).name.casefold() == "qt6qml.dll":
+                found.append((module, plain_path(Path(_windows_image_path(path_buffer.value)))))
+        if not found:
+            return
+        require(len(found) == 1, "ProductAmbiguousQtQmlModule")
+        module, path = found[0]
+        require(path == Path(item["image_path"]).parent / "Qt6Qml.dll", "ProductQtQmlResolvedOutsideFreshApp")
+        info = self.ModuleInfo()
+        require(self.psapi.GetModuleInformation(handle, module, c.byref(info), c.sizeof(info))
+                and info.base and 0 < info.size < 128 * 1024**2, "ProductMappedModuleInfoUnavailable")
+        expected = {"path": str(path), **PRODUCT_QML_PINS[self.plan["variant"]]}
+        pin = self.pin_file(expected)
+        pin.validate_process_image(str(path))
+        self.same_job(self.job, handle)
+        require(self.creation(handle) == int(item["creation_filetime"]), "ProductPidIdentityChanged")
+        item["qt_qml_module"] = {"path": str(path), "base_address": hex(info.base),
+                                 "mapped_image_size": info.size, "entry_point": hex(info.entry or 0),
+                                 "file": {**pin.identity, "volume_serial": str(pin.identity["volume_serial"])},
+                                 "sampled_utc": utc(), "file_handle_held_until_actual_exit": True,
+                                 "memory_bytes_hashed": False}
+        item["module_proved"] = True
+        self.proof["actual_process_module_sampling"] = True
+
+    def poll(self, job):
+        self.job = job
+        c, w, k = self.c, self.w, self.k
+        values = self.PidList()
+        require(k.QueryInformationJobObject(job, 3, c.byref(values), c.sizeof(values), None),
+                "ProductOwnedPidQueryFailed")
+        self.proof["owned_job_queries"] += 1
+        require(self.proof["owned_job_queries"] <= 3000 and values.count <= 256
+                and values.assigned == values.count, "ProductOwnedPidListIncomplete")
+        for pid in values.pids[:values.count]:
+            require(0 < pid <= 0xffffffff, "ProductOwnedPidInvalid")
+            if pid in self.handles:
+                handle = self.handles[pid]
+                item = self.observations[pid]
+            else:
+                handle = k.OpenProcess(0x400 | 0x10 | 0x100000, False, pid)
+                if not handle:
+                    self.note_transient("OwnedPidExitedBeforeOpen:" + str(c.get_last_error()), int(pid))
+                    continue
+                retain = False
+                try:
+                    self.same_job(job, handle)
+                    if k.WaitForSingleObject(handle, 0) == 0:
+                        continue
+                    image = self.image_path(handle)
+                    if image.name.casefold() != "swirl.exe":
+                        continue
+                    creation = self.creation(handle)
+                    require(creation >= self.root_creation, "ProductChildPredatesOwnedRoot")
+                    role = self.app_role(image)
+                    require(role not in [x["role"] for x in self.observations.values()], "ProductDuplicateCaseImage")
+                    pin = self.pin_file({"path": str(image), **PRODUCT_EXE_PIN})
+                    pin.validate_process_image(str(image))
+                    item = {"pid": int(pid), "creation_filetime": str(creation), "role": role,
+                            "image_path": str(image), "image_file": {**pin.identity,
+                                "volume_serial": str(pin.identity["volume_serial"])},
+                            "owned_job_confirmed": True, "module_proved": False,
+                            "first_seen_utc": utc(), "first_seen_monotonic": time.monotonic()}
+                    self.handles[pid], self.observations[pid] = handle, item
+                    self.proof["observations"].append(item)
+                    retain = True
+                finally:
+                    if not retain:
+                        require(k.CloseHandle(handle), "ProductUnretainedProcessHandleCloseFailed")
+            if not item["module_proved"] and k.WaitForSingleObject(handle, 0) == 258:
+                require(time.monotonic() - item["first_seen_monotonic"] <= 5,
+                        "ProductQtQmlSamplingDeadlineExceeded")
+                self.inspect_modules(handle, item)
+
+    def finish(self, job, record):
+        require(record["process_signaled"] and record["owned_job_empty"] and not record["forced_cleanup"]
+                and not record["timed_out"], "ProductRootOrJobRetirementUnproved")
+        expected = {"rapid", "ready"} if self.plan["kind"] == "full-motion" else {self.plan["kind"]}
+        require({v["role"] for v in self.observations.values()} == expected, "ProductActualProcessCoverageIncomplete")
+        for pid, handle in self.handles.items():
+            item = self.observations[pid]
+            # Membership was proved while live; the same retained handle and
+            # creation are used for exit proof even after removal from Job accounting.
+            require(self.creation(handle) == int(item["creation_filetime"]), "ProductExitCreationChanged")
+            code = self.w.DWORD()
+            require(self.k.WaitForSingleObject(handle, 0) == 0
+                    and self.k.GetExitCodeProcess(handle, self.c.byref(code)), "ProductActualChildExitUnproved")
+            item.update(process_signaled=True, actual_exit_code=code.value, exit_proof_utc=utc())
+            require(item["module_proved"], "ProductQtQmlModuleUnproved")
+        for pin in self.pins:
+            pin.validate_process_image(pin.expected["path"])
+        self.proof["complete"] = True
+
+    def close(self, record):
+        operations = [("ProductProcessHandleCloseFailed:" + str(pid),
+                       lambda handle=handle: self.k.CloseHandle(handle)) for pid, handle in self.handles.items()]
+        for pin in self.pins:
+            if pin.handle:
+                handle, pin.handle = pin.handle, None
+                operations.append(("ProductFilePinCloseFailed", lambda handle=handle: self.k.CloseHandle(handle)))
+        close_command_resources(operations, record)
+
+
+def run_product_logged(kind, variant, repository, work, evidence, powershell):
+    plan, environment = product_case_plan(kind, variant, repository, work, evidence, powershell)
+    phase = _ProductPhase(_PRODUCT_FACTORY, plan, environment)
+    command_evidence = Path(evidence) / variant / "commands"
+    write_json(command_evidence / (kind + ".product-plan.json"), plan)
+    return _run_logged(plan["arguments"], repository, command_evidence, kind, plan["timeout"],
+                       env=environment, accepted=phase.accepted, product=phase)
+
+
 def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,), known_executables=None):
     # The public generic entry point has no compiler-retirement option.
     return _run_logged(arguments, cwd, evidence, name, timeout, env=env, accepted=accepted,
@@ -859,7 +1196,7 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
 
 
 def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,),
-                known_executables=None, compiler=None):
+                known_executables=None, compiler=None, product=None):
     """Public build commands have their own kill-on-close Job, allowing compiler children.
 
     This does not reuse or weaken PrivateSubscriptionProcess's one-process/eight-second
@@ -869,6 +1206,8 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
     require(re.fullmatch(r"[A-Za-z0-9_.-]+", name), "InvalidCommandEvidenceName")
     require(compiler is None or (type(compiler) is _CompilerPhase and accepted == (0,)),
             "LiveCompilerCapabilityRequired")
+    require(product is None or (type(product) is _ProductPhase and compiler is None
+            and accepted == product.accepted), "LiveProductCapabilityRequired")
     import msvcrt
     from ctypes import wintypes as w
     c = ctypes
@@ -947,6 +1286,8 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
         record["compiler_phase"] = {"name": compiler.plan["phase"], "plan_content_id": compiler.plan_id,
                                     "environment_content_id": compiler.environment_id}
         record["compiler_controlled_retirement"] = compiler.proof
+    if product is not None:
+        record["product_phase"] = product.proof
     job, attrs, info = None, None, Information()
     streams, inherited = [], []
     started, terminated, retirement_deadline = time.monotonic(), False, None
@@ -990,6 +1331,8 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
             record["owned_pid_snapshot"] = result
             record["errors"].extend(result["errors"])
     try:
+        if product is not None:
+            product.begin(k, c, w, args, cwd, name, environment)
         if compiler is not None:
             compiler.begin(k, c, w, args, cwd, name, environment)
             record["compiler_phase"]["prelaunch_image"] = compiler.image.identity
@@ -1032,6 +1375,8 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
         if compiler is not None:
             compiler.bind_root(info.process)
             record["compiler_phase"]["root_creation_filetime"] = compiler.root_creation
+        if product is not None:
+            product.bind_root(info.process)
         require(k.ResumeThread(info.thread) == 1, "CommandResumeFailed")
         require(k.CloseHandle(info.thread), "CommandThreadCloseFailed")
         info.thread = None
@@ -1042,6 +1387,8 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
             require(k.QueryInformationJobObject(job, 1, c.byref(accounting), c.sizeof(accounting), None),
                     "CommandJobQueryFailed")
             observe_root(state, accounting, "command-loop")
+            if product is not None:
+                product.poll(job)
             now = time.monotonic()
             require(retirement_deadline is None or now < retirement_deadline,
                     "CommandRetirementUnconfirmed")
@@ -1127,6 +1474,14 @@ def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(
                     break
                 if state == 0:
                     time.sleep(0.025)
+        if product is not None:
+            try:
+                product.finish(job, record)
+            except Exception as error:
+                record["errors"].append("ProductObservation:" + type(error).__name__ + ":" + str(error))
+            finally:
+                product.close(record)
+                record["actual_process_module_sampling"] = product.proof["actual_process_module_sampling"]
         if attrs:
             k.DeleteProcThreadAttributeList(attrs)
         if compiler is not None:

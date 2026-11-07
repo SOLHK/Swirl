@@ -414,6 +414,21 @@ jobs:
             if ($mode -eq 'wrong-ca' -and ($exitCode -ne 2 -or $summary.passed -or !@($case.result.proxyRequests | Where-Object tlsRejected).Count)) { throw 'Actual UI TLS rejection control failed.' }
             if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut -or
                 !$case.retirement.requestPhaseObserved -or $case.retirement.exitCode -notin @(124,125))) { throw 'Actual UI hard-stop control failed.' }
+            if ($mode -eq 'stall') {
+              if (!$case.retirement.requestPhaseObserved) { throw 'Actual UI request phase was not observed before the hard stop.' }
+              if ($case.retirement.exitCode -eq 124) {
+                if (!$case.retirement.nativeWatchdog.triggered -or $case.retirement.nativeWatchdog.phase -ne 'requests' -or
+                    $case.retirement.nativeWatchdog.deadlineMs -ne 8000 -or
+                    $case.retirement.stopOrigin -notin @('native-watchdog','parent-and-native-watchdog')) {
+                  throw 'Native hard-stop exit has no identity-bound request-deadline proof.'
+                }
+              } elseif ($case.retirement.exitCode -eq 125) {
+                if (!$case.retirement.parentTimedOut -or
+                    $case.retirement.stopOrigin -notin @('parent-watchdog','parent-and-native-watchdog')) {
+                  throw 'Parent hard-stop exit has no independent deadline proof.'
+                }
+              } else { throw 'The hard-stop control exited without an identified watchdog.' }
+            }
             if ($mode -in $admissionModes -and ($exitCode -ne 2 -or $summary.passed -or !$summary.admissionRefused -or
                 $case.retirement.exitCode -ne 64 -or $case.retirement.timedOut -or
                 $case.result -isnot [pscustomobject] -or @($case.result.psobject.Properties).Count -ne 0 -or

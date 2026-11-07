@@ -24,10 +24,11 @@ import time
 
 from PrivateSubscriptionBudget import BudgetError, _WindowsStorage
 from PrivateSubscriptionProcess import _WindowsJob, _WindowsProcess
+from ControlledNodeWatchdog import NativeWatchdogReceipt
 
 
 LIVE_REFUSAL = "LiveAcceptanceRequiresPersistentBudgetAndRustWorker"
-PROOF_MAGIC = b"SWIRL-FIXTURE-PROOF-1\n"
+PROOF_MAGIC = b"SWIRL-FIXTURE-PROOF-2\n"
 FIXTURE_MAGIC = b"SWIRL-OWNED-FIXTURE-1\n"
 FIXTURE_CERT_SHA256 = "a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311"
 FIXTURE_KEY_SHA256 = "13eb4aa0855cc8e8280b879a0e3b125e8350bd27da76c60371a2755a8ac57d2f"
@@ -339,6 +340,42 @@ class LoopbackFixture:
             raise ValueError("FixtureTaskRetirementUnconfirmed")
 
 
+def _cleanup_controlled_owner(process, job, native_receipt, primary_error):
+    """Close the mapping and Job even if process or pipe cleanup raises."""
+    errors = []
+
+    def attempt(operation):
+        try:
+            operation()
+        except BaseException as error:
+            errors.append(error)
+
+    try:
+        if process:
+            try:
+                if process.poll() is None:
+                    job.terminate()
+                    process.wait(timeout=5)
+                # A failed wait does not block here trying to close a pipe with
+                # a still-running reader. Closing the Job below remains mandatory.
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream:
+                        attempt(stream.close)
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                attempt(process.close_handles)
+    finally:
+        if native_receipt:
+            attempt(native_receipt.close)
+        attempt(job.close)
+    if errors:
+        if primary_error is not None:
+            primary_error.add_note("ControlledOwnerCleanupFailed:" + ",".join(type(error).__name__ for error in errors))
+        else:
+            raise errors[0]
+
+
 def execute(executable, root, manifest, child_environment, proof, *, admission_control=None):
     """Independent watchdog terminates the whole atomically owned process set."""
     if type(proof) is not _FixtureProof:
@@ -346,12 +383,17 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
     pipe_frame = proof.pipe_frame(manifest, admission_control)
     job = _WindowsJob()
     process = None
+    native_receipt = None
     done = threading.Event()
     guard = {"timedOut":False, "error":None, "requestPhaseObserved":False}
     started = time.monotonic()
     try:
+        native_receipt = NativeWatchdogReceipt(job, manifest)
         process = _WindowsProcess([str(executable), "--controlled-node-session="+str(root)], job=job, environment=child_environment)
         job.verify_member(process)
+        native_handle = native_receipt.duplicate_to(process)
+        if pipe_frame:
+            pipe_frame += native_handle
         def watch():
             deadline = started+20
             while not done.wait(0.02):
@@ -415,21 +457,18 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
             thread.join(timeout=1)
         if any(thread.is_alive() for thread in captures) or watchdog.is_alive():
             raise ValueError("ChildReaderRetirementUnconfirmed")
-        # The child's native watchdog can fire before the parent terminates its Job.
-        guard["timedOut"] = guard["timedOut"] or process.returncode == 124
+        native_stop = native_receipt.read_after_exit(process)
+        guard["parentTimedOut"] = guard["timedOut"]
+        guard["nativeWatchdog"] = native_stop
+        guard["timedOut"] = guard["parentTimedOut"] or native_stop["triggered"]
+        guard["stopOrigin"] = ("parent-and-native-watchdog" if guard["parentTimedOut"] and native_stop["triggered"]
+            else "parent-watchdog" if guard["parentTimedOut"]
+            else "native-watchdog" if native_stop["triggered"] else "natural-exit")
         return dict(exitCode=process.returncode,processSignaled=True,ownedJobEmpty=True,
                     elapsedMs=round((time.monotonic()-started)*1000),**guard)
     finally:
         done.set()
-        if process:
-            if process.poll() is None:
-                job.terminate()
-                process.wait(timeout=5)
-            for stream in (process.stdin,process.stdout,process.stderr):
-                if stream:
-                    stream.close()
-            process.close_handles()
-        job.close()
+        _cleanup_controlled_owner(process, job, native_receipt, sys.exception())
 
 
 def main(argv=None):

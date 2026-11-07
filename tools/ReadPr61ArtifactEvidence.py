@@ -170,7 +170,7 @@ def safe_member(info):
     require(0 <= info.file_size <= MAX_MEMBER, "ArchiveMemberLimit")
 
 
-def select_members(kind, names):
+def select_members(kind, names, conditional_absence):
     selected, errors = set(), []
 
     def unique(suffix, required=True):
@@ -196,9 +196,14 @@ def select_members(kind, names):
                        "profile-residual-cleanup-controls/receipt.json"):
             unique(suffix)
     elif kind == "node":
-        for suffix in ("critical-ui.xml", "critical-network.xml", "node-diagnostic-regression.xml",
+        for suffix in ("critical-ui.xml", "critical-network.xml",
                        "node-chain.xml", "node-chain.txt", "swirl-native-tun-recovery.xml"):
             unique(suffix)
+        diagnostic = "node-diagnostic-regression.xml"
+        unique(diagnostic, required=diagnostic not in conditional_absence)
+        if diagnostic in conditional_absence and any(
+                name == diagnostic or name.endswith("/" + diagnostic) for name in names):
+            errors.append("ArtifactPresentForSkippedProducer:" + diagnostic)
         for group in ("node-ui-evidence", "node-ui-native-evidence"):
             matches = [name for name in names
                        if re.search(r"(?:^|/)" + group + r"/node-probe-[A-Za-z0-9_.-]+\.json$", name)]
@@ -218,8 +223,20 @@ def select_members(kind, names):
                        "comparison/commands/01-configure-fixtures.json",
                        "comparison/commands/02-build-fixtures.json",
                        "comparison/commands/04-stock-fixtures.json",
-                       "comparison/commands/04-patched-fixtures.json"):
+                       "comparison/commands/04-patched-fixtures.json",
+                       "native-boundaries/generic-child/native-unknown-child.json",
+                       "native-boundaries/held-image-file/held-file-result.json"):
             unique(suffix)
+        # These four generated headers have actual stock/candidate/predicted
+        # and installed originals in this fixed SDK ZIP. Other source headers
+        # are compared by the complete verified member hash inventory.
+        for header in ("include/QtQml/6.12.0/QtQml/private/qqmljsgrammar_p.h",
+                       "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h",
+                       "include/QtQml/6.12.0/QtQml/private/qtqml-config_p.h",
+                       "include/QtQml/qtqml-config.h"):
+            for prefix in ("sdk/header-inputs/stock/", "sdk/header-inputs/candidate/",
+                           "sdk/header-inputs/expected-candidate/", "sdk/module-install-output/"):
+                unique(prefix + header)
         for flavor in ("stock", "patched"):
             unique("comparison/" + flavor + "/aggregate.json")
             for case in ("popup-normal", "popup-incremental", "sweep-slots"):
@@ -229,7 +246,7 @@ def select_members(kind, names):
     return selected, errors
 
 
-def inspect_archive(path, kind, out):
+def inspect_archive(path, kind, out, conditional_absence):
     with zipfile.ZipFile(path) as archive:
         entries = archive.infolist()
         require(0 < len(entries) <= MAX_MEMBERS, "ArchiveMemberCountLimit")
@@ -253,7 +270,7 @@ def inspect_archive(path, kind, out):
                        "expanded_bytes": expanded})
         for item in index:
             emit("INDEX_MEMBER", {"kind": kind, **item})
-        selected, selection_errors = select_members(kind, file_names)
+        selected, selection_errors = select_members(kind, file_names, conditional_absence)
         selected_bytes = sum(info.file_size for info in entries if info.filename in selected)
         require(selected_bytes <= MAX_SELECTED_TEXT, "SelectedTextBudgetExceeded")
         originals, inventory = {}, []
@@ -297,6 +314,8 @@ def inspect_archive(path, kind, out):
             else:
                 selection_errors.append("SdkReceiptUnavailable")
         write_json(out / "verified-member-inventory.json", inventory)
+        for item in inventory:
+            emit("VERIFIED_MEMBER", {"kind": kind, **item})
         records = []
         for name in sorted(originals):
             data = originals[name]
@@ -312,7 +331,44 @@ def inspect_archive(path, kind, out):
         write_json(out / "selected-member-identities.json", records)
         return {"all_members_crc_verified": True, "regular_files": len(inventory),
                 "expanded_bytes": expanded, "selected_bytes": selected_bytes,
-                "selected_members": records, "selection_errors": selection_errors, "truncated": False}
+                "selected_members": records, "selection_errors": selection_errors,
+                "expected_absent_evidence": conditional_absence, "truncated": False}
+
+
+def original_conditional_evidence(kind, token):
+    if kind != "node":
+        return {}
+    # d136's diagnostic rerun is conditional on an early critical-UI failure.
+    # Its normal critical UI/network reports are still mandatory. Verify the
+    # original producer outcome before treating the diagnostic XML as absent.
+    listing = api("/repos/" + REPOSITORY + "/actions/runs/42338343469/jobs?per_page=100", token)
+    require(type(listing.get("total_count")) is int and listing["total_count"] <= 100,
+            "OriginalJobListingIncomplete")
+    jobs = [job for job in listing.get("jobs", []) if job.get("id") == 128300247013]
+    require(len(jobs) == 1, "OriginalProducerJobMissingOrAmbiguous")
+    job = jobs[0]
+    require(job.get("run_id") == 42338343469 and job.get("head_sha") == TARGET_HEAD
+            and job.get("head_branch") == BRANCH and job.get("status") == "completed"
+            and job.get("conclusion") == "failure", "OriginalProducerJobIdentityMismatch")
+    expected = {
+        42: ("Critical UI startup, rendering and interaction checks", "success"),
+        43: ("Preserve node probe regression after an early UI failure", "skipped"),
+        44: ("Upload current node regression evidence before production builds", "success"),
+    }
+    verified = []
+    for number, (name, conclusion) in expected.items():
+        matches = [step for step in job.get("steps", []) if step.get("number") == number]
+        require(len(matches) == 1 and matches[0].get("name") == name
+                and matches[0].get("status") == "completed"
+                and matches[0].get("conclusion") == conclusion,
+                "OriginalConditionalProducerOutcomeMismatch")
+        verified.append(matches[0])
+    return {"node-diagnostic-regression.xml": {
+        "job_id": job["id"], "run_id": job["run_id"], "source_head_sha": job["head_sha"],
+        "reason": "Original conditional diagnostic producer was skipped; normal critical reports remain required.",
+        "producer_steps": verified, "classification": "not_generated_by_original_workflow",
+        "original_run_conclusion_changed": False,
+    }}
 
 
 def main():
@@ -382,13 +438,15 @@ def main():
         require(expires > dt.datetime.now(dt.timezone.utc), "FixedArtifactExpired")
         write_json(out / "original-run.json", run)
         write_json(out / "original-artifact.json", artifact)
+        conditional_absence = original_conditional_evidence(args.kind, token)
+        write_json(out / "original-conditional-producers.json", conditional_absence)
         original = out / "original.zip"
         report["downloaded_zip"] = download(target, original, token)
         emit("IDENTITY", {"reader_source_sha": reader_sha, "target_head_sha": TARGET_HEAD,
                           "target_merge_sha": TARGET_MERGE, "target_run": target["run"],
                           "original_conclusion": run["conclusion"], "artifact": target["artifact"],
                           **report["downloaded_zip"]})
-        report["archive"] = inspect_archive(original, args.kind, out)
+        report["archive"] = inspect_archive(original, args.kind, out, conditional_absence)
         report["success"] = not report["archive"]["selection_errors"]
         if not report["success"]:
             report["error_code"] = "SelectedEvidenceIncomplete"

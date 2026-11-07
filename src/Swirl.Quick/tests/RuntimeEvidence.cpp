@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include "engine/RustCoreLibrary.h"
 #include "network/HttpRequestPolicy.h"
 #include <QDir>
@@ -121,11 +122,56 @@ void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,Syst
 }
 
 namespace {
-std::atomic<std::int64_t> controlledDeadlineNs{0};
-std::int64_t controlledAbsoluteNs=0;
+std::atomic<std::int64_t> controlledRequestStartedNs{0};
+std::int64_t controlledStartedNs=0,controlledAbsoluteNs=0;
 std::int64_t controlledNowNs() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
+std::int64_t controlledDeadlineFor(std::int64_t requestStarted) {
+    return requestStarted?std::min<std::int64_t>(controlledAbsoluteNs,requestStarted+8'000'000'000LL)
+        :controlledStartedNs+20'000'000'000LL;
+}
+#ifdef Q_OS_WIN
+std::atomic<unsigned char *> controlledStopReceipt{nullptr};
+bool controlledAttachStopReceipt(const ControlledNodeSession &session,const QByteArray &handleBytes) {
+    if(handleBytes.size()!=8||controlledStopReceipt.load(std::memory_order_acquire))return false;
+    quint64 encoded=0;std::memcpy(&encoded,handleBytes.constData(),8);
+    if(!encoded||encoded>std::numeric_limits<quintptr>::max())return false;
+    const auto handle=reinterpret_cast<HANDLE>(quintptr(encoded));
+    auto *view=static_cast<unsigned char *>(MapViewOfFile(handle,FILE_MAP_WRITE,0,0,256));
+    const bool closed=CloseHandle(handle);
+    if(!view)return false;
+    const auto read64=[view](int offset){quint64 result=0;std::memcpy(&result,view+offset,8);return result;};
+    DWORD version=0,pid=0;std::memcpy(&version,view+16,4);std::memcpy(&pid,view+20,4);
+    LARGE_INTEGER frequency{},now{};
+    bool valid=closed&&std::memcmp(view,"SWIRL-STOP-V1\0\0\0",16)==0&&version==1&&pid==GetCurrentProcessId()
+        &&session.nonce.toLatin1()==QByteArray(reinterpret_cast<const char *>(view+24),64)
+        &&session.sourceSha.toLatin1()==QByteArray(reinterpret_cast<const char *>(view+88),40)
+        &&QueryPerformanceFrequency(&frequency)&&QueryPerformanceCounter(&now)
+        &&frequency.QuadPart>0&&read64(184)==quint64(frequency.QuadPart)
+        &&read64(168)>0&&read64(168)<=quint64(now.QuadPart);
+    for(int offset=128;offset<256;++offset){
+        if((offset>=168&&offset<176)||(offset>=184&&offset<192))continue;
+        valid=valid&&view[offset]==0;
+    }
+    if(!valid){UnmapViewOfFile(view);return false;}
+    // Touch the already committed page before any request. The hard-stop path
+    // below performs only bounded memory stores, QPC and TerminateProcess.
+    controlledStopReceipt.store(view,std::memory_order_release);return true;
+}
+void controlledRecordHardStop(std::int64_t requestStarted,std::int64_t deadline,std::int64_t fired) {
+    auto *view=controlledStopReceipt.load(std::memory_order_acquire);
+    if(!view)return;
+    LARGE_INTEGER qpc{};if(!QueryPerformanceCounter(&qpc))return;
+    const auto write64=[view](int offset,quint64 value){std::memcpy(view+offset,&value,8);};
+    write64(128,quint64(controlledStartedNs));write64(136,quint64(controlledAbsoluteNs));
+    write64(144,quint64(requestStarted));write64(152,quint64(deadline));write64(160,quint64(fired));
+    write64(176,quint64(qpc.QuadPart));
+    const DWORD phase=requestStarted?2:1;std::memcpy(view+192,&phase,4);
+    // The release barrier makes a complete record visible before native exit.
+    InterlockedExchange(reinterpret_cast<volatile LONG *>(view+196),1);
+}
+#endif
 bool controlledPath(const QString &path,bool directory=false) {
     const QFileInfo file(path);
     if(!file.isAbsolute()||!file.exists()||file.isSymLink()||(directory?!file.isDir():!file.isFile()))return false;
@@ -205,9 +251,9 @@ bool controlledCreateFixtureCatalog(ControlledNodeSession *session) {
 bool controlledPrivateProof(QByteArray *proof) {
     const auto input=GetStdHandle(STD_INPUT_HANDLE);
     if(input==nullptr||input==INVALID_HANDLE_VALUE||GetFileType(input)!=FILE_TYPE_PIPE)return false;
-    const QByteArray prefix("SWIRL-FIXTURE-PROOF-1\n");
-    const auto expected=prefix.size()+96;
-    const auto deadline=std::min<std::int64_t>(controlledDeadlineNs.load(std::memory_order_acquire),controlledNowNs()+2'000'000'000LL);
+    const QByteArray prefix("SWIRL-FIXTURE-PROOF-2\n");
+    const auto expected=prefix.size()+104;
+    const auto deadline=std::min<std::int64_t>(controlledDeadlineFor(controlledRequestStartedNs.load(std::memory_order_acquire)),controlledNowNs()+2'000'000'000LL);
     QByteArray data;
     while(controlledNowNs()<deadline){
         DWORD available=0;
@@ -227,7 +273,7 @@ bool controlledPrivateProof(QByteArray *proof) {
 }
 bool controlledProveFixture(const ControlledNodeSession &session,const QByteArray &manifestDigest,const QByteArray &key) {
     const QByteArray prefix("SWIRL-OWNED-FIXTURE-1\n");
-    const auto deadline=std::min<std::int64_t>(controlledDeadlineNs.load(std::memory_order_acquire),controlledNowNs()+2'000'000'000LL);
+    const auto deadline=std::min<std::int64_t>(controlledDeadlineFor(controlledRequestStartedNs.load(std::memory_order_acquire)),controlledNowNs()+2'000'000'000LL);
     const auto remaining=[&]{return int(std::max<std::int64_t>(0,(deadline-controlledNowNs())/1'000'000));};
     QByteArray challenge(32,Qt::Uninitialized);
     for(qsizetype offset=0;offset<challenge.size();offset+=sizeof(quint32)){
@@ -364,8 +410,10 @@ private:
                 ||m_controller->activeProxyPort()!=m_session.proxyPort||m_controller->tunRequested()||m_controller->proxyRequested()){
                 fail("SelectedProxyRouteUnconfirmed");return;
             }
+            const auto requestStarted=controlledNowNs();
+            if(requestStarted>=controlledStartedNs+20'000'000'000LL){fail("StartupDeadlineExceeded");return;}
             m_requestsStarted=true;m_requestsClock.start();
-            controlledDeadlineNs.store(std::min<std::int64_t>(controlledAbsoluteNs,controlledNowNs()+8'000'000'000LL),std::memory_order_release);
+            controlledRequestStartedNs.store(requestStarted,std::memory_order_release);
             if(!publish("requests")){fail("PrivateReceiptWriteFailed");return;}
             m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),quint16(m_session.proxyPort)));
             // All three requests use the same explicit selected node. There is
@@ -468,6 +516,7 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     const bool owned=controlledProveFixture(candidate,digest,key);
     key.fill('\0');
     if(!owned){proof.fill('\0');return false;}
+    if(!controlledAttachStopReceipt(candidate,proof.mid(96,8))){proof.fill('\0');return false;}
     candidate.fixturePassword=QString::fromLatin1(proof.mid(64,32).toHex());proof.fill('\0');
     if(!controlledCreateFixtureCatalog(&candidate))return false;
     *session=std::move(candidate);return true;
@@ -482,17 +531,21 @@ void startControlledNodeSession(QQuickWindow *window,EngineController *controlle
 std::jthread startControlledNodeWatchdog(bool enabled) {
 #ifdef Q_OS_WIN
     if(!enabled)return {};
-    const auto now=controlledNowNs();controlledAbsoluteNs=now+28'000'000'000LL;
-    controlledDeadlineNs.store(now+20'000'000'000LL,std::memory_order_release);
+    const auto now=controlledNowNs();controlledStartedNs=now;controlledAbsoluteNs=now+28'000'000'000LL;
+    controlledRequestStartedNs.store(0,std::memory_order_release);
     return std::jthread([](std::stop_token stop){
         while(!stop.stop_requested()){
-            if(controlledNowNs()>=controlledDeadlineNs.load(std::memory_order_acquire)){
+            const auto requestStarted=controlledRequestStartedNs.load(std::memory_order_acquire);
+            const auto deadline=controlledDeadlineFor(requestStarted);const auto now=controlledNowNs();
+            if(now>=deadline){
                 // This QA process has no system-network ownership. Even a
                 // completely stalled Qt/Rust event loop cannot keep its sockets.
+                controlledRecordHardStop(requestStarted,deadline,now);
                 TerminateProcess(GetCurrentProcess(),124);return;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+        if(auto *view=controlledStopReceipt.exchange(nullptr,std::memory_order_acq_rel))UnmapViewOfFile(view);
     });
 #else
     Q_UNUSED(enabled);return {};
