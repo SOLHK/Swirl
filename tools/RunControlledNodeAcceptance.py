@@ -34,6 +34,8 @@ FIXTURE_CERT_SHA256 = "a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f
 FIXTURE_KEY_SHA256 = "13eb4aa0855cc8e8280b879a0e3b125e8350bd27da76c60371a2755a8ac57d2f"
 WRONG_CA_SHA256 = "e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b"
 ADMISSION_CONTROLS = ("missing-proof", "missing-fixture", "preexisting-store", "wrong-proof")
+UI_IMPORT_WORKFLOW = "subscription-policy-v1"
+UI_IMPORT_CONTROLS = ("wrong-ca", "over-limit", "wrong-url", "missing-capability")
 _PROOF_ISSUER = object()
 
 
@@ -46,6 +48,26 @@ def refuse_private_inputs(argv):
 
 def json_bytes(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+
+
+def ui_import_contract(manifest):
+    """Fixed fixture syntax only. This never issues a quota or admission grant."""
+    if "uiWorkflow" not in manifest:
+        if "uiImportControl" in manifest:
+            raise ValueError("PrivateUiImportWorkflowRequired")
+        return None
+    if (manifest.get("uiWorkflow") != UI_IMPORT_WORKFLOW or "nativeWatchdogControl" in manifest
+            or "uiImportControl" in manifest and manifest["uiImportControl"] not in UI_IMPORT_CONTROLS):
+        raise ValueError("PrivateUiImportWorkflowRequired")
+    return manifest.get("uiImportControl", "")
+
+
+def fixed_subscription_body(socks_port, password_hex):
+    if (type(socks_port) is not int or not 1 <= socks_port <= 65535
+            or not isinstance(password_hex, str) or not re.fullmatch(r"[0-9a-f]{64}", password_hex)):
+        raise ValueError("OwnedSyntheticSubscriptionRequired")
+    return ("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: 127.0.0.1\n"
+            f'    port: {socks_port}\n    username: fixture\n    password: "{password_hex}"\n').encode("ascii")
 
 
 class _FixtureProof:
@@ -127,6 +149,11 @@ class LoopbackFixture:
         self.rejected = 0
         self.proofs = 0
         self.socks_connections = 0
+        self.subscription_requests = 0
+        self.subscription_declared_body_bytes = 0
+        self.subscription_body_sha256 = None
+        self._ui_import_control = None
+        self._ui_import_nonce = None
         self._proof_key = secrets.token_bytes(32)
         self._password = secrets.token_bytes(32)
         self._admission = None
@@ -207,9 +234,14 @@ class LoopbackFixture:
         if type(manifest) is not dict:
             raise ValueError("OwnedLoopbackFixtureRequired")
         native_control = control_for_manifest(manifest)
+        import_control = ui_import_contract(manifest)
         fields = {"schema", "sourceSha", "nonce", "nodeOrdinal", "proxyPort", "fixture"}
         if native_control:
             fields.add("nativeWatchdogControl")
+        if import_control is not None:
+            fields.add("uiWorkflow")
+            if "uiImportControl" in manifest:
+                fields.add("uiImportControl")
         fixture = manifest.get("fixture")
         if (self._admission is not None or self.done.is_set() or not self._listeners_alive()
                 or set(manifest) != fields
@@ -223,10 +255,15 @@ class LoopbackFixture:
                 or (fixture["httpPort"], fixture["httpsPort"], fixture["socksPort"]) != (self.http, self.https, self.socks)
                 or fixture["caSha256"] not in (FIXTURE_CERT_SHA256, WRONG_CA_SHA256)
                 or len({manifest["proxyPort"], self.http, self.https, self.socks}) != 4
-                or native_control and (self.stall is not True or fixture["caSha256"] != FIXTURE_CERT_SHA256)):
+                or native_control and (self.stall is not True or fixture["caSha256"] != FIXTURE_CERT_SHA256)
+                or import_control is not None and (self.stall or fixture["caSha256"] != (
+                    WRONG_CA_SHA256 if import_control == "wrong-ca" else FIXTURE_CERT_SHA256))):
             raise ValueError("OwnedLoopbackFixtureRequired")
         proof = _FixtureProof(_PROOF_ISSUER, self, hashlib.sha256(json_bytes(manifest)).digest())
         self._admission = proof
+        if import_control is not None:
+            self._ui_import_control, self._ui_import_nonce = import_control, manifest["nonce"]
+            self.subscription_body_sha256 = hashlib.sha256(fixed_subscription_body(self.socks, self._password.hex())).hexdigest()
         return proof
 
     @staticmethod
@@ -263,6 +300,18 @@ class LoopbackFixture:
                 return
             if self.stall:
                 self.done.wait(10)
+                return
+            if self._ui_import_control is not None and headers.startswith(b"GET /swirl-private-subscription/"):
+                expected = f"GET /swirl-private-subscription/{self._ui_import_nonce}.yaml HTTP/1.1\r\n".encode("ascii")
+                if not tls or self.proofs != 1 or not headers.startswith(expected) or self.subscription_requests:
+                    self.rejected += 1
+                    return
+                self.subscription_requests += 1
+                body = (b"x" * 65537 if self._ui_import_control == "over-limit" else
+                        fixed_subscription_body(self.socks, self._password.hex()))
+                self.subscription_declared_body_bytes = len(body)
+                peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/yaml\r\nContent-Length: "
+                             + str(len(body)).encode("ascii") + b"\r\nConnection: close\r\n\r\n" + body)
                 return
             head = headers.startswith(b"HEAD /generate_204 ")
             body = b"" if head else b"ip=127.0.0.1\nfixture=owned-loopback\n"

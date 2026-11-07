@@ -44,6 +44,15 @@
 #include <QSslConfiguration>
 #include <QElapsedTimer>
 #include <chrono>
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include "engine/NodeImporter.h"
+#include "engine/NativeNodeBridge.h"
+#include <QQuickItem>
+#include <QJSValue>
+#include <QPointer>
+#include <QScopedValueRollback>
+#include <QTest>
+#endif
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -119,6 +128,15 @@ void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,Syst
   }
  });timer->start();
  QTimer::singleShot(30*60*1000,window,[controller]{controller->stop();qApp->quit();});
+}
+
+QUrl ControlledNodeSession::subscriptionUrl() const {
+    return QUrl(QStringLiteral("https://127.0.0.1:%1/swirl-private-subscription/%2.yaml")
+        .arg(fixtureHttpsPort).arg(nonce));
+}
+QByteArray ControlledNodeSession::subscriptionBody() const {
+    return QByteArray("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: 127.0.0.1\n    port: ")
+        +QByteArray::number(fixtureSocksPort)+"\n    username: fixture\n    password: \""+fixturePassword.toLatin1()+"\"\n";
 }
 
 namespace {
@@ -304,6 +322,335 @@ bool controlledProveFixture(const ControlledNodeSession &session,const QByteArra
 }
 #endif
 
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+// This is a Qt-input driver, not a second importer or policy implementation.
+// Each mutation below originates in an existing visible control; its receipt
+// and a separately decrypted NodeStore are observed before the next action.
+class ControlledImportUi final : public QObject {
+public:
+    ControlledImportUi(QQuickWindow *window,EngineController *controller,const ControlledNodeSession &session,
+                       std::function<bool()> networkPhase,QObject *parent)
+        :QObject(parent),m_window(window),m_controller(controller),m_session(session),m_networkPhase(std::move(networkPhase)) {
+        connect(controller,&EngineController::policyApplyFinished,this,[this](const QString &id,bool success){m_completions.insert(id,success);});
+    }
+    bool begin(){return navigate("policies");}
+    QString error() const{return m_error;}
+    QString importedId() const{return m_importedId;}
+    bool importExercised() const{return m_imported;}
+    bool policyExercised() const{return m_policySelected;}
+    bool probeClicked() const{return m_probeClicked;}
+    bool ready() const{return m_phase==Ready;}
+    QJsonObject evidence() const {
+        return {{"workflow","subscription-policy-v1"},{"control",m_session.uiImportControl},
+            {"phase",int(m_phase)},{"inputEvents",m_inputs},{"committedReceipts",m_receipts},
+            {"readbacks",m_readbacks},{"routeWitnesses",m_routes},{"probePresentation",probePresentation()},
+            {"sourceId",m_sourceId},{"importedNodeId",m_importedId},
+            {"bootstrapNodeId",m_session.fixtureNodeId},{"probeButtonClicked",m_probeClicked},
+            {"download",QJsonObject::fromVariantMap(m_controller->imports()->privateUiImportEvidence())}};
+    }
+    bool displayedProbe(qint64 latency,int status,qint64 outboundMs) const {
+        auto *label=item("nodeRequestState");
+        return m_probeClicked&&label&&label->isVisible()&&value("pageLoader.item.selectedId").toString()==m_importedId
+            &&value("pageLoader.item.tested.latency").toLongLong()==latency
+            &&value("pageLoader.item.tested.http").toInt()==status
+            &&outboundMs>=0&&value("pageLoader.item.tested.outboundConnectMs").toLongLong()==outboundMs
+            &&label->property("text").toString().contains(QStringLiteral("HTTP %1").arg(status))
+            &&label->property("text").toString().contains(QStringLiteral("%1 ms").arg(outboundMs));
+    }
+    QJsonObject probePresentation() const {
+        auto *label=m_probeClicked?item("nodeRequestState"):nullptr;
+        const auto id=m_probeClicked?value("pageLoader.item.selectedId").toString():QString{};
+        const auto latency=m_probeClicked?value("pageLoader.item.tested.latency"):QVariant{};
+        const auto outbound=m_probeClicked?value("pageLoader.item.tested.outboundConnectMs"):QVariant{};
+        return {{"visible",label&&label->isVisible()},{"text",label?label->property("text").toString():QString{}},
+            {"nodeReference",id.isEmpty()?QString{}:NodeTestService::nodeReference(id)},
+            {"latency",latency.isValid()?latency.toLongLong():-1},{"outboundConnectMs",outbound.isValid()?outbound.toLongLong():-1},
+            {"httpStatus",m_probeClicked?value("pageLoader.item.tested.http").toInt():0}};
+    }
+    bool witnessRoute(const QString &stage,const QString &resultReference={}) {
+        const auto receipt=m_controller->policyReceipt();
+        const auto target=m_controller->policyDocument().value("default_policy").toMap().value("target").toMap();
+        const auto reference=NodeTestService::nodeReference(m_importedId);
+        if(m_importedId.isEmpty()||!routeMatches(m_importedId)||target.value("kind")!=QStringLiteral("node")
+            ||target.value("id")!=m_importedId||receipt.value("request_id").toString()!=m_recordedRequest
+            ||(stage==QStringLiteral("probe-result")?resultReference!=reference:!resultReference.isEmpty()))return false;
+        for(const auto &entry:m_routes)if(entry.toObject().value("stage")==stage)return false;
+        m_routes.append(QJsonObject{{"stage",stage},{"selectedNodeReference",NodeTestService::nodeReference(m_controller->selectedNodeId())},
+            {"activeNodeReference",NodeTestService::nodeReference(m_controller->activeNodeId())},
+            {"defaultNodeReference",NodeTestService::nodeReference(target.value("id").toString())},
+            {"resultNodeReference",resultReference},{"request_id",receipt.value("request_id").toString()},
+            {"saved_revision",m_controller->savedRevision()},{"applied_revision",m_controller->appliedRevision()},
+            {"plan_digest",receipt.value("plan_digest").toString()},{"proxyPort",m_controller->activeProxyPort()},
+            {"routingMode",m_controller->routingMode()}});
+        return true;
+    }
+    void advance() {
+        if(!m_error.isEmpty()||ready())return;
+        const auto failure=m_controller->imports()->privateUiImportEvidence().value("failureCode").toString();
+        if(!failure.isEmpty()){m_error=failure;return;}
+        if(!m_controller->policyError().isEmpty()){m_error="PrivateUiPolicyTransactionFailed";return;}
+        switch(m_phase){
+        case PolicyPage:
+            if(pageSettled("policies")){if(!m_controller->policyMigrationRequired()){m_error="PrivateUiMigrationExpected";return;}m_phase=MigrationReview;}break;
+        case MigrationReview: if(click("reviewPolicyMigration","review-migration"))m_phase=MigrationConfirm;break;
+        case MigrationConfirm: if(commitClick("confirmPolicyMigration","confirm-migration"))m_phase=MigrationWait;break;
+        case MigrationWait: if(committed("migration")&&!modalVisible("policyMigrationDialog"))m_phase=BootstrapPicker;break;
+        case BootstrapPicker: if(click("defaultPolicyTarget","bootstrap-picker"))m_phase=BootstrapNode;break;
+        case BootstrapNode: if(click("policyNode-"+m_session.fixtureNodeId,"bootstrap-node"))m_phase=BootstrapConfirm;break;
+        case BootstrapConfirm: if(commitClick("confirmPolicyTarget","bootstrap-confirm"))m_phase=BootstrapWait;break;
+        case BootstrapWait:
+            if(committed("bootstrap-target")&&!modalVisible("policyTargetPicker")){
+                if(m_controller->selectedNodeId()!=m_session.fixtureNodeId){m_error="PrivateUiBootstrapPolicyMismatch";return;}
+                m_phase=ModePicker;
+            }break;
+        case ModePicker: if(click("routingModePicker","mode-picker"))m_phase=ModeOption;break;
+        case ModeOption: if(commitClick("swirlComboOption-1","global-mode"))m_phase=ModeWait;break;
+        case ModeWait:
+            if(committed("global-mode")&&m_controller->policyDocument().value("mode")==QStringLiteral("global")){
+                if(!m_controller->canStart()){m_error="PrivateUiBootstrapStartRejected";return;}
+                // Connection startup has no external request. Its exit choice
+                // was committed by the real policy controls above.
+                m_controller->connectNode(m_session.fixtureNodeId);m_phase=BootstrapRunning;
+            }break;
+        case BootstrapRunning:
+            if(m_controller->apiHealthy()){
+                if(!routeMatches(m_session.fixtureNodeId)){m_error="PrivateUiBootstrapRouteMismatch";return;}
+                if(navigate("subscriptions"))m_phase=SubscriptionsPage;
+            }break;
+        case SubscriptionsPage: if(pageSettled("subscriptions"))m_phase=AddSource;break;
+        case AddSource: if(click("addSubscription","add-subscription"))m_phase=NameField;break;
+        case NameField: if(fill("subscriptionName",QStringLiteral("Synthetic owned subscription"),"subscription-name"))m_phase=UrlField;break;
+        case UrlField: {
+            auto url=m_session.subscriptionUrl();
+            if(m_session.uiImportControl==QStringLiteral("wrong-url"))url.setPath(url.path()+QStringLiteral(".unexpected"));
+            if(fill("subscriptionUrl",url.toString(QUrl::FullyEncoded),"subscription-url"))m_phase=AutoFocus;
+            break;
+        }
+        case AutoFocus:
+            // Focus traversal uses the actual adjacent form controls. Setting a
+            // read-only QML property or invoking saveSource() would not prove UI.
+            if(auto *interval=item("subscriptionInterval")){
+                interval->forceActiveFocus(Qt::TabFocusReason);m_interval=interval;
+                QTest::keyClick(m_window,Qt::Key_Tab,Qt::NoModifier,0);m_phase=AutoToggle;
+            }break;
+        case AutoToggle: {
+            auto *toggle=m_window->activeFocusItem();auto *dialog=object("subscriptionDialog");
+            if(!toggle||!m_interval||toggle->parentItem()!=m_interval->parentItem()
+                ||!toggle->property("checked").isValid()||!dialog){m_error="PrivateUiAutomaticRefreshInputMissing";return;}
+            if(!stable(toggle))break;
+            if(!dialog->property("autoUpdate").toBool()){m_error="PrivateUiAutomaticRefreshUnexpected";return;}
+            QTest::keyClick(m_window,Qt::Key_Space,Qt::NoModifier,0);
+            m_inputs.append("disable-automatic-refresh");m_phase=AutoVerify;break;
+        }
+        case AutoVerify:
+            if(auto *dialog=object("subscriptionDialog")){
+                if(dialog->property("autoUpdate").toBool()){m_error="PrivateUiAutomaticRefreshStillEnabled";return;}
+                m_phase=SaveSource;
+            }break;
+        case SaveSource:
+            if(auto *button=item("saveSubscription");stable(button)){
+                // Starts the existing request-phase clock once, before the
+                // form can issue its automatic single post-save refresh.
+                if(!m_networkPhase()){m_error="PrivateUiRequestPhaseRejected";return;}
+                m_beforeRequest=m_controller->policyReceipt().value("request_id").toString();
+                press(button,"save-subscription");m_phase=ImportWait;
+            }break;
+        case ImportWait:
+            if(!m_controller->imports()->busy()&&!m_controller->policyBusy()&&!modalVisible("subscriptionDialog")
+                &&m_controller->imports()->privateUiImportEvidence().value("responseVerified").toBool()){
+                if(!captureCurrentReceipt("subscription-import")||!readback(false)){m_error="PrivateUiImportedStoreMismatch";return;}
+                m_imported=true;m_phase=SelectSource;
+            }break;
+        case SelectSource: if(commitClick("useSubscription-"+m_sourceId,"use-subscription"))m_phase=SourceWait;break;
+        case SourceWait:
+            if(committed("subscription-scope")){
+                if(!m_controller->subscriptionScopeEnabled()||m_controller->activeSubscriptionId()!=m_sourceId){m_error="PrivateUiSourceScopeMismatch";return;}
+                if(navigate("policies"))m_phase=ImportedPolicyPage;
+            }break;
+        case ImportedPolicyPage: if(pageSettled("policies"))m_phase=ImportedPicker;break;
+        case ImportedPicker: if(click("defaultPolicyTarget","imported-picker"))m_phase=ImportedNode;break;
+        case ImportedNode: if(click("policyNode-"+m_importedId,"imported-node"))m_phase=ImportedConfirm;break;
+        case ImportedConfirm: if(commitClick("confirmPolicyTarget","imported-confirm"))m_phase=ImportedWait;break;
+        case ImportedWait:
+            if(committed("imported-target")&&!modalVisible("policyTargetPicker")){
+                if(!routeMatches(m_importedId)||!readback(true)||!witnessRoute("policy-applied")){m_error="PrivateUiImportedPolicyMismatch";return;}
+                m_policySelected=true;if(navigate("proxies"))m_phase=NodesPage;
+            }break;
+        case NodesPage: if(pageSettled("proxies"))m_phase=NodeDetail;break;
+        case NodeDetail:
+            if(auto *row=nodeRow(m_window->contentItem(),m_importedId);stable(row)){
+                const auto point=row->mapToScene(QPointF(qMin(70.0,row->width()/2),row->height()/2)).toPoint();
+                QTest::mouseClick(m_window,Qt::LeftButton,Qt::NoModifier,point,0);
+                QTest::mouseDClick(m_window,Qt::LeftButton,Qt::NoModifier,point,0);
+                m_inputs.append("open-imported-node-details");m_phase=ProbeField;
+            }break;
+        case ProbeField:
+            if(auto *hero=item("nodeHero");hero&&hero->property("opened").toBool()&&!hero->property("moving").toBool()){
+                if(value("pageLoader.item.selectedId").toString()!=m_importedId||!routeMatches(m_importedId)){m_error="PrivateUiInspectedNodeMismatch";return;}
+                if(fill("nodeTestUrl",QStringLiteral("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort),"probe-url"))m_phase=ProbeButton;
+            }break;
+        case ProbeButton:
+            if(auto *button=item("nodeTestButton");stable(button)){
+                if(!witnessRoute("probe-click")){m_error="PrivateUiProbeRouteMismatch";return;}
+                press(button,"probe-button");m_probeClicked=true;m_phase=Ready;
+            }break;
+        case Ready:break;
+        }
+    }
+private:
+    enum Phase {PolicyPage,MigrationReview,MigrationConfirm,MigrationWait,BootstrapPicker,BootstrapNode,BootstrapConfirm,
+        BootstrapWait,ModePicker,ModeOption,ModeWait,BootstrapRunning,SubscriptionsPage,AddSource,NameField,UrlField,
+        AutoFocus,AutoToggle,AutoVerify,SaveSource,ImportWait,SelectSource,SourceWait,ImportedPolicyPage,ImportedPicker,
+        ImportedNode,ImportedConfirm,ImportedWait,NodesPage,NodeDetail,ProbeField,ProbeButton,Ready};
+    QQuickWindow *m_window;EngineController *m_controller;ControlledNodeSession m_session;
+    std::function<bool()> m_networkPhase;Phase m_phase=PolicyPage;
+    QString m_error,m_sourceId,m_importedId,m_beforeRequest,m_recordedRequest;
+    QHash<QString,bool> m_completions;QJsonArray m_inputs,m_receipts,m_readbacks,m_routes;
+    QPointer<QQuickItem> m_lastTarget,m_interval;QRectF m_lastRect;
+    bool m_imported=false,m_policySelected=false,m_probeClicked=false;
+    QVariant value(const QString &expression) const {
+        QQmlExpression query(qmlContext(m_window),m_window,expression);const auto result=query.evaluate();
+        return query.hasError()?QVariant{}:result;
+    }
+    bool navigate(const char *route) {
+        QQmlExpression query(qmlContext(m_window),m_window,QStringLiteral("AppState.navigate('%1')").arg(QString::fromLatin1(route)));
+        query.evaluate();if(query.hasError()){m_error="PrivateUiNavigationFailed";return false;}return true;
+    }
+    bool pageSettled(const char *route) const {
+        auto *host=m_window->findChild<QObject *>("pageLoader");
+        auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;
+        return active&&active->property("routeId").toString()==QString::fromLatin1(route)
+            &&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();
+    }
+    static QQuickItem *findItem(QQuickItem *parent,const QString &name) {
+        if(parent->objectName()==name&&parent->isVisible())return parent;
+        for(auto *child:parent->childItems())if(auto *found=findItem(child,name))return found;
+        return nullptr;
+    }
+    QQuickItem *item(const QString &name) const {
+        if(auto *found=findItem(m_window->contentItem(),name))return found;
+        for(auto *candidate:m_window->findChildren<QQuickItem *>(name))if(candidate->isVisible()&&candidate->window())return candidate;
+        return nullptr;
+    }
+    QObject *object(const QString &name) const {
+        for(auto *candidate:m_window->findChildren<QObject *>(name))if(candidate->property("visible").toBool())return candidate;
+        std::function<QObject *(QQuickItem *)> visual=[&](QQuickItem *parent)->QObject *{
+            for(auto *candidate:parent->findChildren<QObject *>(name))if(candidate->property("visible").toBool())return candidate;
+            for(auto *child:parent->childItems())if(auto *found=visual(child))return found;
+            return nullptr;
+        };
+        if(auto *found=visual(m_window->contentItem()))return found;
+        return nullptr;
+    }
+    bool modalVisible(const QString &name) const {return object(name)!=nullptr;}
+    bool stable(QQuickItem *target) {
+        if(!target||!target->isVisible()||!target->isEnabled()||target->width()<=0||target->height()<=0)return false;
+        const auto rect=target->mapRectToScene(QRectF(QPointF(),target->size()));const auto point=rect.center();qreal opacity=1;
+        for(auto *ancestor=target;ancestor;ancestor=ancestor->parentItem()){
+            opacity*=ancestor->opacity();if(ancestor->clip()&&!ancestor->mapRectToScene(QRectF(QPointF(),ancestor->size())).contains(point))return false;
+        }
+        if(opacity<=0.95||!target->window()||!QRectF(0,0,m_window->width(),m_window->height()).contains(point))return false;
+        const bool settled=m_lastTarget==target&&qAbs(rect.x()-m_lastRect.x())<0.5&&qAbs(rect.y()-m_lastRect.y())<0.5
+            &&qAbs(rect.width()-m_lastRect.width())<0.5&&qAbs(rect.height()-m_lastRect.height())<0.5;
+        m_lastTarget=target;m_lastRect=rect;return settled;
+    }
+    void press(QQuickItem *target,const char *label) {
+        QTest::mouseClick(target->window(),Qt::LeftButton,Qt::NoModifier,
+            target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint(),0);
+        m_inputs.append(QString::fromLatin1(label));m_lastTarget.clear();
+    }
+    bool click(const QString &name,const char *label) {
+        auto *target=item(name);if(!stable(target))return false;press(target,label);return true;
+    }
+    bool commitClick(const QString &name,const char *label) {
+        auto *target=item(name);if(!stable(target))return false;
+        m_beforeRequest=m_controller->policyReceipt().value("request_id").toString();press(target,label);return true;
+    }
+    bool fill(const QString &name,const QString &text,const char *label) {
+        auto *field=item(name);if(!field)return false;
+        field->forceActiveFocus(Qt::TabFocusReason);if(!stable(field))return false;
+        for(const auto ch:text)if(ch.unicode()>=128){m_error="PrivateUiKeyboardInputRejected";return false;}
+        QTest::keyClick(m_window,Qt::Key_A,Qt::ControlModifier,0);
+        for(const auto ch:text)QTest::keyClick(m_window,ch.toLatin1(),Qt::NoModifier,0);
+        if(field->property("text").toString()!=text){m_error="PrivateUiKeyboardInputUnconfirmed";return false;}
+        m_inputs.append(QString::fromLatin1(label));m_lastTarget.clear();return true;
+    }
+    bool captureCurrentReceipt(const char *label) {
+        const auto receipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());const auto id=receipt.value("request_id").toString();
+        if(id.isEmpty()||id==m_beforeRequest||QUuid(id).isNull()||!m_completions.value(id,false)
+            ||m_controller->policyBusy()||m_controller->policyApplyState()!=QStringLiteral("idle")
+            ||receipt.value("saved_revision").toString()!=m_controller->savedRevision()
+            ||QUuid(receipt.value("store_id").toString()).isNull()
+            ||!QRegularExpression("^[0-9a-f]{64}$").match(receipt.value("plan_digest").toString()).hasMatch())return false;
+        if(id!=m_recordedRequest){
+            m_receipts.append(QJsonObject{{"stage",QString::fromLatin1(label)},{"request_id",id},{"store_id",receipt.value("store_id")},
+                {"saved_revision",receipt.value("saved_revision")},{"applied_revision",receipt.value("applied_revision").toString()},
+                {"plan_digest",receipt.value("plan_digest")}});m_recordedRequest=id;
+        }
+        return true;
+    }
+    bool committed(const char *label) {
+        if(m_controller->policyBusy())return false;
+        const auto issued=m_controller->policyRequestId();
+        if(!issued.isEmpty()&&issued!=m_beforeRequest&&m_completions.contains(issued)&&!m_completions.value(issued)){
+            m_error="PrivateUiPolicyCommitRejected";return false;
+        }
+        return captureCurrentReceipt(label);
+    }
+    bool routeMatches(const QString &id) const {
+        return m_controller->apiHealthy()&&!m_controller->policyBusy()&&m_controller->selectedNodeId()==id
+            &&m_controller->activeNodeId()==id&&m_controller->routingMode()==QStringLiteral("global")
+            &&m_controller->activeProxyPort()==m_session.proxyPort&&!m_controller->tunRequested()&&!m_controller->proxyRequested()
+            &&m_controller->appliedRevision()==m_controller->savedRevision();
+    }
+    bool readback(bool selected) {
+        NodeStore reopened(m_session.storePath);const auto providers=reopened.subscriptions();const auto nodes=reopened.nodes();
+        const auto actualReceipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());
+        if(!reopened.error().isEmpty()||reopened.saving()||!reopened.configurationAvailable()||!reopened.configurationV2()
+            ||providers.size()!=1||nodes.size()!=2||reopened.configurationReceipt().value("request_id")!=actualReceipt.value("request_id")
+            ||reopened.configurationReceipt().value("plan_digest")!=actualReceipt.value("plan_digest"))return false;
+        const auto &source=providers.first();
+        if(QUuid(source.id).isNull()||source.name!=QStringLiteral("Synthetic owned subscription")||source.url!=m_session.subscriptionUrl()
+            ||source.enabled||source.intervalMinutes!=1440||source.formatHint!=QStringLiteral("auto")||source.downloadRoute!=QStringLiteral("system")
+            ||source.lastSuccess<=0||(!m_sourceId.isEmpty()&&source.id!=m_sourceId))return false;
+        const auto expected=NodeImporter::parse(m_session.subscriptionBody());if(!expected||expected.nodes.size()!=1)return false;
+        const auto &parsed=expected.nodes.first();QString imported;QJsonObject expectedOutbound;
+        if(!NativeNodeBridge::executableOutbound(parsed,&expectedOutbound).isEmpty())return false;
+        for(const auto &node:nodes){
+            if(node.id==m_session.fixtureNodeId){
+                if(!node.sourceId.isEmpty()||node.importSource!=QStringLiteral("manual")||node.protocol!=QStringLiteral("socks5")
+                    ||node.host!=QStringLiteral("127.0.0.1")||node.port!=m_session.fixtureSocksPort
+                    ||node.username!=QStringLiteral("fixture")||node.password!=m_session.fixturePassword)return false;
+            }else{
+                QJsonObject actualOutbound;
+                if(!imported.isEmpty()||QUuid(node.id).isNull()||node.sourceId!=source.id||node.name!=parsed.name
+                    ||node.protocol!=parsed.protocol||node.host!=parsed.host||node.port!=parsed.port||node.username!=parsed.username
+                    ||node.password!=parsed.password||node.parameters!=parsed.parameters||node.importSource!=QStringLiteral("subscription")
+                    ||!NativeNodeBridge::executableOutbound(node,&actualOutbound).isEmpty()||actualOutbound!=expectedOutbound)return false;
+                imported=node.id;
+            }
+        }
+        const bool actualSelected=reopened.selectedId()==imported;
+        if(imported.isEmpty()||(!m_importedId.isEmpty()&&m_importedId!=imported)||actualSelected!=selected)return false;
+        QFile ciphertext(m_session.storePath);if(!ciphertext.open(QIODevice::ReadOnly))return false;
+        const auto bytes=ciphertext.read(NodeStore::MaximumBytes+1);if(bytes.isEmpty()||bytes.size()>NodeStore::MaximumBytes)return false;
+        m_sourceId=source.id;m_importedId=imported;
+        m_readbacks.append(QJsonObject{{"stage",selected?"selected-imported-node":"imported-catalog"},{"independentNodeStore",true},
+            {"configurationV2",true},{"sourceCount",1},{"nodeCount",2},{"importedNodeId",imported},{"sourceId",source.id},
+            {"selectedImportedNode",actualSelected},{"saved_revision",reopened.configurationRevision()},
+            {"ciphertextSha256",QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())}});
+        return true;
+    }
+    static QQuickItem *nodeRow(QQuickItem *parent,const QString &id) {
+        const auto value=parent->property("record");
+        const auto row=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
+        if(row.value("rowKind")==QStringLiteral("node")&&row.value("id")==id&&!parent->property("pooled").toBool())return parent;
+        for(auto *child:parent->childItems())if(auto *found=nodeRow(child,id))return found;
+        return nullptr;
+    }
+};
+#endif
+
 class ControlledNodeRun final : public QObject {
 public:
     ControlledNodeRun(QQuickWindow *window,EngineController *controller,ControlledNodeSession session)
@@ -315,7 +662,7 @@ public:
     }
     void begin() {
         // No background subscriptions or telemetry are admitted by this run.
-        m_controller->imports()->shutdown();
+        if(!m_session.uiImportPolicy)m_controller->imports()->shutdown();
         auto &library=RustCoreLibrary::instance();
         if(!library.load()||library.expectedSourceSha()!=m_session.sourceSha){fail("PairedCoreIdentityRequired");return;}
         const auto nodes=m_controller->nodes();
@@ -325,6 +672,14 @@ public:
         m_id=nodes.first().toMap().value("id").toString();
         if(m_id!=m_session.fixtureNodeId||!m_controller->prepareRealAcceptance()){fail("IsolatedSessionUnavailable");return;}
         m_controller->setProxyPort(m_session.proxyPort);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_session.uiImportPolicy){
+            m_window->resize(1450,884); // Existing node-input fixture geometry; normal animations stay enabled.
+            m_importUi=std::make_unique<ControlledImportUi>(m_window,m_controller,m_session,[this]{return beginNetworkPhase();},this);
+            if(!publish("ui-import-policy")||!m_importUi->begin()){fail("PrivateUiNavigationFailed");return;}
+            m_begun=true;m_timer.start();QTimer::singleShot(0,this,[this]{tick();});return;
+        }
+#endif
         if(!m_controller->chooseNode(m_id)){fail("NodeConfigurationRejected");return;}
         if(!publish("starting")){fail("PrivateReceiptWriteFailed");return;}
         // Navigation uses the actual window's page/controller bindings.
@@ -345,6 +700,11 @@ private:
     QList<QNetworkReply *> m_replies;
     bool m_begun=false,m_connectRequested=false,m_requestsStarted=false,m_stopping=false,m_done=false;
     bool m_probeCompleted=false,m_probeSuccess=false;
+    bool m_networkPhaseStarted=false;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    std::unique_ptr<ControlledImportUi> m_importUi;
+    bool m_uiTick=false;
+#endif
     qint64 m_uiLatency=-1;
     qint64 m_outboundConnectMs=-1,m_originTlsMs=-1;
     int m_probeHttp=0;
@@ -357,7 +717,35 @@ private:
         if(m_error.isEmpty())m_error=code;
         stop();
     }
+    bool beginNetworkPhase() {
+        if(m_networkPhaseStarted)return true;
+        const auto now=controlledNowNs();
+        if(now>=controlledStartedNs+20'000'000'000LL)return false;
+        m_networkPhaseStarted=true;m_requestsClock.start();
+        controlledRequestStartedNs.store(now,std::memory_order_release);
+        return true;
+    }
+    void proxyRequests(bool probeAlreadyClicked) {
+        if(m_stopping||m_done)return;
+        if(!beginNetworkPhase()){fail("StartupDeadlineExceeded");return;}
+        m_requestsStarted=true;
+        if(!publish("requests")){fail("PrivateReceiptWriteFailed");return;}
+        m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),quint16(m_session.proxyPort)));
+        if(!probeAlreadyClicked){
+            const auto probe=QUrl(QString("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort));
+            m_controller->testSelectedNode(m_id,probe);
+        }
+        request("http",QUrl(QString("http://127.0.0.1:%1/").arg(m_session.fixtureHttpPort)));
+        if(m_stopping||m_done)return;
+        request("https",QUrl(QString("https://127.0.0.1:%1/trace").arg(m_session.fixtureHttpsPort)));
+    }
     void request(const char *scheme,const QUrl &url) {
+        if(m_stopping||m_done)return;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_importUi&&!m_importUi->witnessRoute(QStringLiteral("proxy-%1-start").arg(QString::fromLatin1(scheme)))){
+            fail("PrivateUiNormalProxyRouteMismatch");return;
+        }
+#endif
         QNetworkRequest input(url);SwirlNetwork::applyHttp1OnlyPolicy(input);
         input.setTransferTimeout(8000);input.setRawHeader("Connection","close");
         input.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
@@ -379,6 +767,11 @@ private:
         connect(reply,&QNetworkReply::sslErrors,this,[reply,tlsRejected](const QList<QSslError> &){*tlsRejected=true;reply->abort();});
         connect(reply,&QNetworkReply::finished,this,[this,reply,body,elapsed,tlsRejected,limitExceeded,drain,scheme]{
             drain();m_replies.removeOne(reply);++m_completed;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+            const bool routeRejected=m_importUi&&!m_stopping
+                &&!m_importUi->witnessRoute(QStringLiteral("proxy-%1-complete").arg(QString::fromLatin1(scheme)));
+            if(routeRejected&&m_error.isEmpty())m_error="PrivateUiNormalProxyRouteMismatch";
+#endif
             const int status=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             const bool succeeded=reply->error()==QNetworkReply::NoError&&status>=200&&status<300&&!*tlsRejected&&!*limitExceeded;
             QString exitHash;
@@ -396,17 +789,37 @@ private:
                 {"elapsedMs",elapsed->elapsed()},{"exitIpSha256",exitHash},{"responseEncrypted",sealed}});
             reply->deleteLater();
             if(!sealed&&m_error.isEmpty())m_error="PrivateReceiptWriteFailed";
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+            // Store this completed response before aborting peers: abort can
+            // synchronously run their finished handlers and finish the run.
+            if(routeRejected){stop();return;}
+#endif
             tick();
         });
     }
     void tick() {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_importUi&&m_uiTick)return;
+        QScopedValueRollback<bool> tickScope(m_uiTick,true);
+#endif
         if(m_done||(!m_begun&&!m_stopping))return;
         if(m_stopping){
-            if(m_replies.isEmpty()&&!m_controller->tests()->busy()&&!m_controller->processAlive()&&!m_controller->busy())finish();
+            if(m_replies.isEmpty()&&!m_controller->tests()->busy()&&!m_controller->processAlive()&&!m_controller->busy()
+                &&(!m_session.uiImportPolicy||!m_controller->imports()->busy()))finish();
             return;
         }
         if(!m_requestsStarted){
             if(m_clock.elapsed()>=20000){fail("StartupDeadlineExceeded");return;}
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+            if(m_importUi){
+                if(m_networkPhaseStarted&&m_requestsClock.elapsed()>=8000){fail("RequestDeadlineExceeded");return;}
+                m_importUi->advance();
+                if(!m_importUi->error().isEmpty()){fail(m_importUi->error());return;}
+                if(!m_importUi->ready())return;
+                m_id=m_importUi->importedId();proxyRequests(true);
+            }else
+#endif
+            {
             if(!m_connectRequested&&!m_controller->busy()){
                 if(m_controller->selectedNodeId()!=m_id){fail("NodeSelectionUnconfirmed");return;}
                 m_connectRequested=true;m_controller->connectNode(m_id);return;
@@ -416,24 +829,22 @@ private:
                 ||m_controller->activeProxyPort()!=m_session.proxyPort||m_controller->tunRequested()||m_controller->proxyRequested()){
                 fail("SelectedProxyRouteUnconfirmed");return;
             }
-            const auto requestStarted=controlledNowNs();
-            if(requestStarted>=controlledStartedNs+20'000'000'000LL){fail("StartupDeadlineExceeded");return;}
-            m_requestsStarted=true;m_requestsClock.start();
-            controlledRequestStartedNs.store(requestStarted,std::memory_order_release);
-            if(!publish("requests")){fail("PrivateReceiptWriteFailed");return;}
-            m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),quint16(m_session.proxyPort)));
             // All three requests use the same explicit selected node. There is
             // no direct-mode or alternative-node retry on any failed response.
             // The Rust HEAD fixture is HTTP on loopback; HTTPS is independently
             // exercised below with a fixture-only, peer-verified Qt trust set.
-            const auto probe=QUrl(QString("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort));
-            m_controller->testSelectedNode(m_id,probe);
-            request("http",QUrl(QString("http://127.0.0.1:%1/").arg(m_session.fixtureHttpPort)));
-            request("https",QUrl(QString("https://127.0.0.1:%1/trace").arg(m_session.fixtureHttpsPort)));
+            proxyRequests(false);
+            }
         }
+        if(m_stopping||m_done||!m_requestsStarted)return;
         if(!m_probeCompleted&&!m_controller->tests()->busy()){
             const auto probe=m_controller->tests()->result(m_id);
             if(!probe.isEmpty()){
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+                if(m_importUi&&!m_importUi->witnessRoute("probe-result",probe.value("nodeReference").toString())){
+                    fail("PrivateUiProbeResultReferenceMismatch");return;
+                }
+#endif
                 m_probeCompleted=true;m_probeSuccess=probe.value("success").toBool();m_uiLatency=probe.value("latency",-1).toLongLong();
                 m_probeHttp=probe.value("http").toInt();m_probePhase=probe.value("phase").toString();
                 m_probeFailureCode=probe.value("failureCode").toString();
@@ -448,6 +859,7 @@ private:
         m_stopping=true;publish("stopping");
         const auto replies=m_replies;
         for(auto *reply:replies)reply->abort();
+        if(m_session.uiImportPolicy)m_controller->imports()->shutdown();
         m_controller->tests()->cancel();m_controller->stop();
         m_timer.start();QTimer::singleShot(0,this,[this]{tick();});
     }
@@ -456,16 +868,31 @@ private:
         bool httpPassed=m_http.size()==2;
         bool exitObserved=false;
         for(const auto &entry:m_http){const auto row=entry.toObject();httpPassed=httpPassed&&row.value("success").toBool();exitObserved=exitObserved||!row.value("exitIpSha256").toString().isEmpty();}
+        bool uiImport=false,uiPolicy=false;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        bool uiProbe=false,uiDisplay=false;
+        if(m_importUi){
+            uiImport=m_importUi->importExercised();uiPolicy=m_importUi->policyExercised();uiProbe=m_importUi->probeClicked();
+            uiDisplay=m_importUi->displayedProbe(m_uiLatency,m_probeHttp,m_outboundConnectMs);
+            if(m_error.isEmpty()&&(!uiImport||!uiPolicy||!uiProbe||!uiDisplay))m_error="PrivateUiSurfaceEvidenceIncomplete";
+        }
+#endif
         const bool passed=m_error.isEmpty()&&m_probeCompleted&&m_probeSuccess&&httpPassed&&exitObserved;
-        const QJsonObject result{{"schema",1},{"nonce",m_session.nonce},{"sourceSha",m_session.sourceSha},
+        QJsonObject result{{"schema",1},{"nonce",m_session.nonce},{"sourceSha",m_session.sourceSha},
             {"nodeOrdinal",m_session.nodeOrdinal},{"passed",passed},{"failureCode",m_error},
             {"selectedNodeReference",NodeTestService::nodeReference(m_id)},{"probeCompleted",m_probeCompleted},
             {"probeSuccess",m_probeSuccess},{"uiHeadersMs",m_uiLatency},{"proxyRequests",m_http},
             {"probeHttpStatus",m_probeHttp},{"probePhase",m_probePhase},{"probeFailureCode",m_probeFailureCode},
             {"outboundConnectMs",m_outboundConnectMs},{"originTlsMs",m_originTlsMs},
             {"fixtureOnly",true},{"liveReady",false},{"persistentBudgetGuardExercised",false},
-            {"uiSubscriptionImportExercised",false},{"uiPolicySelectionExercised",false},
+            {"uiSubscriptionImportExercised",uiImport},{"uiPolicySelectionExercised",uiPolicy},
             {"tasksReleased",true},{"systemNetworkChanged",false},{"requestDeadlineMs",8000},{"elapsedMs",m_clock.elapsed()}};
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_importUi){
+            result.insert("uiImportEvidence",m_importUi->evidence());result.insert("uiProbeButtonExercised",uiProbe);
+            result.insert("uiDisplayedLatencyMatches",uiDisplay);
+        }
+#endif
         const bool saved=controlledJson(m_session.root+"/result.json",result);publish("finished");
         QCoreApplication::exit(saved&&passed?0:2);
     }
@@ -495,6 +922,20 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
         if(input.value("nativeWatchdogControl")!=QJsonValue(QStringLiteral("native-watchdog-500ms")))return false;
         manifestKeys.append("nativeWatchdogControl");
     }
+    const bool uiImport=input.contains("uiWorkflow");
+    if(uiImport){
+#ifndef SWIRL_PRIVATE_UI_QUOTA
+        return false;
+#else
+        if(nativeControl||input.value("uiWorkflow")!=QJsonValue(QStringLiteral("subscription-policy-v1")))return false;
+        manifestKeys.append("uiWorkflow");
+        if(input.contains("uiImportControl")){
+            if(!input.value("uiImportControl").isString()||!QStringList{"wrong-ca","over-limit","wrong-url","missing-capability"}
+                .contains(input.value("uiImportControl").toString()))return false;
+            manifestKeys.append("uiImportControl");
+        }
+#endif
+    }
     if(!controlledKeys(input,manifestKeys)
         ||input.value("schema")!=QJsonValue(2)||input.value("nodeOrdinal")!=QJsonValue(1)
         ||input.value("sourceSha").toString()!=RustCoreLibrary::expectedSourceSha()
@@ -506,6 +947,7 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     candidate.root=QDir::cleanPath(root);candidate.sourceSha=input.value("sourceSha").toString();
     candidate.nonce=input.value("nonce").toString();candidate.nodeOrdinal=1;
     candidate.nativeWatchdog500msControl=nativeControl;
+    candidate.uiImportPolicy=uiImport;candidate.uiImportControl=input.value("uiImportControl").toString();
     if(!controlledPort(input.value("proxyPort"),&candidate.proxyPort)
         ||!controlledPort(settings.value("httpPort"),&candidate.fixtureHttpPort)
         ||!controlledPort(settings.value("httpsPort"),&candidate.fixtureHttpsPort)
@@ -514,6 +956,9 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
         ||!QDir(root).entryList(QStringList{"nodes.dpapi*","fixture-store-*"},QDir::AllEntries|QDir::Hidden|QDir::System|QDir::NoDotAndDotDot).isEmpty()
         ||QFileInfo::exists(root+"/result.json")||QFileInfo::exists(root+"/state.json"))return false;
     const auto caHash=settings.value("caSha256").toString();
+    if(uiImport&&caHash!=(candidate.uiImportControl==QStringLiteral("wrong-ca")
+        ?QStringLiteral("e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b")
+        :QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311")))return false;
     if(nativeControl&&caHash!=QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311"))return false;
     if(caHash!=QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311")
         &&caHash!=QStringLiteral("e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b"))return false;

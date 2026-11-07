@@ -35,7 +35,7 @@ $errors = [Collections.Generic.List[string]]::new()
 $receipt = [ordered]@{
     schema=1; source_sha=$env:GITHUB_SHA; run_id=$env:GITHUB_RUN_ID; run_attempt=$env:GITHUB_RUN_ATTEMPT
     started_utc=[DateTime]::UtcNow.ToString('o'); status='failed'; success=$false
-    scope='Fixed synthetic private Qt UI quota profile; no provider, wire, subscription-import, system-proxy or TUN acceptance'
+    scope='Fixed synthetic private Qt UI quota profile and owned subscription-form/policy/probe controls; no provider, wire, system-proxy or TUN acceptance'
     live_ready=$false; ordinary_runtimes_unchanged=$false; private_session_files_uploaded=$false
     build_directory=$qaBuild; rust_target=$qaRust; runtime_directory=$qaRuntime
     test_inventory=$null; steps=@(); errors=@()
@@ -501,6 +501,39 @@ print(json.dumps({"schema": 1, "factory": "PrivateSubscriptionSupervisor.WorkerI
         }
         $receipt.billing_test_inventory = [ordered]@{tests_run=10; passed=10; failures=0; errors=0; skipped=@()
             original_report=(Get-QuotaFile $billingTestPath); identities=$billingResult.identities}
+        # Additional fixed synthetic workflow. The original 9+1 UI and 10+0
+        # billing gates above keep their exact assertions and source identity.
+        $importTests = Join-Path $output 'import-tests'
+        if (Test-Path -LiteralPath $importTests) { throw 'Private UI import evidence must be new.' }
+        $null = Invoke-QuotaTool 'import-tests' $python @(
+            (Join-Path $repo 'tools/tests/test_private_subscription_ui_import.py'),'--evidence',$importTests) `
+            -Environment $billingTestEnvironment -RemoveEnvironment @('SWIRL_PRIVATE_UI_QT_ROOT')
+        $importTestPath = Join-Path $importTests 'private-ui-import-results.json'
+        $importResult = Get-Content -LiteralPath $importTestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($importResult.schema -ne 1 -or $importResult.platform -cne 'win32' -or
+            $importResult.testsRun -ne 14 -or $importResult.failures -ne 0 -or $importResult.errors -ne 0 -or
+            @($importResult.skipped).Count -ne 0 -or $importResult.realNodeRequests -ne 0 -or
+            $importResult.providerRequests -ne 0 -or $importResult.providerStatisticsAuthenticated -ne $false -or
+            $importResult.liveReady -ne $false) {
+            throw 'Private Qt import inventory differs from 14 Windows tests / 14 passes / zero skips.'
+        }
+        $importWorker = $importResult.identities.billingWorker
+        foreach ($entry in $billingMetadata.PSObject.Properties) {
+            if ($importWorker.PSObject.Properties[$entry.Name].Value -cne $entry.Value) {
+                throw 'Import suite billing worker differs from its designated factory identity.'
+            }
+        }
+        $importUi = $importResult.identities.qtUi
+        if ($importWorker.exe_sha256 -cne $billingWorkerBefore.sha256 -or
+            $importUi.source_sha -cne $env:GITHUB_SHA -or $importUi.build_id -cne $pair.build_id -or
+            $importUi.target -cne $pair.target -or $importUi.role -cne 'swirl_private_qt_ui' -or
+            $importUi.exe_sha256 -cne $exeIdentity.sha256 -or $importUi.core_sha256 -cne $coreIdentity.sha256 -or
+            $importUi.qt_version -cne '6.12.0' -or $importUi.guard_mode -cne 'mandatory_before_grant' -or
+            $importUi.abi_version -ne 1 -or $importUi.private_worker_schema -ne 1 -or $importUi.live -ne $false) {
+            throw 'Import suite Qt/worker identity differs from the separate designated binaries.'
+        }
+        $receipt.import_test_inventory = [ordered]@{tests_run=14; passed=14; failures=0; errors=0; skipped=@()
+            original_report=(Get-QuotaFile $importTestPath); identities=$importResult.identities}
     } finally {
         # Run even after a failed test. Keep the original error while recording
         # any changed or missing private binary; the outer ordinary-runtime
@@ -549,3 +582,4 @@ if ($null -ne $primary) { throw $primary }
 if (-not $receipt.success) { throw 'Private Qt quota profile acceptance or evidence preservation failed.' }
 Write-Host 'Verified separate private Qt quota profile: 9 Windows-applicable tests passed; one POSIX-only control skipped.'
 Write-Host 'Verified same-ledger synthetic Qt billing: 10 Windows tests passed; zero skips; live remains unavailable.'
+Write-Host 'Verified owned HTTPS subscription UI: 14 Windows tests passed; zero skips; no real-provider authority.'

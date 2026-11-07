@@ -26,6 +26,132 @@ _UI_ISSUER = object()
 UI_ROLE = "swirl_private_qt_ui"
 UI_WORKLOAD = "qt_ui_session"
 
+_IMPORT_INPUTS = ["review-migration", "confirm-migration", "bootstrap-picker", "bootstrap-node", "bootstrap-confirm",
+                  "mode-picker", "global-mode", "add-subscription", "subscription-name", "subscription-url",
+                  "disable-automatic-refresh", "save-subscription", "use-subscription", "imported-picker",
+                  "imported-node", "imported-confirm", "open-imported-node-details", "probe-url", "probe-button"]
+_IMPORT_RECEIPT_STAGES = ["migration", "bootstrap-target", "global-mode", "subscription-import", "subscription-scope", "imported-target"]
+_IMPORT_ROUTE_STAGES = {"policy-applied", "probe-click", "probe-result", "proxy-http-start", "proxy-https-start",
+                        "proxy-http-complete", "proxy-https-complete"}
+
+
+def _validate_import_observations(result, fixture, control, *, positive, proxy_port):
+    """Validate observed UI facts only; never manufacture admission/ExitProof."""
+    from RunControlledNodeAcceptance import UI_IMPORT_WORKFLOW
+    evidence = result.get("uiImportEvidence")
+    fields = {"workflow", "control", "phase", "inputEvents", "committedReceipts", "readbacks", "routeWitnesses", "probePresentation", "sourceId",
+              "importedNodeId", "bootstrapNodeId", "probeButtonClicked", "download"}
+    download_fields = {"capabilityInstalled", "requests", "tlsVerified", "responseVerified", "responseBytes",
+                       "httpStatus", "expectedBodySha256", "failureCode", "route", "bodyLimit", "revoked"}
+    receipt_fields = {"stage", "request_id", "store_id", "saved_revision", "applied_revision", "plan_digest"}
+    readback_fields = {"stage", "independentNodeStore", "configurationV2", "sourceCount", "nodeCount",
+                       "importedNodeId", "sourceId", "selectedImportedNode", "saved_revision", "ciphertextSha256"}
+    route_fields = {"stage", "selectedNodeReference", "activeNodeReference", "defaultNodeReference", "resultNodeReference",
+                    "request_id", "saved_revision", "applied_revision", "plan_digest", "proxyPort", "routingMode"}
+
+    def uuid(value):
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", value) is not None and value != "00000000-0000-0000-0000-000000000000"
+
+    def sha(value):
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+    def revision(value):
+        return isinstance(value, str) and re.fullmatch(r"[1-9][0-9]{0,19}", value) is not None and int(value) <= 2**64 - 1
+
+    if (type(evidence) is not dict or set(evidence) != fields or evidence["workflow"] != UI_IMPORT_WORKFLOW
+            or evidence["control"] != (control or "") or type(evidence["phase"]) is not int or not 0 <= evidence["phase"] <= 32
+            or type(evidence["inputEvents"]) is not list
+            or evidence["inputEvents"] != _IMPORT_INPUTS[:len(evidence["inputEvents"])]
+            or type(evidence["probeButtonClicked"]) is not bool
+            or any(type(result.get(key)) is not bool for key in ("uiProbeButtonExercised", "uiDisplayedLatencyMatches"))
+            or not uuid(evidence["bootstrapNodeId"])
+            or any(value != "" and not uuid(value) for value in (evidence["sourceId"], evidence["importedNodeId"]))):
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    download = evidence["download"]
+    if (type(download) is not dict or set(download) != download_fields
+            or any(type(download[key]) is not bool for key in ("capabilityInstalled", "tlsVerified", "responseVerified", "revoked"))
+            or type(download["requests"]) is not int or download["requests"] not in (0, 1)
+            or type(download["httpStatus"]) is not int or not 0 <= download["httpStatus"] <= 599
+            or type(download["responseBytes"]) is not int or not 0 <= download["responseBytes"] <= 65537
+            or download["expectedBodySha256"] not in ("", fixture.subscription_body_sha256)
+            or type(download["failureCode"]) is not str or len(download["failureCode"]) > 128
+            or download["route"] != "granted-core-http-listener" or type(download["bodyLimit"]) is not int
+            or download["bodyLimit"] != 65536 or download["revoked"] is not True):
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    receipts, readbacks = evidence["committedReceipts"], evidence["readbacks"]
+    if (type(receipts) is not list or len(receipts) > 6 or type(readbacks) is not list or len(readbacks) > 2):
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    previous = 0
+    request_ids, store_ids = set(), set()
+    for index, receipt in enumerate(receipts):
+        if (type(receipt) is not dict or set(receipt) != receipt_fields or receipt["stage"] != _IMPORT_RECEIPT_STAGES[index]
+                or not uuid(receipt["request_id"]) or not uuid(receipt["store_id"]) or not sha(receipt["plan_digest"])
+                or not revision(receipt["saved_revision"]) or int(receipt["saved_revision"]) <= previous
+                or receipt["applied_revision"] not in ("", receipt["saved_revision"]) or receipt["request_id"] in request_ids):
+            raise BudgetError("ActualUiImportEvidenceRejected")
+        previous = int(receipt["saved_revision"])
+        request_ids.add(receipt["request_id"])
+        store_ids.add(receipt["store_id"])
+    if len(store_ids) > 1:
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    for index, readback in enumerate(readbacks):
+        if (type(readback) is not dict or set(readback) != readback_fields
+                or readback["stage"] != ("imported-catalog", "selected-imported-node")[index]
+                or readback["independentNodeStore"] is not True or readback["configurationV2"] is not True
+                or type(readback["sourceCount"]) is not int or readback["sourceCount"] != 1
+                or type(readback["nodeCount"]) is not int or readback["nodeCount"] != 2
+                or readback["importedNodeId"] != evidence["importedNodeId"] or not uuid(readback["importedNodeId"])
+                or readback["sourceId"] != evidence["sourceId"] or not uuid(readback["sourceId"])
+                or readback["selectedImportedNode"] is not (index == 1)
+                or not revision(readback["saved_revision"]) or not sha(readback["ciphertextSha256"])):
+            raise BudgetError("ActualUiImportEvidenceRejected")
+    routes = evidence["routeWitnesses"]
+    if type(routes) is not list or len(routes) > len(_IMPORT_ROUTE_STAGES):
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    reference = hashlib.sha256(evidence["importedNodeId"].encode("ascii")).hexdigest()[:12]
+    stages = []
+    for route in routes:
+        if (type(route) is not dict or set(route) != route_fields or type(route["stage"]) is not str or route["stage"] not in _IMPORT_ROUTE_STAGES
+                or route["stage"] in stages or len(receipts) != 6 or not uuid(evidence["importedNodeId"])
+                or any(route[key] != reference for key in ("selectedNodeReference", "activeNodeReference", "defaultNodeReference"))
+                or route["resultNodeReference"] != (reference if route["stage"] == "probe-result" else "")
+                or route["request_id"] != receipts[-1]["request_id"] or route["plan_digest"] != receipts[-1]["plan_digest"]
+                or route["saved_revision"] != receipts[-1]["saved_revision"] or route["applied_revision"] != route["saved_revision"]
+                or type(route["proxyPort"]) is not int or route["proxyPort"] != proxy_port or route["routingMode"] != "global"):
+            raise BudgetError("ActualUiImportEvidenceRejected")
+        stages.append(route["stage"])
+    presentation = evidence["probePresentation"]
+    if (type(presentation) is not dict or set(presentation) != {"visible", "text", "nodeReference", "latency", "outboundConnectMs", "httpStatus"}
+            or type(presentation["visible"]) is not bool or type(presentation["text"]) is not str or len(presentation["text"]) > 1024
+            or presentation["nodeReference"] not in ("", reference)
+            or any(type(presentation[key]) is not int or presentation[key] < -1 for key in ("latency", "outboundConnectMs"))
+            or type(presentation["httpStatus"]) is not int or not 0 <= presentation["httpStatus"] <= 599):
+        raise BudgetError("ActualUiImportEvidenceRejected")
+    if not positive:
+        return
+    if (control is not None or result.get("uiSubscriptionImportExercised") is not True
+            or result.get("uiPolicySelectionExercised") is not True or result.get("uiProbeButtonExercised") is not True
+            or result.get("uiDisplayedLatencyMatches") is not True or evidence["probeButtonClicked"] is not True
+            or evidence["phase"] != 32 or evidence["inputEvents"] != _IMPORT_INPUTS
+            or len(receipts) != 6 or len(readbacks) != 2 or evidence["importedNodeId"] == evidence["bootstrapNodeId"]
+            or result.get("selectedNodeReference") != reference or set(stages) != _IMPORT_ROUTE_STAGES
+            or stages[:2] != ["policy-applied", "probe-click"]
+            or any(stages.index("proxy-" + scheme + "-start") > stages.index("proxy-" + scheme + "-complete") for scheme in ("http", "https"))
+            or presentation["visible"] is not True or presentation["nodeReference"] != reference
+            or presentation["httpStatus"] != 204 or presentation["httpStatus"] != result.get("probeHttpStatus")
+            or presentation["latency"] != result.get("uiHeadersMs") or presentation["outboundConnectMs"] != result.get("outboundConnectMs")
+            or presentation["outboundConnectMs"] < 0 or "HTTP 204" not in presentation["text"]
+            or f'{presentation["outboundConnectMs"]} ms' not in presentation["text"]
+            or download["capabilityInstalled"] is not True or download["requests"] != 1 or download["tlsVerified"] is not True
+            or download["responseVerified"] is not True or download["httpStatus"] != 200 or download["failureCode"] != ""
+            or download["expectedBodySha256"] != fixture.subscription_body_sha256
+            or fixture.subscription_requests != 1 or download["responseBytes"] != fixture.subscription_declared_body_bytes
+            or not 0 < download["responseBytes"] <= 65536
+            or readbacks[0]["saved_revision"] != receipts[3]["saved_revision"]
+            or readbacks[1]["saved_revision"] != receipts[5]["saved_revision"]
+            or receipts[-1]["applied_revision"] != receipts[-1]["saved_revision"]):
+        raise BudgetError("ActualUiImportSuccessUnproven")
+
 
 def _local_path(path):
     # Reject remote/ADS/current-drive ambiguity before exists/stat/resolve can
@@ -113,15 +239,21 @@ class UiIdentity(WorkerIdentity):
 class SyntheticUiSession:
     """One exact parent-owned fixed TLS/SOCKS fixture, never an endpoint API."""
 
-    def __init__(self, identity, output, fixture_directory, *, qt_root=None):
+    def __init__(self, identity, output, fixture_directory, *, qt_root=None, import_workflow=False, import_control=None):
         if type(identity) is not UiIdentity or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
             raise BudgetError("PrivateUiIdentityRequired")
+        from RunControlledNodeAcceptance import UI_IMPORT_CONTROLS
+        if (type(import_workflow) is not bool or import_control is not None and import_control not in UI_IMPORT_CONTROLS
+                or import_control is not None and not import_workflow):
+            raise BudgetError("PrivateUiImportWorkflowRequired")
         self._issuer, self.identity = _UI_ISSUER, identity
+        self.import_workflow, self.import_control = import_workflow, import_control
         self.root, self.fixture_directory = _local_path(Path(output)), _local_path(Path(fixture_directory))
         self.qt_root = None if qt_root is None else _local_path(Path(qt_root))
         self.fixture = self.storage = self.native_receipt = None
         self.manifest = self.proof = self.native_handle = self.child_environment = None
         self.ui_result = self.native_stop = None
+        self.import_success_verified = False
         self.quota_proof = None
         self.closed = False
 
@@ -143,19 +275,28 @@ class SyntheticUiSession:
         from RunControlledNodeAcceptance import FIXTURE_CERT_SHA256, FIXTURE_KEY_SHA256
         # No ephemeral port or nonce can turn the same failed configuration into
         # a new attempt. Plan/source changes are explicit reviewable differences.
-        return digest({"workload": UI_WORKLOAD, "fixture_schema": 2, "node": 1,
+        configuration = {"workload": UI_WORKLOAD, "fixture_schema": 2, "node": 1,
                        "source": self.identity.metadata["source_sha"], "exe": self.identity.sha256,
                        "core": self.identity.core_sha256, "plan": plan,
-                       "ca": FIXTURE_CERT_SHA256, "key": FIXTURE_KEY_SHA256})
+                       "ca": FIXTURE_CERT_SHA256, "key": FIXTURE_KEY_SHA256}
+        if self.import_workflow:
+            from RunControlledNodeAcceptance import UI_IMPORT_WORKFLOW
+            configuration.update(uiWorkflow=UI_IMPORT_WORKFLOW, uiImportControl=self.import_control)
+        return digest(configuration)
 
     def open(self, nonce):
         from RunControlledNodeAcceptance import (LoopbackFixture, FIXTURE_CERT_SHA256,
-            FIXTURE_KEY_SHA256, local_file, environment, write_json)
+            FIXTURE_KEY_SHA256, WRONG_CA_SHA256, UI_IMPORT_WORKFLOW, local_file, environment, write_json)
         certificate = local_file(self.fixture_directory / "localhost-cert.pem")
         key = local_file(self.fixture_directory / "localhost-key.pem")
         if (hashlib.sha256(certificate.read_bytes()).hexdigest() != FIXTURE_CERT_SHA256
                 or hashlib.sha256(key.read_bytes()).hexdigest() != FIXTURE_KEY_SHA256):
             raise BudgetError("CommittedSyntheticTlsFixtureRequired")
+        ca = certificate
+        if self.import_control == "wrong-ca":
+            ca = local_file(self.fixture_directory / "xray-download-server-cert.pem")
+            if hashlib.sha256(ca.read_bytes()).hexdigest() != WRONG_CA_SHA256:
+                raise BudgetError("CommittedSyntheticTlsFixtureRequired")
         self.storage = _WindowsStorage()
         self.storage.prepare(self.root)
         self.fixture = LoopbackFixture(certificate, key)
@@ -165,10 +306,14 @@ class SyntheticUiSession:
         self.manifest = {"schema": 2, "sourceSha": self.identity.metadata["source_sha"],
                          "nonce": nonce, "nodeOrdinal": 1, "proxyPort": proxy_port,
                          "fixture": {"httpPort": self.fixture.http, "httpsPort": self.fixture.https,
-                                     "socksPort": self.fixture.socks, "caSha256": FIXTURE_CERT_SHA256}}
+                                     "socksPort": self.fixture.socks, "caSha256": hashlib.sha256(ca.read_bytes()).hexdigest()}}
+        if self.import_workflow:
+            self.manifest["uiWorkflow"] = UI_IMPORT_WORKFLOW
+            if self.import_control is not None:
+                self.manifest["uiImportControl"] = self.import_control
         self.proof = self.fixture.bind_session(self.manifest)
         with (self.root / "fixture-ca.pem").open("xb") as destination:
-            destination.write(certificate.read_bytes())
+            destination.write(ca.read_bytes())
         write_json(self.root / "session.json", self.manifest)
         self.child_environment = environment(self.root, self.qt_root)
         return self
@@ -221,6 +366,7 @@ class SyntheticUiSession:
             self.native_stop = self.native_receipt.read_after_exit(child.process)
 
     def validate_finished(self, reply, exit_proof, child):
+        self.import_success_verified = False
         self.observe_exit(child)
         path = self.root / "result.json"
         if not path.is_file() or path.is_symlink() or path.stat().st_size > 65536:
@@ -236,6 +382,8 @@ class SyntheticUiSession:
                   "uiPolicySelectionExercised", "tasksReleased", "systemNetworkChanged", "requestDeadlineMs", "elapsedMs"}
         row_fields = {"scheme", "httpStatus", "success", "qtError", "tlsRejected", "bodyLimitExceeded",
                       "elapsedMs", "exitIpSha256", "responseEncrypted"}
+        if self.import_workflow:
+            fields.update({"uiImportEvidence", "uiProbeButtonExercised", "uiDisplayedLatencyMatches"})
         if (not isinstance(result, dict) or set(result) != fields or type(result["schema"]) is not int or result["schema"] != 1
                 or result.get("nonce") != self.manifest["nonce"]
                 or result.get("sourceSha") != self.identity.metadata["source_sha"]
@@ -246,11 +394,15 @@ class SyntheticUiSession:
                 or type(result.get("proxyRequests")) is not list
                 or any(type(row) is not dict or set(row) != row_fields for row in result["proxyRequests"])
                 or result.get("persistentBudgetGuardExercised") is not False
-                or result.get("uiSubscriptionImportExercised") is not False
-                or result.get("uiPolicySelectionExercised") is not False
+                or type(result.get("uiSubscriptionImportExercised")) is not bool
+                or type(result.get("uiPolicySelectionExercised")) is not bool
+                or not self.import_workflow and (result["uiSubscriptionImportExercised"] is not False
+                                               or result["uiPolicySelectionExercised"] is not False)
                 or self.fixture.proofs != 1):
             raise BudgetError("ActualUiReceiptRejected")
         self.ui_result = {key: value for key, value in result.items() if key != "nonce"}
+        if self.import_workflow:
+            _validate_import_observations(result, self.fixture, self.import_control, positive=False, proxy_port=self.manifest["proxyPort"])
         guard = reply["guard"]
         if reply.get("raw_tcp_quota_exercised") is not True:
             raise BudgetError("ActualUiRawQuotaUnproven")
@@ -278,19 +430,30 @@ class SyntheticUiSession:
                 or guard["upload"] <= 0 or guard["download"] <= 0 or guard["connection_attempts"] < 3
                 or self.fixture.forwarded < 3 or self.fixture.rejected != 0):
             raise BudgetError("ActualUiSuccessUnproven")
+        if self.import_workflow:
+            _validate_import_observations(result, self.fixture, self.import_control, positive=True, proxy_port=self.manifest["proxyPort"])
+            if guard["connection_attempts"] < 4 or self.fixture.forwarded < 4:
+                raise BudgetError("ActualUiImportTransportUnproven")
+            self.import_success_verified = True
         return "QtUiSucceeded"
 
     def report(self):
-        return {"scope": "owned-fixed-synthetic-qt-ui", "coreSha256": self.identity.core_sha256,
+        result = {"scope": "owned-fixed-synthetic-qt-ui", "coreSha256": self.identity.core_sha256,
                 "qtVersion": self.identity.qt_version, "ui": self.ui_result, "nativeWatchdog": self.native_stop,
                 "guardedSessionProof": self.quota_proof,
                 "ownershipProofs": 0 if self.fixture is None else self.fixture.proofs,
                 "socksConnections": 0 if self.fixture is None else self.fixture.socks_connections,
                 "forwarded": 0 if self.fixture is None else self.fixture.forwarded,
                 "rejected": 0 if self.fixture is None else self.fixture.rejected,
-                "tasksReleased": self.closed, "uiSubscriptionImportExercised": False,
+                "tasksReleased": self.closed, "uiSubscriptionImportExercised": bool(
+                    self.import_workflow and self.import_success_verified),
                 "rawCounterScope": "shared Rust TCP below TLS/protocol; excludes Qt-only local control proof",
                 "wireMeteringProven": False}
+        if self.import_workflow:
+            result.update(uiWorkflow="subscription-policy-v1", uiImportControl=self.import_control,
+                subscriptionRequests=0 if self.fixture is None else self.fixture.subscription_requests,
+                subscriptionDeclaredBodyBytes=0 if self.fixture is None else self.fixture.subscription_declared_body_bytes)
+        return result
 
     def close(self):
         if self.closed:
@@ -323,12 +486,16 @@ def main(argv=None):
     parser.add_argument("--fixture-directory", type=Path, required=True)
     parser.add_argument("--qt-root", type=Path)
     parser.add_argument("--byte-limit", type=int, default=65536)
+    parser.add_argument("--synthetic-ui-import-policy", action="store_true")
+    parser.add_argument("--synthetic-ui-import-control", choices=("wrong-ca", "over-limit", "wrong-url", "missing-capability"))
     parser.add_argument("--synthetic-billing", action="store_true")
     parser.add_argument("--billing-worker", type=Path)
     parser.add_argument("--billing-worker-sha256")
     parser.add_argument("--billing-response-contract", choices=("synthetic_qa_v1", "subscription_userinfo_v1"),
                         default="synthetic_qa_v1")
     args = parser.parse_args(argv)
+    if args.synthetic_ui_import_control is not None and not args.synthetic_ui_import_policy:
+        raise BudgetError("PrivateUiImportWorkflowRequired")
     if ((args.synthetic_billing and (args.billing_worker is None or args.billing_worker_sha256 is None))
             or (not args.synthetic_billing and (args.billing_worker is not None or args.billing_worker_sha256 is not None
                                               or args.billing_response_contract != "synthetic_qa_v1"))):
@@ -350,7 +517,8 @@ def main(argv=None):
                 from PrivateSubscriptionBilling import BillingSession
                 billing_identity = WorkerIdentity.inspect(args.billing_worker, args.expected_source, args.billing_worker_sha256)
                 billing = BillingSession.register(ledger)
-            session = SyntheticUiSession(identity, args.output_directory, args.fixture_directory, qt_root=args.qt_root)
+            session = SyntheticUiSession(identity, args.output_directory, args.fixture_directory, qt_root=args.qt_root,
+                import_workflow=args.synthetic_ui_import_policy, import_control=args.synthetic_ui_import_control)
             result = Supervisor(ledger, identity, billing, billing_worker_identity=billing_identity,
                 billing_response_contract=args.billing_response_contract).run_ui(session, byte_limit=args.byte_limit)
         finally:

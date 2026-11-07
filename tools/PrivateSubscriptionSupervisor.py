@@ -873,7 +873,9 @@ class Supervisor:
                 self.ledger.retain_supervised(ticket, evidence.record["outcome"])
             result = {**evidence.record, "ledger": self.ledger.summary()}
         result.update(persistentBudgetGuardExercised=result["settled"],
-                      uiSubscriptionImportExercised=False, providerStatisticsAuthenticated=False,
+                      uiSubscriptionImportExercised=bool(result["settled"] and session.import_workflow
+                          and session.import_success_verified),
+                      providerStatisticsAuthenticated=False,
                       parentBudgetEvidence=None)
         if ticket is not None:
             with self.ledger.mutex:

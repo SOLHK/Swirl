@@ -1,6 +1,7 @@
 #pragma once
 #include <QString>
 #include <QByteArray>
+#include <QUrl>
 #include <thread>
 class QQuickWindow;
 class EngineController;
@@ -18,6 +19,12 @@ struct ControlledNodeSession {
     QByteArray fixtureCa;
     // Fixed owned-loopback negative control; ordinary deadlines stay unchanged.
     bool nativeWatchdog500msControl=false;
+    // A separate, fixed private-profile workflow. The original one-node
+    // controlled session keeps imports shut down and does not accept this mode.
+    bool uiImportPolicy=false;
+    QString uiImportControl;
+    QUrl subscriptionUrl() const;
+    QByteArray subscriptionBody() const;
 };
 bool loadControlledNodeSession(const QString &,ControlledNodeSession *);
 void startControlledNodeSession(QQuickWindow *,EngineController *,const ControlledNodeSession &);

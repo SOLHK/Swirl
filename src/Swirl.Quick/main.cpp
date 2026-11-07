@@ -717,6 +717,11 @@ int main(int argc, char *argv[])
 #else
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
 #endif
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(controlledNodeSession&&controlledSession.uiImportPolicy){
+        if(!privateUiQuota.attachImportCapability(engineController.imports(),controlledSession))return 64;
+    }else
+#endif
     if(controlledNodeSession)engineController.imports()->shutdown();
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());

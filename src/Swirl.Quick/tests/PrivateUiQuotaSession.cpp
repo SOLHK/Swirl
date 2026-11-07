@@ -1,6 +1,8 @@
 #include "PrivateUiQuotaSession.h"
 #include "RuntimeEvidence.h"
+#include "engine/NodeImportService.h"
 
+#include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonParseError>
@@ -115,8 +117,37 @@ bool PrivateUiQuotaSession::fixtureReady(const ControlledNodeSession &session) {
         ||session.proxyPort!=m_grant.value("listener").toObject().value("port").toInt()
         ||session.nodeOrdinal!=1)return false;
     QByteArray raw;QJsonObject value;
-    return invoke(control("fixture_ready"),&raw,&value)&&value.value("ok").toBool()
+    m_fixtureVerified=invoke(control("fixture_ready"),&raw,&value)&&value.value("ok").toBool()
         &&value.value("op").toString()==QStringLiteral("running")&&emitLine(raw);
+    return m_fixtureVerified;
+}
+
+bool PrivateUiQuotaSession::runningQuota() {
+    if(!m_started||m_finished||!m_fixtureVerified)return false;
+    QByteArray raw;QJsonObject value;
+    if(!invoke(control("snapshot"),&raw,&value)||!value.value("ok").toBool()
+        ||value.value("op").toString()!=QStringLiteral("snapshot"))return false;
+    const auto guard=value.value("guard").toObject();
+    return guard.value("stopped")==QJsonValue(false)&&guard.value("timed_out")==QJsonValue(false)
+        &&guard.value("connection_limit")==QJsonValue(6)&&guard.value("timeout_ms")==QJsonValue(8000);
+}
+
+bool PrivateUiQuotaSession::attachImportCapability(NodeImportService *imports,const ControlledNodeSession &session) {
+    if(!imports||!session.uiImportPolicy||!runningQuota()||imports->m_shuttingDown||imports->m_privateUiImport
+        ||session.nonce!=m_binding.value("nonce").toString()
+        ||session.sourceSha!=m_grant.value("source_sha").toString()
+        ||session.proxyPort!=m_grant.value("listener").toObject().value("port").toInt()
+        ||session.fixtureSocksPort!=m_grant.value("endpoint").toObject().value("port").toInt())return false;
+    // Fixed negative control: the real form must fail without any capability.
+    // This creates no token, socket, alternate route or successful import flag.
+    if(session.uiImportControl==QStringLiteral("missing-capability"))return true;
+    auto capability=std::make_unique<NodeImportService::PrivateUiImportCapability>();
+    capability->url=session.subscriptionUrl();capability->ca=session.fixtureCa;
+    capability->bodyDigest=QCryptographicHash::hash(session.subscriptionBody(),QCryptographicHash::Sha256);
+    capability->proxyPort=quint16(session.proxyPort);
+    capability->guardActive=[this]{return runningQuota();};
+    imports->m_privateUiImport=std::move(capability);
+    return true;
 }
 
 bool PrivateUiQuotaSession::finish() {
