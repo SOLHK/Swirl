@@ -111,7 +111,7 @@ def main():
               "real_provider_requests": 0, "actual_process_module_sampling": False,
               "scope": "The existing normal, incremental and sweep fixtures, once per variant, "
                        "using identical fixture EXEs/source. No Swirl, native GPU, live node or VME fix claim."}
-    evidence = None
+    evidence, build = None, None
     try:
         inputs = sdk.admit(repo, args.expected_source_sha, args.expected_pr_head_sha)
         evidence = sdk.fresh_directory(args.evidence_directory.absolute(), root=repo)
@@ -123,6 +123,7 @@ def main():
                     and receipt.get("pr_head_sha") == args.expected_pr_head_sha,
                     "DerivedSdkReceiptNotAdmitted")
         sdk.require(receipt.get("source_inputs") == inputs, "BuilderAndComparisonSourceDiffer")
+        lock = sdk.read_json(repo / sdk.LOCK, 65536)
         stock = sdk.plain_path(Path(receipt["stock_root"]), root=Path(os.environ["RUNNER_TEMP"]).absolute())
         derived = sdk.plain_path(Path(receipt["derived_root"]), root=Path(os.environ["RUNNER_TEMP"]).absolute())
         sdk.require(not stock.is_relative_to(derived) and not derived.is_relative_to(stock)
@@ -151,23 +152,23 @@ def main():
                                   known_executables=known_executables)
         report["stage"] = "build-identical-fixtures"
         build = sdk.fresh_directory(work / "fixtures", root=work)
+        initial_cache = sdk.prepare_msvc_initial_cache(work, evidence)
+        report["msvc_initial_cache"] = sdk.file_identity(initial_cache)
         env = sdk.tool_environment()
         env.update(PATH=str(stock / "bin") + os.pathsep + env["PATH"],
                    CMAKE_PREFIX_PATH=str(stock), QT_ROOT_DIR=str(stock))
         repro = repo / "tools/repros/qt612-popup-gc"
-        run("01-configure-fixtures", [tools["cmake.exe"], "-S", repro, "-B", build, "-G", "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release", sdk.cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
-            sdk.cmake_path_definition("CMAKE_CXX_COMPILER", tools["cl.exe"], "FILEPATH"),
-            sdk.cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
-            sdk.cmake_path_definition("CMAKE_LINKER", tools["link.exe"], "FILEPATH"),
-            sdk.cmake_path_definition("CMAKE_AR", tools["lib.exe"], "FILEPATH"),
-            sdk.cmake_path_definition("CMAKE_RC_COMPILER", tools["rc.exe"], "FILEPATH"),
-            sdk.cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
-            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL"], seconds=120, env=env)
+        compile_context = {"repo": repo, "work": work, "stock": stock, "tools": tools}
+        sdk.run_compiler_logged("comparison:01-configure-fixtures",
+            sdk.fixture_configure_arguments(repo, work, stock, tools), work, commands, 120,
+            context=compile_context, lock=lock, tool_identities=receipt["tools"],
+            known_executables=known_executables, env=env)
         cache = sdk.cache_values((build / "CMakeCache.txt").read_text(encoding="utf-8"))
         report["fixture_cmake"] = sdk.verify_cmake_executable(cache, receipt["tools"]["cmake.exe"])
         sdk.require(cache.get("CMAKE_BUILD_TYPE") == "Release" and cache.get("CMAKE_GENERATOR") == "Ninja"
-                    and cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") == "MultiThreadedDLL",
+                    and cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") == "MultiThreadedDLL"
+                    and cache.get("CMAKE_POLICY_DEFAULT_CMP0141") == "NEW"
+                    and cache.get("CMAKE_MSVC_DEBUG_INFORMATION_FORMAT") == sdk.MSVC_DEBUG_INFORMATION_FORMAT,
                     "FixtureBuildConfigurationMismatch")
         for key, value in cache.items():
             if re.fullmatch(r"Qt6.*_DIR", key) and not value.endswith("-NOTFOUND"):
@@ -178,8 +179,10 @@ def main():
         sdk.require(compiler == receipt["configuration"]["compiler"], "FixtureCompilerChanged")
         shutil.copyfile(build / "CMakeCache.txt", evidence / "fixture-CMakeCache.txt")
         shutil.copyfile(compiler_files[0], evidence / "fixture-CMakeCXXCompiler.cmake")
-        run("02-build-fixtures", [tools["cmake.exe"], "--build", build, "--target",
-                                 "PopupGcFixture", "SweepSlotsProbe", "--parallel", "2"], seconds=300, env=env)
+        sdk.run_compiler_logged("comparison:02-build-fixtures",
+            [tools["cmake.exe"], "--build", build, "--target", "PopupGcFixture", "SweepSlotsProbe",
+             "--parallel", "2"], work, commands, 300, context=compile_context, lock=lock,
+            tool_identities=receipt["tools"], known_executables=known_executables, env=env)
         executables = {name: sdk.file_identity(build / name) for name in EXECUTABLES}
         report["fixture_executables"] = executables
         binaries = sdk.fresh_directory(evidence / "fixture-binaries", root=evidence)
@@ -278,6 +281,12 @@ def main():
     finally:
         report["finished_utc"] = sdk.utc()
         if evidence is not None:
+            if build is not None:
+                try:
+                    report["configuration_snapshot"] = sdk.preserve_configuration_snapshot(build, evidence)
+                except BaseException as error:
+                    report["success"] = False
+                    report["errors"].append("ConfigurationEvidence:" + type(error).__name__ + ":" + str(error))
             sdk.write_json(evidence / "comparison.json", report)
         print(json.dumps({"success": report["success"], "comparison_collected": report["comparison_collected"],
                           "stage": report["stage"], "errors": report["errors"]}))

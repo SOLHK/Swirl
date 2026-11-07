@@ -20,6 +20,8 @@ use std::{
 use swirl_transport::egress::budget::{self, TcpQuota};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+mod billing;
+
 const MAX_FRAME: usize = 16 * 1024;
 const TASK: &str = "swirl-0.2.40-private-acceptance";
 const CANCELLED: u8 = 1;
@@ -59,6 +61,7 @@ enum Workload {
     DownloadUntilStop,
     StallRuntimeAfterConnect,
     CoreProbe,
+    BillingSnapshot,
 }
 
 #[derive(Deserialize)]
@@ -79,6 +82,7 @@ struct Grant {
     workload: Workload,
     config_fingerprint: String,
     tls: Option<FixtureTls>,
+    billing: Option<billing::BillingGrant>,
 }
 
 #[derive(Deserialize)]
@@ -248,10 +252,20 @@ impl Grant {
             || !(1..=budget::MAX_TIMEOUT_MS).contains(&self.timeout_ms)
             || self.receive_reservation
                 != u64::from(self.connection_limit) * budget::RECEIVE_RESERVATION
-            || (self.workload == Workload::CoreProbe) != self.tls.is_some()
-            || (self.workload == Workload::CoreProbe && self.timeout_ms < 100)
+            || matches!(
+                self.workload,
+                Workload::CoreProbe | Workload::BillingSnapshot
+            ) != self.tls.is_some()
+            || (self.tls.is_some() && self.timeout_ms < 100)
+            || (self.workload == Workload::BillingSnapshot) != self.billing.is_some()
         {
             return Err("PrivateWorkerGrant");
+        }
+        if let Some(billing) = &self.billing {
+            if self.byte_limit != billing::BYTE_LIMIT || self.connection_limit != 2 {
+                return Err("PrivateWorkerGrant");
+            }
+            billing.validate(&binding.nonce)?;
         }
         if let Some(tls) = &self.tls {
             if !swirl_subscription::valid_host(&tls.server_name)
@@ -261,8 +275,12 @@ impl Grant {
             {
                 return Err("PrivateWorkerTls");
             }
-            swirl_transport::validate_tls(&self.tls_options(tls), None)
-                .map_err(|_| "PrivateWorkerTls")?;
+            if self.workload == Workload::BillingSnapshot {
+                billing::tls_config(tls)?;
+            } else {
+                swirl_transport::validate_tls(&self.tls_options(tls), None)
+                    .map_err(|_| "PrivateWorkerTls")?;
+            }
         }
         Ok(())
     }
@@ -290,6 +308,7 @@ fn finish(
     fixture_verified: bool,
     outcome: &'static str,
     metrics: Option<Value>,
+    billing: Option<Value>,
 ) -> Result<()> {
     guard.cancel();
     let mut response = binding.response("finished", guard)?;
@@ -297,6 +316,11 @@ fn finish(
     response["outcome"] = json!(outcome);
     if let Some(metrics) = metrics {
         response["metrics"] = metrics;
+    }
+    if outcome == "billing_snapshot_succeeded"
+        && let Some(billing) = billing
+    {
+        response["billing"] = billing;
     }
     emit(output, response)
 }
@@ -499,13 +523,21 @@ pub fn run() -> Result<()> {
             .map_err(|_| "PrivateWorkerQuotaState")?
             .stopped
         {
-            return finish(&output, &binding, &guard, false, "deadline_expired", None);
+            return finish(
+                &output,
+                &binding,
+                &guard,
+                false,
+                "deadline_expired",
+                None,
+                None,
+            );
         }
         match message {
             Message::Start { .. } => break,
             Message::Snapshot { .. } => emit(&output, binding.response("snapshot", &guard)?)?,
             Message::Cancel { .. } => {
-                return finish(&output, &binding, &guard, false, "cancelled", None);
+                return finish(&output, &binding, &guard, false, "cancelled", None, None);
             }
             Message::Grant { .. } => return Err("PrivateWorkerDuplicateGrant"),
         }
@@ -532,6 +564,7 @@ pub fn run() -> Result<()> {
         .build()
         .map_err(|_| "PrivateWorkerRuntime")?;
     let mut verified = false;
+    let mut billing_snapshot = None;
     let result: Result<()> = runtime.block_on(async {
         let mut socket = authenticate_fixture(&grant).await?;
         verified = true;
@@ -570,10 +603,28 @@ pub fn run() -> Result<()> {
                 let _ = socket.shutdown().await;
                 Ok(())
             }
+            Workload::BillingSnapshot => {
+                socket
+                    .shutdown()
+                    .await
+                    .map_err(|_| "billing_snapshot_failed")?;
+                drop(socket);
+                billing_snapshot = Some(billing::snapshot(&grant).await?);
+                Ok(())
+            }
         }
     });
     drop(runtime);
-    let (mut outcome, metrics) = if result.is_ok() && grant.workload == Workload::CoreProbe {
+    let (mut outcome, metrics) = if grant.workload == Workload::BillingSnapshot {
+        (
+            if result.is_ok() && billing_snapshot.is_some() {
+                "billing_snapshot_succeeded"
+            } else {
+                "billing_snapshot_failed"
+            },
+            None,
+        )
+    } else if result.is_ok() && grant.workload == Workload::CoreProbe {
         core_probe(&grant, &binding, &guard)
     } else {
         let code = match result {
@@ -592,5 +643,13 @@ pub fn run() -> Result<()> {
         _ if receipt.stopped => "quota_stopped",
         _ => outcome,
     };
-    finish(&output, &binding, &guard, verified, outcome, metrics)
+    finish(
+        &output,
+        &binding,
+        &guard,
+        verified,
+        outcome,
+        metrics,
+        billing_snapshot,
+    )
 }

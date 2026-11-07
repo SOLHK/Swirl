@@ -20,6 +20,7 @@ if (-not $parentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Admi
     throw 'Creating the temporary standard account requires the hosted administrator, not LocalSystem.'
 }
 . (Join-Path $PSScriptRoot '../RustProductPackagePolicy.ps1')
+. (Join-Path $PSScriptRoot 'OwnedWindowsProfileCleanup.ps1')
 foreach ($path in @($Script,$ArgumentsFile,$EvidenceDirectory)) { Assert-SwirlPathWithoutLinks $path }
 $targetScript=(Resolve-Path -LiteralPath $Script).Path
 $argumentPath=(Resolve-Path -LiteralPath $ArgumentsFile).Path
@@ -529,10 +530,11 @@ finally {
         $result.input_acls_restored=$allFileAclsRestored
         if(-not $allFileAclsRestored){$cleanupErrors.Add('file-acl: an input DACL differs from its original state; see input_acl_checks.')}
     }catch{$cleanupErrors.Add('file-acl: '+$_.Exception.Message)}
+    $profileWatch=$null
     if($created -and $userSid){
         $profileAttempts=New-Object 'System.Collections.Generic.List[object]'
         $profileObservations=New-Object 'System.Collections.Generic.List[object]'
-        $result.profile_cleanup=[ordered]@{deadline_ms=30000;poll_interval_ms=200;path_scope='Exact newly created disposable account; raw profile paths omitted from observations.';path_verified=$false;token_path_verified=$false;native_delete_accepted=$false;explicit_path_delete_attempted=$false;attempts=$profileAttempts;observations=$profileObservations;inventory_before=$null;inventory_after_registry_delete=$null;inventory_final=$null;final_state=$null;elapsed_ms=$null}
+        $result.profile_cleanup=[ordered]@{deadline_ms=30000;poll_interval_ms=200;path_scope='Exact newly created disposable account; raw profile paths omitted from observations.';path_verified=$false;token_path_verified=$false;native_delete_accepted=$false;explicit_path_delete_attempted=$false;attempts=$profileAttempts;observations=$profileObservations;inventory_before=$null;inventory_after_registry_delete=$null;inventory_final=$null;final_state=$null;elapsed_ms=$null;residual_scope_binding=$null;residual_cleanup=$null;post_account_state=$null}
         try {
             $profileKey='Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\'+$userSid
             $tokenProfilePath=if($null -ne $result.token){[string]$result.token.ProfilePath}else{$null}
@@ -548,6 +550,7 @@ finally {
                 $result.profile_cleanup.path_verified=$true
                 $result.profile_cleanup.token_path_verified=-not [string]::IsNullOrWhiteSpace($tokenProfilePath)
                 $profileWatch=[Diagnostics.Stopwatch]::StartNew()
+                $residualScope=$null
                 function Read-OwnedProfileCleanupState {
                     $observation=[ordered]@{
                         elapsed_ms=$null
@@ -561,6 +564,17 @@ finally {
                 }
                 try {
                     $result.profile_cleanup.inventory_before=[SwirlDisposableUser.Native]::ReadOwnedProfileInventory($profilePath)
+                    # Bind while the original token-confirmed profile still
+                    # exists, before DeleteProfileW can remove its registry key.
+                    # No handles remain open across the native profile API.
+                    if($created -and $result.child_completed -and $result.child_exit_code -eq 0 -and
+                       $result.remaining_job_processes -eq 0 -and -not $result.forced_termination -and
+                       $null -ne $result.token -and $result.token.Sid -ceq $userSid -and
+                       $result.profile_cleanup.token_path_verified) {
+                        $residualScope=[SwirlOwnedProfileCleanup.Native]::BindBeforeNativeDelete(
+                            $tokenProfilePath,$userName,$userSid,[int](30000-$profileWatch.ElapsedMilliseconds))
+                        $result.profile_cleanup.residual_scope_binding=$residualScope
+                    }
                     while($true) {
                         $state=Read-OwnedProfileCleanupState
                         $profileObservations.Add($state);$result.profile_cleanup.final_state=$state
@@ -590,7 +604,8 @@ finally {
                             # Once ProfileList is gone, a NULL-path retry cannot
                             # resolve the directory. Admit one documented native
                             # profile deletion with the previously verified path.
-                            # No direct filesystem deletion or hive unload.
+                            # Preserve the native API result. Any subsequent
+                            # fixed-residual cleanup has a separate receipt.
                             Assert-SwirlPathWithoutLinks $tokenProfilePath
                             $result.profile_cleanup.explicit_path_delete_attempted=$true
                             $attempt=[ordered]@{number=($profileAttempts.Count+1);path_mode='explicit-verified-token-path';before=$state;native_succeeded=$null;native_error=$null;after=$null}
@@ -600,6 +615,22 @@ finally {
                             $attempt.after=Read-OwnedProfileCleanupState
                             $result.profile_cleanup.final_state=$attempt.after
                             if($attempt.after.elapsed_ms -le 30000 -and -not $attempt.after.profile_key_exists -and -not $attempt.after.profile_path_exists -and -not $attempt.after.user_hive_loaded -and -not $attempt.after.user_classes_hive_loaded){$result.profile_removed=$true;break}
+                        }
+                        $state=Read-OwnedProfileCleanupState
+                        if($null -ne $residualScope -and $null -eq $result.profile_cleanup.residual_cleanup -and
+                           $result.profile_cleanup.native_delete_accepted -and $result.profile_cleanup.explicit_path_delete_attempted -and
+                           $state.profile_path_exists -and -not $state.profile_key_exists -and
+                           -not $state.user_hive_loaded -and -not $state.user_classes_hive_loaded -and
+                           $profileWatch.ElapsedMilliseconds -lt 30000) {
+                            $cleanup=[SwirlOwnedProfileCleanup.Native]::DeleteFixedResiduals(
+                                $residualScope,[int](30000-$profileWatch.ElapsedMilliseconds))
+                            $result.profile_cleanup.residual_cleanup=$cleanup
+                            if(-not $cleanup.success) {
+                                # Partial deletion, an unknown entry, a failed
+                                # native call or late recreation remains an
+                                # acceptance failure even if a later poll is empty.
+                                $cleanupErrors.Add('owned-profile-residual: handle-bound cleanup did not complete within the original deadline; see profile_cleanup.residual_cleanup.')
+                            }
                         }
                         $remaining=30000-$profileWatch.ElapsedMilliseconds
                         if($remaining -le 0){break}
@@ -619,7 +650,10 @@ finally {
                             -not $finalState.profile_key_exists -and -not $finalState.profile_path_exists -and
                             -not $finalState.user_hive_loaded -and -not $finalState.user_classes_hive_loaded
                     }finally{
-                        $profileWatch.Stop();$result.profile_cleanup.elapsed_ms=$profileWatch.Elapsed.TotalMilliseconds
+                        # Freeze this decision's elapsed time for diagnostics.
+                        # The same clock continues to the final account check;
+                        # later cleanup cannot reset or extend the 30s deadline.
+                        $result.profile_cleanup.elapsed_ms=$profileWatch.Elapsed.TotalMilliseconds
                     }
                 }
                 if(-not $result.profile_removed){throw 'Disposable profile key, directory and both user hives were not confirmed absent within 30000 ms; see profile_cleanup.'}
@@ -703,6 +737,28 @@ finally {
         Remove-Item -LiteralPath $fixture -Recurse -Force
         $result.fixture_removed=-not (Test-Path -LiteralPath $fixture)
     }catch{$cleanupErrors.Add('bootstrap-fixture: '+$_.Exception.Message)}
+    if($null -ne $profileWatch){
+        try {
+            $postAccount=Read-OwnedProfileCleanupState
+            $postAccount['bound_root_absent']=if($null -ne $residualScope){[SwirlOwnedProfileCleanup.Native]::RootAbsentAfterCleanup($residualScope)}else{-not $postAccount.profile_path_exists}
+            $postAccount['account_removed_at_previous_check']=$result.account_removed
+            $postAccount['account_absent_at_final_check']=-not [SwirlDisposableUser.Native]::UserExists($userName)
+            $result.account_removed=$result.account_removed -and $postAccount.account_absent_at_final_check
+            $postAccount['account_removed']=$result.account_removed
+            $postAccount.elapsed_ms=$profileWatch.Elapsed.TotalMilliseconds
+            $result.profile_cleanup.post_account_state=$postAccount
+            if($result.profile_removed -and ($postAccount.elapsed_ms -gt 30000 -or
+               -not $postAccount.bound_root_absent -or -not $postAccount.account_removed -or
+               $postAccount.profile_key_exists -or $postAccount.profile_path_exists -or
+               $postAccount.user_hive_loaded -or $postAccount.user_classes_hive_loaded)) {
+                $result.profile_removed=$false
+                $cleanupErrors.Add('profile-final: disappearance was not preserved through account and fixture cleanup within the original 30000 ms.')
+            }
+        }catch {
+            $result.profile_removed=$false
+            $cleanupErrors.Add('profile-final: final absence could not be verified.')
+        }finally {$profileWatch.Stop()}
+    }
     $result.cleanup_errors=@($cleanupErrors.ToArray())
     if($cleanupErrors.Count -or -not $result.account_removed -or -not $result.profile_removed -or
         -not $result.desktop_access_removed -or -not $result.window_station_access_removed -or

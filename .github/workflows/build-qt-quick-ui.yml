@@ -81,7 +81,8 @@ jobs:
         run: |
           foreach ($path in @('scripts/tests/WindowsProxyDiagnostics.ps1','scripts/tests/Test-WindowsProxyQueryOnly.ps1',
               'scripts/tests/Invoke-DisposableWindowsUser.ps1','scripts/tests/Test-WindowsNormalInstaller.ps1',
-              'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1')) {
+              'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1',
+              'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1')) {
             $tokens = $null; $errors = $null
             $null = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$errors)
             if ($errors.Count) { throw ('PowerShell parser rejected '+$path+': '+($errors.Message -join ' ')) }
@@ -123,6 +124,10 @@ jobs:
           if ($size -ne 16 -or -not $controls.success -or $controls.total -ne 24 -or $controls.passed -ne 24) {
             throw 'The actual residual-event filter controls or ABI failed.'
           }
+      - name: Prove fixed disposable-profile cleanup with actual Win32 controls
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: ./scripts/tests/Test-OwnedWindowsProfileCleanup.ps1 -EvidenceDirectory build-evidence/profile-residual-cleanup-controls
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
@@ -1473,6 +1478,7 @@ jobs:
             build-evidence/full-motion-release/
             build-evidence/ctest-inventory.json
             build-evidence/profile-event-controls/
+            build-evidence/profile-residual-cleanup-controls/
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml
             build/swirl-quick/policy-configuration.xml

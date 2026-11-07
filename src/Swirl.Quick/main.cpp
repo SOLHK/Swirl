@@ -11,9 +11,7 @@
 #include "tests/third_party/renderdoc_app.h"
 #endif
 #include <QQmlApplicationEngine>
-#ifdef SWIRL_UI_TESTS
 #include "SwirlBuildIdentity.h"
-#include <QQmlDebuggingEnabler>
 #include <QtQml/private/qqmlengine_p.h>
 #include <QtQml/private/qqmldata_p.h>
 #include <QtQml/private/qqmlcontextdata_p.h>
@@ -25,9 +23,11 @@
 #include <QElapsedTimer>
 #include <QMetaEnum>
 #include <QScopedValueRollback>
-#include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
 #include <QJsonArray>
 #include <QSet>
+#ifdef SWIRL_UI_TESTS
+#include <QQmlDebuggingEnabler>
+#include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
 #endif
 #include <QQmlContext>
 #include <QQmlError>
@@ -122,6 +122,7 @@ public:
         return QGuiApplication::notify(receiver,event);
     }
 };
+#endif
 
 struct QmlVmeWarningCapture {
     const char *phase="setup-before-main-load";
@@ -283,7 +284,9 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
         const bool matches=description.contains(QStringLiteral("Cannot find member data"))
             ||(description.contains(QStringLiteral("is not a function"))
                &&(description.contains(QStringLiteral("'scheduleRefresh'"))
-                  ||description.contains(QStringLiteral("'contourPath'"))));
+                  ||description.contains(QStringLiteral("'contourPath'"))
+                  ||description.contains(QStringLiteral("'finish'"))
+                  ||description.contains(QStringLiteral("'retarget'"))));
         if(!matches)continue;
         if(!capture.firstMatch.isValid())capture.firstMatch.start();
         if(capture.firstMatch.elapsed()>firstClusterMs
@@ -334,6 +337,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
     }
 }
 
+#ifdef SWIRL_UI_TESTS
 static void recordQmlCreationLifecycle(QQmlApplicationEngine &engine, const char *phase)
 {
     // The public controller counts incubators, while the engine also counts
@@ -667,11 +671,9 @@ int main(int argc, char *argv[])
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
     DismissalController dismissals;
-#ifdef SWIRL_UI_TESTS
     // Declared before the engine so warning callbacks cannot outlive this state.
     QmlVmeWarningCapture qmlVmeWarnings;
     qmlVmeWarnings.runtime.start();
-#endif
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("fontManager", &fontManager);
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
@@ -688,15 +690,18 @@ int main(int argc, char *argv[])
     bool xrayUiCompleted = false;
     bool xrayUiTimedOut = false;
     QObject::connect(&engine, &QQmlEngine::warnings, &app,
-                     [&qmlWarnings, smoke, interaction, captureTest, windowTest
+                     [&qmlWarnings, smoke, interaction, captureTest, windowTest,
+                      &engine, &qmlVmeWarnings
 #ifdef SWIRL_UI_TESTS
-                      , &engine, &qmlVmeWarnings, nodeTest
+                      , nodeTest
 #endif
                      ](const QList<QQmlError> &warnings) {
                          if (!warnings.isEmpty()) qmlWarnings = true;
+                         bool captureVmeWarning=smoke;
 #ifdef SWIRL_UI_TESTS
-                         if(nodeTest || smoke)recordQmlVmeWarningContext(engine,qmlVmeWarnings,warnings);
+                         captureVmeWarning=captureVmeWarning||nodeTest;
 #endif
+                         if(captureVmeWarning)recordQmlVmeWarningContext(engine,qmlVmeWarnings,warnings);
                      });
     const QStringList arguments = app.arguments();
     const auto argumentValue = [&arguments](const QString &prefix) {
@@ -777,12 +782,10 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     if(hdrTest)return runHdrChecks();
 #endif
-#ifdef SWIRL_UI_TESTS
     qmlVmeWarnings.phase="main-load";
-#endif
     engine.loadFromModule("SwirlQuick", "Main");
-#ifdef SWIRL_UI_TESTS
     qmlVmeWarnings.phase="after-main-load";
+#ifdef SWIRL_UI_TESTS
     recordQmlCreationLifecycle(engine,"after-main-load");
 #endif
     if (engine.rootObjects().isEmpty())
@@ -1199,20 +1202,20 @@ int main(int argc, char *argv[])
             QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
     const int result = app.exec();
-#ifdef SWIRL_UI_TESTS
     qmlVmeWarnings.phase="after-event-loop";
+#ifdef SWIRL_UI_TESTS
     recordQmlCreationLifecycle(engine,"after-event-loop");
-    qmlVmeWarnings.phase="existing-incubation-drain";
 #endif
+    qmlVmeWarnings.phase="existing-incubation-drain";
     // Drain any lazy Qt Controls creation before the engine is destroyed.
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-#ifdef SWIRL_UI_TESTS
     qmlVmeWarnings.phase="after-existing-incubation-drain";
+#ifdef SWIRL_UI_TESTS
     recordQmlCreationLifecycle(engine,"after-existing-incubation-drain");
-    qmlVmeWarnings.phase="main-return";
 #endif
+    qmlVmeWarnings.phase="main-return";
     const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;

@@ -26,7 +26,7 @@ import tempfile
 import threading
 import time
 
-from PrivateSubscriptionBudget import (BudgetError, Ledger, SYNTHETIC_DOMAIN, TASK,
+from PrivateSubscriptionBudget import (BudgetError, Ledger, SYNTHETIC_DOMAIN, TASK, FIRST_ROUND,
     TCP_RECEIVE_RESERVATION, SUPERVISED_WORKLOADS, tcp_plan, validate_guard_receipt)
 from PrivateSubscriptionProcess import OwnedProcess
 
@@ -34,11 +34,13 @@ MAX_LINE = 16384
 WORKER_ROLE = "swirl_private_worker"
 GUARD_MODE = "mandatory_before_grant"
 _IDENTITY_ISSUER = object()
+_EXECUTION_ISSUER = object()
 OUTCOMES = {"quota_stopped": "QuotaStopped", "deadline_expired": "DeadlineExpired",
             "cancelled": "Cancelled", "fixture_rejected": "FixtureRejected",
             "fixture_closed": "FixtureClosed", "core_probe_succeeded": "CoreProbeSucceeded",
             "core_probe_failed": "CoreProbeFailed", "worker_protocol_error": "WorkerProtocolError",
-            "worker_io_error": "WorkerIoError"}
+            "worker_io_error": "WorkerIoError", "billing_snapshot_succeeded": "BillingSnapshotSucceeded",
+            "billing_snapshot_failed": "BillingSnapshotFailed"}
 
 
 def canonical(value):
@@ -264,9 +266,17 @@ class WorkerIdentity:
 
 class _OwnedFixture:
     """Never accepts an endpoint argument and never resolves/forwards a host."""
-    def __init__(self, root, workload, byte_limit, challenge, nonce):
+    def __init__(self, root, workload, byte_limit, challenge, nonce, billing_query=None):
         self.workload, self.byte_limit = workload, byte_limit
         self.challenge, self.nonce = challenge, nonce
+        self.billing_query = billing_query
+        if workload == "billing_snapshot":
+            from PrivateSubscriptionBilling import _BillingQuery, _QUERY_ISSUER
+            if (not isinstance(billing_query, _BillingQuery) or billing_query._seal is not _QUERY_ISSUER
+                    or billing_query.nonce != nonce):
+                raise BudgetError("OwnedBillingQueryRequired")
+        elif billing_query is not None:
+            raise BudgetError("UnexpectedBillingQuery")
         self.key = bytes.fromhex(challenge)
         self.stop = threading.Event()
         self.authenticated = threading.Event()
@@ -287,7 +297,10 @@ class _OwnedFixture:
         self.server.settimeout(0.1)
         self.port = self.server.getsockname()[1]
         try:
-            self.tls, self.context = self._tls(root) if workload == "core_probe" else (None, None)
+            self.tls, self.context = self._tls(root) if workload in {"core_probe", "billing_snapshot"} else (None, None)
+            if billing_query is not None:
+                self.context.set_alpn_protocols(["http/1.1"])
+                self.tls = billing_query.configure_tls(self.tls)
             self.thread = threading.Thread(target=self._serve, name="Swirl owned synthetic fixture", daemon=True)
             self.thread.start()
         except BaseException:
@@ -309,10 +322,13 @@ class _OwnedFixture:
               .sign(ca_key, hashes.SHA256()))
         key = ec.generate_private_key(ec.SECP256R1())
         name = "swirl-qa.fixture.invalid"
-        cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)]))
+        certificate_name = "wrong-qa.fixture.invalid" if self.billing_query is not None and self.billing_query.fault == "wrong_sni" else name
+        expired_certificate = self.billing_query is not None and self.billing_query.fault == "expired_certificate"
+        cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, certificate_name)]))
                 .issuer_name(issuer).public_key(key.public_key()).serial_number(x509.random_serial_number())
-                .not_valid_before(now - timedelta(minutes=1)).not_valid_after(now + timedelta(days=1))
-                .add_extension(x509.SubjectAlternativeName([x509.DNSName(name)]), False)
+                .not_valid_before(now - timedelta(days=2) if expired_certificate else now - timedelta(minutes=1))
+                .not_valid_after(now - timedelta(days=1) if expired_certificate else now + timedelta(days=1))
+                .add_extension(x509.SubjectAlternativeName([x509.DNSName(certificate_name)]), False)
                 .add_extension(x509.BasicConstraints(ca=False, path_length=None), True)
                 .sign(ca_key, hashes.SHA256()))
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -407,7 +423,7 @@ class _OwnedFixture:
 
     def _serve(self):
         try:
-            count = 2 if self.workload == "core_probe" else 1
+            count = 2 if self.workload in {"core_probe", "billing_snapshot"} else 1
             for ordinal in range(count):
                 while not self.stop.is_set():
                     try:
@@ -428,7 +444,10 @@ class _OwnedFixture:
                     self.active.append(conn)
                 with conn:
                     if ordinal:
-                        self._core_probe(conn)
+                        if self.billing_query is not None:
+                            self.billing_query.serve(self, conn)
+                        else:
+                            self._core_probe(conn)
                     else:
                         self._authenticate(conn)
                         if self.workload in {"upload_until_stop", "stall_runtime_after_connect"}:
@@ -448,11 +467,15 @@ class _OwnedFixture:
             self.protocol_failure = str(error)
 
     def report(self):
-        return {"acceptedConnections": self.accepted, "authenticatedConnections": self.authenticated_connections,
+        result = {"acceptedConnections": self.accepted, "authenticatedConnections": self.authenticated_connections,
                 "fixtureSentBytes": self.sent, "fixtureReceivedBytes": self.received,
                 "protocolErrors": self.protocol_errors, "httpStatus": self.http_status,
                 "protocolFailure": self.protocol_failure,
                 "scope": "owned-loopback-sockets; fixture application counts are not wire billing"}
+        if self.billing_query is not None:
+            result.update(billingRequestReceived=self.billing_query.request_received,
+                          billingRequestAuthenticated=self.billing_query.request_authenticated)
+        return result
 
     def close(self):
         self.stop.set()
@@ -476,7 +499,7 @@ def _check_envelope(value, envelope, identity, op):
         fields.add("fixture_verified")
     if op == "finished":
         fields |= {"fixture_verified", "outcome"}
-    allowed = fields | ({"metrics"} if op == "finished" else set())
+    allowed = fields | ({"metrics", "billing"} if op == "finished" else set())
     if (not isinstance(value, dict) or not fields <= set(value) <= allowed
             or value.get("ok") is not True or value.get("guard_mode") != GUARD_MODE):
         raise BudgetError("WorkerReceiptSchemaMismatch")
@@ -489,39 +512,68 @@ def _check_envelope(value, envelope, identity, op):
         raise BudgetError("WorkerReceiptIdentityMismatch")
 
 
+class _ExecutionEvidence:
+    """Current-process evidence from the shared executor, never deserialized."""
+    def __init__(self, issuer, record, *, exit_proof, guard, receipt, received, query, complete, cleanup):
+        if issuer is not _EXECUTION_ISSUER:
+            raise BudgetError("ControlledExecutionEvidenceRequired")
+        self._issuer = issuer
+        self.record = record
+        self.exit_proof, self.guard = exit_proof, guard
+        self._receipt = None if receipt is None else canonical(receipt)
+        self.received, self.query = received, query
+        self.complete, self.cleanup = complete, cleanup
+
+    def billing_snapshot(self, query):
+        if (self._issuer is not _EXECUTION_ISSUER or not self.complete or not self.cleanup
+                or self.query is not query or self.record["workload"] != "billing_snapshot"
+                or self.record["outcome"] != "BillingSnapshotSucceeded" or self._receipt is None
+                or self.exit_proof is None):
+            raise BudgetError("ControlledBillingExchangeRequired")
+        return json.loads(self._receipt)["billing"], self.received
+
+
 class Supervisor:
-    def __init__(self, ledger, identity):
+    def __init__(self, ledger, identity, billing=None):
         ledger.require_synthetic()
         if not isinstance(identity, WorkerIdentity) or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
             raise BudgetError("WorkerIdentityRequired")
-        self.ledger, self.identity = ledger, identity
+        if ledger.data["schema"] == 4:
+            ledger._require_billing_session(billing)
+        elif billing is not None:
+            raise BudgetError("SyntheticBillingSessionRequired")
+        self.ledger, self.identity, self.billing = ledger, identity, billing
 
-    def run(self, workload, *, node=1, byte_limit=65536, timeout_ms=2000, cancel_event=None):
-        if workload not in SUPERVISED_WORKLOADS:
-            raise BudgetError("SyntheticWorkloadRequired")
-        connections = 2 if workload == "core_probe" else 1
-        plan = tcp_plan(byte_limit, connections, timeout_ms)
-        self.identity.recheck()
-        nonce, challenge = secrets.token_hex(32), secrets.token_hex(32)
-        fingerprint = digest({"protocol": 1, "node": node, "workload": workload, "configuration_version": 1})
-        ticket = self.ledger.reserve_supervised(node, byte_limit, connections, timeout_ms,
-            config_fingerprint=fingerprint, source_sha=self.identity.metadata["source_sha"],
-            worker_sha256=self.identity.sha256, build_id=self.identity.metadata["build_id"], nonce=nonce, workload=workload)
+    def _identity_fields(self):
+        return {"source_sha": self.identity.metadata["source_sha"], "worker_sha256": self.identity.sha256,
+                "build_id": self.identity.metadata["build_id"]}
+
+    def _execute_reserved(self, ticket, workload, plan, nonce, fingerprint, *, cancel_event=None, billing_query=None):
+        """One real reserve/grant/OS-exit boundary shared by node and billing I/O.
+
+        This method never refunds. A typed result carries the actual ExitProof
+        only after bounded process/reader/fixture cleanup. Ledger settlement is
+        a separate caller action after all these checks have completed.
+        """
+        challenge = secrets.token_hex(32)
         fixture = child = frames = None
         child_closed = fixture_closed = frames_finished = False
-        final_guard = exit_proof = metrics = None
-        observed_running = False
-        outcome, settled = "CoordinatorFailure", False
+        final_guard = exit_proof = metrics = final_receipt = received = None
+        observed_running = complete = False
+        outcome = "CoordinatorFailure"
         started = time.monotonic()
         elapsed = 0
+        timeout_ms = plan["timeoutMs"]
         try:
-            fixture = _OwnedFixture(self.ledger.root, workload, byte_limit, challenge, nonce)
+            fixture = _OwnedFixture(self.ledger.root, workload, plan["byteLimit"], challenge, nonce, billing_query)
             grant = {"task_id": TASK, "ledger_id": self.ledger.data["ledgerId"], "sequence": int(ticket),
                      "source_sha": self.identity.metadata["source_sha"], "build_id": self.identity.metadata["build_id"],
-                     "role": "synthetic_loopback", "byte_limit": byte_limit, "connection_limit": connections,
+                     "role": "synthetic_loopback", "byte_limit": plan["byteLimit"], "connection_limit": plan["connectionLimit"],
                      "receive_reservation": plan["receiveReservation"], "timeout_ms": timeout_ms,
                      "endpoint": {"host": "127.0.0.1", "port": fixture.port}, "challenge": challenge,
                      "workload": workload, "config_fingerprint": fingerprint, "tls": fixture.tls}
+            if billing_query is not None:
+                grant["billing"] = billing_query.grant()
             envelope = {"schema": 1, "reservation_id": ticket, "nonce": nonce, "plan_digest": digest(grant)}
             self.ledger.bind_supervised_grant(ticket, envelope["plan_digest"])
             self.identity.recheck()
@@ -550,6 +602,7 @@ class Supervisor:
                     if str(error) == "ParentDeadlineExpired" and time.monotonic() < deadline:
                         continue
                     raise
+                received_at = time.monotonic()
                 operation = reply.get("op")
                 if operation not in {"running", "snapshot", "finished"}:
                     raise BudgetError("UnexpectedWorkerReceipt")
@@ -568,78 +621,197 @@ class Supervisor:
                     raise BudgetError("UnrequestedSnapshotReceipt")
                 if reply.get("outcome") not in OUTCOMES or type(reply.get("fixture_verified")) is not bool:
                     raise BudgetError("InvalidWorkerOutcome")
-                validate_guard_receipt(reply.get("guard"), plan)
                 outcome = OUTCOMES[reply["outcome"]]
-                final_guard = reply["guard"]
+                final_guard, final_receipt, received = reply["guard"], reply, received_at
                 if outcome == "CoreProbeSucceeded":
                     metrics = reply.get("metrics")
-                    if (not isinstance(metrics, dict) or set(metrics) != {"http_status", "outbound_connect_ms", "response_headers_ms"}
+                    if (workload != "core_probe" or not isinstance(metrics, dict)
+                            or set(metrics) != {"http_status", "outbound_connect_ms", "response_headers_ms"}
                             or any(type(value) is not int or value < 0 for value in metrics.values())
                             or metrics["http_status"] != 204
                             or not metrics["outbound_connect_ms"] <= metrics["response_headers_ms"] <= timeout_ms):
                         raise BudgetError("InvalidProbeMetrics")
                 elif "metrics" in reply:
                     raise BudgetError("UnexpectedProbeMetrics")
+                if outcome == "BillingSnapshotSucceeded":
+                    from PrivateSubscriptionBilling import validate_snapshot
+                    # Only the Rust success route can produce this typed
+                    # exchange; the modeled response is never taken directly.
+                    if billing_query is None or workload != "billing_snapshot":
+                        raise BudgetError("UnexpectedBillingReceipt")
+                    validate_snapshot(reply.get("billing"), billing_query.session.binding)
+                elif "billing" in reply:
+                    raise BudgetError("UnexpectedBillingReceipt")
                 exit_proof = child.wait(timeout=max(0.001, deadline - time.monotonic()))
                 if (exit_proof.record()["exitCode"] != 0 or not reply["fixture_verified"]
-                        or not observed_running or fixture.authenticated_connections != 1 or fixture.protocol_errors
-                        or outcome not in {"QuotaStopped", "Cancelled", "CoreProbeSucceeded", "DeadlineExpired"}
+                        or not observed_running or fixture.authenticated_connections != 1 or fixture.protocol_errors):
+                    raise BudgetError("IncompleteSyntheticEvidence")
+                if workload == "billing_snapshot":
+                    if outcome != "BillingSnapshotSucceeded" or fixture.http_status != 200:
+                        raise BudgetError("BillingSnapshotFailed")
+                elif (outcome not in {"QuotaStopped", "Cancelled", "CoreProbeSucceeded", "DeadlineExpired"}
                         or (workload == "core_probe" and (outcome != "CoreProbeSucceeded" or fixture.http_status != 204))):
                     raise BudgetError("IncompleteSyntheticEvidence")
-                frames.finish()
-                frames_finished = True
-                child.close()
-                child_closed = True
-                fixture.close()
-                fixture_closed = True
-                self.ledger.settle_synthetic(ticket, final_guard, exit_proof, outcome)
-                settled = True
+                complete = True
                 break
         except BudgetError as error:
             outcome = str(error)
         except Exception:
             outcome = "CoordinatorFailure"
         finally:
-            if child is not None and not child_closed:
+            if child is not None:
                 try:
                     if exit_proof is None:
                         exit_proof = child.terminate_and_wait()
                 except BudgetError:
                     outcome = "ProcessExitUnconfirmed"
-                finally:
-                    elapsed = int((time.monotonic() - started) * 1000)
-                    if frames is not None and not frames_finished:
-                        try:
-                            frames.finish()
-                            frames_finished = True
-                        except BudgetError:
-                            # An incomplete protocol remains unresolved, even
-                            # if OS termination and pipe release both succeeded.
-                            if outcome == "CoordinatorFailure":
-                                outcome = "WorkerReaderExitUnconfirmed"
+                if frames is not None:
                     try:
-                        child.close()
-                    except BudgetError:
-                        outcome = "ProcessExitUnconfirmed"
-            if child_closed:
+                        frames.finish()
+                        frames_finished = True
+                    except BudgetError as error:
+                        if complete or outcome == "CoordinatorFailure":
+                            outcome = str(error)
+                try:
+                    child.close()
+                    child_closed = True
+                except BudgetError:
+                    outcome = "ProcessExitUnconfirmed"
                 elapsed = int((time.monotonic() - started) * 1000)
-            if fixture is not None and not fixture_closed:
+            if fixture is not None:
                 try:
                     fixture.close()
+                    fixture_closed = True
                 except BudgetError:
                     outcome = "FixtureExitUnconfirmed"
+        cleanup = exit_proof is not None and frames_finished and child_closed and fixture_closed
+        complete = complete and cleanup
+        record = {"schema": 1, "scope": SYNTHETIC_DOMAIN, **self._identity_fields(),
+                  "reservation_id": ticket, "config_fingerprint": fingerprint, "workload": workload,
+                  "plan": plan, "outcome": outcome, "settled": False, "guard": final_guard,
+                  "metrics": metrics, "observedRunning": observed_running,
+                  "localMeasurement": "unknown-full-reservation-held", "cleanupConfirmed": cleanup,
+                  "exit": None if exit_proof is None else exit_proof.record(), "parentElapsedMs": elapsed,
+                  "fixture": None if fixture is None else fixture.report(),
+                  "providerRequests": 0, "realNodeRequests": 0, "liveReady": False}
+        return _ExecutionEvidence(_EXECUTION_ISSUER, record, exit_proof=exit_proof, guard=final_guard,
+                                  receipt=final_receipt, received=received, query=billing_query,
+                                  complete=complete, cleanup=cleanup)
+
+    def run(self, workload, *, node=1, byte_limit=65536, timeout_ms=2000, cancel_event=None):
+        if workload not in SUPERVISED_WORKLOADS:
+            raise BudgetError("SyntheticWorkloadRequired")
+        if self.billing is not None:
+            return self._run_with_billing(workload, node=node, byte_limit=byte_limit,
+                                          timeout_ms=timeout_ms, cancel_event=cancel_event)
+        connections = 2 if workload == "core_probe" else 1
+        plan = tcp_plan(byte_limit, connections, timeout_ms)
+        self.identity.recheck()
+        nonce = secrets.token_hex(32)
+        fingerprint = digest({"protocol": 1, "node": node, "workload": workload, "configuration_version": 1})
+        ticket = self.ledger.reserve_supervised(node, byte_limit, connections, timeout_ms,
+            config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce, workload=workload)
+        evidence = self._execute_reserved(ticket, workload, plan, nonce, fingerprint, cancel_event=cancel_event)
+        if evidence.complete:
+            self.ledger.settle_synthetic(ticket, evidence.guard, evidence.exit_proof, evidence.record["outcome"])
+            evidence.record.update(settled=True, localMeasurement="socket-counters")
+        else:
+            self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+        return {**evidence.record, "ledger": self.ledger.summary()}
+
+    def _billing_query(self, purpose, parent_ticket=None, *, timeout_ms=2000):
+        from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, WORKLOAD
+        self.ledger._require_billing_session(self.billing)
+        self.identity.recheck()
+        nonce = secrets.token_hex(32)
+        fingerprint = digest({"domain": "synthetic-billing-control-v1", "nonce": nonce,
+                              "purpose": purpose, "parent": parent_ticket})
+        ticket = self.ledger.reserve_billing_control(self.billing, purpose=purpose, parent_ticket=parent_ticket,
+            timeout_ms=timeout_ms, config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce)
+        query = self.billing.query(ticket, nonce)
+        plan = tcp_plan(BYTE_LIMIT, CONNECTION_LIMIT, timeout_ms)
+        evidence = self._execute_reserved(ticket, WORKLOAD, plan, nonce, fingerprint, billing_query=query)
+        observation = None
+        if evidence.complete:
+            try:
+                observation = self.billing.observation(query, evidence)
+                self.ledger.check_billing_observation(self.billing, ticket, observation)
+            except BudgetError as error:
+                observation = None
+                evidence.record["outcome"] = str(error)
+        if evidence.cleanup:
+            self.ledger.consume_billing_control(self.billing, ticket, evidence.guard, evidence.exit_proof,
+                                                evidence.record["outcome"], observation)
+            evidence.record.update(controlConsumed=True, controlDebit=plan["byteLimit"] + plan["receiveReservation"],
+                                   localMeasurement="socket-counters" if evidence.guard is not None else "unknown")
+        else:
+            self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+            evidence.record.update(controlConsumed=False, controlDebit=0)
+        evidence.record["billingObservationAccepted"] = observation is not None
+        evidence.record["controlDebitIsMeasuredTraffic"] = False
+        return observation, evidence.record
+
+    def _run_with_billing(self, workload, *, node, byte_limit, timeout_ms, cancel_event):
+        from PrivateSubscriptionBilling import DOMAIN
+        self.ledger._require_billing_session(self.billing)
+        connections = 2 if workload == "core_probe" else 1
+        plan = tcp_plan(byte_limit, connections, timeout_ms)
+        fingerprint = digest({"protocol": 1, "node": node, "workload": workload, "configuration_version": 1})
+        with self.ledger.mutex:
+            if any(h["configFingerprint"] == fingerprint for h in self.ledger.data["history"].values()):
+                raise BudgetError("ConfigurationAlreadyAttempted")
+            if self.ledger.data["attempts"] >= FIRST_ROUND:
+                raise BudgetError("FirstRoundComplete")
+        controls = []
+        with self.billing.query_lock:
+            before, report = self._billing_query("preflight", timeout_ms=timeout_ms)
+            controls.append(report)
+            if before is None:
+                return {"schema": 1, "scope": SYNTHETIC_DOMAIN, "billingScope": DOMAIN, **self._identity_fields(),
+                        "stage": "billing-preflight", "settled": False, "outcome": report["outcome"],
+                        "nodeStarted": False, "controlQueries": controls, "ledger": self.ledger.summary(),
+                        "providerRequests": 0, "realNodeRequests": 0, "liveReady": False}
+            nonce = secrets.token_hex(32)
+            ticket = self.ledger.reserve_billing_node(self.billing, before, node, byte_limit, connections, timeout_ms,
+                config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce, workload=workload)
+        evidence = self._execute_reserved(ticket, workload, plan, nonce, fingerprint, cancel_event=cancel_event)
+        if not evidence.complete:
+            self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+        else:
+            self.ledger.record_billing_exit(self.billing, ticket, evidence.guard, evidence.exit_proof, evidence.record["outcome"])
+            reconciliation = self.reconcile(ticket, timeout_ms=timeout_ms)
+            controls.extend(reconciliation["controlQueries"])
+            if reconciliation["settled"]:
+                evidence.record.update(settled=True, localMeasurement="socket-counters")
+            else:
+                evidence.record["outcome"] = reconciliation["outcome"]
+        return {**evidence.record, "billingScope": DOMAIN, "nodeStarted": True, "controlQueries": controls,
+                "ledger": self.ledger.summary()}
+
+    def reconcile(self, ticket, *, timeout_ms=2000):
+        """Only the same live session can finish a prior exit-confirmed attempt."""
+        from PrivateSubscriptionBilling import DOMAIN
+        self.ledger._require_billing_session(self.billing)
+        ticket = str(ticket)
+        proof = self.billing._pending_exits.get(ticket)
+        if proof is None:
+            raise BudgetError("CurrentSessionExitProofRequired")
+        outcome, settled, controls = "BillingReconciliationRequired", False, []
+        with self.billing.query_lock:
+            after, report = self._billing_query("reconcile", ticket, timeout_ms=timeout_ms)
+            controls.append(report)
+            if after is not None:
+                try:
+                    self.ledger.settle_billing_node(self.billing, ticket, after, proof)
+                    settled, outcome = True, "BillingReconciled"
+                except BudgetError as error:
+                    outcome = str(error)
+            else:
+                outcome = report["outcome"]
             if not settled:
                 self.ledger.retain_supervised(ticket, outcome)
-        summary = self.ledger.summary()
-        return {"schema": 1, "scope": SYNTHETIC_DOMAIN, "source_sha": self.identity.metadata["source_sha"],
-                "build_id": self.identity.metadata["build_id"], "worker_sha256": self.identity.sha256,
-                "reservation_id": ticket, "config_fingerprint": fingerprint, "workload": workload,
-                "plan": plan, "outcome": outcome, "settled": settled, "guard": final_guard,
-                "metrics": metrics,
-                "observedRunning": observed_running,
-                "localMeasurement": "socket-counters" if settled else "unknown-full-reservation-held",
-                "exit": None if exit_proof is None else exit_proof.record(), "parentElapsedMs": elapsed,
-                "fixture": None if fixture is None else fixture.report(), "ledger": summary,
+        return {"schema": 1, "scope": SYNTHETIC_DOMAIN, "billingScope": DOMAIN, "reservation_id": ticket,
+                "settled": settled, "outcome": outcome, "controlQueries": controls, "ledger": self.ledger.summary(),
                 "providerRequests": 0, "realNodeRequests": 0, "liveReady": False}
 
 
@@ -668,13 +840,21 @@ def main(argv=None):
     parser.add_argument("--node", type=int, default=1)
     parser.add_argument("--byte-limit", type=int, default=65536)
     parser.add_argument("--timeout-ms", type=int, default=2000)
+    parser.add_argument("--synthetic-billing", action="store_true",
+                        help="Use only the parent's owned TLS billing fixture; never an official provider")
     try:
         args = parser.parse_args(argv)
+        if args.synthetic_billing:
+            Ledger.require_existing(args.state_dir)
         identity = WorkerIdentity.inspect(args.worker, args.expected_source, args.worker_sha256)
-        with Ledger(args.state_dir) as ledger:
-            if ledger.data is None:
+        with Ledger(args.state_dir, existing_only=args.synthetic_billing) as ledger:
+            if ledger.data is None and not args.synthetic_billing:
                 ledger.initialize_synthetic()
-            report = Supervisor(ledger, identity).run(args.workload, node=args.node,
+            billing_session = None
+            if args.synthetic_billing:
+                from PrivateSubscriptionBilling import BillingSession
+                billing_session = BillingSession.register(ledger)
+            report = Supervisor(ledger, identity, billing_session).run(args.workload, node=args.node,
                                                     byte_limit=args.byte_limit, timeout_ms=args.timeout_ms)
         print(json.dumps(report, sort_keys=True))
         return 0 if report["settled"] else 2

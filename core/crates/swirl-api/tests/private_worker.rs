@@ -389,6 +389,100 @@ fn grant_is_required_and_cannot_admit_live_or_unowned_addresses() {
     }
 }
 
+fn billing_plan(listener: &TcpListener) -> Value {
+    let (certificate, _, _) = tls_material();
+    let mut value = plan(listener, "billing_snapshot", 2000);
+    value["grant"]["byte_limit"] = json!(65536);
+    value["grant"]["connection_limit"] = json!(2);
+    value["grant"]["receive_reservation"] = json!(2 * 1024 * 1024);
+    value["grant"]["tls"] = json!({"server_name":"swirl-qa.fixture.invalid",
+        "ca_der_base64":base64::engine::general_purpose::STANDARD.encode(certificate)});
+    value["grant"]["billing"] = json!({"schema":1,"domain":"swirl-synthetic-billing-v1",
+        "authority_id":"e".repeat(64),"account_id":"f".repeat(64),
+        "period_id":"0".repeat(64),"request_nonce":NONCE});
+    seal(&mut value);
+    value
+}
+
+#[test]
+fn billing_admission_is_fixed_and_cannot_extend_existing_workloads() {
+    for violation in [
+        "missing",
+        "nonce",
+        "domain",
+        "schema",
+        "identity",
+        "unknown",
+        "raw-workload",
+        "connections-low",
+        "connections-high",
+        "bytes-low",
+        "bytes-high",
+        "timeout",
+        "tls-missing",
+        "tls-name",
+    ] {
+        let listener = listener();
+        let mut value = billing_plan(&listener);
+        match violation {
+            "missing" => value["grant"]["billing"] = Value::Null,
+            "nonce" => value["grant"]["billing"]["request_nonce"] = json!("f".repeat(64)),
+            "domain" => value["grant"]["billing"]["domain"] = json!("other"),
+            "schema" => value["grant"]["billing"]["schema"] = json!(2),
+            "identity" => value["grant"]["billing"]["account_id"] = json!("F".repeat(64)),
+            "unknown" => value["grant"]["billing"]["fresh"] = json!(true),
+            "raw-workload" => {
+                value["grant"]["workload"] = json!("upload_until_stop");
+                value["grant"]["tls"] = Value::Null;
+            }
+            "connections-low" => {
+                value["grant"]["connection_limit"] = json!(1);
+                value["grant"]["receive_reservation"] = json!(1024 * 1024);
+            }
+            "connections-high" => {
+                value["grant"]["connection_limit"] = json!(3);
+                value["grant"]["receive_reservation"] = json!(3 * 1024 * 1024);
+            }
+            "bytes-low" => value["grant"]["byte_limit"] = json!(65535),
+            "bytes-high" => value["grant"]["byte_limit"] = json!(65537),
+            "timeout" => value["grant"]["timeout_ms"] = json!(99),
+            "tls-missing" => value["grant"]["tls"] = Value::Null,
+            "tls-name" => value["grant"]["tls"]["server_name"] = json!("different.fixture.invalid"),
+            _ => unreachable!(),
+        }
+        seal(&mut value);
+        let mut worker = Worker::spawn();
+        worker.send(&value);
+        worker.wait(false);
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+}
+
+#[test]
+fn billing_ready_and_cancel_before_start_have_zero_network_and_no_snapshot() {
+    let listener = listener();
+    let value = billing_plan(&listener);
+    let mut worker = Worker::spawn();
+    worker.grant(&value);
+    worker.send(&control(&value, "cancel"));
+    let finished = worker.response("finished");
+    assert_eq!(finished["outcome"], "cancelled");
+    assert_eq!(finished["guard"]["connection_attempts"], 0);
+    assert_eq!(finished["guard"]["upload"], 0);
+    assert_eq!(finished["guard"]["download"], 0);
+    assert_eq!(finished["guard"]["stopped"], true);
+    assert!(finished.get("billing").is_none());
+    assert!(finished.get("metrics").is_none());
+    worker.wait(true);
+    assert_eq!(
+        listener.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+}
+
 #[test]
 fn ready_opens_no_socket_and_binding_or_duplicate_grant_never_starts() {
     for violation in ["binding", "grant", "expand"] {

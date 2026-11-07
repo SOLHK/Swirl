@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 [features]
 private-acceptance = ["swirl-transport/private-acceptance"]
-private-acceptance-worker = ["private-acceptance", "swirl-transport/private-acceptance-worker"]
+private-acceptance-worker = ["private-acceptance", "swirl-transport/private-acceptance-worker", "dep:base64", "dep:tokio-rustls"]
 [[bin]]
 name = "swirl-private-worker"
 path = "src/bin/swirl-private-worker.rs"
@@ -29,6 +29,8 @@ swirl-platform.workspace = true
 swirl-tun.workspace = true
 ipnet.workspace = true
 ring.workspace = true
+base64 = { workspace = true, optional = true }
+tokio-rustls = { workspace = true, optional = true }
 [dev-dependencies]
 base64.workspace = true
 tokio = { workspace = true, features = ["test-util"] }

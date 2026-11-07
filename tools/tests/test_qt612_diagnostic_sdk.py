@@ -1,6 +1,7 @@
-"""Boundary and configuration controls: no Qt, compiler, network or private data."""
+"""Boundary controls; Windows adds held-file and harmless owned-child checks, never Qt/live data."""
 
 import copy
+import ctypes
 import hashlib
 import importlib.util
 import json
@@ -8,7 +9,9 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -27,7 +30,353 @@ sdk = load("sdk_boundary_tests", "Build-Qt612QmlDiagnosticSdk.py")
 comparison = load("comparison_boundary_tests", "RunQt612RuntimeComparison.py")
 
 
+def synthetic_compiler_context(root):
+    repo, work, stock = root / "repo", root / "work", root / "stock"
+    for path in (repo / "tools/repros/qt612-popup-gc", work / "source", work / "build",
+                 work / "fixtures", work / "module-stage", stock / "bin"):
+        path.mkdir(parents=True)
+    for path in (work / "source/CMakeLists.txt", repo / "tools/repros/qt612-popup-gc/CMakeLists.txt"):
+        path.write_bytes(b"# Synthetic path binding only; never executed.\n")
+    (stock / "bin/qt-configure-module.bat").write_bytes(b"synthetic unexecuted wrapper")
+    directory = root / "VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64"
+    directory.mkdir(parents=True)
+    tools = {}
+    for name in ("cmake.exe", "pwsh.exe", "cl.exe", "link.exe", "lib.exe", "rc.exe", "mt.exe", "ninja.exe"):
+        path = directory / name
+        path.write_bytes(("synthetic unexecuted " + name).encode())
+        tools[name] = str(path)
+    helper = directory / "vctip.exe"
+    helper.write_bytes(b"synthetic image identity only; never launched")
+    identities = {name: {"path": path, **sdk.file_identity(Path(path))} for name, path in tools.items()}
+    lock = json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
+    lock["compiler_retirement"].update(sdk.file_identity(helper))
+    known = {str(helper).replace("\\", "/").casefold(): {"path": str(helper), **sdk.file_identity(helper)}}
+    (work / "msvc-initial-cache.cmake").write_bytes(sdk.MSVC_INITIAL_CACHE.encode())
+    (work / "configure-module.ps1").write_bytes(
+        sdk.module_configure_script(sdk.module_configure_arguments(work, stock, tools)))
+    return {"repo": repo, "work": work, "stock": stock, "tools": tools}, lock, identities, known
+
+
+def completed_compiler_record():
+    return {"atomic_job_membership": True, "process_signaled": True, "owned_job_empty": False,
+            "errors": [], "timed_out": False, "exit_code": 0, "forced_cleanup": False,
+            "root_first_signal": {"exit_code": 0, "before_any_termination": True}}
+
+
+def native_control_evidence(root, name):
+    path = root / "native-evidence" / name
+    if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("SWIRL_QT612_RUNTIME_PATCH") == "1":
+        path = Path(os.environ["GITHUB_WORKSPACE"]) / "build-evidence/qt612-runtime-patch/native-boundaries" / name
+    return sdk.fresh_directory(path) if path.parent.is_dir() else _make_native_parent(path)
+
+
+def _make_native_parent(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return sdk.fresh_directory(path)
+
+
 class DiagnosticBoundaryTests(unittest.TestCase):
+    def test_only_four_exact_compiler_invocations_can_construct_a_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context, lock, identities, known = synthetic_compiler_context(Path(directory).resolve())
+            work, tools = context["work"], context["tools"]
+            cases = [
+                ("sdk:10-configure", [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive",
+                                       "-File", work / "configure-module.ps1"], work / "build"),
+                ("sdk:11-qml-build", [tools["cmake.exe"], "--build", work / "build", "--target",
+                                      "Qml", "BuiltinsOutput", "--parallel", "2"], work),
+                ("comparison:01-configure-fixtures", sdk.fixture_configure_arguments(
+                    context["repo"], work, context["stock"], tools), work),
+                ("comparison:02-build-fixtures", [tools["cmake.exe"], "--build", work / "fixtures",
+                    "--target", "PopupGcFixture", "SweepSlotsProbe", "--parallel", "2"], work)]
+            for phase, args, cwd in cases:
+                with self.subTest(phase=phase):
+                    plan = sdk.compiler_phase_plan(phase, args, cwd, context, lock, identities, known)
+                    self.assertEqual(plan["phase"], phase)
+                    with self.assertRaisesRegex(RuntimeError, "CompilerPhaseInvocationMismatch"):
+                        sdk.compiler_phase_plan(phase, [*args, "-P", "arbitrary.cmake"], cwd,
+                                                context, lock, identities, known)
+            phase, args, cwd = cases[0]
+            for invalid in ("sdk:12-install-qml-only", "comparison:04-stock-fixtures", "git", "sdk:10-configure-other"):
+                with self.assertRaisesRegex(RuntimeError, "UnrecognizedCompilerPhase"):
+                    sdk.compiler_phase_plan(invalid, args, cwd, context, lock, identities, known)
+            with self.assertRaisesRegex(RuntimeError, "CompilerPhaseInvocationMismatch"):
+                sdk.compiler_phase_plan(phase, args, work, context, lock, identities, known)
+            with self.assertRaisesRegex(RuntimeError, "CompilerCapabilityFactoryRequired"):
+                sdk._CompilerPhase(object(), {}, {})
+
+    def test_changed_script_cache_tool_or_helper_is_rejected_before_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context, lock, identities, known = synthetic_compiler_context(Path(directory).resolve())
+            work, tools = context["work"], context["tools"]
+            args = [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive", "-File", work / "configure-module.ps1"]
+            for path, failure in ((work / "configure-module.ps1", "CompilerConfigureScriptChanged"),
+                                  (work / "msvc-initial-cache.cmake", "CompilerInitialCacheChanged"),
+                                  (Path(tools["cmake.exe"]), "CompilerToolIdentityChanged"),
+                                  (Path(tools["cl.exe"]).parent / "vctip.exe", "CompilerHelperPinMismatch")):
+                original = path.read_bytes()
+                try:
+                    path.write_bytes(original + b"changed")
+                    with patch.object(sdk, "_run_logged") as launch:
+                        with self.assertRaisesRegex(RuntimeError, failure):
+                            sdk.run_compiler_logged("sdk:10-configure", args, work / "build", work / "logs", 10,
+                                context=context, lock=lock, tool_identities=identities, known_executables=known, env={})
+                        launch.assert_not_called()
+                finally:
+                    path.write_bytes(original)
+            with self.assertRaisesRegex(RuntimeError, "CompilerHelperNotInPrelaunchInventory"):
+                sdk.compiler_phase_plan("sdk:10-configure", args, work / "build", context, lock, identities, {})
+            altered = copy.deepcopy(lock)
+            altered["compiler_retirement"]["msvc_tools_version"] = "14.45.12345"
+            with self.assertRaisesRegex(RuntimeError, "CompilerRetirementToolsetMismatch"):
+                sdk.compiler_phase_plan("sdk:10-configure", args, work / "build", context, altered, identities, known)
+
+    def test_receipt_flags_cannot_create_live_compiler_retirement_proof(self):
+        record = completed_compiler_record()
+        record.update(owned_job_empty=True, forced_cleanup=True,
+                      termination_reason="controlled-pinned-compiler-helper",
+                      compiler_controlled_retirement={"accepted": True, "helper_signaled": True,
+                                                     "proved_within_original_deadline": True})
+        capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+        for value in (None, {}, record["compiler_controlled_retirement"], capability):
+            self.assertFalse(sdk.compiler_completion_allowed(record, value))
+        self.assertFalse(sdk.command_completion_allowed(record, (0,)))
+        # A simulated backend proof is used only to test the independent failure conditions.
+        capability.proved = capability.targeted = True
+        self.assertTrue(sdk.compiler_completion_allowed(record, capability))
+        for key, value in (("exit_code", 1), ("timed_out", True), ("errors", ["OutputLimitExceeded"]),
+                           ("owned_job_empty", False), ("process_signaled", False),
+                           ("atomic_job_membership", False), ("termination_reason", "exception-cleanup")):
+            self.assertFalse(sdk.compiler_completion_allowed({**record, key: value}, capability), key)
+        first = {"exit_code": 0, "before_any_termination": False}
+        self.assertFalse(sdk.compiler_completion_allowed({**record, "root_first_signal": first}, capability))
+
+    def test_targeted_retirement_rechecks_same_handle_and_preserves_deadline(self):
+        events = []
+        capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+        capability.process, capability.creation, capability.root_creation = 1234, 200, 100
+        capability.c = SimpleNamespace(byref=ctypes.byref, get_last_error=lambda: 0)
+        capability.w = SimpleNamespace(DWORD=ctypes.c_uint32)
+        def inspect(job, handle):
+            events.append(("inspect", job, handle))
+            return 200, 258, "bound-path-hash"
+        def terminate(handle, code):
+            events.append(("terminate", handle, code))
+            return True
+        def get_exit(handle, output):
+            events.append(("exit", handle))
+            output._obj.value = 125
+            return True
+        capability.inspect_process = inspect
+        capability.creation_time = lambda handle: 200
+        capability.k = SimpleNamespace(TerminateProcess=terminate, WaitForSingleObject=lambda h, t: 0,
+                                       GetExitCodeProcess=get_exit)
+        record = completed_compiler_record()
+        with patch.object(sdk.time, "monotonic", return_value=100):
+            capability.terminate(88, record, 105)
+            record["owned_job_empty"] = True
+            capability.prove(record, 105)
+        self.assertEqual(events, [("inspect", 88, 1234), ("terminate", 1234, 125), ("exit", 1234)])
+        self.assertTrue(record["forced_cleanup"])
+        self.assertEqual(record["exit_code"], 0)
+        self.assertTrue(sdk.compiler_completion_allowed(record, capability))
+        with patch.object(sdk.time, "monotonic", return_value=105):
+            with self.assertRaisesRegex(RuntimeError, "CompilerHelperExitProofExpired"):
+                capability.prove(record, 105)
+
+    def test_changed_creation_nonzero_root_or_expired_deadline_never_terminates_candidate(self):
+        for scenario in ("creation", "nonzero", "deadline", "prior-error"):
+            capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+            capability.process, capability.creation = 1234, 200
+            capability.inspect_process = lambda job, handle: (201 if scenario == "creation" else 200, 258, "hash")
+            calls = []
+            capability.k = SimpleNamespace(TerminateProcess=lambda *args: calls.append(args))
+            record = completed_compiler_record()
+            if scenario == "nonzero":
+                record["exit_code"] = record["root_first_signal"]["exit_code"] = 7
+            if scenario == "prior-error":
+                record["errors"].append("OutputLimitExceeded")
+            with patch.object(sdk.time, "monotonic", return_value=100):
+                with self.assertRaises(RuntimeError):
+                    capability.terminate(88, record, 99 if scenario == "deadline" else 105)
+            self.assertEqual(calls, [], scenario)
+            self.assertFalse(record["forced_cleanup"])
+
+    def test_failed_targeted_api_is_recorded_as_forced_and_never_proved(self):
+        capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+        capability.process, capability.creation = 1234, 200
+        capability.inspect_process = lambda job, handle: (200, 258, "bound-path-hash")
+        calls = []
+        capability.k = SimpleNamespace(TerminateProcess=lambda *args: calls.append(args) or False)
+        capability.c = SimpleNamespace(get_last_error=lambda: 5)
+        record = completed_compiler_record()
+        with patch.object(sdk.time, "monotonic", return_value=100):
+            with self.assertRaisesRegex(RuntimeError, "CompilerHelperTerminationFailed:5"):
+                capability.terminate(88, record, 105)
+        self.assertEqual(calls, [(1234, 125)])
+        self.assertTrue(record["forced_cleanup"])
+        self.assertFalse(capability.proof["terminate_process_returned"])
+        self.assertFalse(capability.proved)
+        self.assertEqual(record["exit_code"], 0)
+        self.assertFalse(sdk.compiler_completion_allowed(record, capability))
+
+    def test_actual_helper_exit_and_job_proof_fail_closed_and_keep_observed_exit(self):
+        for scenario in ("active", "query-failed", "wrong-exit", "creation-changed", "job-not-empty", "root-failed"):
+            capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+            capability.process, capability.creation, capability.targeted = 1234, 200, True
+            capability.c = SimpleNamespace(byref=ctypes.byref)
+            capability.w = SimpleNamespace(DWORD=ctypes.c_uint32)
+            calls = []
+            def get_exit(handle, output):
+                calls.append(handle)
+                output._obj.value = 7 if scenario == "wrong-exit" else 125
+                return scenario != "query-failed"
+            capability.k = SimpleNamespace(
+                WaitForSingleObject=lambda h, t: 258 if scenario == "active" else 0,
+                GetExitCodeProcess=get_exit)
+            capability.creation_time = lambda handle: 201 if scenario == "creation-changed" else 200
+            record = completed_compiler_record()
+            record.update(owned_job_empty=scenario != "job-not-empty", forced_cleanup=True,
+                          termination_reason="controlled-pinned-compiler-helper")
+            if scenario == "root-failed":
+                record["exit_code"] = 1
+            with self.subTest(scenario=scenario), patch.object(sdk.time, "monotonic", return_value=100):
+                with self.assertRaises(RuntimeError):
+                    capability.prove(record, 105)
+                self.assertFalse(capability.proved)
+                self.assertFalse(sdk.compiler_completion_allowed(record, capability))
+                if scenario == "active":
+                    self.assertEqual(calls, [])
+                elif scenario == "wrong-exit":
+                    self.assertEqual(capability.proof["helper_exit_code"], 7)
+                    self.assertTrue(capability.proof["helper_signaled"])
+
+    def test_foreign_or_unconfirmed_job_handle_is_not_inspected_further(self):
+        for success in (False, True):
+            capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+            capability.c, capability.w = ctypes, SimpleNamespace(BOOL=ctypes.c_int32)
+            calls = []
+            def membership(handle, job, output):
+                calls.append((handle, job))
+                output._obj.value = 0
+                return success
+            capability.k = SimpleNamespace(IsProcessInJob=membership)
+            capability.creation_time = lambda handle: self.fail("must not inspect a foreign process")
+            with self.assertRaisesRegex(RuntimeError, "CompilerHelperNotInOwnedJob"):
+                capability.inspect_process(88, 1234)
+            self.assertEqual(calls, [(1234, 88)])
+
+    def test_multiple_owned_residues_do_not_open_a_target_handle(self):
+        capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+        calls = []
+        def query(job, kind, output, size, length):
+            calls.append(("query", job, kind))
+            output._obj.assigned = output._obj.count = 2
+            output._obj.pids[0], output._obj.pids[1] = 10, 11
+            return True
+        capability.c, capability.w = ctypes, SimpleNamespace(DWORD=ctypes.c_uint32)
+        capability.k = SimpleNamespace(QueryInformationJobObject=query,
+                                       OpenProcess=lambda *args: calls.append(("open", *args)))
+        snapshot = {}
+        with self.assertRaisesRegex(RuntimeError, "CompilerRetirementRequiresExactlyOneSurvivor"):
+            capability.capture(88, snapshot)
+        self.assertEqual(calls, [("query", 88, 3)])
+        self.assertEqual(snapshot["listed_pids"], [10, 11])
+
+    def test_compiler_resource_close_failure_does_not_skip_the_image_lock(self):
+        capability = sdk._CompilerPhase(sdk._COMPILER_PHASE_FACTORY, {}, {})
+        capability.process, capability.image = 1234, SimpleNamespace(handle=5678)
+        calls = []
+        def close(handle):
+            calls.append(handle)
+            if handle == 1234:
+                raise OSError("controlled process handle close failure")
+            return True
+        capability.k = SimpleNamespace(CloseHandle=close)
+        record = {"errors": ["OriginalNativeFailure"], "exit_code": 7}
+        capability.close(record)
+        self.assertEqual(calls, [1234, 5678])
+        self.assertEqual(record["errors"][0], "OriginalNativeFailure")
+        self.assertEqual(record["exit_code"], 7)
+        self.assertIn("CompilerHelperHandleCloseFailed:OSError", record["errors"][1])
+
+    def test_same_path_with_changed_file_id_is_rejected_and_alias_handle_is_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "identity-control.bin"
+            path.write_bytes(b"not executed")
+            image = object.__new__(sdk._PinnedCompilerImage)
+            image.handle = 1
+            image.identity = {"path_key": str(path).replace("\\", "/").casefold(), "file_id_128": "11" * 16}
+            image.read_identity = lambda handle: (image.identity if handle == 1 else
+                                                  {**image.identity, "file_id_128": "22" * 16})
+            image.open = lambda candidate: 2
+            closed = []
+            image.k = SimpleNamespace(CloseHandle=lambda handle: closed.append(handle) or True)
+            with patch.object(sdk, "_windows_image_path", side_effect=lambda value: value):
+                with self.assertRaisesRegex(RuntimeError, "CompilerProcessImageIdentityMismatch"):
+                    image.validate_process_image(str(path))
+            self.assertEqual(closed, [2])
+
+    @unittest.skipUnless(os.name == "nt", "Actual Windows held-file identity/sharing required")
+    def test_windows_image_file_pin_rejects_writes_delete_and_other_path(self):
+        from ctypes import wintypes
+        with tempfile.TemporaryDirectory(prefix="swirl image pin ") as directory:
+            root = Path(directory).resolve()
+            evidence = native_control_evidence(root, "held-image-file")
+            report = {"success": False, "scope": "ordinary public file only; no executable started",
+                      "actual_process_module_sampling": False}
+            original, other = root / "public-image-control.bin", root / "other-control.bin"
+            original.write_bytes(b"Public synthetic file identity control; not executable.")
+            other.write_bytes(original.read_bytes())
+            expected = {"path": str(original), **sdk.file_identity(original)}
+            try:
+                image = sdk._PinnedCompilerImage(ctypes.WinDLL("kernel32", use_last_error=True), ctypes, wintypes, expected)
+                try:
+                    report["locked_image"] = image.identity
+                    self.assertEqual(len(image.identity["file_id_128"]), 32)
+                    self.assertNotEqual(image.identity["file_id_128"], "0" * 32)
+                    image.validate_process_image(str(original))
+                    with self.assertRaises(OSError) as write_error:
+                        with original.open("wb"):
+                            pass
+                    report["denied_write_winerror"] = getattr(write_error.exception, "winerror", None)
+                    with self.assertRaises(OSError) as delete_error:
+                        original.unlink()
+                    report["denied_delete_winerror"] = getattr(delete_error.exception, "winerror", None)
+                    with self.assertRaisesRegex(RuntimeError, "CompilerProcessImagePathMismatch"):
+                        image.validate_process_image(str(other))
+                finally:
+                    report["image_handle_closed"] = bool(image.k.CloseHandle(image.handle))
+                    image.handle = None
+                    self.assertTrue(report["image_handle_closed"])
+                original.write_bytes(b"Read lock released after all handle checks.")
+                report["write_after_close_succeeded"] = True
+                report["success"] = True
+            except BaseException as error:
+                report["error"] = type(error).__name__ + ":" + str(error)
+                raise
+            finally:
+                sdk.write_json(evidence / "held-file-result.json", report)
+
+    @unittest.skipUnless(os.name == "nt", "Actual Windows Job retirement required")
+    def test_windows_generic_unknown_child_still_fails_after_owned_cleanup(self):
+        with tempfile.TemporaryDirectory(prefix="swirl owned child ") as directory:
+            root = Path(directory).resolve()
+            evidence = native_control_evidence(root, "generic-child")
+            program = ("import subprocess,sys; child=subprocess.Popen([sys.executable,'-c',"
+                       "'import time; time.sleep(30)'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);"
+                       "print('public harmless owned child',child.pid)")
+            with self.assertRaisesRegex(RuntimeError, "CommandFailed:native-unknown-child"):
+                sdk.run_logged([str(Path(sys.executable).resolve()), "-c", program], root, evidence,
+                               "native-unknown-child", 5)
+            record = json.loads((evidence / "native-unknown-child.json").read_text())
+            self.assertEqual(record["exit_code"], 0)
+            self.assertTrue(record["root_first_signal"]["before_any_termination"])
+            self.assertTrue(record["forced_cleanup"])
+            self.assertTrue(record["process_signaled"] and record["owned_job_empty"])
+            self.assertIn("UnexpectedDescendantsAfterSuccessfulRoot", record["errors"])
+            self.assertNotIn("compiler_phase", record)
+
     @unittest.skipUnless(os.name == "nt", "Actual Windows batch parsing required")
     def test_initial_cache_survives_batch_reexpansion_and_preserves_release_format(self):
         cmake, powershell, ninja = shutil.which("cmake"), shutil.which("pwsh"), shutil.which("ninja")

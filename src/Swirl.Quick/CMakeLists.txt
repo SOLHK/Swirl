@@ -281,7 +281,7 @@ if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
 target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp app/PopupMotionBridge.cpp)
-target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private)
+target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private Qt6::QmlPrivate)
 # The SDK-specific popup adapter alone sees the Qt Quick transition internals.
 set_property(SOURCE app/PopupMotionBridge.cpp APPEND PROPERTY INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:Qt6::QuickPrivate,INTERFACE_INCLUDE_DIRECTORIES>")
 
@@ -395,7 +395,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
  set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QSG_INFO=1" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
- target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QmlPrivate Qt6::QuickPrivate)
+ target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QuickPrivate)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  if(WIN32)
   target_sources(Swirl PRIVATE tests/NativeTunBrokerChecks.cpp tests/NativeTunBrokerChecks.h)

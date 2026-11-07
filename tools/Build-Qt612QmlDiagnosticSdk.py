@@ -320,8 +320,8 @@ def tool_environment():
     env.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never", GIT_CONFIG_NOSYSTEM="1",
                GIT_CONFIG_GLOBAL=os.devnull, VSLANG="1033", PYTHONUTF8="1",
                QT_FORCE_STDERR_LOGGING="1", QT_MESSAGE_PATTERN="[%{type}] %{message}")
-    # Invocation-local compiler opt-out, not a promise that no helper starts.
-    # The unchanged owned-Job retirement check still decides acceptance.
+    # Retain the prior invocation-local setting; no supported effect is established.
+    # Actual owned-Job exit and the exact compiler capability decide acceptance.
     env["VCTIP_NO_TELEMETRY"] = "1"
     return env
 
@@ -336,6 +336,400 @@ def executable_inventory(toolchain, tools):
     for value in tools.values():
         result[value["path"].replace("\\", "/").casefold()] = value
     return result
+
+
+def prepare_msvc_initial_cache(work, evidence):
+    path = Path(work) / "msvc-initial-cache.cmake"
+    with path.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write(MSVC_INITIAL_CACHE)
+    copied = Path(evidence) / path.name
+    with copied.open("xb") as stream:
+        stream.write(path.read_bytes())
+    require(file_identity(copied) == file_identity(path), "InitialCacheEvidenceChanged")
+    return path
+
+
+def module_configure_arguments(work, stock, tools):
+    work, stock = Path(work), Path(stock)
+    return [stock / "bin/qt-configure-module.bat", work / "source", "--", "-G", "Ninja",
+            "-C", work / "msvc-initial-cache.cmake",
+            cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
+            "-DCMAKE_BUILD_TYPE=Release",
+            cmake_path_definition("CMAKE_INSTALL_PREFIX", work / "module-stage", "PATH"),
+            *[cmake_path_definition(key, tools[name], "FILEPATH") for key, name in (
+                ("CMAKE_C_COMPILER", "cl.exe"), ("CMAKE_CXX_COMPILER", "cl.exe"),
+                ("CMAKE_LINKER", "link.exe"), ("CMAKE_AR", "lib.exe"),
+                ("CMAKE_RC_COMPILER", "rc.exe"), ("CMAKE_MT", "mt.exe"),
+                ("CMAKE_MAKE_PROGRAM", "ninja.exe"))],
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL", "-DQT_BUILD_TESTS=OFF",
+            "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+
+
+def module_configure_script(arguments):
+    return ("$ErrorActionPreference = 'Stop'\n& " + " ".join(ps_quote(x) for x in arguments)
+            + "\nexit $LASTEXITCODE\n").encode("utf-8")
+
+
+def fixture_configure_arguments(repo, work, stock, tools):
+    return [tools["cmake.exe"], "-S", Path(repo) / "tools/repros/qt612-popup-gc",
+            "-B", Path(work) / "fixtures", "-G", "Ninja",
+            "-C", Path(work) / "msvc-initial-cache.cmake", "-DCMAKE_BUILD_TYPE=Release",
+            cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
+            *[cmake_path_definition(key, tools[name], "FILEPATH") for key, name in (
+                ("CMAKE_CXX_COMPILER", "cl.exe"), ("CMAKE_MAKE_PROGRAM", "ninja.exe"),
+                ("CMAKE_LINKER", "link.exe"), ("CMAKE_AR", "lib.exe"),
+                ("CMAKE_RC_COMPILER", "rc.exe"), ("CMAKE_MT", "mt.exe"))],
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+
+
+def compiler_phase_plan(phase, arguments, cwd, context, lock, tool_identities, known_executables):
+    """Bind one of four exact compiler invocations; a name or a receipt is not a capability."""
+    phases = {"sdk:10-configure", "sdk:11-qml-build",
+              "comparison:01-configure-fixtures", "comparison:02-build-fixtures"}
+    require(phase in phases and set(context) == {"repo", "work", "stock", "tools"},
+            "UnrecognizedCompilerPhase")
+    repo, work, stock = (plain_path(Path(context[key])) for key in ("repo", "work", "stock"))
+    tools = context["tools"]
+    build = plain_path(work / ("build" if phase.startswith("sdk:") else "fixtures"), root=work)
+    cache = plain_path(work / "msvc-initial-cache.cmake", root=work)
+    require(cache.read_bytes() == MSVC_INITIAL_CACHE.encode("utf-8"), "CompilerInitialCacheChanged")
+    inputs = {str(cache): file_identity(cache)}
+    if phase == "sdk:10-configure":
+        source = plain_path(work / "source", root=work)
+        plain_path(work / "module-stage", root=work)
+        script = plain_path(work / "configure-module.ps1", root=work)
+        configure = module_configure_arguments(work, stock, tools)
+        require(script.read_bytes() == module_configure_script(configure), "CompilerConfigureScriptChanged")
+        wrapper = plain_path(stock / "bin/qt-configure-module.bat", root=stock)
+        inputs.update({str(script): file_identity(script), str(wrapper): file_identity(wrapper)})
+        expected = [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive", "-File", script]
+        expected_cwd = build
+    elif phase == "comparison:01-configure-fixtures":
+        source = plain_path(repo / "tools/repros/qt612-popup-gc", root=repo)
+        expected = fixture_configure_arguments(repo, work, stock, tools)
+        expected_cwd = work
+    else:
+        source = (plain_path(work / "source", root=work) if phase.startswith("sdk:")
+                  else plain_path(repo / "tools/repros/qt612-popup-gc", root=repo))
+        targets = ["Qml", "BuiltinsOutput"] if phase.startswith("sdk:") else ["PopupGcFixture", "SweepSlotsProbe"]
+        expected = [tools["cmake.exe"], "--build", build, "--target", *targets, "--parallel", "2"]
+        expected_cwd = work
+    args = [str(x) for x in arguments]
+    require(args == [str(x) for x in expected] and plain_path(Path(cwd)) == expected_cwd,
+            "CompilerPhaseInvocationMismatch")
+    require((source / "CMakeLists.txt").is_file(), "CompilerSourceRootMissing")
+    for name in ("cmake.exe", "pwsh.exe", "cl.exe", "link.exe", "lib.exe", "rc.exe", "mt.exe", "ninja.exe"):
+        path = plain_path(Path(tools[name]))
+        identity = {"path": str(path), **file_identity(path)}
+        require(identity == tool_identities.get(name), "CompilerToolIdentityChanged:" + name)
+        inputs[str(path)] = {k: identity[k] for k in ("bytes", "sha256")}
+    pin = lock.get("compiler_retirement", {})
+    require(pin.get("kind") == "one-owned-pinned-msvc-vctip" and pin.get("image") == "vctip.exe"
+            and pin.get("maximum_survivors") == 1 and pin.get("grace_seconds") == 2
+            and pin.get("proof_seconds") == 5 and 0 < pin.get("bytes", 0) <= 16 * 1024**2
+            and SHA.fullmatch(pin.get("sha256", ""))
+            and re.fullmatch(r"14\.[0-9]+\.[0-9]+", pin.get("msvc_tools_version", "")),
+            "InvalidCompilerRetirementPin")
+    cl = plain_path(Path(tools["cl.exe"]))
+    require(tuple(x.casefold() for x in cl.parts[-6:]) == (
+                "msvc", pin["msvc_tools_version"].casefold(), "bin", "hostx64", "x64", "cl.exe"),
+            "CompilerRetirementToolsetMismatch")
+    helper = plain_path(cl.parent / "vctip.exe")
+    key = str(helper).replace("\\", "/").casefold()
+    expected_helper = {"path": str(helper), "bytes": pin["bytes"], "sha256": pin["sha256"]}
+    require(known_executables.get(key) == expected_helper,
+            "CompilerHelperNotInPrelaunchInventory")
+    require(file_identity(helper) == {k: pin[k] for k in ("bytes", "sha256")}, "CompilerHelperPinMismatch")
+    return {"phase": phase, "name": phase.split(":", 1)[1], "arguments": args,
+            "cwd": str(expected_cwd), "source": str(source), "build": str(build),
+            "inputs": inputs, "helper": expected_helper, "policy": pin,
+            "actual_process_module_sampling": False}
+
+
+def compiler_retirement_prerequisites(record):
+    first = record.get("root_first_signal") or {}
+    return (record.get("atomic_job_membership") is True and record.get("process_signaled") is True
+            and not record.get("errors") and record.get("timed_out") is False
+            and record.get("forced_cleanup") is False and record.get("exit_code") == 0
+            and first.get("exit_code") == 0 and first.get("before_any_termination") is True)
+
+
+def _windows_image_path(value):
+    if value.startswith("\\\\?\\"):
+        value = value[4:]
+    require(re.match(r"^[A-Za-z]:[\\/]", value) is not None
+            and not any(x in value for x in "\0\r\n"), "NonLocalCompilerImagePath")
+    return value
+
+
+class _PinnedCompilerImage:
+    """An exact prelaunch image, kept open without write/delete sharing until retirement."""
+    def __init__(self, k, c, w, expected):
+        self.k, self.c, self.w, self.expected, self.handle = k, c, w, expected, None
+        class FileTime(c.Structure):
+            _fields_ = [("low", w.DWORD), ("high", w.DWORD)]
+        class FileInfo(c.Structure):
+            _fields_ = [("attributes", w.DWORD), ("creation", FileTime), ("access", FileTime),
+                        ("write", FileTime), ("volume", w.DWORD), ("size_high", w.DWORD),
+                        ("size_low", w.DWORD), ("links", w.DWORD), ("id_high", w.DWORD), ("id_low", w.DWORD)]
+        class FileId(c.Structure):
+            _fields_ = [("volume", c.c_ulonglong), ("identifier", c.c_ubyte * 16)]
+        self.FileInfo, self.FileId = FileInfo, FileId
+        require((c.sizeof(FileTime), c.sizeof(FileInfo), c.sizeof(FileId)) == (8, 52, 24)
+                and FileInfo.volume.offset == 28 and FileId.identifier.offset == 8,
+                "CompilerImageFileAbiMismatch")
+        for name, result, args in (
+                ("CreateFileW", w.HANDLE, [w.LPCWSTR, w.DWORD, w.DWORD, c.c_void_p, w.DWORD, w.DWORD, w.HANDLE]),
+                ("GetFileType", w.DWORD, [w.HANDLE]),
+                ("GetFileInformationByHandle", w.BOOL, [w.HANDLE, c.POINTER(FileInfo)]),
+                ("GetFileInformationByHandleEx", w.BOOL, [w.HANDLE, c.c_int, c.c_void_p, w.DWORD]),
+                ("GetFinalPathNameByHandleW", w.DWORD, [w.HANDLE, w.LPWSTR, w.DWORD, w.DWORD]),
+                ("CloseHandle", w.BOOL, [w.HANDLE]),
+                ("SetFilePointerEx", w.BOOL, [w.HANDLE, c.c_longlong, c.POINTER(c.c_longlong), w.DWORD]),
+                ("ReadFile", w.BOOL, [w.HANDLE, c.c_void_p, w.DWORD, c.POINTER(w.DWORD), c.c_void_p])):
+            getattr(k, name).restype, getattr(k, name).argtypes = result, args
+        try:
+            self.handle = self.open(expected["path"])
+            self.identity = self.read_identity(self.handle)
+            require(self.identity["path_key"] == expected["path"].replace("\\", "/").casefold(),
+                    "CompilerImageCanonicalPathMismatch")
+            require({key: self.identity[key] for key in ("bytes", "sha256")}
+                    == {key: expected[key] for key in ("bytes", "sha256")}, "CompilerImageLockedBytesMismatch")
+        except BaseException:
+            if self.handle:
+                if not k.CloseHandle(self.handle):
+                    raise RuntimeError("CompilerImageCloseAfterPinFailure:" + str(c.get_last_error()))
+                self.handle = None
+            raise
+
+    def open(self, path):
+        handle = self.k.CreateFileW(str(plain_path(Path(path))), 0x80000000, 1, None, 3, 0x00200000, None)
+        require(bool(handle) and handle != self.c.c_void_p(-1).value,
+                "CompilerImageReadLockFailed:" + str(self.c.get_last_error()))
+        return handle
+
+    def read_identity(self, handle):
+        k, c, w = self.k, self.c, self.w
+        info, identifier = self.FileInfo(), self.FileId()
+        require(k.GetFileType(handle) == 1, "CompilerImageIsNotDiskFile")
+        require(k.GetFileInformationByHandle(handle, c.byref(info))
+                and k.GetFileInformationByHandleEx(handle, 18, c.byref(identifier), c.sizeof(identifier)),
+                "CompilerImageFileIdentityUnavailable")
+        require(not info.attributes & (0x10 | 0x400) and info.links > 0
+                and identifier.volume != 0 and any(identifier.identifier), "CompilerImageFileIdentityInvalid")
+        size = (info.size_high << 32) | info.size_low
+        require(size == self.expected["bytes"], "CompilerImageLockedSizeMismatch")
+        path = c.create_unicode_buffer(32768)
+        length = k.GetFinalPathNameByHandleW(handle, path, len(path), 0)
+        require(0 < length < len(path), "CompilerImageFinalPathUnavailable")
+        canonical = plain_path(Path(_windows_image_path(path.value)))
+        position = c.c_longlong()
+        require(k.SetFilePointerEx(handle, 0, c.byref(position), 0) and position.value == 0,
+                "CompilerImageSeekFailed")
+        hashed, count, buffer = hashlib.sha256(), 0, c.create_string_buffer(65536)
+        while count <= size:
+            received = w.DWORD()
+            wanted = min(len(buffer), size + 1 - count)
+            require(k.ReadFile(handle, buffer, wanted, c.byref(received), None), "CompilerImageReadFailed")
+            require(received.value <= wanted, "CompilerImageReadCountInvalid")
+            if not received.value:
+                break
+            hashed.update(buffer.raw[:received.value])
+            count += received.value
+        require(count == size, "CompilerImageReadSizeMismatch")
+        return {"path_key": str(canonical).replace("\\", "/").casefold(),
+                "volume_serial": identifier.volume, "file_id_128": bytes(identifier.identifier).hex(),
+                "attributes": info.attributes, "links": info.links, "bytes": count,
+                "sha256": hashed.hexdigest(), "share_mode": "FILE_SHARE_READ only"}
+
+    def validate_process_image(self, path):
+        # Keep the prelaunch handle open while checking the live process's image path.
+        canonical = plain_path(Path(_windows_image_path(path)))
+        require(str(canonical).replace("\\", "/").casefold() == self.identity["path_key"],
+                "CompilerProcessImagePathMismatch")
+        require(self.read_identity(self.handle) == self.identity, "CompilerPinnedImageChanged")
+        other = self.open(canonical)
+        try:
+            require(self.read_identity(other) == self.identity, "CompilerProcessImageIdentityMismatch")
+        finally:
+            require(self.k.CloseHandle(other), "CompilerImageAliasHandleCloseFailed")
+
+
+_COMPILER_PHASE_FACTORY = object()
+
+
+class _CompilerPhase:
+    def __init__(self, token, plan, environment):
+        require(token is _COMPILER_PHASE_FACTORY, "CompilerCapabilityFactoryRequired")
+        self.plan = json.loads(json.dumps(plan))
+        self.plan_id = canonical_digest(self.plan)
+        self.environment_id = canonical_digest(environment)
+        self.image, self.process, self.started, self.targeted, self.proved = None, None, False, False, False
+        self.creation, self.root_creation, self.k, self.c, self.w = None, None, None, None, None
+        self.proof = {"scope": "one exact owned MSVC telemetry image in a compiler phase only",
+                      "method": None, "targeted_termination_called": False, "helper_signaled": False,
+                      "helper_exit_code": None, "proved_within_original_deadline": False,
+                      "accepted": False, "actual_process_module_sampling": False}
+
+    def begin(self, k, c, w, arguments, cwd, name, environment):
+        require(not self.started and canonical_digest(self.plan) == self.plan_id
+                and canonical_digest(environment) == self.environment_id
+                and self.plan["arguments"] == arguments and self.plan["cwd"] == str(cwd)
+                and self.plan["name"] == name, "CompilerCapabilityBindingChanged")
+        for path, expected in self.plan["inputs"].items():
+            require(file_identity(Path(path)) == expected, "CompilerInputChangedBeforeLaunch:" + path)
+        require(environment.get("VCTOOLSVERSION") == self.plan["policy"]["msvc_tools_version"],
+                "CompilerEnvironmentToolsetChanged")
+        self.k, self.c, self.w, self.started = k, c, w, True
+        self.image = _PinnedCompilerImage(k, c, w, self.plan["helper"])
+
+    def creation_time(self, handle):
+        c, w = self.c, self.w
+        class FileTime(c.Structure):
+            _fields_ = [("low", w.DWORD), ("high", w.DWORD)]
+        require(c.sizeof(FileTime) == 8, "CompilerProcessTimeAbiMismatch")
+        values = [FileTime() for _ in range(4)]
+        require(self.k.GetProcessTimes(handle, *[c.byref(x) for x in values]), "CompilerProcessTimesFailed")
+        value = (values[0].high << 32) | values[0].low
+        require(value > 0, "CompilerProcessCreationTimeMissing")
+        return value
+
+    def bind_root(self, handle):
+        self.root_creation = self.creation_time(handle)
+
+    def inspect_process(self, job, handle, observation=None):
+        k, c, w = self.k, self.c, self.w
+        observation = {} if observation is None else observation
+        member = w.BOOL()
+        require(k.IsProcessInJob(handle, job, c.byref(member)) and member.value,
+                "CompilerHelperNotInOwnedJob")
+        observation["owned_job_membership_confirmed"] = True
+        creation = self.creation_time(handle)
+        observation["creation_filetime"] = creation
+        require(creation >= self.root_creation, "CompilerHelperPredatesOwnedCommand")
+        state = k.WaitForSingleObject(handle, 0)
+        require(state in (0, 258), "CompilerHelperWaitFailed")
+        observation["state"] = "still-active" if state == 258 else "exited-before-inspection"
+        size, buffer = w.DWORD(32768), c.create_unicode_buffer(32768)
+        require(k.QueryFullProcessImageNameW(handle, 0, buffer, c.byref(size)), "CompilerHelperImageQueryFailed")
+        path_hash = hashlib.sha256(buffer.value.replace("\\", "/").casefold().encode()).hexdigest()
+        observation.update(executable_basename=Path(buffer.value).name, absolute_path_sha256=path_hash,
+                           path_hash_encoding="forward-slash/casefold/UTF-8")
+        self.image.validate_process_image(buffer.value)
+        return creation, state, path_hash
+
+    def capture(self, job, result):
+        k, c, w = self.k, self.c, self.w
+        class PidList(c.Structure):
+            _fields_ = [("assigned", w.DWORD), ("count", w.DWORD), ("pids", c.c_size_t * 256)]
+        require(c.sizeof(PidList) == 2056, "CompilerPidListAbiMismatch")
+        values = PidList()
+        result.update(utc=utc(), capacity=256, query_count=1, complete_pid_list=False,
+                      processes=[], errors=[], command_line_or_environment_read=False,
+                      actual_process_module_sampling=False, diagnostic_budget_seconds=1,
+                      diagnostic_budget_scope="cooperative snapshot; separate from 5-second exit proof")
+        deadline = time.monotonic() + 1
+        require(k.QueryInformationJobObject(job, 3, c.byref(values), c.sizeof(values), None),
+                "CompilerOwnedPidQueryFailed")
+        result.update(assigned_count=values.assigned, listed_count=values.count)
+        require(values.count <= 256 and values.assigned == values.count, "CompilerOwnedPidListIncomplete")
+        result["complete_pid_list"] = True
+        result["listed_pids"] = [int(x) for x in values.pids[:values.count]]
+        require(values.count == 1, "CompilerRetirementRequiresExactlyOneSurvivor")
+        pid = values.pids[0]
+        item = {"pid": pid, "state": "not-inspected"}
+        result["processes"].append(item)
+        require(0 < pid <= 0xffffffff and self.process is None, "CompilerOwnedPidInvalid")
+        self.process = k.OpenProcess(0x1000 | 0x100000 | 0x0001, False, pid)
+        require(bool(self.process), "CompilerHelperOpenFailed:" + str(c.get_last_error()))
+        item["same_process_handle_retained_for_termination"] = True
+        creation, state, path_hash = self.inspect_process(job, self.process, item)
+        self.creation = creation
+        require(time.monotonic() < deadline, "CompilerHelperSnapshotBudgetExceeded")
+        item.update(state="still-active" if state == 258 else "exited-before-inspection",
+                    owned_job_membership_confirmed=True, creation_filetime=creation,
+                    absolute_path_sha256=path_hash, path_hash_encoding="forward-slash/casefold/UTF-8",
+                    matched_inventory_path=self.plan["helper"]["path"],
+                    pinned_file_identity=self.image.identity,
+                    same_process_handle_retained_for_termination=True)
+        self.proof.update(pid=pid, creation_filetime=creation, file_identity=self.image.identity)
+        result["completed"] = True
+
+    def terminate(self, job, record, deadline):
+        require(compiler_retirement_prerequisites(record) and self.process is not None,
+                "CompilerRetirementPrerequisitesMissing")
+        creation, state, path_hash = self.inspect_process(job, self.process)
+        require(creation == self.creation and time.monotonic() < deadline,
+                "CompilerHelperIdentityOrDeadlineChanged")
+        self.proof.update(rechecked_creation_filetime=creation, rechecked_path_sha256=path_hash)
+        if state == 0:
+            self.proof["method"] = "identified-helper-exited-before-targeted-termination"
+            return
+        self.targeted = True
+        record.update(forced_cleanup=True, termination_reason="controlled-pinned-compiler-helper",
+                      termination_utc=utc())
+        self.proof.update(method="TerminateProcess on retained verified process handle",
+                          targeted_termination_called=True, requested_exit_code=125)
+        result = bool(self.k.TerminateProcess(self.process, 125))
+        self.proof["terminate_process_returned"] = result
+        require(result, "CompilerHelperTerminationFailed:" + str(self.c.get_last_error()))
+
+    def prove(self, record, deadline):
+        require(self.process is not None and deadline is not None and time.monotonic() < deadline,
+                "CompilerHelperExitProofExpired")
+        state, code = self.k.WaitForSingleObject(self.process, 0), self.w.DWORD()
+        self.proof.update(helper_wait_result=state, helper_signaled=state == 0)
+        require(state == 0, "CompilerHelperActualExitUnconfirmed")
+        queried = bool(self.k.GetExitCodeProcess(self.process, self.c.byref(code)))
+        self.proof["helper_exit_code_query_succeeded"] = queried
+        if queried:
+            self.proof["helper_exit_code"] = code.value
+        require(queried, "CompilerHelperActualExitUnconfirmed")
+        creation = self.creation_time(self.process)
+        self.proof["exit_creation_filetime"] = creation
+        require(creation == self.creation, "CompilerHelperExitIdentityChanged")
+        if self.targeted:
+            require(code.value == 125, "CompilerHelperTerminationExitCodeChanged")
+        require(record["process_signaled"] and record["owned_job_empty"]
+                and record["exit_code"] == 0 and not record["errors"] and not record["timed_out"],
+                "CompilerRootOrOwnedJobExitUnconfirmed")
+        self.proof.update(helper_signaled=True, helper_exit_code=code.value,
+                          proved_within_original_deadline=True, proof_utc=utc())
+        self.proved = True
+
+    def close(self, record):
+        operations = []
+        if self.process:
+            handle, self.process = self.process, None
+            operations.append(("CompilerHelperHandleCloseFailed", lambda: self.k.CloseHandle(handle)))
+        if self.image and self.image.handle:
+            image, self.image.handle = self.image.handle, None
+            operations.append(("CompilerImageHandleCloseFailed", lambda: self.k.CloseHandle(image)))
+        close_command_resources(operations, record)
+
+
+def compiler_completion_allowed(record, capability):
+    # No JSON receipt boolean can create the live proof held by this invocation.
+    if command_completion_allowed(record, (0,)):
+        return True
+    first = record.get("root_first_signal") or {}
+    return (type(capability) is _CompilerPhase and capability.proved and capability.targeted
+            and record.get("atomic_job_membership") is True and record.get("process_signaled") is True
+            and record.get("owned_job_empty") is True and not record.get("errors")
+            and record.get("timed_out") is False and record.get("exit_code") == 0
+            and record.get("forced_cleanup") is True
+            and record.get("termination_reason") == "controlled-pinned-compiler-helper"
+            and first.get("before_any_termination") is True and first.get("exit_code") == 0)
+
+
+def run_compiler_logged(phase, arguments, cwd, evidence, timeout, *, context, lock,
+                        tool_identities, known_executables, env):
+    plan = compiler_phase_plan(phase, arguments, cwd, context, lock, tool_identities, known_executables)
+    capability = _CompilerPhase(_COMPILER_PHASE_FACTORY, plan, env)
+    write_json(Path(evidence) / (plan["name"] + ".compiler-plan.json"), plan)
+    return _run_logged(arguments, cwd, evidence, plan["name"], timeout, env=env,
+                       known_executables=known_executables, compiler=capability)
 
 
 def owned_pid_snapshot(k, c, w, job, known_executables):
@@ -459,6 +853,13 @@ def collect_command_output_evidence(paths, record):
 
 
 def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,), known_executables=None):
+    # The public generic entry point has no compiler-retirement option.
+    return _run_logged(arguments, cwd, evidence, name, timeout, env=env, accepted=accepted,
+                       known_executables=known_executables)
+
+
+def _run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0,),
+                known_executables=None, compiler=None):
     """Public build commands have their own kill-on-close Job, allowing compiler children.
 
     This does not reuse or weaken PrivateSubscriptionProcess's one-process/eight-second
@@ -466,6 +867,8 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
     """
     require(os.name == "nt" and 0 < timeout <= 1200, "InvalidWindowsBuildCommand")
     require(re.fullmatch(r"[A-Za-z0-9_.-]+", name), "InvalidCommandEvidenceName")
+    require(compiler is None or (type(compiler) is _CompilerPhase and accepted == (0,)),
+            "LiveCompilerCapabilityRequired")
     import msvcrt
     from ctypes import wintypes as w
     c = ctypes
@@ -540,6 +943,10 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
               "root_first_signal": None, "forced_cleanup": False, "termination_reason": None,
               "retirement_grace_seconds": 2, "termination_proof_seconds": 5,
               "owned_pid_snapshot": None, "actual_process_module_sampling": False}
+    if compiler is not None:
+        record["compiler_phase"] = {"name": compiler.plan["phase"], "plan_content_id": compiler.plan_id,
+                                    "environment_content_id": compiler.environment_id}
+        record["compiler_controlled_retirement"] = compiler.proof
     job, attrs, info = None, None, Information()
     streams, inherited = [], []
     started, terminated, retirement_deadline = time.monotonic(), False, None
@@ -571,14 +978,21 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
             else:
                 require(record["exit_code"] == code.value, "RootExitCodeChanged")
 
-    def snapshot_once():
+    def snapshot_once(for_compiler=False):
         if record["owned_pid_snapshot"] is None:
             record["owned_pid_snapshot"] = {"attempted_utc": utc(), "query_count_maximum": 1,
                                              "completed": False}
-            result = owned_pid_snapshot(k, c, w, job, known_executables or {})
+            if for_compiler:
+                result = record["owned_pid_snapshot"]
+                compiler.capture(job, result)
+            else:
+                result = owned_pid_snapshot(k, c, w, job, known_executables or {})
             record["owned_pid_snapshot"] = result
             record["errors"].extend(result["errors"])
     try:
+        if compiler is not None:
+            compiler.begin(k, c, w, args, cwd, name, environment)
+            record["compiler_phase"]["prelaunch_image"] = compiler.image.identity
         job = k.CreateJobObjectW(None, None)
         require(bool(job), "CommandJobCreateFailed")
         limits = Limits()
@@ -615,6 +1029,9 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
         require(k.IsProcessInJob(info.process, job, c.byref(member)) and member.value,
                 "AtomicCommandMembershipUnconfirmed")
         record.update(pid=info.pid, atomic_job_membership=True)
+        if compiler is not None:
+            compiler.bind_root(info.process)
+            record["compiler_phase"]["root_creation_filetime"] = compiler.root_creation
         require(k.ResumeThread(info.thread) == 1, "CommandResumeFailed")
         require(k.CloseHandle(info.thread), "CommandThreadCloseFailed")
         info.thread = None
@@ -634,6 +1051,8 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
             if state == 0 and accounting.active == 0:
                 if excessive:
                     record["errors"].append("OutputLimitExceeded")
+                if compiler is not None and compiler.process is not None and retirement_deadline is not None:
+                    compiler.prove(record, retirement_deadline)
                 break
             if not terminated and (excessive or (state != 0 and now >= deadline)
                                    or (state == 0 and now >= grace_deadline)):
@@ -646,7 +1065,9 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
                     record["errors"].append("CommandDeadlineExceeded")
                 else:
                     reason = "root-exited-descendants-after-grace"
-                snapshot_once()
+                qualified_phase = (compiler is not None and reason == "root-exited-descendants-after-grace"
+                                   and compiler_retirement_prerequisites(record))
+                snapshot_once(for_compiler=qualified_phase)
                 # Root/child exit can race with the snapshot; observe both before termination.
                 state = k.WaitForSingleObject(info.process, 0)
                 require(state in (0, 258), "PreTerminationRootWaitFailed")
@@ -656,12 +1077,19 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
                 if state == 0 and accounting.active == 0:
                     record["owned_job_empty"] = True
                     continue
-                record.update(forced_cleanup=True, termination_reason=reason,
-                              termination_utc=utc(), active_at_termination=accounting.active)
-                if state == 0 and record["exit_code"] == 0:
-                    record["errors"].append("UnexpectedDescendantsAfterSuccessfulRoot")
-                start_termination_proof()
-                require(k.TerminateJobObject(job, 125), "CommandJobTerminationFailed")
+                if qualified_phase:
+                    require(accounting.active == 1 and compiler_retirement_prerequisites(record),
+                            "CompilerResidueChangedBeforeRetirement")
+                    record["active_at_termination"] = accounting.active
+                    start_termination_proof()
+                    compiler.terminate(job, record, retirement_deadline)
+                else:
+                    record.update(forced_cleanup=True, termination_reason=reason,
+                                  termination_utc=utc(), active_at_termination=accounting.active)
+                    if state == 0 and record["exit_code"] == 0:
+                        record["errors"].append("UnexpectedDescendantsAfterSuccessfulRoot")
+                    start_termination_proof()
+                    require(k.TerminateJobObject(job, 125), "CommandJobTerminationFailed")
                 terminated = True
             require(retirement_deadline is None or time.monotonic() < retirement_deadline,
                     "CommandRetirementUnconfirmed")
@@ -701,6 +1129,8 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
                     time.sleep(0.025)
         if attrs:
             k.DeleteProcThreadAttributeList(attrs)
+        if compiler is not None:
+            compiler.close(record)
         for handle in inherited:
             if not k.SetHandleInformation(handle, 1, 0):
                 record["errors"].append("StdioInheritanceResetFailed")
@@ -712,8 +1142,14 @@ def run_logged(arguments, cwd, evidence, name, timeout, *, env=None, accepted=(0
         close_command_resources(closes, record)
         record.update(finished_utc=utc(), elapsed_seconds=round(time.monotonic() - started, 3))
         collect_command_output_evidence((stdout_path, stderr_path), record)
+        if compiler is not None:
+            allowed = compiler_completion_allowed(record, compiler)
+            compiler.proof["accepted"] = bool(allowed and compiler.targeted and compiler.proved)
+            record["compiler_phase"]["completion_accepted"] = allowed
         write_json(evidence / (name + ".json"), record)
-    require(command_completion_allowed(record, accepted), "CommandFailed:" + name)
+    allowed = (command_completion_allowed(record, accepted) if compiler is None
+               else compiler_completion_allowed(record, compiler))
+    require(allowed, "CommandFailed:" + name)
     return record
 
 
@@ -1214,30 +1650,17 @@ def main():
         # CMP0141 applies before project(); the format propagates to try_compile.
         # /Z7 avoids compiler PDBs in debug probes, leaving Release unchanged.
         # https://cmake.org/cmake/help/v3.31/variable/CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.html
-        initial_cache = work / "msvc-initial-cache.cmake"
-        initial_cache.write_text(MSVC_INITIAL_CACHE, encoding="utf-8", newline="\n")
-        shutil.copyfile(initial_cache, evidence / initial_cache.name)
+        initial_cache = prepare_msvc_initial_cache(work, evidence)
         report["msvc_initial_cache"] = file_identity(initial_cache)
-        configure_args = [
-            stock / "bin/qt-configure-module.bat", source, "--", "-G", "Ninja",
-            "-C", initial_cache,
-            cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
-            "-DCMAKE_BUILD_TYPE=Release", cmake_path_definition("CMAKE_INSTALL_PREFIX", module_stage, "PATH"),
-            cmake_path_definition("CMAKE_C_COMPILER", tools["cl.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_CXX_COMPILER", tools["cl.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_LINKER", tools["link.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_AR", tools["lib.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_RC_COMPILER", tools["rc.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
-            cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
-            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
-            "-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF",
-            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-        ]
+        configure_args = module_configure_arguments(work, stock, tools)
         require(Path(configure_args[0]).is_file(), "OfficialModuleConfigureWrapperMissing")
-        configure.write_text("$ErrorActionPreference = 'Stop'\n& "
-                             + " ".join(ps_quote(x) for x in configure_args)
-                             + "\nexit $LASTEXITCODE\n", encoding="utf-8")
+        with configure.open("xb") as stream:
+            stream.write(module_configure_script(configure_args))
+        with (evidence / configure.name).open("xb") as stream:
+            stream.write(configure.read_bytes())
+        require(file_identity(configure) == file_identity(evidence / configure.name),
+                "ConfigureScriptEvidenceChanged")
+        report["configure_script"] = file_identity(configure)
         env = tool_environment()
         env.update(PATH=str(stock / "bin") + os.pathsep + env["PATH"],
                    CMAKE_PREFIX_PATH=str(stock), QT_ROOT_DIR=str(stock))
@@ -1245,18 +1668,26 @@ def main():
             "invocation_environment": {"VCTIP_NO_TELEMETRY": env["VCTIP_NO_TELEMETRY"]},
             "debug_information_format": MSVC_DEBUG_INFORMATION_FORMAT,
             "telemetry_opt_out_effect_verified": False,
-            "acceptance": "Unchanged native exit, no forced cleanup and empty owned Job required.",
+            "acceptance": "Natural successful compiler root plus actual empty owned Job; only the "
+                          "locked, fully identified vctip may use recorded targeted retirement. "
+                          "No telemetry opt-out guarantee or runtime/private exception.",
+            "retirement_policy": lock["compiler_retirement"],
         }
-        run("10-configure", [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive",
-                             "-File", configure], cwd=build, seconds=180, env=env)
+        compile_context = {"repo": repo, "work": work, "stock": stock, "tools": tools}
+        run_compiler_logged("sdk:10-configure",
+            [tools["pwsh.exe"], "-NoLogo", "-NoProfile", "-NonInteractive", "-File", configure],
+            build, commands, 180, context=compile_context, lock=lock, tool_identities=report["tools"],
+            known_executables=known_executables, env=env)
         for name in ("CMakeCache.txt", "config.opt", "config.summary", "compile_commands.json"):
             candidate = build / name
             require(candidate.is_file(), "MissingConfigurationEvidence:" + name)
             shutil.copyfile(candidate, evidence / name)
         report["configuration"] = verify_configuration(
             source, build, stock, tools, evidence, lock, report["tools"]["cmake.exe"])
-        run("11-qml-build", [tools["cmake.exe"], "--build", build, "--target", "Qml", "BuiltinsOutput",
-                            "--parallel", "2"], seconds=1200, env=env)
+        run_compiler_logged("sdk:11-qml-build",
+            [tools["cmake.exe"], "--build", build, "--target", "Qml", "BuiltinsOutput", "--parallel", "2"],
+            work, commands, 1200, context=compile_context, lock=lock, tool_identities=report["tools"],
+            known_executables=known_executables, env=env)
         report["stage"] = "headers-and-install-closure"
         header_review = verify_headers(source, build, stock)
         write_json(evidence / "header-alignment.json", header_review)

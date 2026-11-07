@@ -63,6 +63,41 @@ jobs:
           process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = hashlib.sha256(worker.read_bytes()).hexdigest()
           raise SystemExit(subprocess.call([sys.executable, '../tools/tests/test_private_subscription_supervisor.py', '--evidence', '${{ runner.temp }}/swirl-private-supervisor'], env=process_env))
           PY
+      - name: Guarded TLS billing preflight and post-exit settlement
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker
+          SWIRL_PRIVATE_BILLING_EVIDENCE: ${{ runner.temp }}/swirl-private-billing
+        run: |
+          set -euo pipefail
+          cargo test --locked -p swirl-api --features private-acceptance-worker --lib private_worker::billing::tests
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          worker_sha = hashlib.sha256(worker.read_bytes()).hexdigest()
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = worker_sha
+          evidence = pathlib.Path(process_env['SWIRL_PRIVATE_BILLING_EVIDENCE'])
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_billing.py', '--evidence', str(evidence)], env=process_env, check=True)
+          result = json.loads((evidence / 'billing-results.json').read_text(encoding='utf-8'))
+          expected = {'schema': 1, 'scope': 'swirl-synthetic-billing-v1', 'collected': 20, 'failures': 0, 'errors': 0, 'skipped': 0,
+                      'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                      'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                      'officialAccountStatistics': None, 'externalHistoryAnchor': False}
+          if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
+              raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
+          print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          PY
+      - name: Preserve controlled TLS billing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Billing-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-billing
+          if-no-files-found: error
+          retention-days: 14
       - name: Preserve supervised private-loopback evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -451,6 +486,41 @@ jobs:
           $env:SWIRL_PRIVATE_EXPECTED_WORKER_SHA256=(Get-FileHash -LiteralPath $env:SWIRL_PRIVATE_WORKER -Algorithm SHA256).Hash.ToLowerInvariant()
           python ../tools/tests/test_private_subscription_supervisor.py --evidence "$env:RUNNER_TEMP/swirl-private-supervisor"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Windows guarded TLS billing and post-exit settlement
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker.exe
+          SWIRL_PRIVATE_BILLING_EVIDENCE: ${{ runner.temp }}/swirl-private-billing
+        run: |
+          set -euo pipefail
+          cargo test --locked -p swirl-api --features private-acceptance-worker --lib private_worker::billing::tests
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          worker_sha = hashlib.sha256(worker.read_bytes()).hexdigest()
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = worker_sha
+          evidence = pathlib.Path(process_env['SWIRL_PRIVATE_BILLING_EVIDENCE'])
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_billing.py', '--evidence', str(evidence)], env=process_env, check=True)
+          result = json.loads((evidence / 'billing-results.json').read_text(encoding='utf-8'))
+          expected = {'schema': 1, 'scope': 'swirl-synthetic-billing-v1', 'collected': 20, 'failures': 0, 'errors': 0, 'skipped': 0,
+                      'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                      'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                      'officialAccountStatistics': None, 'externalHistoryAnchor': False}
+          if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
+              raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
+          print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          PY
+      - name: Preserve Windows controlled TLS billing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Billing-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-billing
+          if-no-files-found: error
+          retention-days: 14
       - name: Preserve Windows supervised private-loopback evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

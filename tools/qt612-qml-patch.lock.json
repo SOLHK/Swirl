@@ -122,5 +122,23 @@
     "parallel": 2,
     "runtime_library": "MultiThreadedDLL"
   },
-  "scope": "Independent Windows fixture diagnosis only. Neither an official Qt release nor a Swirl VME/product fix. Original stock SDK is preserved; changed source and corresponding-source provenance accompany diagnostic outputs."
+  "scope": "Independent Windows fixture diagnosis only. Neither an official Qt release nor a Swirl VME/product fix. Original stock SDK is preserved; changed source and corresponding-source provenance accompany diagnostic outputs.",
+  "compiler_retirement": {
+    "kind": "one-owned-pinned-msvc-vctip",
+    "image": "vctip.exe",
+    "msvc_tools_version": "14.44.35207",
+    "bytes": 335288,
+    "sha256": "d591358c6aee4b673562ca3b3a15c250e612708394fe3b44a7a7eda2470570a5",
+    "maximum_survivors": 1,
+    "grace_seconds": 2,
+    "proof_seconds": 5,
+    "source_repository": "https://github.com/microsoft/BuildXL",
+    "source_commit": "8afb09668504a91787aa416e46447b8e2c218eae",
+    "source_paths": [
+      "Public/Src/FrontEnd/Ninja/NinjaPipConstructor.cs",
+      "Public/Src/Engine/Processes/SandboxedProcess.cs",
+      "Public/Src/Engine/ProcessPipExecutor/SandboxedProcessPipExecutor.cs"
+    ],
+    "scope": "Explicit public compiler phases only. Natural root exit 0, held image-file/process identities, targeted owned vctip termination and actual exit/empty Job proof are required. This is not a graceful shutdown claim or an exception for private/runtime fixtures."
+  }
 }
