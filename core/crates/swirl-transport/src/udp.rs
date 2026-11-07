@@ -30,6 +30,7 @@ pub fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
 /// Bind a native UDP forwarding socket, returning buffer setup errors to the
 /// caller. This changes only this socket; system-wide network limits are intact.
 pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
+    let address = crate::egress::outbound_udp_bind_address(address)?;
     let socket = UdpSocket::bind(address).await?;
     crate::egress::pin_udp(&socket, address)?;
     reserve_datagram_buffers(&socket)?;
@@ -39,6 +40,7 @@ pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
 /// Bind an inbound proxy relay on its explicit local interface. This must not
 /// inherit an outbound physical-interface constraint when Native TUN is active.
 pub async fn bind_udp_inbound(address: SocketAddr) -> io::Result<UdpSocket> {
+    crate::egress::check_private_udp()?;
     let socket = UdpSocket::from_std(crate::inbound::bind_udp_std(address)?)?;
     reserve_datagram_buffers(&socket)?;
     Ok(socket)

@@ -844,8 +844,19 @@ fn native_and_system_proxy_share_one_connection_budget_and_drop_releases_it() {
     let mut core = start(config);
     let dispatcher = core.flow_dispatcher().unwrap();
     runtime().block_on(async {
-        let peer = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let candidate = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        // TCP and UDP allocate independent port namespaces. Keep a colliding
+        // UDP candidate bound while replacing it, so this connection-budget
+        // fixture cannot accidentally exercise the unchanged proxy-loop guard.
+        let peer = if candidate.local_addr().unwrap().port() == core.address().port() {
+            let replacement = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            drop(candidate);
+            replacement
+        } else {
+            candidate
+        };
         let address = peer.local_addr().unwrap();
+        assert_ne!(address.port(), core.address().port());
         let flow = dispatcher
             .open_udp("192.0.2.2:10000".parse().unwrap(), target(address))
             .await

@@ -19,7 +19,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # An unchanged cold macOS job reached final Vision compilation at 29m35s.
+    # Allow the complete build and evidence sequence; individual tests retain
+    # their existing deadlines, and Linux keeps its original job budget.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 30 }}
     defaults:
       run:
         working-directory: core
@@ -36,6 +39,89 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Offline private-subscription accounting invariants
+        run: python ../tools/tests/test_private_subscription_budget.py
+      - name: Guarded private TCP cancellation and receive reservations
+        run: |
+          cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
+          cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          cargo check --locked -p swirl-api --features private-acceptance
+          cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
+      - name: Supervised private ledger and mandatory guarded worker
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker
+        run: |
+          set -euo pipefail
+          python -m pip install cryptography==50.0.2
+          cargo build --locked -p swirl-api --features private-acceptance-worker --bin swirl-private-worker
+          cargo clippy --locked -p swirl-api --features private-acceptance-worker --all-targets -- -D warnings
+          cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
+          python - <<'PY'
+          import hashlib, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = hashlib.sha256(worker.read_bytes()).hexdigest()
+          raise SystemExit(subprocess.call([sys.executable, '../tools/tests/test_private_subscription_supervisor.py', '--evidence', '${{ runner.temp }}/swirl-private-supervisor'], env=process_env))
+          PY
+      - name: Guarded TLS billing preflight and post-exit settlement
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker
+          SWIRL_PRIVATE_BILLING_EVIDENCE: ${{ runner.temp }}/swirl-private-billing
+        run: |
+          set -euo pipefail
+          cargo test --locked -p swirl-api --features private-acceptance-worker --lib private_worker::billing::tests
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          worker_sha = hashlib.sha256(worker.read_bytes()).hexdigest()
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = worker_sha
+          evidence = pathlib.Path(process_env['SWIRL_PRIVATE_BILLING_EVIDENCE'])
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_billing.py', '--evidence', str(evidence)], env=process_env, check=True)
+          result = json.loads((evidence / 'billing-results.json').read_text(encoding='utf-8'))
+          expected = {'schema': 1, 'scope': 'swirl-synthetic-billing-v1', 'collected': 20, 'failures': 0, 'errors': 0, 'skipped': 0,
+                      'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                      'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                      'officialAccountStatistics': None, 'externalHistoryAnchor': False}
+          if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
+              raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
+          print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          # Ordinary HTTP counters are transport observations, never provider authority.
+          http_evidence = evidence / 'http-counter-observation'
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_http_billing.py', '--evidence', str(http_evidence)], env=process_env, check=True)
+          http_result = json.loads((http_evidence / 'http-billing-results.json').read_text(encoding='utf-8'))
+          http_expected = {'schema': 1, 'scope': 'owned-synthetic-http-counter-observation-v1',
+                           'collected': 11, 'failures': 0, 'errors': 0, 'skipped': 0,
+                           'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                           'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                           'officialAccountStatistics': None, 'providerAccountAuthorization': 'unimplemented',
+                           'externalHistoryAnchor': False}
+          if any(type(http_result.get(key)) is not type(value) or http_result.get(key) != value for key, value in http_expected.items()):
+              raise SystemExit('HTTP counter evidence identity or required refusal coverage did not match.')
+          print('Verified all 11 HTTP counter controls without skips; no provider authorization was issued.')
+          PY
+      - name: Preserve controlled TLS billing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Billing-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-billing
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve supervised private-loopback evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Supervisor-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-supervisor
+          if-no-files-found: error
+          retention-days: 14
       - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
         shell: bash
         env:
@@ -52,6 +138,41 @@ jobs:
         with:
           name: Swirl-Proxy-Compatibility-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swirl-proxy-compat
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/private-ui-quota-rust-evidence"
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/tests.log"
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/clippy.log"
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: REALITY authenticated hello clock controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s ../tools/tests -p test_authenticated_hello_hold.py -v
+      - name: VMess official peer HTTP HTTPS and transport lifecycle
+        working-directory: .
+        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
+      - name: Preserve current VMess official peer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-vmess-acceptance
           if-no-files-found: error
           retention-days: 14
       - name: Independent portable protocol peers
@@ -339,9 +460,13 @@ jobs:
           retention-days: 7
   windows-rust:
     runs-on: windows-2022
-    # Source-built TLS plus the complete native application must fit a cold run;
-    # the original Qt/Core/public gates and final application build all remain.
-    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # Read the immutable, source-verified Qt SDK producer artifact.
+    # A verified cold run took 59m20s; the next was still compiling the final
+    # application at 60m. Budget the full pipeline while preserving every
+    # Qt/Core/public gate and each individual test's existing deadline.
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: core
@@ -374,6 +499,92 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Check Windows private budget storage and guarded loopback transport
+        shell: pwsh
+        run: |
+          python ../tools/tests/test_private_subscription_budget.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo check --locked -p swirl-api --features private-acceptance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
+      - name: Verify Windows supervised private ledger and single-process Job
+        shell: pwsh
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker.exe
+        run: |
+          python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --locked -p swirl-api --features private-acceptance-worker --bin swirl-private-worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked -p swirl-api --features private-acceptance-worker --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-api --features private-acceptance-worker --test private_worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SWIRL_PRIVATE_EXPECTED_WORKER_SHA256=(Get-FileHash -LiteralPath $env:SWIRL_PRIVATE_WORKER -Algorithm SHA256).Hash.ToLowerInvariant()
+          python ../tools/tests/test_private_subscription_supervisor.py --evidence "$env:RUNNER_TEMP/swirl-private-supervisor"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Windows guarded TLS billing and post-exit settlement
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_PRIVATE_EXPECTED_SOURCE: ${{ github.sha }}
+          SWIRL_PRIVATE_WORKER: ${{ github.workspace }}/core/target/debug/swirl-private-worker.exe
+          SWIRL_PRIVATE_BILLING_EVIDENCE: ${{ runner.temp }}/swirl-private-billing
+        run: |
+          set -euo pipefail
+          cargo test --locked -p swirl-api --features private-acceptance-worker --lib private_worker::billing::tests
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          process_env = os.environ.copy()
+          worker = pathlib.Path(process_env['SWIRL_PRIVATE_WORKER'])
+          worker_sha = hashlib.sha256(worker.read_bytes()).hexdigest()
+          process_env['SWIRL_PRIVATE_EXPECTED_WORKER_SHA256'] = worker_sha
+          evidence = pathlib.Path(process_env['SWIRL_PRIVATE_BILLING_EVIDENCE'])
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_billing.py', '--evidence', str(evidence)], env=process_env, check=True)
+          result = json.loads((evidence / 'billing-results.json').read_text(encoding='utf-8'))
+          expected = {'schema': 1, 'scope': 'swirl-synthetic-billing-v1', 'collected': 20, 'failures': 0, 'errors': 0, 'skipped': 0,
+                      'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                      'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                      'officialAccountStatistics': None, 'externalHistoryAnchor': False}
+          if any(type(result.get(key)) is not type(value) or result.get(key) != value for key, value in expected.items()):
+              raise SystemExit('Synthetic billing evidence identity or required coverage did not match.')
+          print('Verified all 20 controlled TLS billing tests without skips; live readiness remains false.')
+          # Ordinary HTTP counters are transport observations, never provider authority.
+          http_evidence = evidence / 'http-counter-observation'
+          subprocess.run([sys.executable, '../tools/tests/test_private_subscription_http_billing.py', '--evidence', str(http_evidence)], env=process_env, check=True)
+          http_result = json.loads((http_evidence / 'http-billing-results.json').read_text(encoding='utf-8'))
+          http_expected = {'schema': 1, 'scope': 'owned-synthetic-http-counter-observation-v1',
+                           'collected': 11, 'failures': 0, 'errors': 0, 'skipped': 0,
+                           'source_sha': process_env['SWIRL_PRIVATE_EXPECTED_SOURCE'], 'worker_sha256': worker_sha,
+                           'providerRequests': 0, 'realNodeRequests': 0, 'liveReady': False,
+                           'officialAccountStatistics': None, 'providerAccountAuthorization': 'unimplemented',
+                           'externalHistoryAnchor': False}
+          if any(type(http_result.get(key)) is not type(value) or http_result.get(key) != value for key, value in http_expected.items()):
+              raise SystemExit('HTTP counter evidence identity or required refusal coverage did not match.')
+          print('Verified all 11 HTTP counter controls without skips; no provider authorization was issued.')
+          PY
+      - name: Preserve Windows controlled TLS billing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Billing-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-billing
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve Windows supervised private-loopback evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Supervisor-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-private-supervisor
+          if-no-files-found: error
+          retention-days: 14
       - name: Provision pinned official Windows Codex CLI
         working-directory: .
         shell: pwsh
@@ -418,6 +629,45 @@ jobs:
         with:
           name: Swirl-Proxy-Compatibility-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swirl-proxy-compat
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: pwsh
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:RUNNER_TEMP 'private-ui-quota-rust-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'tests.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI controls failed.' }
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'clippy.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI Clippy failed.' }
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: REALITY authenticated hello clock controls
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s ../tools/tests -p test_authenticated_hello_hold.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: VMess official peer HTTP HTTPS and transport lifecycle
+        working-directory: .
+        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
+      - name: Preserve current VMess official peer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-vmess-acceptance
           if-no-files-found: error
           retention-days: 14
       - name: Independent TLS and protocol peers
@@ -704,6 +954,14 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
           "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
           (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+          New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
+          Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
+      - name: Select the complete source-verified Qt 6.12 product SDK
+        working-directory: .
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Select-Qt612ProductSdk.ps1 -OfficialReceipt build-evidence/qt-sdk.json -EvidenceDirectory build-evidence/qt-product-sdk
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
@@ -731,9 +989,33 @@ jobs:
       - name: Build Qt to Rust integration test
         working-directory: .
         run: |
-          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+          # Existing protocol fixture blocks use the job PATH. Prove both
+          # deployment lookups resolve to the selected complete kit before any
+          # of those unchanged commands run; they never borrow another Qt kit.
+          foreach ($name in @('windeployqt.exe','qtpaths.exe')) {
+            $actual = (Get-Command $name -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+            $expected = Join-Path $env:QT_ROOT_DIR ('bin/'+$name)
+            if (-not $actual.Equals($expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Qt deployment command lookup differs from the selected SDK.' }
+          }
+          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/rust-qt" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-configured"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Qt to Rust target differs from the selected SDK.' }
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
+      - name: Preserve the selected Qt SDK and actual control-adapter target identity
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Rust-Qt612-Selected-SDK-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build-evidence/qt-sdk.json
+            build-evidence/qt-product-sdk/
+            build-evidence/qt-product-rust-configured/
+            build/rust-qt/swirl-selected-qt-Release.txt
+            build/rust-qt/CMakeCache.txt
+            build/rust-qt/CMakeFiles/*/CMakeCXXCompiler.cmake
+          if-no-files-found: warn
+          retention-days: 14
       - name: Reject the removed runtime build option
         working-directory: .
         shell: pwsh
@@ -753,8 +1035,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           if (-not $IsWindows -or -not (Test-Path -LiteralPath $env:SWIRL_CAPTURE_INSPECTOR -PathType Leaf)) { throw 'Required Windows Qt capture inspector is missing.' }
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_CAPTURE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_CAPTURE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-capture"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_offline_cpp_import_and_existing_store_protection -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Fetch hash-pinned independent QUIC server fixtures
@@ -777,8 +1061,10 @@ jobs:
           foreach ($binary in @($env:SWIRL_RUST_QT_TESTS, $env:HY2_SERVER, $env:SWIRL_TUIC_SERVER)) {
             if ([string]::IsNullOrWhiteSpace($binary) -or -not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'Required QUIC fixture binary missing.' }
           }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_RUST_QT_TESTS"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_RUST_QT_TESTS"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-quic"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           # Evidence is never restored from a cache or mixed with another run.
           if (Test-Path -LiteralPath $env:SWIRL_SINGBOX_QUIC_EVIDENCE) { throw 'QUIC evidence directory already exists.' }
           New-Item -ItemType Directory -Path $env:SWIRL_SINGBOX_QUIC_EVIDENCE | Out-Null
@@ -836,8 +1122,10 @@ jobs:
           QT_FORCE_STDERR_LOGGING: '1'
         run: |
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend build/rust-qt/Release/SwirlRustCoreTests.exe
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend build/rust-qt/Release/SwirlRustCoreTests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-integration"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure -V
@@ -977,8 +1265,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           if (-not $IsWindows -or [string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or -not (Test-Path -LiteralPath $env:SWIRL_QT_PRIVATE_INSPECTOR -PathType Leaf)) { throw "Required Windows Qt DPAPI inspector is missing" }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_public_qt_reality.py
@@ -1008,5 +1298,9 @@ jobs:
             build/rust-qt/swirl-rust-qt-integration.xml
             build/rust-qt/swirl-import-boundaries.xml
             build/removed-runtime/rejection.log
+            build-evidence/qt-product-rust-d3d-capture/
+            build-evidence/qt-product-rust-d3d-quic/
+            build-evidence/qt-product-rust-d3d-integration/
+            build-evidence/qt-product-rust-d3d-public/
           if-no-files-found: warn
           retention-days: 7

@@ -1,0 +1,559 @@
+{
+  "build_only_modules": [
+    "qtshadertools",
+    "qttools"
+  ],
+  "limits": {
+    "archive_files": 60000,
+    "archive_uncompressed_bytes": 629145600,
+    "bundle_bytes": 402653184,
+    "download_seconds": 240,
+    "runtime_files": 5000
+  },
+  "modified_declarative": {
+    "archive": {
+      "bytes": 54653393,
+      "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+    },
+    "file_manifest_content_id": "3e23d5e979ec3c1cf60b42c83ee873130be0a9b1b2fb34e5c179754067d74bb4",
+    "omitted_gitlinks": [
+      {
+        "commit": "a0efb7e1ab1cee24c387abe1897ff18fa116c17d",
+        "path": "tests/auto/qml/ecmascripttests/test262",
+        "reason": "Unbuilt test suite; Qml/BuiltinsOutput do not use this gitlink."
+      }
+    ],
+    "patch": {
+      "added_lines": 15,
+      "deleted_lines": 7,
+      "path": "tools/patches/qt612-qv4-sweep-8c92fe0.patch",
+      "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
+      "preimage_sha256": "574d2d3d973a78cc6b3cb214069148dae5d0563d2c53c8602015f4735ee52780",
+      "production_path": "src/qml/memory/qv4mm.cpp",
+      "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac",
+      "upstream_commit": "8c92fe01338c76885f412a68fd39238147e21a81"
+    },
+    "scope": "Modified QtDeclarative library source and its build/license files. The unbuilt test262 suite is explicitly omitted. The single upstream-forced CRLF test data file retains its pinned checkout bytes; no general newline normalization.",
+    "source": {
+      "checkout_eol_contract": {
+        "attribute_rule": "*_crlf.*         eol=crlf",
+        "attribute_source": ".gitattributes",
+        "checkout_bytes": 248,
+        "checkout_sha256": "d5beca780bde5745e8041e2ba618874b313deb753d7c30b58b8ba4242b527e8a",
+        "git_blob_bytes": 235,
+        "git_blob_sha1": "f84ba8c722b55690a5ab9ae4c7b572b0775af72b",
+        "git_blob_sha256": "67839d6b26c29f4d0c4b354e7233b224eb839cb45ce15a368e7fb6d6c099c525",
+        "participates_in_qml_build": false,
+        "path": "tests/auto/qml/qqmlecmascript/data/rewriteMultiLineStrings_crlf.1.qml"
+      },
+      "commit": "4332fbbb4c340463dc8cee36dda0c85d932122d8",
+      "qtbase_tag_commit": "025bdad181de241e81bf853c8a2d7bf3d19261a9",
+      "repository": "https://github.com/qt/qtdeclarative.git",
+      "tree": "98324181f2eebf01e806603a01829a40b8683631"
+    },
+    "tracked_bytes": 119268782,
+    "tracked_regular_files": 23849
+  },
+  "official_sources": [
+    {
+      "archive": "qtbase-everywhere-src-6.12.0.tar.xz",
+      "bytes": 51220268,
+      "checksum_url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtbase-everywhere-src-6.12.0.tar.xz.sha256",
+      "commit": "025bdad181de241e81bf853c8a2d7bf3d19261a9",
+      "module": "qtbase",
+      "role": "runtime",
+      "sha256": "a951bd163c7b80fc6b8c88d7668fb56abf91c152373e13c10666763238131307",
+      "tag_object": "fcef5b2c755492753eb8f7424dd2bc7337832068",
+      "tree": "09cffd3c354c81b13e3d780ff603b6728f79eb33",
+      "url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtbase-everywhere-src-6.12.0.tar.xz",
+      "version": "6.12.0"
+    },
+    {
+      "archive": "qtshadertools-everywhere-src-6.12.0.tar.xz",
+      "bytes": 1244684,
+      "checksum_url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtshadertools-everywhere-src-6.12.0.tar.xz.sha256",
+      "commit": "bccd516b990a6396900051470ac86cc27a7042ea",
+      "module": "qtshadertools",
+      "role": "build-only",
+      "sha256": "c7d84f436e1aaef39fdcadebf2bd71bdf24dc69497e13f2e0198873cbbfea2ab",
+      "tag_object": "a386823038d8ea1c52e2414f4e82b6e59fd4e3fc",
+      "tree": "00cf97838baca2f2b1a4833f6498ca39e6e073ec",
+      "url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtshadertools-everywhere-src-6.12.0.tar.xz",
+      "version": "6.12.0"
+    },
+    {
+      "archive": "qtsvg-everywhere-src-6.12.0.tar.xz",
+      "bytes": 2341876,
+      "checksum_url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtsvg-everywhere-src-6.12.0.tar.xz.sha256",
+      "commit": "883a58532078d003cefef0a549bfe9f885ce41f5",
+      "module": "qtsvg",
+      "role": "runtime",
+      "sha256": "e4ab39534ec97987b1b9b60ef7f4d3253d5912a69f8c713a01753174a4029331",
+      "tag_object": "0a753f450c4b4671cc97ef1c566512b9ab322382",
+      "tree": "8e965f3de3846149761c17e055f0182e3ca5ec41",
+      "url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qtsvg-everywhere-src-6.12.0.tar.xz",
+      "version": "6.12.0"
+    },
+    {
+      "archive": "qttools-everywhere-src-6.12.0.tar.xz",
+      "bytes": 10819720,
+      "checksum_url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qttools-everywhere-src-6.12.0.tar.xz.sha256",
+      "commit": "613a6fbf0a7998010ab2fda260b64066d66a021d",
+      "module": "qttools",
+      "role": "build-only",
+      "sha256": "8dab8f3611496486a470ad5f115ceea584f36bc22a2b8b6f6ebdbafbb8160693",
+      "tag_object": "aab111d8ce2d471b040dbf4d2f32c6023959fad4",
+      "tree": "1d83e0dacab71d136f89217acb95a7f2e9440e33",
+      "url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qttools-everywhere-src-6.12.0.tar.xz",
+      "version": "6.12.0"
+    },
+    {
+      "archive": "qttranslations-everywhere-src-6.12.0.tar.xz",
+      "bytes": 1745884,
+      "checksum_url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qttranslations-everywhere-src-6.12.0.tar.xz.sha256",
+      "commit": "2811457ceff8f0c24a1c4d14f947a283a17239d0",
+      "module": "qttranslations",
+      "role": "runtime",
+      "sha256": "85929c0c30d6f273f23bd879bb69803ea17b010ab73cab2f8abf95357f6f6bbb",
+      "tag_object": "a35a766dd1a30d98b7647819d747700f91a1b429",
+      "tree": "b0cc84329ebb5d17c19b85f691fba31e076c4b2c",
+      "url": "https://download.qt.io/archive/qt/6.12/6.12.0/submodules/qttranslations-everywhere-src-6.12.0.tar.xz",
+      "version": "6.12.0"
+    }
+  ],
+  "qt_version": "6.12.0",
+  "runtime_modules": [
+    "qtbase",
+    "qtdeclarative",
+    "qtsvg",
+    "qttranslations"
+  ],
+  "runtime_rules": {
+    "generated_translations": {
+      "translations/qt_ar.qm": "eb09d3211567f7a0419738a8b29c8f8dffd33a72cc7826f8a06b04dd63e7b80d",
+      "translations/qt_bg.qm": "3c466e21df3b04188c77b4712cc068fc1ed3fa4ae87c133c0848e91abdf7cf1f",
+      "translations/qt_ca.qm": "8b01fa037d2203bddc1f8891ae2a9c084fe1b6afe5d4057c42e61ab81a92c94c",
+      "translations/qt_cs.qm": "03028b42df5479270371e4c3bdc7df2f56cbbe6dda956a2864ac6f6415861fe8",
+      "translations/qt_da.qm": "7ae318be007b0525f3d34f019f81840b98c34fdbdd3660aaa59d3828bf733368",
+      "translations/qt_de.qm": "0d42ad6a2e34e320198d6c741e3a3a2349112f429cdd1982edeac7d30eefcb95",
+      "translations/qt_en.qm": "494ac9a2b2cb2fdeced353f4a9f898ed8dcf616e9bc667438c62681e3f7f79cf",
+      "translations/qt_es.qm": "661105be6e930ec3b8ee2ad11ce9644514d5ff41e4a11c4f0d97419ff148319b",
+      "translations/qt_fa.qm": "e3fb7456660442dd9907bd1776f7d21c33bc64a9645d64f5ce96d97e437150a6",
+      "translations/qt_fi.qm": "1592fe9d114d96bb15d43c42c8acb3ba7786bb698c3b51335964df153aff21a9",
+      "translations/qt_fr.qm": "6a2af2232299317a0559612b8326355272ae787c325eb1552742a3cfd43ee372",
+      "translations/qt_gd.qm": "63b439dd44139aa3aed54c2ebe03fa9bc77f22c14ed8fba8eff2608445bb233d",
+      "translations/qt_he.qm": "e1ebca16afe8994356f81ca007fbdb9ddf865842010fe908923d873b687cad3f",
+      "translations/qt_hr.qm": "789064113567808f2a968e2ba973349cb537250adc3cfc3b14a75e4c5c0b6952",
+      "translations/qt_hu.qm": "d5fee6e7e708956edd50e4eb7f252abf0d939724bb12e34346effc42416a4838",
+      "translations/qt_it.qm": "eddce0a4677b28c100d880bacd333846ce872b12ea9ff97384e4e21b658b3e93",
+      "translations/qt_ja.qm": "5ad12b2b8c520129fd81050636e597cf8a6c48b8b6c35b9a49aef0067762c805",
+      "translations/qt_ka.qm": "583fc623628e172adaf1f0da097b81373f281870d6acb1be35ff596f2c087aef",
+      "translations/qt_kk.qm": "88093fd31061699edfb70badadff65296100bbe97a9484b1b36a9498a5827bdc",
+      "translations/qt_ko.qm": "4745455ef25561732ba5ef92ea429fb15cc374159b408713a8e7adee57eac313",
+      "translations/qt_lg.qm": "31c0cc4ce13b1d74fe0c19ed0b47638fb31e20c93ee08092533e884007aebfb5",
+      "translations/qt_lv.qm": "d87cb760d1864772e28190ba1539821eaa7963e18c6d021f43f2bb1f01ed9b9a",
+      "translations/qt_nl.qm": "2d46e62f973f786a4312dbebef7708df81bf710977ae7341b69880ca15a46a4c",
+      "translations/qt_nn.qm": "fdba48066c854a3be558f121f9da441d87b2eeeb87d43643da0a2512381c0e0a",
+      "translations/qt_pl.qm": "4ee1e943c6110db91e97e8be5280f0c8453e5567a29d301131ad7cb66ea093fd",
+      "translations/qt_pt_BR.qm": "9da2186587f5b8aad872bdbca4a0d4b72bb83dc869ef04e482b96002f0faaa91",
+      "translations/qt_ru.qm": "3806fe039e79ee19207e82816ac3e0db14f05e9da10f519f5019e9bd5c99c5d4",
+      "translations/qt_sk.qm": "b09b46ddccd6a321f5f4caa87be9477f6cecd9c5d4680f22e3815ccbb42715c6",
+      "translations/qt_sv.qm": "b8aaa8885a6a276d2351e417edb7578c49869b538587f434ff5946ae8df406a5",
+      "translations/qt_tr.qm": "e7c2f8aa9b69f6695dde6d8ed61e83c171f18bddc578d9ccbb588adb0e334563",
+      "translations/qt_uk.qm": "e1c0f6b9667e5d83f35b3eacc80294d3204561d609d4f01f8dfe1e50b1dcb6d2",
+      "translations/qt_zh_CN.qm": "4b6e3079994d5982799da59e37135353421cc8556e8df52d99b7c457e6c2153b",
+      "translations/qt_zh_TW.qm": "4e73b9103c0da6b81d31c7f3c3c564addd53b68c0690233c77d99725cfa7fddc"
+    },
+    "non_qt_root_dlls": [
+      "d3dcompiler_47.dll",
+      "dxcompiler.dll",
+      "dxil.dll",
+      "libcrypto-3-x64.dll",
+      "libssl-3-x64.dll",
+      "msvcp140_1.dll",
+      "msvcp140_2.dll",
+      "msvcp140.dll",
+      "opengl32sw.dll",
+      "swirl_api.dll",
+      "vcruntime140_1.dll",
+      "vcruntime140.dll",
+      "wintun.dll"
+    ],
+    "plugins": {
+      "generic/qtuiotouchplugin.dll": "qtbase",
+      "iconengines/qsvgicon.dll": "qtsvg",
+      "imageformats/qgif.dll": "qtbase",
+      "imageformats/qico.dll": "qtbase",
+      "imageformats/qjpeg.dll": "qtbase",
+      "imageformats/qsvg.dll": "qtsvg",
+      "networkinformation/qnetworklistmanager.dll": "qtbase",
+      "platforms/qwindows.dll": "qtbase",
+      "qmltooling/qmldbg_debugger.dll": "qtdeclarative",
+      "qmltooling/qmldbg_inspector.dll": "qtdeclarative",
+      "qmltooling/qmldbg_local.dll": "qtdeclarative",
+      "qmltooling/qmldbg_messages.dll": "qtdeclarative",
+      "qmltooling/qmldbg_native.dll": "qtdeclarative",
+      "qmltooling/qmldbg_nativedebugger.dll": "qtdeclarative",
+      "qmltooling/qmldbg_preview.dll": "qtdeclarative",
+      "qmltooling/qmldbg_profiler.dll": "qtdeclarative",
+      "qmltooling/qmldbg_quickeventreplay.dll": "qtdeclarative",
+      "qmltooling/qmldbg_quickprofiler.dll": "qtdeclarative",
+      "qmltooling/qmldbg_server.dll": "qtdeclarative",
+      "qmltooling/qmldbg_tcp.dll": "qtdeclarative",
+      "tls/qcertonlybackend.dll": "qtbase",
+      "tls/qopensslbackend.dll": "qtbase",
+      "tls/qschannelbackend.dll": "qtbase"
+    },
+    "qml_roots": [
+      "qml/QML/",
+      "qml/Qt/labs/folderlistmodel/",
+      "qml/QtCore/",
+      "qml/QtQml/",
+      "qml/QtQml/Models/",
+      "qml/QtQml/WorkerScript/",
+      "qml/QtQuick/",
+      "qml/QtQuick/Controls/",
+      "qml/QtQuick/Controls/Basic/",
+      "qml/QtQuick/Controls/Basic/impl/",
+      "qml/QtQuick/Controls/FluentWinUI3/",
+      "qml/QtQuick/Controls/FluentWinUI3/impl/",
+      "qml/QtQuick/Controls/Fusion/",
+      "qml/QtQuick/Controls/Fusion/impl/",
+      "qml/QtQuick/Controls/Imagine/",
+      "qml/QtQuick/Controls/Imagine/impl/",
+      "qml/QtQuick/Controls/Material/",
+      "qml/QtQuick/Controls/Material/impl/",
+      "qml/QtQuick/Controls/Universal/",
+      "qml/QtQuick/Controls/Universal/impl/",
+      "qml/QtQuick/Controls/Windows/",
+      "qml/QtQuick/Controls/Windows/impl/",
+      "qml/QtQuick/Controls/impl/",
+      "qml/QtQuick/Dialogs/",
+      "qml/QtQuick/Dialogs/quickimpl/",
+      "qml/QtQuick/Effects/",
+      "qml/QtQuick/Layouts/",
+      "qml/QtQuick/NativeStyle/",
+      "qml/QtQuick/Shapes/",
+      "qml/QtQuick/Templates/",
+      "qml/QtQuick/Window/"
+    ],
+    "required_files": [
+      "Qt6Core.dll",
+      "Qt6Gui.dll",
+      "Qt6Network.dll",
+      "Qt6Qml.dll",
+      "Qt6Quick.dll",
+      "Qt6QuickControls2.dll",
+      "Qt6Svg.dll",
+      "platforms/qwindows.dll",
+      "tls/qopensslbackend.dll"
+    ],
+    "root_dlls": {
+      "Qt6Core.dll": "qtbase",
+      "Qt6Gui.dll": "qtbase",
+      "Qt6LabsFolderListModel.dll": "qtdeclarative",
+      "Qt6Network.dll": "qtbase",
+      "Qt6OpenGL.dll": "qtbase",
+      "Qt6Qml.dll": "qtdeclarative",
+      "Qt6QmlCore.dll": "qtdeclarative",
+      "Qt6QmlMeta.dll": "qtdeclarative",
+      "Qt6QmlModels.dll": "qtdeclarative",
+      "Qt6QmlWorkerScript.dll": "qtdeclarative",
+      "Qt6Quick.dll": "qtdeclarative",
+      "Qt6QuickControls2.dll": "qtdeclarative",
+      "Qt6QuickControls2Basic.dll": "qtdeclarative",
+      "Qt6QuickControls2BasicStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2FluentWinUI3.dll": "qtdeclarative",
+      "Qt6QuickControls2FluentWinUI3StyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2Fusion.dll": "qtdeclarative",
+      "Qt6QuickControls2FusionStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2Imagine.dll": "qtdeclarative",
+      "Qt6QuickControls2ImagineStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2Impl.dll": "qtdeclarative",
+      "Qt6QuickControls2Material.dll": "qtdeclarative",
+      "Qt6QuickControls2MaterialStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2Universal.dll": "qtdeclarative",
+      "Qt6QuickControls2UniversalStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickControls2Windows.dll": "qtdeclarative",
+      "Qt6QuickControls2WindowsStyleImpl.dll": "qtdeclarative",
+      "Qt6QuickDialogs2.dll": "qtdeclarative",
+      "Qt6QuickDialogs2QuickImpl.dll": "qtdeclarative",
+      "Qt6QuickDialogs2Utils.dll": "qtdeclarative",
+      "Qt6QuickEffects.dll": "qtdeclarative",
+      "Qt6QuickLayouts.dll": "qtdeclarative",
+      "Qt6QuickNativeStyle.dll": "qtdeclarative",
+      "Qt6QuickShapes.dll": "qtdeclarative",
+      "Qt6QuickTemplates2.dll": "qtdeclarative",
+      "Qt6Svg.dll": "qtsvg"
+    }
+  },
+  "schema": 1,
+  "scope": "Pinned corresponding source for actual Qt modules and their build tools; not an assertion about all product dependency licenses, runtime acceptance, or permanent hosting.",
+  "scope_basis": {
+    "package_file_count": 1918,
+    "package_manifest_sha256": "1557138c990087f5e25ae7e671eb87c3c3de8bdc6841e33d59b120d69f9fca8e",
+    "qt_qa_inventory_is_not_release_scope": true,
+    "source_sha": "1f4c1bbba938cdf435c89212c75bb3160b0b1679"
+  },
+  "sdk_artifact": {
+    "artifact_id": 13561016761,
+    "bytes": 60774580,
+    "files": {
+      "CMakeCXXCompiler.cmake": {
+        "bytes": 6603,
+        "sha256": "6b785cbe38f04d4be2b1b10fce27f15347e8298adb88db5b7a8f76cd5a1d5820"
+      },
+      "CMakeCache.txt": {
+        "bytes": 95395,
+        "sha256": "affd3b8cdf23ac66b37e567a299f6967c2616145d0ea159cb2ea442862e7eaed"
+      },
+      "commands/10-configure.compiler-plan.json": {
+        "bytes": 3897,
+        "sha256": "5a50f53663bd1b5abfc4643f99157ce0c814f8f5f6d7f24b678912c2f7ed13b6"
+      },
+      "commands/10-configure.json": {
+        "bytes": 5496,
+        "sha256": "54f451060763368510e83b63136d1577d12c3db3c694285bef15ee57a329ea2a"
+      },
+      "commands/10-configure.stderr.log": {
+        "bytes": 105,
+        "sha256": "54c2510dd4b4adc98b58737d210d406cec1c56ae71e3eba567de5120df232563"
+      },
+      "commands/10-configure.stdout.log": {
+        "bytes": 2871,
+        "sha256": "99052dddc2de95271ca3d3d45c389a47a2e76a48be224b67b25bc113b6d9e0ee"
+      },
+      "commands/11-qml-build.compiler-plan.json": {
+        "bytes": 3495,
+        "sha256": "48e61d4e5966c00547235ce7611ad561d51f7778d0b0e81434f61c3db303e587"
+      },
+      "commands/11-qml-build.json": {
+        "bytes": 5498,
+        "sha256": "7b167dde3a53420215fd5caf10d1da7cdb8080c8a7d359c5f7daf025d14f19a0"
+      },
+      "commands/11-qml-build.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/11-qml-build.stdout.log": {
+        "bytes": 24303,
+        "sha256": "cce49c51e0b0912423beb410861a8a72f1bff1beb50055e38deccdedc11d4d77"
+      },
+      "commands/12-install-qml-only.json": {
+        "bytes": 1422,
+        "sha256": "67ea68e4b8dd66b62205cc9e615572219269ed6851f053b6e569244ea5f04ccd"
+      },
+      "commands/12-install-qml-only.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/12-install-qml-only.stdout.log": {
+        "bytes": 43308,
+        "sha256": "3232b2a8a613f58d71d03bf4d800a1927c871ed8410527ddbc98d230778890ba"
+      },
+      "commands/13-patched-exports.json": {
+        "bytes": 1515,
+        "sha256": "f46c5967e59f143cebb7080d37b66b8bbb4b725f5d62b57fcef5075a54dbb033"
+      },
+      "commands/13-patched-exports.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/13-patched-exports.stdout.log": {
+        "bytes": 579291,
+        "sha256": "fb4e0a7f525aa97c3446180745d3d34b54233b4865db839d2ce9854afdaca563"
+      },
+      "commands/13-stock-exports.json": {
+        "bytes": 1524,
+        "sha256": "b3b2fba302f3facfd4b6fb74af4f7162eef04631f3d8c39b5d08cecbceebdfe1"
+      },
+      "commands/13-stock-exports.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/13-stock-exports.stdout.log": {
+        "bytes": 579303,
+        "sha256": "faa7a4ac8b2a4cff6b7b2b3fc742d4573d89a5ddad43c56445c5e26fe0186168"
+      },
+      "commands/15-patched-dependents.json": {
+        "bytes": 1521,
+        "sha256": "f5d0d745490778d7c114478d8fd6f8c203446d5b27b7fa5b3ea0e5f47d133b98"
+      },
+      "commands/15-patched-dependents.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/15-patched-dependents.stdout.log": {
+        "bytes": 701,
+        "sha256": "b28515569c9372890689a2735395ed45500f50ea9832b13f94d942201c8d57d1"
+      },
+      "commands/15-stock-dependents.json": {
+        "bytes": 1531,
+        "sha256": "1d352d16c2495c182e4834c14d9fd14bb8be357dcff7bd2710e24c1592f8dbc6"
+      },
+      "commands/15-stock-dependents.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "commands/15-stock-dependents.stdout.log": {
+        "bytes": 713,
+        "sha256": "d1b59da5d62cc7d3f99a86a7fcd9941006587f123add63c0147cd813b4832221"
+      },
+      "compile_commands.json": {
+        "bytes": 11591603,
+        "sha256": "d404a060bf7f2b0ad7f8ad6ae6f49f75c97d2facde9807dcd6adda32a8b90b53"
+      },
+      "config.opt": {
+        "bytes": 1229,
+        "sha256": "b0c44fea604d775a64549534f37e7ba2cecdbaed997c28f089e24a332d4cc978"
+      },
+      "config.summary": {
+        "bytes": 2289,
+        "sha256": "fdc68d4d3bd68fb8965dcaf5eec847324341c401dee1278e47833b107d9992fa"
+      },
+      "configuration-identity.json": {
+        "bytes": 10159,
+        "sha256": "63c9e1e04482bb5291bd2d24df59e51030514319b273d8f93e0f124d9c5c48a4"
+      },
+      "configure-module.ps1": {
+        "bytes": 1440,
+        "sha256": "b6cc206b4b55f3d70784ecdb8a67d1b3c5bbc9904d5c750f5a6e4267f0ff474a"
+      },
+      "corresponding-source.json": {
+        "bytes": 2116,
+        "sha256": "65f20366b34512e1b0b450c00c95e6d4d5ed3f191f8786e9f15e40085b1c1bf4"
+      },
+      "derived-files.json": {
+        "bytes": 1884576,
+        "sha256": "cf3853876854a7cf88e1dfceb700c6174cfe2291a1de69c0b754bef489ed0a1a"
+      },
+      "header-alignment.json": {
+        "bytes": 244886,
+        "sha256": "48e12238a77625668c803abeb366bc02c38cc6a06e4462489c48b39d971eb17e"
+      },
+      "install-qml-only.cmake": {
+        "bytes": 585,
+        "sha256": "69ad109ae84ca69462009d3c5318e6cc8d3aa2f67062040b40a5ef09c9db5619"
+      },
+      "module-files.json": {
+        "bytes": 61027,
+        "sha256": "dcbc21d7d6394bc88a5d9b73cccb9cdc7a2efb27a7eed869e9c02e73ae895f04"
+      },
+      "module-header-retention.json": {
+        "bytes": 242884,
+        "sha256": "5f695da83db225c35542c3b8788fbdc79d190915dcfeddac20f56cb24a331f9f"
+      },
+      "module-install-files.txt": {
+        "bytes": 37909,
+        "sha256": "b2fb5190724a6753ea77abfd2ffffdc4f2f5a918956bf40fdf699bfb19327e3e"
+      },
+      "msvc-initial-cache.cmake": {
+        "bytes": 231,
+        "sha256": "d6ebe1d490bcd4efeaa970b9e3fe75944501d9658eddeda39187aa6df18d00cd"
+      },
+      "native-toolchain-files.json": {
+        "bytes": 1072830,
+        "sha256": "fff07a252295c5fdbf45da732cbf63af1920caa5ebe6fad8af5eb29394350f29"
+      },
+      "pe-interface-review.json": {
+        "bytes": 943,
+        "sha256": "c3eb860aeece60e98a0bf59ae1f4618beb42ca37fc68b73868326806cac3044a"
+      },
+      "qml-cmake-install.cmake": {
+        "bytes": 40175,
+        "sha256": "3829979a5c2a95a08ab2f725b532ea9a523de56a0f20b99b1685bb7e786f19bd"
+      },
+      "qtdeclarative-corresponding-source.zip": {
+        "bytes": 54653393,
+        "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+      },
+      "receipt.json": {
+        "bytes": 66395,
+        "sha256": "ca9c401827665956e929be87934d20252b61d525154da97148990fc1d0b7f361"
+      },
+      "reproduction/tools/Build-Qt612QmlDiagnosticSdk.py": {
+        "bytes": 113069,
+        "sha256": "164906db9e451121a45806cacd56be5b8af0c3fbe4b7a86a9237b7cf9d91afcc"
+      },
+      "reproduction/tools/Install-QtSdk.py": {
+        "bytes": 11188,
+        "sha256": "c7c6709ab67947c343a12f35bfb68771360bbc54f849e943bbadbb2c8c7e13dd"
+      },
+      "reproduction/tools/PrivateSubscriptionBudget.py": {
+        "bytes": 80744,
+        "sha256": "054f85ecbfbaf60c30cf34f9aa021bf385740577abedc0f61106f2ca5230f7fb"
+      },
+      "reproduction/tools/PrivateSubscriptionProcess.py": {
+        "bytes": 26253,
+        "sha256": "f5b71ca13933fce12312f7a7009f7d93235dab373b35eaf3bd4a08f3a984168d"
+      },
+      "reproduction/tools/RunQt612GcProbe.py": {
+        "bytes": 16132,
+        "sha256": "6fca877c3ecf40e237948a0d58211d3fccb66595d182a1c6a763dc234cee0f74"
+      },
+      "reproduction/tools/RunQt612RuntimeComparison.py": {
+        "bytes": 19234,
+        "sha256": "54e91c7dc570b099843c3fc59277ea243c0baad8f5805bd54b6aac7851a7fda9"
+      },
+      "reproduction/tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
+        "bytes": 2284,
+        "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
+      },
+      "reproduction/tools/qt612-qml-patch.lock.json": {
+        "bytes": 9857,
+        "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/CMakeLists.txt": {
+        "bytes": 497,
+        "sha256": "3ac5707454c243c6a83e6991050d3c9d648042e32362e12c96b0eb277964936d"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/Main.qml": {
+        "bytes": 737,
+        "sha256": "41a4da312132e55f7f9be6de91b3dde58a205637870c5e31175aeddc2335a31c"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/OwnedHelper.qml": {
+        "bytes": 498,
+        "sha256": "3c715aa5481365b77270c5433038f9a95bdcc22884b9c8667883b080a9d9beb6"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/ProbeDialog.qml": {
+        "bytes": 1526,
+        "sha256": "518dc651975532a486983a591f11d7d7b28f43c9e8788a1158e7b599187f15cc"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/main.cpp": {
+        "bytes": 5005,
+        "sha256": "6047d0c6c92bc5ecd8b2e98606db28bbd85b9cc92f7140ec899210e007407200"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/sweep.cpp": {
+        "bytes": 3123,
+        "sha256": "5fdb8be03d676b94c6b57f6ced5a1474b7328cef59c425fb69bfbf3d0a192848"
+      },
+      "reproduction/tools/requirements-qt-sdk.txt": {
+        "bytes": 31,
+        "sha256": "e776cf2b9612d54b7894e3428e7ea4ac20ca4efa5abcf643c1e9f4b81bcf2b6a"
+      },
+      "reproduction/tools/tests/test_qt612_diagnostic_sdk.py": {
+        "bytes": 56851,
+        "sha256": "fe7995a18019ab083f129678d99546b8b22fada58fc5b2c3914070cf322c5602"
+      },
+      "source-snapshot-files.json": {
+        "bytes": 7234465,
+        "sha256": "8000d2e3d6a5903d1732d19f717087239907955594a817165224c369c50e755c"
+      },
+      "stock-Qml.json": {
+        "bytes": 538,
+        "sha256": "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f"
+      },
+      "stock-files-before.json": {
+        "bytes": 1884420,
+        "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+      },
+      "stock-sdk-receipt.json": {
+        "bytes": 8545,
+        "sha256": "46a02c48f0e128fed32f4a8f9377dd0703e32e805935f1bdc71d662179b1f7b8"
+      }
+    },
+    "sha256": "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
+    "source_sha": "e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab",
+    "workflow_run_id": 42338365419
+  }
+}

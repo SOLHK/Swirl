@@ -314,6 +314,108 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertLess(menu.index(preflight), menu.index("          python tools/tests/test_reality_peer.py\n"))
         self.assertIn("          if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi\n", menu)
 
+    def test_vmess_stage_preserves_history_and_exact_current_source_evidence(self):
+        root = Path(__file__).resolve().parents[2]
+        checked_in = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        final = development.updated_workflow(FIXTURE)
+        for source in (checked_in, final):
+            with self.subTest(checked_in=source == checked_in):
+                self.assertEqual(development.updated_workflow(source), source)
+                previous = development.without_vmess_steps(source)
+                self.assertNotIn("VMess", previous)
+                self.assertEqual(development.updated_workflow(previous), source)
+                for index, part in enumerate(source.split("  windows-rust:\n")):
+                    command = ('        run: python tools/tests/run_vmess_ci_acceptance.py '
+                               '--evidence "${{ runner.temp }}/swirl-vmess-acceptance"\n')
+                    self.assertEqual(part.count(command), 1)
+                    step = part.split("      - name: VMess official peer HTTP HTTPS and transport lifecycle\n", 1)[1]
+                    run, rest = step.split("      - name: Preserve current VMess official peer evidence\n", 1)
+                    self.assertEqual(run, "        working-directory: .\n" + command)
+                    title = ("Independent TLS and protocol peers" if index
+                             else "Independent portable protocol peers")
+                    evidence, _ = rest.split(f"      - name: {title}\n", 1)
+                    self.assertIn("        if: always()\n", evidence)
+                    self.assertIn("uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", evidence)
+                    self.assertIn("name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}\n", evidence)
+                    self.assertIn("path: ${{ runner.temp }}/swirl-vmess-acceptance\n", evidence)
+                    self.assertIn("if-no-files-found: error\n", evidence)
+                    self.assertTrue(evidence.endswith("          retention-days: 14\n"))
+
+    def test_vmess_partial_duplicate_moved_and_weakened_gates_fail_closed(self):
+        final = development.updated_workflow(FIXTURE)
+        block = development.vmess_steps()
+        run, artifact = block.split("      - name: Preserve current VMess official peer evidence\n", 1)
+        artifact = "      - name: Preserve current VMess official peer evidence\n" + artifact
+        edits = (
+            "", block * 2, run, artifact,
+            block.replace("working-directory: .", "working-directory: core", 1),
+            block.replace("        run:", "        shell: bash\n        run:", 1),
+            block.replace("        run:", "        shell: pwsh\n        run:", 1),
+            block.replace("        run:", "        continue-on-error: true\n        run:", 1),
+            block.replace("        run:", "        if: false\n        run:", 1),
+            block.replace("run_vmess_ci_acceptance.py", "unreviewed_vmess.py", 1),
+            block.replace(" --evidence", " --allow-skipped --evidence", 1),
+            block.replace("${{ runner.temp }}/swirl-vmess-acceptance", "unverified-evidence", 1),
+            block.replace("${{ github.sha }}", "unverified-source", 1),
+            block.replace("${{ github.run_attempt }}", "1", 1),
+            block.replace("if: always()", "if: success()", 1),
+            block.replace("if-no-files-found: error", "if-no-files-found: ignore", 1),
+            block.replace("path: ${{ runner.temp }}/swirl-vmess-acceptance", "path: .", 1),
+            block.replace("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4", 1),
+            block + "      - run: echo unreviewed separator\n",
+        )
+        separator = "  windows-rust:\n"
+        for index in (0, 1):
+            for drift, edit in enumerate(edits):
+                parts = final.split(separator)
+                parts[index] = parts[index].replace(block, edit, 1)
+                with self.subTest(job=index, drift=drift), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    workflow = self.make_repository(root, separator.join(parts))
+                    before = workflow.read_bytes()
+                    with self.assertRaises(ValueError):
+                        development.apply_update(root, ENVIRONMENT)
+                    self.assertEqual(workflow.read_bytes(), before)
+            parts = final.split(separator)
+            anchor = development.product_chain_steps(windows=bool(index))
+            parts[index] = parts[index].replace(block, "", 1).replace(anchor, block + anchor, 1)
+            with self.subTest(moved_to_previous_product_position=index), self.assertRaises(ValueError):
+                development.updated_workflow(separator.join(parts))
+            parts = final.split(separator)
+            peer_title = ("Independent TLS and protocol peers" if index
+                          else "Independent portable protocol peers")
+            parts[index] = parts[index].replace(peer_title, "Unreviewed peer menu", 1)
+            with self.subTest(changed_peer_boundary=index), self.assertRaises(ValueError):
+                development.updated_workflow(separator.join(parts))
+        for target_job in (0, 1):
+            parts = final.split(separator)
+            parts[target_job] = parts[target_job].replace(block, block * 2, 1)
+            parts[1 - target_job] = parts[1 - target_job].replace(block, "", 1)
+            with self.subTest(both_in_job=target_job), self.assertRaises(ValueError):
+                development.updated_workflow(separator.join(parts))
+
+    def test_vmess_stage_does_not_repair_historical_peer_or_exit_guard_drift(self):
+        final = development.updated_workflow(FIXTURE)
+        for marker in (
+            "          python ../tools/tests/test_socks5_udp.py\n",
+            "          python ../tools/tests/test_subscription_import.py\n",
+            "          python ../tools/tests/test_reality_peer.py\n" + development.WINDOWS_STATUS_GUARD,
+        ):
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(marker, "", 1))
+
+    def test_vmess_missing_required_material_prevents_atomic_workflow_write(self):
+        for source in (FIXTURE, development.updated_workflow(FIXTURE)):
+            for missing in development.VMESS_SOURCES:
+                with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    workflow = self.make_repository(root, source)
+                    before = workflow.read_bytes()
+                    (root / missing).unlink()
+                    with self.assertRaises(ValueError):
+                        development.apply_update(root, ENVIRONMENT)
+                    self.assertEqual(workflow.read_bytes(), before)
+
     def test_product_chain_gates_use_release_binaries_and_preserve_exact_evidence(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
@@ -473,6 +575,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# public synthetic fingerprint fixture\n", encoding="utf-8")
+        for relative in development.VMESS_SOURCES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# public synthetic VMess fixture\n", encoding="utf-8")
         return workflow
 
     def test_reality_runtime_gates_require_actual_binary_and_preserve_every_prior_gate(self):
@@ -894,6 +1000,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             "build/rust-qt/swirl-rust-qt-integration.xml",
             "build/rust-qt/swirl-import-boundaries.xml",
             "build/removed-runtime/rejection.log",
+            "build-evidence/qt-product-rust-d3d-capture/",
+            "build-evidence/qt-product-rust-d3d-quic/",
+            "build-evidence/qt-product-rust-d3d-integration/",
+            "build-evidence/qt-product-rust-d3d-public/",
         ])
         self.assertIn("        if: always()\n", artifact)
         self.assertIn("          retention-days: 7\n", artifact)
@@ -912,6 +1022,13 @@ class CoreDevelopmentTests(unittest.TestCase):
             (artifact, artifact.replace("          if-no-files-found:",
                                         "            ${{ env.SWIRL_TEST_ROOT }}\n          if-no-files-found:")),
         ]
+        for suffix in ("capture", "quic", "integration", "public"):
+            entry = "            build-evidence/qt-product-rust-d3d-" + suffix + "/\n"
+            broken_blocks.extend((
+                (artifact, artifact.replace(entry, "")),
+                (artifact, artifact.replace(entry, entry * 2)),
+                (artifact, artifact.replace(entry, "            build-evidence/**\n")),
+            ))
         exit_guard = "          if ($nativeQtExit -ne 0) { exit $nativeQtExit }\n"
         capture = "          $nativeQtExit = $LASTEXITCODE\n"
         broken_blocks.extend((
@@ -1615,14 +1732,20 @@ class CoreDevelopmentTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
         block = development.public_qt_steps()
-        deploy = ('          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT '
+        deploy = ('          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT '
                   '--include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"\n')
-        self.assertIn(deploy + development.WINDOWS_STATUS_GUARD, block)
+        d3d = ('          python tools/Compose-Qt612ProductSdk.py copy-d3d '
+               '--receipt "$env:SWIRL_QT_SELECTED_RECEIPT" '
+               '--runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" '
+               '--evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"\n')
+        d3d_status = "          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }\n"
+        self.assertIn(deploy + development.WINDOWS_STATUS_GUARD + d3d + d3d_status, block)
         # The generator owns the public gate, not the reviewed runtime setup,
         # cache or integration deployment elsewhere in this actual workflow.
         self.assertEqual(development.updated_workflow(source), source)
         self.assertEqual(development.without_public_qt_steps(source), source.replace(block, "", 1))
         mutations = (
+            deploy.replace(' --no-system-d3d-compiler', ''),
             deploy.replace(' --openssl-root $env:SWIRL_OPENSSL_ROOT', ''),
             deploy.replace('$env:SWIRL_OPENSSL_ROOT', '$env:PATH'),
             deploy.replace(' --include-plugins qopensslbackend', ''),
@@ -1637,6 +1760,31 @@ class CoreDevelopmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             development.updated_workflow(source.replace(deploy + development.WINDOWS_STATUS_GUARD,
                                                         deploy, 1))
+        for changed in ('', d3d * 2,
+                        d3d.replace('copy-d3d', 'verify'),
+                        d3d.replace('$env:SWIRL_QT_SELECTED_RECEIPT', '$env:PATH'),
+                        d3d.replace('/build/rust-qt/Release', '/unverified-runtime'),
+                        d3d.replace('qt-product-rust-d3d-public', 'reused-evidence')):
+            with self.subTest(d3d_deployment=changed), self.assertRaises(ValueError):
+                development.updated_workflow(source.replace(d3d, changed, 1))
+        with self.assertRaises(ValueError):
+            development.updated_workflow(source.replace(d3d + d3d_status, d3d, 1))
+        # Every selected-kit deployment must copy the fixed D3D compiler before
+        # its next fixture runs. Later windeployqt calls share this directory.
+        deploy_lines = [line for line in source.splitlines()
+                        if line.startswith('          windeployqt ')]
+        self.assertEqual(len(deploy_lines), 4)
+        for line, suffix in zip(deploy_lines, ('capture', 'quic', 'integration', 'public')):
+            self.assertIn(' --no-system-d3d-compiler ', line)
+            self.assertNotIn('--no-system-dxc-compiler', line)
+            copy = d3d.replace('qt-product-rust-d3d-public', 'qt-product-rust-d3d-' + suffix)
+            self.assertIn(line + '\n' + development.WINDOWS_STATUS_GUARD + copy + d3d_status, source)
+        preservation = source.split('      - name: Preserve isolated Qt test reports\n')
+        self.assertEqual(len(preservation), 2)
+        self.assertIn('        if: always()\n', preservation[1])
+        for suffix in ('capture', 'quic', 'integration', 'public'):
+            self.assertIn('            build-evidence/qt-product-rust-d3d-' + suffix + '/\n', preservation[1])
+        self.assertIn(d3d, preservation[0])
 
     def test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group(self):
         final = development.updated_workflow(FIXTURE)

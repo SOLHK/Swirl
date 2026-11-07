@@ -12,7 +12,17 @@ bool hasContentFilter(const QVariantMap &filters) {
 }
 }
 
-NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent) {}
+NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent),m_projectionTimer(this),m_valueRefreshTimer(this) {
+    m_projectionTimer.setSingleShot(true);
+    m_projectionTimer.setTimerType(Qt::PreciseTimer);
+    connect(&m_projectionTimer,&QTimer::timeout,this,&NodeSectionModel::commitPendingProjection);
+    m_valueRefreshTimer.setSingleShot(true);
+    connect(&m_valueRefreshTimer,&QTimer::timeout,this,[this]{
+        if(m_syncingRows)return;
+        m_valueRefreshPending=false;
+        rebuild(); // Read the latest source, including requests that superseded the first reentry.
+    });
+}
 int NodeSectionModel::rowCount(const QModelIndex &parent) const { return parent.isValid()?0:m_rows.size(); }
 QVariant NodeSectionModel::data(const QModelIndex &index,int role) const {
     if(!index.isValid()||index.column()!=0||index.row()<0||index.row()>=m_rows.size()||role!=Qt::UserRole)return {};
@@ -25,6 +35,17 @@ Qt::ItemFlags NodeSectionModel::flags(const QModelIndex &index) const {
 QVariantMap NodeSectionModel::get(int row) const { return row>=0&&row<m_rows.size()?m_rows.at(row):QVariantMap{}; }
 int NodeSectionModel::indexOfNode(const QString &id) const { return id.isEmpty()?-1:rowForDisplayKey("node:"+id); }
 int NodeSectionModel::rowForDisplayKey(const QString &key) const { return m_rowByKey.value(key,-1); }
+
+void NodeSectionModel::setProjectionDelayMs(int value) {
+    value=std::max(0,value);
+    if(m_projectionDelayMs==value)return;
+    m_projectionDelayMs=value;
+    const QPointer<NodeSectionModel> guard(this);
+    // Disabling motion or detaching the opt-in view publishes the latest rows
+    // immediately; an obsolete timer must never bring an old layout back.
+    if(!value)commitPendingProjection();
+    if(guard)emit projectionDelayMsChanged();
+}
 
 void NodeSectionModel::setSource(NodeViewModel *value) {
     if(m_source==value)return;
@@ -49,8 +70,9 @@ QString NodeSectionModel::sectionKey(const QVariantMap &row) {
     return kind=="subscription"||(!sourceId.isEmpty()&&kind.isEmpty())?"subscription:"+sourceId:"manual";
 }
 void NodeSectionModel::toggleSection(const QString &key) {
-    const int row=rowForDisplayKey("section:"+key);
-    if(row<0||!get(row).value("collapsible").toBool())return;
+    const auto &logicalRows=m_projectionPending?m_pendingRows:m_rows;
+    const auto found=std::find_if(logicalRows.cbegin(),logicalRows.cend(),[&](const auto &row){return displayKey(row)=="section:"+key;});
+    if(found==logicalRows.cend()||!found->value("collapsible").toBool())return;
     if(m_collapsed.contains(key))m_collapsed.remove(key);else m_collapsed.insert(key);
     rebuild();
 }
@@ -143,13 +165,94 @@ void NodeSectionModel::rebuild() {
         nodeIds.append(ids);
         if(expanded)for(const auto &id:ids)next.append(m_cachedNodes.constFind(id)->entry);
     }
-    const bool rowChanges=next!=m_rows;
+    const bool rowChanges=next!=(m_projectionPending?m_pendingRows:m_rows);
     const bool changed=rowChanges||nodeIds!=m_nodeIds||total!=m_total;
     if(!changed)return;
-    if(rowChanges){emit aboutToSync();syncRows(next);}
+    // Filtered testing always follows the latest logical source, even while a
+    // view is fading its previous, read-only display snapshot out.
     m_nodeIds=std::move(nodeIds);m_total=total;++m_revision;
-    if(rowChanges)emit synced();
+    if(m_projectionPending) {
+        m_pendingRows=std::move(next);++m_pendingVersion;
+        // Keep the first deadline: neither probe values nor another structural
+        // request may indefinitely postpone the next visible layout.
+        emit this->changed();
+        return;
+    }
+    // Probe results only change cell data. Saving/restoring the viewport and
+    // replaying row-position animations for each result interrupts scrolling
+    // and repeatedly retargets delegates while their text is being updated.
+    // Fixed-height rows need a projection only when their ordered keys change.
+    const bool projectionChanges=rowChanges&&(next.size()!=m_rows.size()||
+        !std::equal(next.cbegin(),next.cend(),m_rows.cbegin(),[](const auto &left,const auto &right){
+            return displayKey(left)==displayKey(right);
+        }));
+    const QPointer<NodeSectionModel> guard(this);
+    if(projectionChanges) {
+        const bool delayed=m_projectionDelayMs>0&&!m_rows.isEmpty();
+        // Even a zero-delay projection must own its latest snapshot before
+        // notifying observers. A callback can change the source/filter while
+        // aboutToSync or projectionCommitting is being delivered.
+        m_pendingRows=std::move(next);m_projectionPending=true;++m_pendingVersion;
+        if(delayed)m_projectionTimer.start(m_projectionDelayMs);
+        m_notifyingProjection=true;
+        emit aboutToSync();
+        if(!guard)return;
+        emit projectionPendingChanged();
+        if(!guard)return;
+        m_notifyingProjection=false;
+        if(!delayed||m_flushRequested||!m_projectionDelayMs) {
+            m_flushRequested=false;
+            commitPendingProjection();
+            // A dataChanged observer can request a zero-delay structural
+            // change. Logical filters are current while row mutation waits.
+            if(guard&&m_syncingRows)emit this->changed();
+        } else emit this->changed();
+        return;
+    }
+    if(rowChanges&&(m_syncingRows||m_valueRefreshPending)) {
+        // Reentrant value updates must not recurse through dataChanged. Keep
+        // the logical IDs above current and coalesce a fresh source read after
+        // this complete set of row notifications, without projection signals.
+        m_valueRefreshPending=true;
+        emit this->changed();
+        return;
+    }
+    if(rowChanges)syncRows(next);
+    if(!guard)return;
     emit this->changed();
+}
+
+void NodeSectionModel::commitPendingProjection() {
+    if(!m_projectionPending||m_committingProjection)return;
+    // Complete both the projection notification and any in-flight row/value
+    // notification batch before mutating its model indexes.
+    if(m_notifyingProjection||m_syncingRows){m_flushRequested=true;return;}
+    m_projectionTimer.stop();m_committingProjection=true;
+    const QPointer<NodeSectionModel> guard(this);
+    // Timers and GUI animation ticks need not run in the same order. Force the
+    // view's final zero opacity synchronously before any Qt row notification.
+    emit projectionCommitting();
+    if(!guard)return;
+    const auto next=m_pendingRows;
+    const auto version=m_pendingVersion;
+    syncRows(next);
+    if(!guard)return;
+    m_committingProjection=false;
+    if(version!=m_pendingVersion) {
+        // A source callback during a row notification queued a newer snapshot.
+        // Finish this Qt transaction, then publish it while the view is hidden.
+        m_projectionTimer.start(0);
+        return;
+    }
+    m_projectionPending=false;m_pendingRows.clear();m_flushRequested=false;
+    ++m_revision;
+    emit projectionPendingChanged();
+    if(!guard)return;
+    emit synced();
+    if(!guard)return;
+    // Display-index consumers must recheck after the delayed commit, as well as
+    // when the logical filter first changed.
+    emit changed();
 }
 
 void NodeSectionModel::rebuildIndex() {
@@ -157,6 +260,8 @@ void NodeSectionModel::rebuildIndex() {
     for(int row=0;row<m_rows.size();++row)m_rowByKey.insert(displayKey(m_rows.at(row)),row);
 }
 void NodeSectionModel::syncRows(const QList<QVariantMap> &next) {
+    Q_ASSERT(!m_syncingRows);
+    m_syncingRows=true;
     QSet<QString> keys;keys.reserve(next.size());
     for(const auto &row:next)keys.insert(displayKey(row));
     for(int last=m_rows.size()-1;last>=0;) {
@@ -203,4 +308,7 @@ void NodeSectionModel::syncRows(const QList<QVariantMap> &next) {
         emit dataChanged(index(first,0),index(last,0),{Qt::UserRole});
     }
     rebuildIndex();
+    m_syncingRows=false;
+    if(m_valueRefreshPending&&!m_valueRefreshTimer.isActive())m_valueRefreshTimer.start(0);
+    if(m_projectionPending&&m_flushRequested&&!m_committingProjection)m_projectionTimer.start(0);
 }

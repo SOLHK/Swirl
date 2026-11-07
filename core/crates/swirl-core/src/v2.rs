@@ -536,6 +536,8 @@ impl Core {
         let epoch = random_number()?;
         let prepared = candidate.prepare()?;
         prepared.runtime.policy.validate_start()?;
+        swirl_transport::egress::check_private_listener(prepared.runtime.listen)
+            .map_err(|_| "PrivateQuotaListenerDenied")?;
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .max_blocking_threads(4)

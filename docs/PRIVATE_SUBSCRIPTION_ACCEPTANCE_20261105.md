@@ -1,4 +1,4 @@
-# Window-gated private subscription QA
+# Private subscription QA: current gate and historical fixtures
 
 `SwirlPrivateSubscriptionAcceptance` is a Windows-only QA target under
 `SWIRL_BUILD_CORE_TESTS`. It is excluded from the product package and does not
@@ -8,11 +8,192 @@ The default invocation refuses networking. `--self-test` uses synthetic data
 and loopback fixtures only; `--offline-body` decrypts a local response and checks
 the actual importer and an independent encrypted NodeStore round trip.
 
-The explicit live command accepts a local DPAPI manifest, UTC start/end times
-for a newly authorized window of at most ten minutes, and a fresh absolute
-private output directory outside a Git repository. The manifest contains six
-sources; URLs and credentials are never CLI arguments or public report fields.
-No live test is authorized by the existence of this tool or this document.
+## Offline installer persistence fixture
+
+`--installer-store-fixture` is a separate fixed synthetic `create`/`verify` mode for the opted-in disposable Windows installer job. It requires the exact source identity, real non-admin medium-integrity user SID and ordinary Swirl profile; it does not accept node credentials or start an engine. Creation refuses an existing store. Verification uses production NodeStore decryption, checks the two fixed loopback nodes, disabled subscription, selection and V1 network configuration, and proves it did not rewrite the store or selection sidecar. The installer harness compares both file hashes across same-package reinstall, ordinary startup/close and uninstall. It is not previous-release migration or live-network acceptance. Scope refusals write no receipt; later receipts only create a new local non-reparse file outside the profile.
+
+## Current 0.2.40 live boundary
+
+The historical `Swirl.exe --runtime-store/--runtime-commands/--runtime-state`
+QA entry is also closed. Either QA or Release refuses any of those options,
+including partial, empty and separate-value arguments, before Qt startup,
+maintenance/self-test dispatch or private-store access. The legacy
+`tools/Invoke-WindowsRustAcceptance.ps1` launcher refuses before resolving its
+paths or creating output. Both return exit 64 and the fixed, value-free
+`AuthenticatedBillingAndWireGuardRequired` error. Ordinary UI operation and
+the existing `ControlledNetwork` controller tests are unchanged. This closes
+an alternate unguarded acceptance entry; it does not connect the live guard.
+
+`tools/tests/test_runtime_acceptance_refusal.py` runs the actual deployed QA and
+production EXEs with synthetic sentinel paths, then the old launcher with
+Windows PowerShell 5.1 and PowerShell 7. It checks exact error/exit 64, value
+redaction and unchanged sentinel/profile/output trees. A deliberately absent
+QPA plugin prevents an accidentally reopened GUI from reaching network setup;
+mixed TLS/Rust self-tests and extra-argument maintenance calls prove refusal
+precedes their dispatch. Raw output and source/EXE hashes are retained even on
+failure. These negative checks do not replace the existing legal runtime
+self-tests or `ControlledNetwork` positive cases.
+
+`--live` unconditionally returns `AuthenticatedBillingAndWireGuardRequired`
+before reading a private manifest, creating an output directory or starting a
+network runtime. A fresh authorization window does not bypass this refusal.
+`PrivateSubscriptionBudget.py` also remains offline-only: neither a parsed
+`subscription-userinfo` header nor a successful reservation is a live grant.
+
+The persistent ledger can store a separate TCP byte quota and a receive-buffer
+reservation for every allowed connection attempt. Failed durable writes poison
+the session until it closes and reloads actual disk state under the exclusive
+lock. Existing baselines, local counts and outstanding reservations survive a
+schema-1 to schema-2 upgrade. Official account growth and local socket bytes
+remain separate; account growth can include other clients.
+
+Until authenticated reconciliation proves which local bytes are already
+reflected, budget admission gives no overlap credit. It conservatively adds
+account growth, settled local counts and outstanding holds; the reported
+package remainder must also cover all local counts and holds above 80 GB.
+Taking the larger of account growth and local counts is insufficient when
+other clients have been billed while this task's usage is delayed. This may
+count already reflected local bytes twice for refusal, but never attributes
+all account growth to Swirl or reports that admission bound as measured
+traffic. No stored baseline, schema, counter or reservation is reset. The
+synthetic domain has no official account observation, so its accounting is
+unchanged. This conservative numeric rule is still not authenticated billing
+or a complete wire bound.
+
+The optional Rust `private-acceptance` build provides one process-wide TCP
+quota, an immutable deadline of at most 8000 ms, cancellation during connect,
+and shutdown of registered idle sockets. Pending-connect cancellation still
+requires its future to be polled; a stalled runtime requires an external
+supervisor to terminate and await the dedicated process. Guarded UDP, OS
+resolver lookups and the separate physical-download path fail closed. Native
+TUN start, gateway preparation/activation (including DHCP preflight), broker
+startup and restricted packet-worker startup also reject an installed quota
+before system-network activity or helper creation. Validation, status and
+cleanup remain available. A parent must reserve the
+full byte limit plus 1 MiB for each permitted connection attempt before launch.
+Socket reads/writes include TLS and protocol framing, but do not measure IP
+headers, retransmissions or unread kernel data. These controls do not establish
+complete wire accounting or provider billing.
+
+The dedicated synthetic coordinator below now exercises durable admission,
+a mandatory guarded process and OS-confirmed exit together. Its live
+integration still requires fresh authenticated provider snapshots bound to the
+original account/history, coverage of every egress path, the ordinary Qt UI
+entry and provider reconciliation before settlement. The original Windows
+private ledger and DPAPI inputs must remain in their controlled environment;
+a new empty ledger is not a substitute. Never unblock the legacy command with
+a boolean or by removing its early return.
+
+The cumulative policy remains decimal 2/5/10/15/20 GB with at least 80 GB kept
+available. The first live round must contain at most 12 executable nodes, at
+most three concurrent attempts and an eight-second deadline per attempt.
+Prefer HTTPS 204 and cap ordinary GET bodies at 64 KiB. These are required
+admission conditions, not evidence that live execution has occurred.
+
+## Supervised synthetic process path
+
+`tools/PrivateSubscriptionSupervisor.py` uses the existing `Ledger` storage,
+exclusive lock and durable replacement. A distinct synthetic schema-3 domain
+records its identity, immutable source/worker hash/configuration fingerprint,
+full TCP reservation and execution phases. Official baseline/provider counters
+remain null. It cannot relabel an existing schema-1/2 ledger, accept provider
+observations, or use the old offline boolean settlement. Completed or interrupted
+configuration fingerprints cannot silently be retried; reopening retains
+unresolved reservations and the attempt count.
+
+The parent retains its own loopback fixture and accepts no arbitrary endpoint,
+subscription URL, credential or real-node configuration. The sole pre-reservation
+child is a bounded, contained `--build-info` query of the mandatory-guard worker.
+Before even that query, the caller must provide the designated trusted QA
+build's SHA256 through `--worker-sha256`; missing, malformed or mismatched
+digests reject without starting any executable. Hashing an arbitrary path and
+then trusting its own metadata is not sufficient. CI derives the expected hash
+only after explicitly building the known QA target. This known worker's
+identity entry has no networking dispatcher. Before a workload child starts, the
+parent verifies source identity/file hash and commits the entire reservation
+and grant digest. Private pipes carry one grant, a matching guard-installation
+acknowledgement and a separate start message. An HMAC response authenticates the
+owned fixture before workload traffic. Limits and deadlines cannot be reset.
+
+The separate `swirl-private-worker` target requires Cargo feature
+`private-acceptance-worker`. Before its grant it rejects TCP, DNS, UDP, native
+management and listener admission; afterwards it permits only the owned
+loopback endpoint. Ordinary product/optional-quota behavior is unchanged.
+There is no ordinary DLL install command, and the worker is not product payload.
+Its `core_probe` uses the actual Controller start/probe/status/stop path,
+certificate-verified TLS and authenticated HTTP CONNECT to a fixed synthetic
+HEAD/204 origin. This is HTTP through a TLS proxy, not an HTTPS origin, private
+node or Qt UI test.
+
+`PrivateSubscriptionProcess.py` creates a suspended Windows child with
+`STARTUPINFOEX` and `PROC_THREAD_ATTRIBUTE_JOB_LIST`, placing it in the existing
+non-inheritable kill-on-close Job with active-process limit one during process
+creation. The separate handle-list attribute contains only three child stdio
+handles; the Job is never inherited. The owner verifies actual Job membership
+and resumes the retained primary-thread handle exactly once. Unsupported or
+failed attributes reject creation; there is no post-create assignment fallback.
+See [Microsoft's explanation of the creation/assignment crash window](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812).
+The parent deadline is at most eight seconds, independent of Tokio polling.
+Windows exit proof requires both a signaled child handle and an empty Job.
+POSIX process groups support portable synthetic regression, not Windows proof.
+POSIX termination refreshes the owned child's actual status and records a
+successful group kill so concurrent cleanup does not signal it again. A signal
+returning `EPERM` or `ESRCH` is not itself success: the bounded proof still
+requires reaping the owned child and independently observing that its group no
+longer exists. A live child, remaining group or denied absence query cannot
+produce an exit proof or release a reservation.
+The added Windows gate pauses immediately after the real `CreateProcessW`
+returns, before the wrapper takes ownership or performs post-create work. It
+verifies the suspended synthetic Python child's Job membership and limit one, then
+kills the parent. Its observer retains only a real child process handle and
+requires termination, no first-user-code marker and preservation of the prepared
+reservation. It does not retain a Job handle that would defeat kill-on-close,
+does not claim a post-crash Job query, and does not issue an ExitProof. Normal
+owned termination still supplies the full process-signaled/Job-empty proof.
+The separate Rust-worker crash case still kills the parent after an authenticated
+socket becomes active. New atomic-creation, stdio/Unicode/exit-code and API-failure
+tests require actual Windows CI on their own source; prior passes do not cover them.
+Final socket counters must match the grant; child JSON is not exit proof.
+The coordinator checks OS exit, drains/joins output readers, closes child
+handles and all fixture sockets/tasks, and only then settles. Missing receipts,
+malformed output, cleanup failures, uncertain writes and crashes retain the full
+hold. Unknown traffic stays unknown. Socket counts and fixture application
+bytes remain separate; neither is official billing.
+The counted sockets are active egress to the owned fixture. Core's ephemeral
+local listener is not exposed through worker IPC, but its inbound bytes are
+not quota counters; ordinary inbound/UI integration remains unverified.
+
+All three Rust CI jobs build the exact-source worker, run its protocol tests
+and all-target Clippy, then run `tools/tests/test_private_subscription_supervisor.py`.
+The suite covers real quota stops/cancellation, a stalled runtime killed by its
+parent, concurrency, crash holds and failure-to-settle controls. Windows also
+has real Job child-limit and parent-crash cases. A local Linux run on the
+`e17c9a7b` checkout plus this patch passed 18/20 tests; the two Windows cases
+were explicitly skipped. This is not clean-commit Windows acceptance; the new
+source must pass its own CI.
+
+A subsequent pre-query admission correction on `5f5b2b09` plus its patch passed
+seven focused Linux tests: four digest/factory refusal cases, the actual native
+Core 204 positive control, argument redaction and early live refusal. The
+positive control used the previously recorded trusted worker digest, not a hash
+learned from executing the candidate. Windows and all-platform full suites are
+required on the resulting commit.
+
+Supervisor and legacy Qt `--live` both refuse before private paths, ledger
+creation or networking. Authenticated billing, full wire coverage and Qt
+integration remain implementation gaps, in addition to the unavailable original
+private Windows context. Synthetic results do not grant live execution or merge.
+
+## Historical capture harness (unreachable from `--live`)
+
+The legacy path expected a local DPAPI manifest, UTC start/end times for a
+window of at most ten minutes, and a fresh absolute private output directory
+outside a Git repository. Its manifest expected six sources. URLs and
+credentials were never CLI arguments or public report fields. This old path
+has thirty-second source deadlines and can traverse every imported node, so
+it does not meet the current bounded live-round contract. Its existence is
+neither authorization nor a ready execution path. The following descriptions
+and historical checks concern that earlier harness and its retained fixtures.
 
 Each source uses a separate Qt HTTPS client through native `start_once` with
 normal certificate verification, at most thirty seconds and four MiB. Redirects
@@ -45,7 +226,7 @@ routes with isolated node options; they do not prove an independent physical
 egress, UDP/QUIC, full foreign configuration execution, physical TUN, Codex
 Desktop or real-node throughput acceptance. HTTP-header time is not RTT.
 
-## Executed checks before live use
+## Historical executed checks (not current-source live acceptance)
 
 - Actual native RED/GREEN followed by **15/15** route tests, including wrong
   authentication/target before the permit, concurrent claims and the real ABI.

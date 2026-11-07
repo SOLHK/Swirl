@@ -6,6 +6,7 @@
 #include "network/HttpRequestPolicy.h"
 #include "tests/ControlledNetwork.h"
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
@@ -17,10 +18,13 @@
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
 #include <QNetworkReply>
+#include <QProcess>
 #include <QQueue>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <QSet>
+#include <QStandardPaths>
 #include <QSslConfiguration>
 #include <QSslError>
 #include <QSslSocket>
@@ -33,6 +37,7 @@
 #include <memory>
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <sddl.h>
 #include <wincrypt.h>
 #endif
 
@@ -90,6 +95,194 @@ bool roundTrip(const QString &path, const QList<ProxyNode> &nodes, QList<ProxyNo
     for (qsizetype i = 0; i < saved.size(); ++i)
         if (!sameParameters(saved[i], store.nodes()[i])) return false;
     *loaded = store.nodes(); return true;
+}
+
+// This fixed, offline installer fixture uses the product's persistence code.
+// It is deliberately V1 preservation, not a V2 or previous-release migration.
+QList<ProxyNode> installerNodes() {
+    QList<ProxyNode> nodes;
+    for (int i = 0; i < 2; ++i) {
+        ProxyNode node;
+        node.id = QStringLiteral("40000000-0000-4000-8000-00000000008%1").arg(i + 1);
+        node.name = QStringLiteral("Installer synthetic node %1").arg(i + 1);
+        node.protocol = "socks5"; node.host = "127.0.0.1"; node.port = quint16(9 + i);
+        node.username = QStringLiteral("installer-fixture-user-%1").arg(i + 1);
+        node.password = QStringLiteral("installer-fixture-secret-%1").arg(i + 1);
+        node.importSource = "manual-import";
+        nodes.append(node);
+    }
+    return nodes;
+}
+QJsonObject installerNetworkConfiguration() {
+    return {{"schema", 1}, {"proxyPort", 17899}, {"tun", false}, {"allowLan", false},
+        {"dns", QJsonObject{}}, {"rules", QJsonArray{}}, {"groups", QJsonArray{}}};
+}
+bool installerStandardUser(QString *sid) {
+#ifdef Q_OS_WIN
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
+    const auto close = qScopeGuard([&] { CloseHandle(token); });
+    TOKEN_ELEVATION elevation{}; DWORD length = 0;
+    if (!GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &length)
+        || elevation.TokenIsElevated) return false;
+    SID_IDENTIFIER_AUTHORITY authority = SECURITY_NT_AUTHORITY; PSID administrators = nullptr;
+    if (!AllocateAndInitializeSid(&authority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
+                                  0, 0, 0, 0, 0, 0, &administrators)) return false;
+    BOOL member = TRUE;
+    const bool queried = CheckTokenMembership(nullptr, administrators, &member);
+    FreeSid(administrators);
+    if (!queried || member) return false;
+    auto information = [&](TOKEN_INFORMATION_CLASS type) {
+        DWORD size = 0; GetTokenInformation(token, type, nullptr, 0, &size);
+        if (!size || size > 65536) return QByteArray{};
+        QByteArray bytes(int(size), Qt::Uninitialized);
+        return GetTokenInformation(token, type, bytes.data(), size, &size) ? bytes : QByteArray{};
+    };
+    const auto integrity = information(TokenIntegrityLevel);
+    if (integrity.isEmpty()) return false;
+    const auto level = reinterpret_cast<const TOKEN_MANDATORY_LABEL *>(integrity.constData())->Label.Sid;
+    if (!IsValidSid(level) || !*GetSidSubAuthorityCount(level)
+        || *GetSidSubAuthority(level, *GetSidSubAuthorityCount(level) - 1) != SECURITY_MANDATORY_MEDIUM_RID) return false;
+    const auto user = information(TokenUser);
+    if (user.isEmpty()) return false;
+    LPWSTR text = nullptr;
+    if (!ConvertSidToStringSidW(reinterpret_cast<const TOKEN_USER *>(user.constData())->User.Sid, &text)) return false;
+    *sid = QString::fromWCharArray(text); LocalFree(text); return true;
+#else
+    Q_UNUSED(sid); return false;
+#endif
+}
+bool installerLocalPath(const QString &path) {
+#ifdef Q_OS_WIN
+    auto current = QDir::cleanPath(QDir::fromNativeSeparators(path));
+    if (current.size() < 3 || !current[0].isLetter() || current.mid(1, 2) != ":/") return false;
+    while (!current.isEmpty()) {
+        const auto native = QDir::toNativeSeparators(current);
+        const DWORD attributes = GetFileAttributesW(reinterpret_cast<LPCWSTR>(native.utf16()));
+        if (attributes != INVALID_FILE_ATTRIBUTES) {
+            if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) return false;
+        } else if (const auto error = GetLastError(); error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND) return false;
+        const auto parent = QFileInfo(current).absolutePath();
+        if (parent == current) break;
+        current = parent;
+    }
+    return true;
+#else
+    Q_UNUSED(path); return false;
+#endif
+}
+int installerStoreFixture(const QStringList &args) {
+    // --installer-store-fixture create|verify source-sha user-sid store-path receipt
+    if (args.size() != 7) return 2;
+    const auto mode = args[2], path = QDir::cleanPath(QDir::fromNativeSeparators(args[5]));
+    const auto receipt = QDir::cleanPath(QDir::fromNativeSeparators(args[6]));
+    // Receipts must never replace the store, one of its sidecars, or previous
+    // evidence, including when a create request is correctly refused.
+    if (!QDir::isAbsolutePath(receipt) || !installerLocalPath(receipt) || QFileInfo::exists(receipt)
+        || receipt.startsWith(QFileInfo(path).absolutePath() + '/', Qt::CaseInsensitive)) return 2;
+    bool receiptAllowed = false;
+    QJsonObject report{{"schema", 1}, {"kind", "installer-node-store-fixture"},
+        {"scope", "same-package-reinstall-synthetic-v1-node-store"}, {"operation", mode},
+        {"source_sha", RustCoreLibrary::expectedSourceSha()}, {"success", false},
+        {"network_requests", 0}, {"engine_started", false}, {"store_write_attempted", false}};
+    auto finish = [&](const char *error) {
+        if (error) report.insert("error_code", QString::fromLatin1(error));
+        const auto bytes = QJsonDocument(report).toJson(QJsonDocument::Compact);
+        // Scope rejections have no write side effect. Later phase receipts are
+        // new-only even if another process creates the path after validation.
+        if (receiptAllowed) {
+            QFile file(receipt);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)
+                || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+                || file.write(bytes) != bytes.size() || !file.flush()) return 2;
+        }
+        QTextStream(stdout) << bytes << Qt::endl;
+        return report.value("success").toBool() ? 0 : 2;
+    };
+    if ((mode != "create" && mode != "verify")
+        || !QRegularExpression("^[0-9a-f]{40}$").match(args[3]).hasMatch()
+        || args[3] != RustCoreLibrary::expectedSourceSha()) return finish("FixtureSourceOrModeMismatch");
+    if (qEnvironmentVariable("GITHUB_ACTIONS") != "true"
+        || qEnvironmentVariable("RUNNER_ENVIRONMENT") != "github-hosted"
+        || qEnvironmentVariable("SWIRL_DISPOSABLE_INSTALL_TEST") != "1"
+        || qEnvironmentVariableIsSet("SWIRL_TEST_ROOT") || qEnvironmentVariableIsSet("SWIRL_ISOLATED_INSTALL_ROOT")
+        || QStandardPaths::isTestModeEnabled()) return finish("DisposableOrdinaryProfileRequired");
+    report.insert("host_scope_verified", true);
+    QString sid;
+    if (!installerStandardUser(&sid) || sid != args[4]) return finish("ExactStandardUserRequired");
+    QCoreApplication::setOrganizationName("SOLHK"); QCoreApplication::setApplicationName("Swirl");
+    const auto ordinary = QDir::cleanPath(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/nodes.dpapi");
+    if (path.compare(ordinary, Qt::CaseInsensitive) != 0 || !installerLocalPath(path)
+        || !installerLocalPath(path + ".selected")
+        || receipt.startsWith(QDir::cleanPath(QStandardPaths::writableLocation(QStandardPaths::HomeLocation)) + '/', Qt::CaseInsensitive))
+        return finish("OrdinaryNodeStorePathRequired");
+    receiptAllowed = true;
+    report.insert("user_sid", sid); report.insert("store_path", ordinary); report.insert("ordinary_profile", true);
+    auto &library = RustCoreLibrary::instance();
+    // Loading/build-info validation is offline; never invoke an engine command.
+    if (!library.load()) return finish("PairedRustLibraryRequired");
+    report.insert("rust_build_id", RustCoreLibrary::expectedBuildId());
+    report.insert("qt_runtime_version", QString::fromLatin1(qVersion()));
+    const auto expected = installerNodes();
+    const QString subscriptionName = "Installer disabled synthetic subscription";
+    const QUrl subscriptionUrl("http://127.0.0.1:9/installer-disabled-fixture");
+    if (mode == "create") {
+        for (const auto &suffix : QStringList{"", ".selected", ".lock", ".network.json"})
+            if (QFileInfo::exists(path + suffix)) return finish("ExistingStoreRefused");
+        NodeStore store(path);
+        // A competing writer between the initial check and constructor must
+        // also be refused. NodeStore's locked digest check rejects a changed
+        // baseline from another cooperating NodeStore writer before every save.
+        if (QFileInfo::exists(path) || !store.error().isEmpty()) return finish("ExistingStoreRefused");
+        report.insert("store_write_attempted", true);
+        if (!store.importNodes(expected)
+            || !store.saveSubscription({}, subscriptionName, subscriptionUrl, 360, false, "clash", "nodes-only", "system")
+            || !store.saveNetworkConfiguration(installerNetworkConfiguration())
+            || !store.select(expected.last().id)) return finish("ProductionNodeStoreWriteFailed");
+    }
+    auto read = [](const QString &name, qint64 limit) {
+        QFile file(name);
+        if (!file.open(QIODevice::ReadOnly) || file.size() <= 0 || file.size() > limit) return QByteArray{};
+        const auto bytes = file.read(limit + 1);
+        return bytes.size() <= limit && file.error() == QFile::NoError ? bytes : QByteArray{};
+    };
+    const auto ciphertext = read(path, 1024 * 1024), selection = read(path + ".selected", 512);
+    if (!ciphertext.startsWith("SWIRLNODE1\n") || selection.isEmpty()) return finish("V1EncryptedFixtureRequired");
+    for (const auto &node : expected)
+        for (const auto &value : {node.name, node.username, node.password})
+            if (ciphertext.contains(value.toUtf8())) return finish("PlaintextFixtureRejected");
+    if (ciphertext.contains(subscriptionName.toUtf8()) || ciphertext.contains(subscriptionUrl.toEncoded()))
+        return finish("PlaintextFixtureRejected");
+    NodeStore loaded(path);
+    if (!loaded.error().isEmpty() || !loaded.configurationAvailable() || loaded.configurationV2()
+        || loaded.nodes().size() != expected.size()) return finish("ProductionNodeStoreReloadFailed");
+    const auto nodes = loaded.nodes();
+    for (qsizetype i = 0; i < expected.size(); ++i) {
+        const auto &a = nodes[i], &b = expected[i];
+        if (!sameParameters(a, b) || a.name != b.name || a.sourceId != b.sourceId || a.sourceFormat != b.sourceFormat
+            || a.importSource != b.importSource || a.providerAlias != b.providerAlias || a.conversionIssues != b.conversionIssues
+            || a.certificateVerificationEnforced != b.certificateVerificationEnforced
+            || a.transportType != b.transportType || a.securityType != b.securityType) return finish("FixtureNodeSemanticsChanged");
+    }
+    const auto subscriptions = loaded.subscriptions();
+    if (subscriptions.size() != 1) return finish("FixtureSubscriptionChanged");
+    const auto &subscription = subscriptions.first();
+    if (QUuid(subscription.id).isNull() || subscription.name != subscriptionName || subscription.url != subscriptionUrl
+        || subscription.enabled || subscription.lastSuccess != 0 || subscription.intervalMinutes != 360
+        || subscription.formatHint != "clash" || subscription.importScope != "nodes-only" || subscription.downloadRoute != "system")
+        return finish("FixtureSubscriptionChanged");
+    if (loaded.selectedId() != expected.last().id || loaded.networkConfiguration() != installerNetworkConfiguration())
+        return finish("FixtureSelectionOrConfigurationChanged");
+    if (read(path, 1024 * 1024) != ciphertext || read(path + ".selected", 512) != selection)
+        return finish("ReadOnlyReloadChangedStore");
+    report.insert("node_count", nodes.size()); report.insert("subscription_count", subscriptions.size());
+    report.insert("node_parameters_match", true); report.insert("selection_matches", true);
+    report.insert("disabled_subscription_matches", true); report.insert("network_configuration_matches", true);
+    report.insert("dpapi_roundtrip_verified", true); report.insert("plaintext_absent", true);
+    report.insert("read_only_reload", true); report.insert("store_format", "SWIRLNODE1");
+    report.insert("ciphertext_sha256", QString::fromLatin1(QCryptographicHash::hash(ciphertext, QCryptographicHash::Sha256).toHex()));
+    report.insert("selection_sha256", QString::fromLatin1(QCryptographicHash::hash(selection, QCryptographicHash::Sha256).toHex()));
+    report.insert("success", true); return finish(nullptr);
 }
 QJsonObject routeCommand(const QJsonObject &input) {
     auto &library = RustCoreLibrary::instance();
@@ -321,6 +514,27 @@ int selfTest() {
     check(!validWindow(now.addSecs(-601), now.addSecs(1), now));
     check(!validWindow(now.addSecs(-10), now, now));
     check(!validWindow(now.addSecs(1), now.addSecs(2), now));
+    // Exercise the actual CLI boundary. Even a fresh authorization window
+    // cannot replace authenticated billing and enforced wire accounting.
+    const auto refusedOutput = temporary.filePath("refused-live-output");
+    const auto absentManifest = temporary.filePath("absent-manifest.dpapi");
+    const QList<QStringList> liveCommands{
+        {"--live", absentManifest, now.addSecs(-1).toString(Qt::ISODateWithMs),
+            now.addSecs(60).toString(Qt::ISODateWithMs), refusedOutput},
+        {"--live", absentManifest, now.addSecs(-60).toString(Qt::ISODateWithMs),
+            now.addSecs(-1).toString(Qt::ISODateWithMs), refusedOutput},
+        {"--live"}
+    };
+    for (const auto &arguments : liveCommands) {
+        QProcess process;
+        process.start(QCoreApplication::applicationFilePath(), arguments);
+        const bool finished = process.waitForFinished(5000);
+        if (!finished) { process.kill(); process.waitForFinished(1000); }
+        const auto response = QJsonDocument::fromJson(process.readAllStandardOutput()).object();
+        check(finished && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 2
+            && response == QJsonObject{{"errorCode", "AuthenticatedBillingAndWireGuardRequired"}, {"networkStarted", false}}
+            && !QFileInfo::exists(refusedOutput));
+    }
     const QJsonObject privateFixture{{"secret", "synthetic-private-value"}};
     check(writePrivate(temporary.filePath("receipt.dpapi"), privateFixture));
     check(QJsonDocument::fromJson(readPrivate(temporary.filePath("receipt.dpapi"))).object() == privateFixture);
@@ -443,6 +657,11 @@ int main(int argc, char **argv) {
         QTextStream(stdout) << QJsonDocument(QJsonObject{{"errorCode", code}, {"networkStarted", false}})
             .toJson(QJsonDocument::Compact) << Qt::endl; return 2;
     };
+    // The legacy live harness has no authenticated provider accounting,
+    // persistent transport reservation or enforced wire-byte cancellation.
+    // Refuse before reading private inputs or creating any network runtime.
+    if (args.size() > 1 && args[1] == "--live") return fail("AuthenticatedBillingAndWireGuardRequired");
+    if (args.size() > 1 && args[1] == "--installer-store-fixture") return installerStoreFixture(args);
     if (args.size() == 2 && args[1] == "--self-test") return selfTest();
     if (args.size() == 4 && args[1] == "--offline-body") {
         if (!newPrivateDirectory(args[3])) return fail("NewPrivateDirectoryRequired");

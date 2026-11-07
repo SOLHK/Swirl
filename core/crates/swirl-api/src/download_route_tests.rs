@@ -245,29 +245,52 @@ async fn physical_dns_uses_pinned_source_and_rejects_replayed_transaction() {
 #[tokio::test]
 async fn truncated_physical_dns_udp_uses_the_same_pinned_tcp_server() {
     // Reserve the protocol pair together. Windows may exclude a port for only
-    // one transport. Hold failed TCP candidates so port zero cannot select the
-    // same unavailable UDP port again before starting either peer.
+    // one transport. After a second-protocol bind fails, let that protocol's
+    // port-zero allocator choose the next candidate instead of walking through
+    // a contiguous exclusion range from the other allocator. Keep every first
+    // socket owned until both protocols are reserved; never release and rebind.
     let mut pair = None;
-    let mut reserved = Vec::new();
+    let mut reserved_tcp = Vec::new();
+    let mut reserved_udp = Vec::new();
     let mut failures = Vec::new();
+    let mut udp_first = false;
     for _ in 0..16 {
-        let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = tcp.local_addr().unwrap();
-        match tokio::net::UdpSocket::bind(address).await {
-            Ok(udp) => {
-                pair = Some((tcp, udp));
-                break;
+        if udp_first {
+            let udp = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let address = udp.local_addr().unwrap();
+            match TcpListener::bind(address).await {
+                Ok(tcp) => {
+                    pair = Some((tcp, udp));
+                    break;
+                }
+                Err(error) => {
+                    failures.push(("tcp", address.port(), error.kind(), error.raw_os_error()));
+                    reserved_udp.push(udp);
+                    udp_first = false;
+                }
             }
-            Err(error) => {
-                failures.push((address.port(), error.kind(), error.raw_os_error()));
-                reserved.push(tcp);
+        } else {
+            let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = tcp.local_addr().unwrap();
+            match tokio::net::UdpSocket::bind(address).await {
+                Ok(udp) => {
+                    pair = Some((tcp, udp));
+                    break;
+                }
+                Err(error) => {
+                    failures.push(("udp", address.port(), error.kind(), error.raw_os_error()));
+                    reserved_tcp.push(tcp);
+                    udp_first = true;
+                }
             }
         }
     }
     let (tcp, udp) = pair.unwrap_or_else(|| {
         panic!("no available TCP/UDP fixture port pair; failed candidates={failures:?}")
     });
-    drop(reserved);
+    drop(reserved_tcp);
+    drop(reserved_udp);
+    assert_eq!(tcp.local_addr().unwrap(), udp.local_addr().unwrap());
     let endpoint = Endpoint {
         address: tcp.local_addr().unwrap(),
         source: "127.0.0.1".parse().unwrap(),

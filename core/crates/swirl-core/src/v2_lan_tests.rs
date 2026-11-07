@@ -10,6 +10,9 @@ use std::{
 };
 use swirl_subscription::v2::{DEFAULT_POLICY_ID, DefaultPolicy};
 
+#[path = "fixture_ports.rs"]
+mod fixture_ports;
+
 const STORE: &str = "40000000-0000-4000-8000-000000000001";
 const START: &str = "50000000-0000-4000-8000-000000000001";
 const REQUEST: &str = "50000000-0000-4000-8000-000000000002";
@@ -898,29 +901,12 @@ impl DnsPeer {
     }
 
     fn with_ttl(answers: Vec<std::net::Ipv4Addr>, ttl: u32) -> Self {
-        // The ingress guard rejects a DNS endpoint at the Core listener port.
-        // Reserve both protocols so a later TCP port-zero bind cannot claim it.
-        let mut pair = None;
-        let mut reserved = Vec::new();
-        let mut failures = Vec::new();
-        for _ in 0..16 {
-            let tcp = StdListener::bind("127.0.0.1:0").unwrap();
-            let address = tcp.local_addr().unwrap();
-            match StdUdpSocket::bind(address) {
-                Ok(udp) => {
-                    pair = Some((tcp, udp));
-                    break;
-                }
-                Err(error) => {
-                    failures.push((address.port(), error.kind(), error.raw_os_error()));
-                    reserved.push(tcp);
-                }
-            }
-        }
-        let (tcp_reservation, socket) = pair.unwrap_or_else(|| {
-            panic!("no available DNS fixture TCP/UDP port pair; failed candidates={failures:?}")
-        });
-        drop(reserved);
+        // Keep both actual owners: the ingress guard rejects DNS at the Core
+        // listener port, and a TCP port-zero choice need not be available to
+        // UDP on Windows. Known exclusions are filtered before the second
+        // bind; unknown access denials remain fatal fixture errors.
+        let (tcp_reservation, socket) =
+            fixture_ports::reserve_tcp_udp().expect("no available DNS fixture TCP/UDP port pair");
         socket
             .set_read_timeout(Some(Duration::from_millis(50)))
             .unwrap();

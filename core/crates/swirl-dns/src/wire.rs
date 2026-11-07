@@ -311,7 +311,9 @@ pub(super) fn parse(data: &[u8], request: &[u8], host: &str, kind: u16) -> Resul
 }
 async fn exchange(server: SocketAddr, host: &str, kind: u16) -> Result<Answer> {
     let request = query(host, kind)?;
-    let socket = swirl_transport::bind_udp(if server.is_ipv4() {
+    let socket = swirl_transport::bind_udp(if server.ip().is_loopback() {
+        SocketAddr::new(server.ip(), 0)
+    } else if server.is_ipv4() {
         SocketAddr::from(([0, 0, 0, 0], 0))
     } else {
         SocketAddr::from(([0u16; 8], 0))

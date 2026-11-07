@@ -22,6 +22,8 @@ interoperability after the complete REALITY R3 gate, preserving both raw logs.
 The product stage runs subscription-to-target peers on every Rust platform and
 the persisted Qt wrapper on Windows, with Release preflights and exact-source
 evidence. Its separate steps preserve every existing protocol and build gate.
+The VMess stage runs the official-peer suite before each independent peer menu,
+preserving exact-source evidence without changing the historical peer menus.
 It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
@@ -62,6 +64,15 @@ DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py", "test_connect
 CONNECTIVITY_IMPORT_TESTS = ("test_connectivity_diagnostics.py", "test_subscription_import.py")
 SOCKS5_UDP_TEST = "test_socks5_udp.py"
 SOCKS5_UDP_QT_TEST = "test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path"
+VMESS_SOURCES = (
+    Path("tools/tests/run_vmess_ci_acceptance.py"),
+    Path("tools/tests/test_vmess_xray.py"),
+    Path("tools/tests/transport_peer.py"),
+    Path("tools/tests/transport-peer-lock.json"),
+    Path("tools/Fetch-TransportPeers.py"),
+    Path("core/crates/swirl-core/examples/transport-runtime.rs"),
+    Path("core/crates/swirl-protocol/examples/transport-client.rs"),
+)
 REALITY_TESTS = ("test_reality_peer.py", "test_reality_tls.py")
 REALITY_SOURCES = (
     Path("core/crates/swirl-transport/examples/reality-client.rs"),
@@ -343,8 +354,10 @@ def public_qt_steps() -> str:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           if (-not $IsWindows -or [string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or -not (Test-Path -LiteralPath $env:SWIRL_QT_PRIVATE_INSPECTOR -PathType Leaf)) { throw "Required Windows Qt DPAPI inspector is missing" }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_public_qt_reality.py
@@ -474,8 +487,66 @@ def product_chain_steps(windows: bool = False, qt: bool = False,
     )
 
 
+def vmess_steps() -> str:
+    """One unchanged official-peer command and its exact source-bound evidence."""
+    return (
+        "      - name: VMess official peer HTTP HTTPS and transport lifecycle\n"
+        "        working-directory: .\n"
+        '        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"\n'
+        "      - name: Preserve current VMess official peer evidence\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2\n"
+        "        with:\n"
+        "          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}\n"
+        "          path: ${{ runner.temp }}/swirl-vmess-acceptance\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def _vmess_peer_anchor(windows: bool) -> str:
+    title = "Independent TLS and protocol peers" if windows else "Independent portable protocol peers"
+    return f"      - name: {title}\n"
+
+
+def without_vmess_steps(source: str) -> str:
+    """Strip only complete gates from both jobs before historical validation."""
+    markers = ("run_vmess_ci_acceptance.py", "test_vmess_xray.py", "swirl-vmess-acceptance",
+               "VMess official peer", "Swirl-VMess-Acceptance")
+    if not any(marker in source for marker in markers):
+        return source
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI VMess job boundaries drifted; review required")
+    block = vmess_steps()
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        anchor = _vmess_peer_anchor(windows=bool(index))
+        if part.count(block) != 1 or part.count(anchor) != 1 or part.count(block + anchor) != 1:
+            raise ValueError("Rust CI VMess test/evidence gate must precede each independent peer menu")
+        part = part.replace(block, "", 1)
+        if any(marker in part for marker in markers):
+            raise ValueError("Rust CI VMess stage is partial, duplicated or changed; review required")
+        parts[index] = part
+    return separator.join(parts)
+
+
+def _add_vmess_steps(source: str) -> str:
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI VMess insertion job boundaries drifted; review required")
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        anchor = _vmess_peer_anchor(windows=bool(index))
+        if part.count(anchor) != 1:
+            raise ValueError("Rust CI VMess peer insertion boundary drifted; review required")
+        parts[index] = part.replace(anchor, vmess_steps() + anchor, 1)
+    return separator.join(parts)
+
+
 def without_product_chain_steps(source: str) -> str:
     """Accept a complete prior stage or all three exact product gates."""
+    source = without_vmess_steps(source)
     markers = (PRODUCT_CHAIN_TEST, "SWIRL_PRODUCT_EVIDENCE", "Product-Chain-",
                "Subscription to native proxy", "Subscription through persisted Qt")
     if not any(marker in source for marker in markers):
@@ -722,6 +793,10 @@ QT_TEST_ARTIFACT = """      - name: Preserve isolated Qt test reports
             build/rust-qt/swirl-rust-qt-integration.xml
             build/rust-qt/swirl-import-boundaries.xml
             build/removed-runtime/rejection.log
+            build-evidence/qt-product-rust-d3d-capture/
+            build-evidence/qt-product-rust-d3d-quic/
+            build-evidence/qt-product-rust-d3d-integration/
+            build-evidence/qt-product-rust-d3d-public/
           if-no-files-found: warn
           retention-days: 7
 """
@@ -1128,8 +1203,8 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return _add_public_qt_steps(_add_fingerprint_steps(_add_reality_runtime_steps(
-        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts)))))))
+    return _add_vmess_steps(_add_public_qt_steps(_add_fingerprint_steps(_add_reality_runtime_steps(
+        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts))))))))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -1185,6 +1260,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in FINGERPRINT_SOURCES:
         if not (repository / relative).is_file():
             raise ValueError(f"Required independent fingerprint source is missing: {relative.as_posix()}")
+    for relative in VMESS_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required official VMess peer source is missing: {relative.as_posix()}")
     return path, before, after
 
 

@@ -5,10 +5,10 @@ use crate::dial::{connect_tcp, within};
 use std::{io, net::SocketAddr, time::Duration};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound};
-use swirl_transport::bind_udp;
+use swirl_transport::{TcpConnection, bind_udp};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::{TcpStream, UdpSocket},
+    net::UdpSocket,
     time::Instant,
 };
 use zeroize::Zeroizing;
@@ -87,7 +87,7 @@ pub(super) async fn request<S: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub struct UdpAssociation {
-    control: TcpStream,
+    control: TcpConnection,
     socket: UdpSocket,
 }
 

@@ -9,11 +9,41 @@ NodeTestService::~NodeTestService(){cancel();}
 QString NodeTestService::nodeReference(const QString &id){
  return QString::fromLatin1(QCryptographicHash::hash(id.toUtf8(),QCryptographicHash::Sha256).toHex().left(12));
 }
+QString NodeTestService::failureStatusText(const QVariantMap &result){
+ const auto phase=result.value("phase").toString(),code=result.value("failureCode").toString();
+ if(code=="ProbeEgressNetworkConflict")return QStringLiteral("网络路由冲突");
+ if(code.startsWith("ProbeEgress"))return QStringLiteral("物理出口不可用");
+ const bool timeout=QStringList{"UrlTestTimeout","UpstreamDnsTimeout","DnsTimeout","TuicDnsTimeout","Hysteria2DnsTimeout","UpstreamTcpTimeout",
+  "UpstreamTlsTimeout","TlsHandshakeIoTimeout","UpstreamProtocolTimeout","QuicHandshakeTimeout","RealityHandshakeTimeout",
+  "WebSocketUpgradeTimeout","InitialWriteTimeout","ProbeDeadlineExceeded"}.contains(code);
+ const bool certificate=QStringList{"TlsCertificateExpired","TlsCertificateNotValidYet","TlsCertificateNameMismatch",
+  "TlsCertificateUnknownIssuer","TlsCertificateRevoked","TlsCertificateInvalid","TlsCertificateMissing"}.contains(code);
+ if(phase=="configuration")return QStringLiteral("配置无效");
+ if(phase=="startup")return QStringLiteral("内核启动失败");
+ if(phase=="dns")return timeout?QStringLiteral("DNS 超时"):QStringLiteral("DNS 失败");
+ if(phase=="tcp_connect"||phase=="outbound_connect")return timeout?QStringLiteral("连接超时"):QStringLiteral("连接失败");
+ if(phase=="outbound_handshake")return certificate?QStringLiteral("TLS 验证失败"):timeout?QStringLiteral("握手超时"):QStringLiteral("握手失败");
+ if(phase=="origin_tls")return timeout?QStringLiteral("目标 TLS 超时"):QStringLiteral("目标 TLS 失败");
+ if(phase=="request_write")return timeout?QStringLiteral("请求超时"):QStringLiteral("请求失败");
+ if(phase=="response_headers")return timeout?QStringLiteral("响应超时"):QStringLiteral("响应失败");
+ if(phase=="http_status")return QStringLiteral("HTTP 异常");
+ if(phase=="input")return QStringLiteral("测试地址无效");
+ if(phase=="timeout"&&timeout)return QStringLiteral("测试超时");
+ const auto error=result.value("error").toString();
+ return timeout||error.contains("timeout",Qt::CaseInsensitive)||error.contains(QStringLiteral("超时"))?QStringLiteral("超时"):QStringLiteral("测试失败");
+}
 EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &source){
- // Keep only node data. A test must not inherit saved TUN, LAN, routing,
- // authentication, external executable paths or the live resolver owner.
+ // Preserve resolver data as well as nodes: the configured DNS/hosts may be
+ // the only way to resolve a node endpoint. configuration() still validates
+ // the entire map; invalid options must fail instead of falling back to the OS.
+ // This creates an independent resolver, never inheriting live TUN, LAN,
+ // routing, inbound authentication or system-network ownership.
  EngineStartOptions result;
- result.nodes=source.nodes;
+ result.nodes=source.nodes;result.dnsConfig=source.dnsConfig;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+  result.privateUiDnsTrust=source.privateUiDnsTrust;
+#endif
+ result.internalProbePhysicalEgress=source.internalProbePhysicalEgress;
  result.proxyPort=0;result.internalProbeListener=true;
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
@@ -102,7 +132,9 @@ void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVarian
 }
 void NodeTestService::record(const QString &id,QVariantMap row){
  row["nodeReference"]=nodeReference(id);
- row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");row["resolverPolicy"]=QStringLiteral("isolated_default_dns");
+ row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");
+ row["resolverPolicy"]=m_options.dnsConfig.isEmpty()?QStringLiteral("isolated_default_dns"):QStringLiteral("isolated_configured_dns");
+ row["egressPolicy"]=m_options.internalProbePhysicalEgress?QStringLiteral("isolated_physical_egress"):QStringLiteral("system_routes");
  row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;
  if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",QStringLiteral("节点 #%1 · %2 · %3 · %4").arg(row.value("nodeReference").toString(),row.value("phase").toString(),row.value("failureCode").toString(),row.value("error").toString()));}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();

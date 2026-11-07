@@ -13,6 +13,9 @@
 #include <memory>
 
 class QNetworkReply;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+class PrivateUiQuotaSession;
+#endif
 class NodeImportService final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantList providers READ providers NOTIFY changed)
@@ -78,12 +81,32 @@ public:
     // recovery. It must never force downloads through the selected node.
     void setDownloadProxy(int port);
     void rememberOwnedProxyPort(int port);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    // Read-only observations. QML cannot construct or install the capability.
+    QVariantMap privateUiImportEvidence() const;
+#endif
 signals:
     void changed();
     void nodesApplied();
     // Fixed request metadata only; never emit URLs, response bodies or headers.
     void downloadDiagnostic(const QString &message);
 private:
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    friend class PrivateUiQuotaSession;
+    struct PrivateUiImportCapability {
+        QUrl url;
+        QByteArray ca,bodyDigest;
+        quint16 proxyPort=0;
+        std::function<bool()> guardActive;
+        bool revoked=false,started=false,tlsVerified=false,responseVerified=false;
+        int requests=0,httpStatus=0;
+        qint64 responseBytes=0;
+    };
+    std::unique_ptr<PrivateUiImportCapability> m_privateUiImport;
+    QString m_privateUiImportFailure;
+    bool privateUiImportAllowed(const QUrl &);
+    void privateUiImportReject(const char *);
+#endif
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);

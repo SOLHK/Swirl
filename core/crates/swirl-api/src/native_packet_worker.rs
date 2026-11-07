@@ -389,6 +389,8 @@ fn status(session: &Option<Session>, profile: &TokenProfile, stopped: bool) -> V
 /// Only the exact internal bin should invoke this endpoint. An actual restricted
 /// token is required, but is not sufficient to authenticate a production broker.
 pub fn run() -> io::Result<()> {
+    // Inherited packet resources are outside the private TCP socket quota.
+    swirl_transport::egress::check_unmetered_egress()?;
     let profile = current_token_profile()?;
     token_gate(&profile)?;
     let _egress = EgressLease::acquire_suspended()?;

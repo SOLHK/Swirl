@@ -198,6 +198,8 @@ impl Core {
     ) -> Result<Self> {
         config.validate()?;
         validate_transports(&config, &transports)?;
+        swirl_transport::egress::check_private_listener(config.listen)
+            .map_err(|_| "PrivateQuotaListenerDenied")?;
         let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
@@ -394,6 +396,18 @@ impl Core {
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
     ) -> Result<ProbeStatus> {
+        self.probe_start_with_egress(url, timeout_ms, expected_status, false)
+    }
+
+    /// Internal isolated-worker probe. Physical egress is request-scoped and
+    /// never changes this Core's listener, another Core, or the TUN owner.
+    pub fn probe_start_with_egress(
+        &self,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        physical_egress: bool,
+    ) -> Result<ProbeStatus> {
         if self.runtime.is_none() {
             return Err("CoreStopped");
         }
@@ -410,6 +424,15 @@ impl Core {
         };
         options.target()?;
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        if physical_egress
+            && (!plan.config.listen.ip().is_loopback()
+                || plan.config.listen.port() != 0
+                || !plan.config.rules.is_empty()
+                || !plan.config.selectors.is_empty()
+                || plan.config.smart_routing)
+        {
+            return Err("ProbePhysicalWorkerRequired");
+        }
         let node = plan
             .config
             .nodes
@@ -422,7 +445,7 @@ impl Core {
         let outbound = node.outbound.clone();
         let transport = plan.transports.get(&node.id).cloned();
         let resolver = plan.resolver.clone();
-        self.probe.start_with(async move {
+        let request = async move {
             if let Some(transport) = transport {
                 swirl_protocol::url_test_head_with_transport(
                     &outbound,
@@ -434,6 +457,26 @@ impl Core {
                 .await
             } else {
                 swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
+            }
+        };
+        self.probe.start_with(async move {
+            if physical_egress {
+                swirl_transport::egress::with_physical_probe(request)
+                    .await
+                    .unwrap_or_else(|error| {
+                        Err(swirl_protocol::UrlTestFailure {
+                            stage: swirl_protocol::UrlTestStage::OutboundConnect,
+                            code: match error.kind() {
+                                std::io::ErrorKind::AlreadyExists => "ProbeEgressNetworkConflict",
+                                std::io::ErrorKind::Unsupported => "ProbeEgressUnsupported",
+                                _ => "ProbeEgressUnavailable",
+                            },
+                            http_status: None,
+                            outbound_timing: None,
+                        })
+                    })
+            } else {
+                request.await
             }
         })
     }

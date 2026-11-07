@@ -9,7 +9,7 @@ pub mod quic;
 pub mod reality;
 mod udp;
 pub mod xhttp;
-pub use egress::connect_tcp;
+pub use egress::{TcpConnection, connect_tcp};
 pub use udp::{bind_udp, bind_udp_inbound, reserve_datagram_buffers};
 
 use std::{

@@ -549,6 +549,8 @@ mod windows {
         Ok(())
     }
     pub fn run(arguments: Vec<String>) -> io::Result<()> {
+        // A helper is a new process and cannot inherit an installed TCP quota.
+        swirl_transport::egress::check_unmetered_egress()?;
         if arguments.len() != 4 || arguments[0] != "--pipe" || arguments[2] != "--gui-pid" {
             return Err(invalid("BrokerArguments"));
         }

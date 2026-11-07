@@ -291,6 +291,71 @@ private slots:
         QVERIFY(!controller.setTunEnabled(false));QVERIFY(controller.tunRequested());QVERIFY(controller.processAlive());
         QCOMPARE(bytes(path),before);QVERIFY(!controller.routingError().isEmpty());
     }
+    void probeEgressUsesActualCaptureOwnershipInsteadOfTheSavedPreference(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("probe-egress-state.dpapi"));
+        controller.m_options.tunEnabled=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.state=ProxyEngine::State::Running;engine->current.processAlive=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        controller.m_options.tunEnabled=false;engine->current.tunCapturePossible=true;
+        QVERIFY(controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.state=ProxyEngine::State::Degraded;engine->current.tunEnabled=false;
+        QVERIFY(controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.tunRecoveryRequired=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        QVERIFY(!controller.canStart());QVERIFY(!controller.nodeProbeReady());
+        QVERIFY(controller.nodeError().contains(QStringLiteral("TUN")));
+        controller.testAllNodes(QUrl("http://127.0.0.1:9/probe"));QVERIFY(!controller.m_tests.busy());
+        engine->current.tunRecoveryRequired=false;
+        engine->current.tunCapturePossible=false;engine->current.processAlive=false;engine->current.state=ProxyEngine::State::Stopped;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+    }
+#ifdef Q_OS_WIN
+    void tunStartWaitsForOldProbeSockets_data(){
+        QTest::addColumn<int>("action");
+        QTest::newRow("continue-original-connection-intent")<<0;
+        QTest::newRow("stop-withdraws-intent")<<1;
+        QTest::newRow("queued-stop-and-new-start")<<2;
+    }
+    void tunStartWaitsForOldProbeSockets(){
+        QFETCH(int,action);
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("probe-start-barrier.dpapi"));
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        auto candidate=controller.m_options;candidate.tunEnabled=true;candidate.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
+        QVERIFY(controller.applyPolicyConfiguration(document(),candidate));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
+        ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Controlled pending probe";
+        node.protocol="socks5";node.host="127.0.0.1";node.port=stalled.serverPort();
+        EngineStartOptions options;options.nodes={node};
+        controller.m_tests.start(options,{node.id},QUrl("http://127.0.0.1:9/probe"));
+        QTRY_VERIFY_WITH_TIMEOUT(stalled.hasPendingConnections(),10000);
+        auto *socket=stalled.nextPendingConnection();QVERIFY(socket);socket->setParent(&stalled);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable()>0,2000);
+        QVERIFY(controller.m_tests.busy());
+        bool replacedIntent=false;
+        // The observer must disconnect before controller/member destruction
+        // can emit changed(), including on an assertion's early return.
+        QObject probeObserver;
+        connect(&controller.m_tests,&NodeTestService::changed,&probeObserver,[&]{
+            if(action!=2||replacedIntent||controller.m_tests.busy()||!controller.m_startAfterProbes)return;
+            replacedIntent=true;controller.stop();controller.connectConfiguredPolicy();
+        });
+        controller.connectConfiguredPolicy();
+        QVERIFY(controller.m_startAfterProbes);QCOMPARE(engine->starts,0);
+        if(action==1)controller.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.m_tests.busy(),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->state()==QAbstractSocket::UnconnectedState,3000);
+        if(action==1){QTest::qWait(50);QCOMPARE(engine->starts,0);QVERIFY(!controller.processAlive());}
+        else {QTRY_COMPARE_WITH_TIMEOUT(engine->starts,1,5000);QTest::qWait(50);QCOMPARE(engine->starts,1);QVERIFY(controller.processAlive());}
+        QCOMPARE(replacedIntent,action==2);
+        QVERIFY(!controller.m_startAfterProbes);QVERIFY(!controller.m_tests.busy());
+        QVERIFY(controller.m_tests.message().contains(QStringLiteral("已取消")));
+    }
+#endif
 #endif
     void acceptedMutationRejectsAConcurrentWriterWithoutReplacingItsRequest(){
         QTemporaryDir dir;EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("nodes.dpapi"));

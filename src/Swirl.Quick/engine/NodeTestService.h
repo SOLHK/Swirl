@@ -20,6 +20,7 @@ public:
  ~NodeTestService() override;
  static EngineStartOptions isolatedOptions(const EngineStartOptions &);
  static QString nodeReference(const QString &id);
+ static QString failureStatusText(const QVariantMap &result);
  void start(const EngineStartOptions &,const QStringList &ids,const QUrl &url);
  Q_INVOKABLE void cancel();
  // A catalog change invalidates results for the old connection parameters.

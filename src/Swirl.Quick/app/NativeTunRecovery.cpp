@@ -17,24 +17,37 @@ bool registryError(QString *error, const char *stage, LSTATUS status) {
     if (error) *error = QStringLiteral("%1 (Windows %2)").arg(QString::fromLatin1(stage)).arg(status);
     return false;
 }
-bool recoveryPending(bool *pending, QString *error) {
-    *pending = false;
+}
+#endif
+
+NativeTunRecoveryState nativeTunRecoveryState(QString *error) {
+    if (error) error->clear();
+#ifdef Q_OS_WIN
     HKEY key = nullptr;
     const auto opened = RegOpenKeyExW(HKEY_CURRENT_USER, MarkerKey, 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &key);
-    if (opened == ERROR_FILE_NOT_FOUND) return true;
-    if (opened != ERROR_SUCCESS) return registryError(error, "TunRecoveryMarkerRead", opened);
+    if (opened == ERROR_FILE_NOT_FOUND) return NativeTunRecoveryState::Clear;
+    if (opened != ERROR_SUCCESS) {
+        registryError(error, "TunRecoveryMarkerRead", opened);
+        return NativeTunRecoveryState::Unknown;
+    }
     const auto close = qScopeGuard([&] { RegCloseKey(key); });
     DWORD type = 0, value = 0, bytes = sizeof(value);
     const auto queried = RegQueryValueExW(key, MarkerValue, nullptr, &type, reinterpret_cast<BYTE *>(&value), &bytes);
-    if (queried == ERROR_FILE_NOT_FOUND) return true;
-    if (queried != ERROR_SUCCESS) return registryError(error, "TunRecoveryMarkerRead", queried);
-    if (type != REG_DWORD || bytes != sizeof(value) || value > 1)
-        return registryError(error, "TunRecoveryMarkerInvalid", ERROR_INVALID_DATA);
-    *pending = value == 1;
-    return true;
-}
-}
+    if (queried == ERROR_FILE_NOT_FOUND) return NativeTunRecoveryState::Clear;
+    if (queried != ERROR_SUCCESS) {
+        registryError(error, "TunRecoveryMarkerRead", queried);
+        return NativeTunRecoveryState::Unknown;
+    }
+    if (type != REG_DWORD || bytes != sizeof(value) || value > 1) {
+        registryError(error, "TunRecoveryMarkerInvalid", ERROR_INVALID_DATA);
+        return NativeTunRecoveryState::Unknown;
+    }
+    return value == 1 ? NativeTunRecoveryState::Pending : NativeTunRecoveryState::Clear;
+#else
+    // This marker describes Windows native TUN ownership only.
+    return NativeTunRecoveryState::Clear;
 #endif
+}
 
 bool setNativeTunRecoveryPending(bool pending, QString *error) {
     if (error) error->clear();
@@ -62,10 +75,10 @@ bool setNativeTunRecoveryPending(bool pending, QString *error) {
 int recoverNativeTunForMaintenance(QString *error) {
     if (error) error->clear();
 #ifdef Q_OS_WIN
-    bool pending = false;
-    if (!recoveryPending(&pending, error)) return 2;
+    const auto state = nativeTunRecoveryState(error);
+    if (state == NativeTunRecoveryState::Unknown) return 2;
     // Ordinary installs and previously confirmed sessions never request UAC.
-    if (!pending) return 0;
+    if (state == NativeTunRecoveryState::Clear) return 0;
     NativeTunBrokerClient broker;
     if (!broker.launch(error)) return 2;
     const auto id = QUuid::createUuid().toString(QUuid::WithoutBraces);

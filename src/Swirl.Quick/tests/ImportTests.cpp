@@ -76,6 +76,49 @@ public:
 class ImportTests:public QObject {
     Q_OBJECT
 private slots:
+    void emptyUriCertificatePinDoesNotBlockVerifiedTls() {
+        const QByteArray uri = "trojan://secret@example.invalid:443?type=tcp&pcs=&sni=example.invalid#Fixture";
+        const auto parsed = NodeImporter::parse(uri);
+        QVERIFY2(parsed, qPrintable(parsed.error));
+        QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+        QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri").toString(), QString::fromUtf8(uri));
+        const auto pinned = NodeImporter::parse(QByteArray(uri).replace("pcs=", "pcs=nonempty"));
+        QVERIFY(pinned);
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(pinned.nodes.first()).isEmpty());
+        QVERIFY(!NodeImporter::parse(QByteArray(uri).replace("pcs=", "pcs=&pcs=")));
+    }
+    void mixedAnyTlsShareLinksStayInCatalog() {
+        const QByteArray any = "anytls://p%40ss@example.invalid/?sni=edge.invalid&insecure=0#Any";
+        const QByteArray trojan = "trojan://p@other.invalid:443#Trojan";
+        for (const auto &mixed : {any + "\r\n" + trojan, trojan + "\n" + any}) {
+            const auto parsed = NodeImporter::parse(mixed.toBase64());
+            QVERIFY2(parsed, qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.size(), 2);
+            const auto &node = parsed.nodes[mixed.startsWith(any) ? 0 : 1];
+            QCOMPARE(node.protocol, QStringLiteral("anytls"));
+            QCOMPARE(node.password, QStringLiteral("p@ss"));
+            QCOMPARE(node.port, 443);
+            QCOMPARE(node.serverName, QStringLiteral("edge.invalid"));
+            QCOMPARE(node.originalConfiguration.value("uri").toString(), QString::fromUtf8(any));
+            QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+        }
+        const auto insecure = NodeImporter::parse(QByteArray(any).replace("insecure=0", "insecure=1"));
+        QVERIFY(insecure);
+        QVERIFY(!insecure.nodes.first().conversionIssues.isEmpty());
+        QVERIFY(!insecure.nodes.first().parameters.value("skip-cert-verify").toBool());
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(insecure.nodes.first()).isEmpty());
+        QVERIFY(!NodeImporter::parse(QByteArray(any).replace("insecure=0", "insecure=bogus")));
+        QVERIFY(!NodeImporter::parse(QByteArray(any).replace("insecure=0", "sni=other.invalid")));
+        const QByteArray yaml = "proxies:\n - {name: Any, type: anytls, server: example.invalid, port: 443, password: secret, skip-cert-verify: true}\n - {name: Trojan, type: trojan, server: other.invalid, port: 443, password: secret}";
+        const auto mixedYaml = NodeImporter::parse(yaml);
+        QVERIFY2(mixedYaml, qPrintable(mixedYaml.error));
+        QCOMPARE(mixedYaml.nodes.size(), 2);
+        QVERIFY(mixedYaml.nodes.first().certificateVerificationEnforced);
+        QVERIFY(!mixedYaml.nodes.first().parameters.value("skip-cert-verify").toBool());
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(mixedYaml.nodes.first()).isEmpty());
+        QVERIFY(mixedYaml.nodes.first().publicInfo().value("normalizationNotes").toString().contains("AnyTLS"));
+    }
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
     void tcpUriTransportRequirementsRemainBlockedAfterPersistence() {
         const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);

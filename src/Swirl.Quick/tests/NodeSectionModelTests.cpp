@@ -127,7 +127,269 @@ private slots:
         for(int iteration=0;iteration<20;++iteration)source.updateRows(rows);
         model.setProviders({});QCOMPARE(about.size(),0);QCOMPARE(synced.size(),0);QCOMPARE(changed.size(),0);
     }
-    void largeReorderingIsOnePermutationAndLatencyUpdateIsOneProjection() {
+    void synchronousProjectionCommitsLatestReentrantQuery() {
+        NodeViewModel source;source.updateRows({node("a","Alpha"),node("b","Beta"),node("c","Gamma")});
+        NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QCOMPARE(model.projectionDelayMs(),0);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced);
+        bool retargeted=false;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{
+            if(!retargeted){retargeted=true;source.setQuery("Gamma");}
+        });
+        source.setQuery("Beta");
+        // No event-loop turn is needed when reentry precedes row mutation.
+        QVERIFY(retargeted);QVERIFY(!model.projectionPending());QCOMPARE(source.query(),QString("Gamma"));
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));
+        QCOMPARE(model.get(1).value("id").toString(),QString("c"));QCOMPARE(model.indexOfNode("b"),-1);
+        QCOMPARE(about.size(),1);QCOMPARE(committing.size(),1);QCOMPARE(synced.size(),1);
+    }
+    void firstFillCommitsLatestReentrantSourceSynchronously() {
+        NodeViewModel first,latest;first.updateRows({node("b","Beta")});latest.updateRows({node("c","Gamma")});
+        NodeSectionModel model;model.setProjectionDelayMs(80);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced);
+        bool replaced=false;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{
+            if(!replaced){replaced=true;model.setSource(&latest);}
+        });
+        model.setSource(&first);
+        QVERIFY(replaced);QVERIFY(!model.projectionPending());QCOMPARE(model.source(),&latest);
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        QTest::qWait(100);QCOMPARE(synced.size(),1);
+    }
+    void synchronousRowNotificationReentryWaitsForLatestCommit() {
+        NodeViewModel source;source.updateRows({node("a","Alpha"),node("b","Beta"),node("c","Gamma")});
+        NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced);
+        bool retargeted=false,hidden=false,notificationsProtected=true;
+        int transactionDepth=0,maximumDepth=0;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{hidden=true;});
+        connect(&model,&NodeSectionModel::synced,&model,[&]{hidden=false;});
+        connect(&model,&QAbstractItemModel::rowsAboutToBeRemoved,&model,[&]{
+            maximumDepth=std::max(maximumDepth,++transactionDepth);
+            notificationsProtected&=model.projectionPending()&&hidden;
+            if(!retargeted){retargeted=true;source.setQuery("Gamma");}
+        });
+        connect(&model,&QAbstractItemModel::rowsRemoved,&model,[&]{
+            notificationsProtected&=model.projectionPending()&&hidden;
+            --transactionDepth;
+        });
+        source.setQuery("Beta");
+        // Finish the current Qt transaction before applying the new snapshot.
+        // The view remains hidden/pending; it must not receive an early synced.
+        QVERIFY(retargeted);QVERIFY(model.projectionPending());QVERIFY(hidden);
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(model.get(1).value("id").toString(),QString("b"));
+        QCOMPARE(synced.size(),0);QCOMPARE(transactionDepth,0);QCOMPARE(maximumDepth,1);
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QVERIFY(notificationsProtected);QVERIFY(!hidden);QCOMPARE(transactionDepth,0);QCOMPARE(maximumDepth,1);
+        QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));QCOMPARE(model.nodeIds(),QStringList({"c"}));
+        QCOMPARE(about.size(),1);QCOMPARE(committing.size(),2);QCOMPARE(synced.size(),1);
+    }
+    void dataNotificationFilterReentryPreservesAllRangeIndexes() {
+        NodeViewModel source;QVariantList rows{node("a","Alpha"),node("b","Beta"),node("c","Gamma")};
+        source.updateRows(rows);NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced);
+        QList<QPair<int,int>> ranges;
+        int notificationDepth=0,maximumDepth=0;
+        bool retargeted=false,indexesValid=true,logicalIdsImmediate=false,logicalIdsNotified=false,rowsInsideDataNotification=false;
+        connect(&model,&NodeSectionModel::changed,&model,[&]{
+            if(model.projectionPending()&&model.nodeIds()==QStringList({"b"}))logicalIdsNotified=true;
+        });
+        connect(&model,&QAbstractItemModel::rowsAboutToBeRemoved,&model,[&]{
+            rowsInsideDataNotification|=notificationDepth>0;
+        });
+        connect(&model,&QAbstractItemModel::dataChanged,&model,[&](const QModelIndex &first,const QModelIndex &last){
+            maximumDepth=std::max(maximumDepth,++notificationDepth);
+            indexesValid&=first.isValid()&&last.isValid()&&first.model()==&model&&last.model()==&model
+                &&first.row()>=0&&last.row()>=first.row()&&last.row()<model.rowCount();
+            ranges.append({first.row(),last.row()});
+            if(!retargeted){
+                retargeted=true;source.setQuery("Beta");
+                logicalIdsImmediate=model.nodeIds()==QStringList({"b"})&&model.count()==1&&model.projectionPending();
+            }
+            --notificationDepth;
+        });
+        auto alpha=rows[0].toMap(),gamma=rows[2].toMap();alpha["latency"]="5";gamma["latency"]="9";
+        rows[0]=alpha;rows[2]=gamma;source.updateRows(rows);
+        // Both nonadjacent ranges still belong to the unchanged displayed
+        // model. The requested filter cannot remove the second range early.
+        QCOMPARE(ranges,(QList<QPair<int,int>>{{1,1},{3,3}}));
+        QVERIFY(indexesValid);QVERIFY(logicalIdsImmediate);QVERIFY(logicalIdsNotified);
+        QVERIFY(model.projectionPending());QCOMPARE(model.rowCount(),4);QCOMPARE(synced.size(),0);
+        QCOMPARE(committing.size(),0);QCOMPARE(maximumDepth,1);QVERIFY(!rowsInsideDataNotification);
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QVERIFY(indexesValid);QCOMPARE(notificationDepth,0);QCOMPARE(maximumDepth,1);QVERIFY(!rowsInsideDataNotification);
+        QCOMPARE(source.query(),QString("Beta"));QCOMPARE(model.nodeIds(),QStringList({"b"}));
+        QCOMPARE(keys(model),QStringList({"section:manual","node:b"}));
+        QCOMPARE(about.size(),1);QCOMPARE(committing.size(),1);QCOMPARE(synced.size(),1);
+    }
+    void reentrantValueUpdatesCoalesceWithoutProjectionOrRecursion() {
+        NodeViewModel source;QVariantList rows{node("a","Alpha"),node("b","Beta"),node("c","Gamma")};
+        source.updateRows(rows);NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced),removed(&model,&QAbstractItemModel::rowsRemoved),
+            inserted(&model,&QAbstractItemModel::rowsInserted),moved(&model,&QAbstractItemModel::rowsMoved);
+        int callbacks=0,notificationDepth=0,maximumDepth=0,latestValue=1;
+        bool indexesValid=true,neverProjected=true;
+        QStringList displayedValues;
+        connect(&model,&QAbstractItemModel::dataChanged,&model,[&](const QModelIndex &first,const QModelIndex &last){
+            maximumDepth=std::max(maximumDepth,++notificationDepth);++callbacks;
+            indexesValid&=first.isValid()&&last.isValid()&&first.model()==&model&&last.model()==&model
+                &&first.row()>=0&&last.row()>=first.row()&&last.row()<model.rowCount();
+            neverProjected&=!model.projectionPending();
+            displayedValues.append(model.get(model.indexOfNode("a")).value("latency").toString());
+            if(callbacks<=3)for(int update=0;update<2;++update){
+                auto alpha=rows[0].toMap();alpha["latency"]=QString::number(++latestValue);rows[0]=alpha;source.updateRows(rows);
+            }
+            --notificationDepth;
+        });
+        auto alpha=rows[0].toMap();alpha["latency"]="1";rows[0]=alpha;source.updateRows(rows);
+        QCOMPARE(callbacks,1);QCOMPARE(maximumDepth,1);QCOMPARE(displayedValues,QStringList({"1"}));
+        QCOMPARE(model.get(model.indexOfNode("a")).value("latency").toString(),QString("1"));
+        QVERIFY(QTest::qWaitFor([&]{return callbacks==4&&model.get(model.indexOfNode("a")).value("latency").toString()=="7";},1000));
+        QVERIFY(indexesValid);QVERIFY(neverProjected);QVERIFY(!model.projectionPending());
+        QCOMPARE(notificationDepth,0);QCOMPARE(maximumDepth,1);QCOMPARE(latestValue,7);
+        QCOMPARE(displayedValues,QStringList({"1","3","5","7"}));
+        QCOMPARE(source.find("a").value("latency").toString(),QString("7"));
+        QCOMPARE(keys(model),QStringList({"section:manual","node:a","node:b","node:c"}));
+        QCOMPARE(model.nodeIds(),QStringList({"a","b","c"}));
+        QCOMPARE(about.size(),0);QCOMPARE(committing.size(),0);QCOMPARE(synced.size(),0);
+        QCOMPARE(removed.size(),0);QCOMPARE(inserted.size(),0);QCOMPARE(moved.size(),0);
+    }
+    void stagedProjectionPreservesDisplaySnapshotAndLogicalSelection() {
+        NodeViewModel source;QVariantList rows{node("a","Alpha"),node("b","Beta"),node("c","Gamma")};
+        source.updateRows(rows);NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QCOMPARE(model.projectionDelayMs(),0);QVERIFY(!model.projectionPending());
+        source.setQuery("Beta");QCOMPARE(model.rowCount(),2);QCOMPARE(model.indexOfNode("a"),-1);
+        source.setQuery("");const auto before=keys(model);const auto oldBeta=model.get(model.indexOfNode("b"));
+        model.setProjectionDelayMs(80);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced),values(&model,&QAbstractItemModel::dataChanged);
+        source.setQuery("Beta");
+        QVERIFY(model.projectionPending());QCOMPARE(keys(model),before);
+        QCOMPARE(model.nodeIds(),QStringList({"b"}));QCOMPARE(model.count(),1);QCOMPARE(model.total(),3);
+        QVERIFY(model.indexOfNode("a")>=0); // Display indexes still describe displayed rows.
+        auto beta=rows[1].toMap();beta["latency"]="7";beta["status"]="ready";rows[1]=beta;source.updateRows(rows);
+        QCOMPARE(model.get(model.indexOfNode("b")),oldBeta);QCOMPARE(values.size(),0);
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),0);
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QCOMPARE(keys(model),QStringList({"section:manual","node:b"}));
+        QCOMPARE(model.get(1).value("latency").toString(),QString("7"));
+        QCOMPARE(model.get(1).value("status").toString(),QString("ready"));
+        QCOMPARE(committing.size(),1);QCOMPARE(synced.size(),1);
+        beta["latency"]="8";rows[1]=beta;source.updateRows(rows);
+        QVERIFY(!model.projectionPending());QCOMPARE(model.get(1).value("latency").toString(),QString("8"));
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+    }
+    void stagedProjectionCoalescesWithoutExtendingItsDeadline() {
+        NodeViewModel source;QVariantList rows{node("a","Alpha"),node("b","Beta"),node("c","Gamma")};
+        source.updateRows(rows);NodeSectionModel model;model.setSource(&source);model.setProjectionDelayMs(80);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        const auto before=keys(model);const auto oldAlpha=model.get(1);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced);
+        QTimer updates;updates.setInterval(10);int batches=0;bool frozen=true;
+        connect(&updates,&QTimer::timeout,&model,[&]{
+            ++batches;auto alpha=rows[0].toMap();alpha["latency"]=QString::number(batches);rows[0]=alpha;
+            source.updateRows(rows);source.setFilters({{"sort","name"},{"descending",batches%2==0}});
+            frozen&=keys(model)==before&&model.get(1)==oldAlpha;
+        });
+        connect(&model,&NodeSectionModel::synced,&updates,&QTimer::stop);
+        source.setFilters({{"sort","name"},{"descending",true}});updates.start();
+        // An implementation that restarts on each 10 ms request never reaches
+        // synced while this producer is running. The original deadline must win.
+        const bool committed=QTest::qWaitFor([&]{return !synced.isEmpty();},1000);updates.stop();
+        QVERIFY(committed);QVERIFY(batches>1);QVERIFY(frozen);QVERIFY(!model.projectionPending());
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        QStringList expected;for(int row=0;row<source.rowCount();++row)expected.append(source.get(row).value("id").toString());
+        QCOMPARE(model.nodeIds(),expected);
+        for(int row=0;row<expected.size();++row)QCOMPARE(model.get(row+1).value("id").toString(),expected[row]);
+        QCOMPARE(model.get(model.indexOfNode("a")).value("latency").toString(),QString::number(batches));
+    }
+    void disablingStageFlushesLatestAndBalancesReentrantNotifications() {
+        NodeViewModel source;source.updateRows({node("a","Alpha"),node("b","Beta"),node("c","Gamma")});
+        NodeSectionModel model;model.setSource(&source);model.setProjectionDelayMs(80);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced);
+        QStringList order;
+        connect(&model,&NodeSectionModel::aboutToSync,&model,[&]{source.setQuery("Gamma");model.setProjectionDelayMs(0);order.append("first-about");});
+        connect(&model,&NodeSectionModel::aboutToSync,&model,[&]{order.append("last-about");});
+        connect(&model,&NodeSectionModel::synced,&model,[&]{order.append("synced");});
+        source.setQuery("Beta");
+        QVERIFY(!model.projectionPending());QCOMPARE(model.projectionDelayMs(),0);
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(model.get(1).value("id").toString(),QString("c"));
+        QCOMPARE(order,QStringList({"first-about","last-about","synced"}));
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        QTest::qWait(100);QCOMPARE(synced.size(),1);
+    }
+    void stagedProjectionHandlesSourceRetirementAndCommitReentry() {
+        auto source=std::make_unique<NodeViewModel>();source->updateRows({node("a","Alpha"),node("b","Beta")});
+        NodeSectionModel model;model.setSource(source.get());model.setProjectionDelayMs(30);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        source->setQuery("Beta");QVERIFY(model.projectionPending());source.reset();
+        QCOMPARE(model.count(),0);QVERIFY(model.nodeIds().isEmpty());
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));QCOMPARE(model.rowCount(),0);
+
+        NodeViewModel first,latest;first.updateRows({node("a","Alpha"),node("b","Beta")});latest.updateRows({node("z","Latest")});
+        model.setSource(&first);QVERIFY(!model.projectionPending()); // No outgoing rows on first fill.
+        bool replaced=false;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{if(!replaced){replaced=true;model.setSource(&latest);}});
+        first.setQuery("Beta");
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QCOMPARE(model.source(),&latest);QCOMPARE(model.nodeIds(),QStringList({"z"}));
+        QCOMPARE(model.get(1).value("id").toString(),QString("z"));
+
+        bool changedInsideRows=false;
+        connect(&model,&QAbstractItemModel::rowsRemoved,&model,[&]{if(!changedInsideRows){
+            changedInsideRows=true;latest.updateRows({node("new","Latest replacement")});
+        }});
+        latest.updateRows({});
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QVERIFY(changedInsideRows);QCOMPARE(model.nodeIds(),QStringList({"new"}));
+        QCOMPARE(model.get(1).value("id").toString(),QString("new"));
+    }
+    void probeValueBurstsPreserveGeometryAndRealLatencyReorderingStillProjects() {
+        NodeViewModel source;QVariantList rows;
+        for(int row=0;row<104;++row)rows.append(node(QString::number(row),QString("Node %1").arg(row,3,10,QLatin1Char('0')),"subscription","a"));
+        source.updateRows(rows);NodeSectionModel model;
+        model.setProviders({QVariantMap{{"id","a"},{"name","Fixture"}}});model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        const auto originalKeys=keys(model);
+        const QPersistentModelIndex retained(model.index(model.indexOfNode("52"),0));
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced),
+            values(&model,&QAbstractItemModel::dataChanged),changed(&model,&NodeSectionModel::changed),
+            resets(&model,&QAbstractItemModel::modelReset);
+        // Model the three-worker probe pool completing a full batch. The
+        // visible cells must update without asking the view to reposition.
+        for(int first=0;first<rows.size();first+=3) {
+            for(int row=first;row<std::min(first+3,int(rows.size()));++row) {
+                auto value=rows.at(row).toMap();value["latency"]=QString::number(1000-row);
+                value["status"]=QStringLiteral("可用");value["testAvailable"]=true;rows[row]=value;
+            }
+            source.updateRows(rows);QCOMPARE(keys(model),originalKeys);
+            QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("52"));
+        }
+        QCOMPARE(about.size(),0);QCOMPARE(synced.size(),0);QVERIFY(!values.isEmpty());QCOMPARE(changed.size(),35);
+        QCOMPARE(model.get(model.indexOfNode("103")).value("latency").toString(),QString("897"));
+        QCOMPARE(model.get(model.indexOfNode("103")).value("status").toString(),QStringLiteral("可用"));
+        // Sorting, and then a result that actually changes that sort order,
+        // still produce one balanced projection each and preserve selection.
+        source.setFilters({{"sort","latency"}});
+        QCOMPARE(model.get(1).value("id").toString(),QString("103"));QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        auto first=rows.first().toMap();first["latency"]="1";rows[0]=first;source.updateRows(rows);
+        QCOMPARE(model.get(1).value("id").toString(),QString("0"));QCOMPARE(about.size(),2);QCOMPARE(synced.size(),2);
+        QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("52"));
+        QCOMPARE(resets.size(),0);
+    }
+    void largeReorderingIsOnePermutationAndLatencyUpdatePreservesGeometry() {
         NodeViewModel source;QVariantList rows;
         for(int row=0;row<2000;++row)rows.append(node(QString::number(row),QString("Node %1").arg(row,4,10,QLatin1Char('0')),"subscription","a",row));
         source.updateRows(rows);NodeSectionModel model;model.setProviders({QVariantMap{{"id","a"},{"name","A"}}});model.setSource(&source);
@@ -139,9 +401,14 @@ private slots:
         QCOMPARE(model.get(1).value("id").toString(),QString("1999"));QCOMPARE(model.nodeIds().size(),2000);
         QCOMPARE(layouts.size(),1);QCOMPARE(moves.size(),0);QCOMPARE(batches.size(),1);QCOMPARE(resets.size(),0);
         QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("1500"));
-        batches.clear();
+        batches.clear();layouts.clear();moves.clear();
+        QSignalSpy values(&model,&QAbstractItemModel::dataChanged),changed(&model,&NodeSectionModel::changed);
         for(int row=0;row<rows.size();++row){auto value=rows.at(row).toMap();value["latency"]=QString::number(3000-row);rows[row]=value;}
-        source.updateRows(rows);QCOMPARE(batches.size(),1);QCOMPARE(resets.size(),0);
+        source.updateRows(rows);QCOMPARE(batches.size(),0);QCOMPARE(resets.size(),0);
+        QCOMPARE(layouts.size(),0);QCOMPARE(moves.size(),0);QVERIFY(!values.isEmpty());QCOMPARE(changed.size(),1);
+        QCOMPARE(model.get(model.indexOfNode("0")).value("latency").toString(),QString("3000"));
+        QCOMPARE(model.get(model.indexOfNode("1999")).value("latency").toString(),QString("1001"));
+        QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("1500"));
     }
     void destroyingOrReplacingSourceDoesNotLeaveNodeReferences() {
         auto source=std::make_unique<NodeViewModel>();source->updateRows({node("a","A")});

@@ -231,6 +231,19 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(&m_telemetry,&TelemetryService::nativeProbeRequested,this,[this](const QUrl &url,quint64 tag){if(!m_shuttingDown)m_engine->probeNodeTagged(url,tag);});
     connect(m_engine.get(),&ProxyEngine::probeRequestRejected,&m_telemetry,&TelemetryService::rejectNativeProbe);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
+    connect(&m_tests,&NodeTestService::changed,this,[this]{
+        if(!m_startAfterProbes||m_tests.busy()||m_probeStartPosted)return;
+        m_probeStartPosted=true;const auto generation=m_probeStartGeneration;
+        QTimer::singleShot(0,this,[this,generation]{
+            if(m_shuttingDown||generation!=m_probeStartGeneration||!m_startAfterProbes)return;
+            m_startAfterProbes=false;m_probeStartPosted=false;
+            if(m_connectionRequested&&!processAlive()&&!m_tests.busy())startConfiguredSession();
+            emit statusChanged();
+        });
+    });
+    connect(&m_tests,&NodeTestService::diagnostic,this,[this](const QString &code,const QString &message){
+        emit diagnostic(QStringLiteral("NodeTestService"),code,message);
+    });
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
         if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
@@ -478,13 +491,14 @@ QString EngineController::errorCode() const {
 }
 bool EngineController::busy() const {
     const auto state = m_engine->status().state;
-    return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+    return m_startAfterProbes||m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
         ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
         ||state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() {
     if(m_shuttingDown||m_stopPhase==StopPhase::StoppingCore)return;
+    ++m_probeStartGeneration;m_startAfterProbes=false;m_probeStartPosted=false;
     if(m_stopPhase==StopPhase::ReleasingProxy) {
         // changed/status observers can re-enter while disable() is still
         // emitting its release result. Never stop from inside that emission.
@@ -535,7 +549,8 @@ void EngineController::finishStopAfterProxyRelease() {
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
-    m_shuttingDown=true;m_stopPhase=StopPhase::Idle;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
+    m_shuttingDown=true;m_stopPhase=StopPhase::Idle;m_connectionRequested=false;m_restartPending=false;
+    ++m_probeStartGeneration;m_startAfterProbes=false;m_probeStartPosted=false;m_proxyRequested=false;
     cancelSystemProxyCheck();
     if(m_lanSession)m_lanSession->stop();
     m_imports.shutdown();m_tests.cancel();
@@ -567,6 +582,10 @@ QVariantList EngineController::nodes() const {
         const auto connection=row.value("connectionState").toString();
         if(connection!=QStringLiteral("未连接"))nodeStatus=connection;
         row.insert("status",nodeStatus);
+        // Keep the stable status families used by filters, while the table
+        // explains the observed failure stage. Active connection state wins.
+        row.insert("statusDetail",connection==QStringLiteral("未连接")&&!m_tests.testing(id)&&!measured.isEmpty()&&!measured.value("success").toBool()
+            ?NodeTestService::failureStatusText(measured):nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
         // Never substitute a connection-state RTT for an HTTP node-probe measurement.
         row.insert("latency",QStringLiteral("—"));
@@ -756,6 +775,7 @@ void EngineController::rollbackPendingSelection(const QString &reason) {
 }
 void EngineController::connectNode(const QString &id) {
     if(m_shuttingDown)return;
+    if(m_engine->status().tunRecoveryRequired){m_nodeError=m_engine->status().message;emit selectionChanged();return;}
     if(m_store.configurationV2()){
         const auto target=m_policyDocument.value("default_policy").toObject().value("target").toObject();
         if(!id.isEmpty()&&(target.value("kind")!=QJsonValue("node")||target.value("id")!=QJsonValue(id))){
@@ -782,7 +802,8 @@ void EngineController::connectNode(const QString &id) {
     else m_engine->start(m_options);
 }
 void EngineController::startConfiguredSession() {
-    if(m_shuttingDown||m_stopPhase!=StopPhase::Idle||m_stopAfterPolicy)return;
+    if(m_shuttingDown||m_stopPhase!=StopPhase::Idle||m_stopAfterPolicy||m_startAfterProbes)return;
+    if(m_engine->status().tunRecoveryRequired){m_nodeError=m_engine->status().message;emit selectionChanged();return;}
     if(m_store.configurationV2()){
         if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyDocument.isEmpty()){
             m_policyError=QStringLiteral("配置仍在保存或恢复，未启动连接。");emit policyChanged();return;
@@ -793,7 +814,15 @@ void EngineController::startConfiguredSession() {
         candidate.configurationRequestId=newPolicyId();candidate.routingMode=m_policyDocument.value("mode").toString();candidate.directSession=candidate.routingMode=="direct";
         QJsonObject runtime;const auto error=RustCoreEngine::configurationV2(candidate,m_policyDocument,&runtime);
         if(!error.isEmpty()){m_policyError=error;emit policyChanged();return;}
-        m_options=candidate;m_connectionRequested=true;m_nodeError.clear();m_policyError.clear();m_engine->start(candidate);emit statusChanged();return;
+        m_options=candidate;m_connectionRequested=true;m_nodeError.clear();m_policyError.clear();
+        if(candidate.tunEnabled&&m_tests.busy()){
+            // These workers were created before capture and may own unbound
+            // sockets. Complete cancellation before admitting the TUN start.
+            // Only the connection intent resumes; the cancelled batch does not.
+            ++m_probeStartGeneration;m_startAfterProbes=true;m_probeStartPosted=false;
+            m_tests.cancel();emit statusChanged();return;
+        }
+        m_engine->start(candidate);emit statusChanged();return;
     }
     // An absent/deleted subscription selection is not authorization to bypass
     // proxies. DIRECT is an explicit routing mode, never the empty-ID default.
@@ -817,9 +846,22 @@ void EngineController::startConfiguredSession() {
     emit statusChanged();
 }
 void EngineController::testNode(const QUrl &url) { if(!nodeBusy())m_engine->probeNode(url); }
-void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
-void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,ids,url); }
-void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,{id},url); }
+EngineStartOptions EngineController::nodeProbeOptions() const {
+    auto options=m_options;options.nodes=availableNodes();
+    const auto status=m_engine->status();options.internalProbePhysicalEgress=status.tunCapturePossible&&!status.tunRecoveryRequired;
+    return options;
+}
+bool EngineController::nodeProbeReady(){
+    if(m_shuttingDown)return false;
+    if(m_engine->status().tunRecoveryRequired){m_nodeError=QStringLiteral("TUN 网络恢复尚未确认，请先完成恢复后重新测速。");emit selectionChanged();return false;}
+    if(m_policyBusy||busy()||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){
+        m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return false;
+    }
+    return true;
+}
+void EngineController::testAllNodes(const QUrl &url) { if(!nodeProbeReady())return;const auto options=nodeProbeOptions();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
+void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),ids,url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {

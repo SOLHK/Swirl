@@ -177,6 +177,9 @@ fn execute(controller: &mut Controller, command: Command) -> Result<Value> {
             engine_epoch,
             config,
         } => {
+            // Preflight can send DHCP packets before any session exists.
+            swirl_transport::egress::check_unmetered_egress()
+                .map_err(|_| "PrivateQuotaUnmeteredDenied")?;
             helper(controller)?;
             let handle = identity(controller, &handle, &engine_epoch)?;
             config.validate()?;
@@ -208,6 +211,8 @@ fn execute(controller: &mut Controller, command: Command) -> Result<Value> {
             preparation_id,
             dhcp,
         } => {
+            swirl_transport::egress::check_unmetered_egress()
+                .map_err(|_| "PrivateQuotaUnmeteredDenied")?;
             helper(controller)?;
             let handle = identity(controller, &handle, &engine_epoch)?;
             if preparation_id.len() != 32 || !preparation_id.bytes().all(|b| b.is_ascii_hexdigit())
