@@ -84,7 +84,7 @@ bool NodeImportService::privateUiImportAllowed(const QUrl &url) {
     return m_privateUiImport&&!m_privateUiImport->revoked&&!m_shuttingDown
         &&m_privateUiImport->guardActive&&m_privateUiImport->guardActive()
         &&url==m_privateUiImport->url&&url.scheme()==QStringLiteral("https")
-        &&url.host()==QStringLiteral("127.0.0.1")&&url.userInfo().isEmpty()
+        &&url.host()==QStringLiteral("203.0.113.1")&&url.userInfo().isEmpty()
         &&url.query().isEmpty()&&url.fragment().isEmpty();
 }
 void NodeImportService::privateUiImportReject(const char *code) {

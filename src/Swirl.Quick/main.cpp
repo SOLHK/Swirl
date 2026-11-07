@@ -720,6 +720,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_PRIVATE_UI_QUOTA
     if(controlledNodeSession&&controlledSession.uiImportPolicy){
         if(!privateUiQuota.attachImportCapability(engineController.imports(),controlledSession))return 64;
+        if(controlledSession.uiDnsPolicy&&!privateUiQuota.attachDnsCapability(&engineController,&controlledSession))return 64;
     }else
 #endif
     if(controlledNodeSession)engineController.imports()->shutdown();

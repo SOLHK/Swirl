@@ -18,6 +18,7 @@ import secrets
 import select
 import socket
 import ssl
+import struct
 import sys
 import threading
 import time
@@ -36,6 +37,14 @@ WRONG_CA_SHA256 = "e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26
 ADMISSION_CONTROLS = ("missing-proof", "missing-fixture", "preexisting-store", "wrong-proof")
 UI_IMPORT_WORKFLOW = "subscription-policy-v1"
 UI_IMPORT_CONTROLS = ("wrong-ca", "over-limit", "wrong-url", "missing-capability")
+UI_IMPORT_ORIGIN_HOST = "203.0.113.1"
+UI_IMPORT_ORIGIN_CERT_SHA256 = "650152f76d410e5ae1a2b589002d1dd79a9c2af405021aed50da861fac52d748"
+UI_IMPORT_ORIGIN_KEY_SHA256 = "e62fd952d2f14fa39e6849032825d4e6a6b46837fce0037f6ed1abd46becc814"
+UI_DNS_WORKFLOW = "same-endpoint-dot-v1"
+UI_DNS_HOST = "swirl-node.fixture.invalid"
+UI_DNS_CONTROLS = ("wrong-ca", "wrong-address", "wrong-question", "stall", "cancel")
+DNS_SERVER_CERT_SHA256 = "e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b"
+DNS_SERVER_KEY_SHA256 = "da232e7a9ffdd91087e498ba3aaa3e6ab2c8ba2475ed15d3d9856333d1195f80"
 _PROOF_ISSUER = object()
 
 
@@ -62,11 +71,68 @@ def ui_import_contract(manifest):
     return manifest.get("uiImportControl", "")
 
 
-def fixed_subscription_body(socks_port, password_hex):
+def ui_dns_contract(manifest):
+    """One fixed resolver fixture; never an arbitrary DNS endpoint or trust API."""
+    if "uiDns" not in manifest:
+        return None
+    value = manifest["uiDns"]
+    if (ui_import_contract(manifest) != "" or "uiImportControl" in manifest
+            or type(value) is not dict or set(value) != {"workflow", "control", "caSha256"}
+            or value["workflow"] != UI_DNS_WORKFLOW or value["control"] not in ("", *UI_DNS_CONTROLS)
+            or value["caSha256"] != (WRONG_CA_SHA256 if value["control"] == "wrong-ca" else FIXTURE_CERT_SHA256)):
+        raise ValueError("PrivateUiDnsWorkflowRequired")
+    return value["control"]
+
+
+def fixed_ui_origin():
+    return {"host": UI_IMPORT_ORIGIN_HOST, "certificateSha256": UI_IMPORT_ORIGIN_CERT_SHA256,
+            "keySha256": UI_IMPORT_ORIGIN_KEY_SHA256}
+
+
+def fixed_dns_configuration(socks_port):
+    if type(socks_port) is not int or not 1 <= socks_port <= 65535:
+        raise ValueError("OwnedSyntheticDnsRequired")
+    return {"mode": 0, "servers": "", "encrypted": f"tls://127.0.0.1:{socks_port}",
+            "hosts": [], "useHosts": False, "respectRules": False, "queryFamily": "ipv4_only"}
+
+
+def fixed_dns_response(packet, control):
+    if (type(packet) is not bytes or not 17 <= len(packet) <= 512
+            or control not in ("", *UI_DNS_CONTROLS)):
+        raise ValueError("OwnedSyntheticDnsQueryRequired")
+    identity, flags, questions, answers, authority, additional = struct.unpack("!6H", packet[:12])
+    if flags != 0x0100 or (questions, answers, authority, additional) != (1, 0, 0, 0):
+        raise ValueError("OwnedSyntheticDnsQueryRequired")
+    labels, offset = [], 12
+    while offset < len(packet):
+        size = packet[offset]
+        offset += 1
+        if size == 0:
+            break
+        if not 1 <= size <= 63 or offset + size > len(packet):
+            raise ValueError("OwnedSyntheticDnsQueryRequired")
+        labels.append(packet[offset:offset + size])
+        offset += size
+    if (offset + 4 != len(packet) or b".".join(labels) != UI_DNS_HOST.encode("ascii")
+            or packet[offset:] != b"\x00\x01\x00\x01"):
+        raise ValueError("OwnedSyntheticDnsQueryRequired")
+    question = packet[12:]
+    if control == "wrong-question":
+        question = b"".join(bytes([len(label)]) + label for label in b"other-node.fixture.invalid".split(b".")) + b"\x00\x00\x01\x00\x01"
+    address = "127.0.0.2" if control == "wrong-address" else "127.0.0.1"
+    response = (struct.pack("!6H", identity, 0x8180, 1, 1, 0, 0) + question
+                + b"\xc0\x0c" + struct.pack("!HHIH", 1, 1, 60, 4) + socket.inet_aton(address))
+    return response, {"queryHost": UI_DNS_HOST, "queryType": "A", "answerAddress": address,
+                      "questionMatched": control != "wrong-question", "ttl": 60,
+                      "requestBytes": len(packet), "responseBytes": len(response), "responseSent": False}
+
+
+def fixed_subscription_body(socks_port, password_hex, *, dns=False):
     if (type(socks_port) is not int or not 1 <= socks_port <= 65535
-            or not isinstance(password_hex, str) or not re.fullmatch(r"[0-9a-f]{64}", password_hex)):
+            or not isinstance(password_hex, str) or not re.fullmatch(r"[0-9a-f]{64}", password_hex) or type(dns) is not bool):
         raise ValueError("OwnedSyntheticSubscriptionRequired")
-    return ("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: 127.0.0.1\n"
+    return ("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: "
+            + (UI_DNS_HOST if dns else "127.0.0.1") + "\n"
             f'    port: {socks_port}\n    username: fixture\n    password: "{password_hex}"\n').encode("ascii")
 
 
@@ -154,12 +220,20 @@ class LoopbackFixture:
         self.subscription_body_sha256 = None
         self._ui_import_control = None
         self._ui_import_nonce = None
+        self._ui_dns_control = None
+        self.dns_tls_attempts = 0
+        self.dns_tls_completed = 0
+        self.dns_queries = []
+        self.dns_query_observed = threading.Event()
         self._proof_key = secrets.token_bytes(32)
         self._password = secrets.token_bytes(32)
         self._admission = None
         self._listeners = []
         self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self.context.load_cert_chain(str(certificate), str(key))
+        self.import_context = None
+        self.dns_context = None
+        self._dns_fixture_directory = Path(certificate).parent
         try:
             self.http = self.listen(lambda peer: self.origin(peer, False))
             self.https = self.listen(lambda peer: self.origin(peer, True))
@@ -235,13 +309,16 @@ class LoopbackFixture:
             raise ValueError("OwnedLoopbackFixtureRequired")
         native_control = control_for_manifest(manifest)
         import_control = ui_import_contract(manifest)
+        dns_control = ui_dns_contract(manifest)
         fields = {"schema", "sourceSha", "nonce", "nodeOrdinal", "proxyPort", "fixture"}
         if native_control:
             fields.add("nativeWatchdogControl")
         if import_control is not None:
-            fields.add("uiWorkflow")
+            fields.update(("uiWorkflow", "uiOrigin"))
             if "uiImportControl" in manifest:
                 fields.add("uiImportControl")
+        if dns_control is not None:
+            fields.add("uiDns")
         fixture = manifest.get("fixture")
         if (self._admission is not None or self.done.is_set() or not self._listeners_alive()
                 or set(manifest) != fields
@@ -257,13 +334,32 @@ class LoopbackFixture:
                 or len({manifest["proxyPort"], self.http, self.https, self.socks}) != 4
                 or native_control and (self.stall is not True or fixture["caSha256"] != FIXTURE_CERT_SHA256)
                 or import_control is not None and (self.stall or fixture["caSha256"] != (
-                    WRONG_CA_SHA256 if import_control == "wrong-ca" else FIXTURE_CERT_SHA256))):
+                    WRONG_CA_SHA256 if import_control == "wrong-ca" else FIXTURE_CERT_SHA256)
+                    or manifest.get("uiOrigin") != fixed_ui_origin())):
             raise ValueError("OwnedLoopbackFixtureRequired")
+        if import_control is not None:
+            certificate = local_file(self._dns_fixture_directory / "private-ui-origin-cert.pem")
+            key = local_file(self._dns_fixture_directory / "private-ui-origin-key.pem")
+            if digest(certificate) != UI_IMPORT_ORIGIN_CERT_SHA256 or digest(key) != UI_IMPORT_ORIGIN_KEY_SHA256:
+                raise ValueError("CommittedSyntheticUiOriginRequired")
+            self.import_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            self.import_context.load_cert_chain(str(certificate), str(key))
+        if dns_control is not None:
+            # DoT uses the fixed IP-127 server leaf, independently of the
+            # IP-203 UI origin leaf. Never present the CA as a server leaf.
+            certificate = local_file(self._dns_fixture_directory / "xray-download-server-cert.pem")
+            key = local_file(self._dns_fixture_directory / "xray-download-server-key.pem")
+            if digest(certificate) != DNS_SERVER_CERT_SHA256 or digest(key) != DNS_SERVER_KEY_SHA256:
+                raise ValueError("CommittedSyntheticDnsTlsFixtureRequired")
+            self.dns_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            self.dns_context.load_cert_chain(str(certificate), str(key))
+            self.dns_context.set_alpn_protocols(["dot"])
         proof = _FixtureProof(_PROOF_ISSUER, self, hashlib.sha256(json_bytes(manifest)).digest())
         self._admission = proof
         if import_control is not None:
             self._ui_import_control, self._ui_import_nonce = import_control, manifest["nonce"]
-            self.subscription_body_sha256 = hashlib.sha256(fixed_subscription_body(self.socks, self._password.hex())).hexdigest()
+            self._ui_dns_control = dns_control
+            self.subscription_body_sha256 = hashlib.sha256(fixed_subscription_body(self.socks, self._password.hex(), dns=dns_control is not None)).hexdigest()
         return proof
 
     @staticmethod
@@ -284,7 +380,8 @@ class LoopbackFixture:
                 with self.lock:
                     if self.done.is_set():
                         return
-                    wrapped = self.context.wrap_socket(peer, server_side=True,
+                    context = self.import_context if self._ui_import_control is not None else self.context
+                    wrapped = context.wrap_socket(peer, server_side=True,
                                                        do_handshake_on_connect=False)
                     self.sockets.discard(peer)
                     self.sockets.add(wrapped)
@@ -308,7 +405,7 @@ class LoopbackFixture:
                     return
                 self.subscription_requests += 1
                 body = (b"x" * 65537 if self._ui_import_control == "over-limit" else
-                        fixed_subscription_body(self.socks, self._password.hex()))
+                        fixed_subscription_body(self.socks, self._password.hex(), dns=self._ui_dns_control is not None))
                 self.subscription_declared_body_bytes = len(body)
                 peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/yaml\r\nContent-Length: "
                              + str(len(body)).encode("ascii") + b"\r\nConnection: close\r\n\r\n" + body)
@@ -320,7 +417,61 @@ class LoopbackFixture:
         finally:
             self.retire(peer)
 
+    def dns(self, peer):
+        try:
+            with self.lock:
+                if self.done.is_set() or self.proofs != 1 or self._ui_dns_control is None:
+                    raise ValueError("OwnedSyntheticDnsRequired")
+                self.dns_tls_attempts += 1
+                wrapped = self.dns_context.wrap_socket(peer, server_side=True, do_handshake_on_connect=False)
+                self.sockets.discard(peer)
+                self.sockets.add(wrapped)
+                peer = wrapped
+            peer.do_handshake()
+            if peer.selected_alpn_protocol() != "dot":
+                raise ValueError("OwnedSyntheticDnsAlpnRequired")
+            with self.lock:
+                self.dns_tls_completed += 1
+            size = int.from_bytes(self.exact(peer, 2), "big")
+            if not 17 <= size <= 512:
+                raise ValueError("OwnedSyntheticDnsQueryRequired")
+            packet = self.exact(peer, size)
+            response, observation = fixed_dns_response(packet, self._ui_dns_control)
+            with self.lock:
+                if len(self.dns_queries) >= 2:
+                    self.rejected += 1
+                    raise ValueError("OwnedSyntheticDnsQueryLimit")
+                self.dns_queries.append(observation)
+                self.dns_query_observed.set()
+            if self._ui_dns_control in ("stall", "cancel"):
+                self.done.wait(10)
+                return
+            peer.sendall(len(response).to_bytes(2, "big") + response)
+            with self.lock:
+                observation["responseSent"] = True
+            # The resolver may close normally or ask a second question only if
+            # its fixed ipv4_only contract was violated. Never answer it.
+            if peer.recv(1):
+                with self.lock:
+                    self.rejected += 1
+        finally:
+            self.retire(peer)
+
+    def dns_report(self):
+        with self.lock:
+            listeners_closed = (self.done.is_set() and len(self._listeners) == 3
+                                and all(peer.fileno() < 0 for peer in self._listeners) and not self.sockets)
+            return {"scope": "owned fixed DoT fixture observations; not provider or wire accounting",
+                    "tlsAttempts": self.dns_tls_attempts, "tlsCompleted": self.dns_tls_completed,
+                    "queries": [dict(row) for row in self.dns_queries], "listenersClosed": listeners_closed,
+                    "tasksReleased": self.done.is_set() and all(not worker.is_alive() for worker in self.threads)}
+
     def relay(self, peer):
+        # Peek keeps the full TLS ClientHello available to SSL. No new socket or
+        # destination is admitted: this is the already owned SOCKS endpoint.
+        if self._ui_dns_control is not None and peer.recv(1, socket.MSG_PEEK) == b"\x16":
+            self.dns(peer)
+            return
         first = self.exact(peer, 1)
         if first == FIXTURE_MAGIC[:1]:
             if first + self.exact(peer, len(FIXTURE_MAGIC)-1) != FIXTURE_MAGIC:
@@ -359,10 +510,13 @@ class LoopbackFixture:
         else:
             host = "rejected"
         port = int.from_bytes(self.exact(peer, 2), "big")
-        if version != 5 or command != 1 or reserved or host != "127.0.0.1" or port not in {self.http, self.https}:
+        allowed_host = UI_IMPORT_ORIGIN_HOST if self._ui_import_control is not None else "127.0.0.1"
+        if version != 5 or command != 1 or reserved or host != allowed_host or port not in {self.http, self.https}:
             self.rejected += 1
             peer.sendall(b"\x05\x02\x00\x01\x00\x00\x00\x00\x00\x00")
             return
+        # This logical address is never a socket destination. Authenticated
+        # SOCKS maps only this fixture's two exact owned ports to loopback.
         upstream = self.own(socket.create_connection(("127.0.0.1", port), timeout=3))
         self.forwarded += 1
         try:

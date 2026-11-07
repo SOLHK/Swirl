@@ -32,7 +32,8 @@ IDENTITIES = {"qtUi": None, "billingWorker": None}
 
 def sample_observations():
     """Only data-validator inputs; these objects cannot issue an ExitProof."""
-    owner = SimpleNamespace(subscription_body_sha256="a" * 64, subscription_requests=1, subscription_declared_body_bytes=241)
+    owner = SimpleNamespace(subscription_body_sha256="a" * 64, subscription_requests=1, subscription_declared_body_bytes=241,
+                            http=12346, https=12347)
     source, imported, bootstrap, store = (f"{number:08x}-1111-1111-1111-111111111111" for number in range(1, 5))
     receipts = [{"stage": stage, "request_id": f"{index + 10:08x}-2222-2222-2222-222222222222",
                  "store_id": store, "saved_revision": str(index + 1),
@@ -55,7 +56,18 @@ def sample_observations():
               "uiProbeButtonExercised": True, "uiDisplayedLatencyMatches": True,
               "uiImportEvidence": {"workflow": fixture.UI_IMPORT_WORKFLOW, "control": "", "phase": 32,
                   "inputEvents": list(ui._IMPORT_INPUTS), "committedReceipts": receipts, "readbacks": readbacks,
-                  "routeWitnesses": routes, "probePresentation": {"visible": True, "text": "出站建立 3 ms · HTTP 204",
+                  "routeWitnesses": routes, "coreRouting": {"scope": "actual-main-core-records-v1",
+                      "receipt": {"engine_epoch": "17", "generation": "5", "store_id": store,
+                          "request_id": receipts[-1]["request_id"], "applied_revision": "6", "plan_digest": "b" * 64},
+                      "requests": [{"scheme": scheme, "id": str(index + 2), "host": fixture.UI_IMPORT_ORIGIN_HOST,
+                          "port": owner.http if scheme == "http" else owner.https, "category": "proxy",
+                          "nodeReference": reference, "leafNodeReference": reference,
+                          "sourceReference": hashlib.sha256(source.encode("ascii")).hexdigest()[:12],
+                          "rule": "policy:default", "ruleId": "policy:default", "mode": "global", "tier": 5,
+                          "revision": "6", "generation": "5", "beforeConnectionRevision": "20",
+                          "responseConnectionRevision": "21", "observedConnectionRevision": "22",
+                          "preexistingConnectionIds": ["1"], "closed": True} for index, scheme in enumerate(("http", "https"))]},
+                  "probePresentation": {"visible": True, "text": "出站建立 3 ms · HTTP 204",
                       "nodeReference": reference, "latency": 7, "outboundConnectMs": 3, "httpStatus": 204},
                   "sourceId": source, "importedNodeId": imported, "bootstrapNodeId": bootstrap,
                   "probeButtonClicked": True, "download": {"capabilityInstalled": True, "requests": 1,
@@ -142,7 +154,14 @@ class ImportContractTests(unittest.TestCase):
                    lambda row: row["uiImportEvidence"]["routeWitnesses"][1].update(proxyPort=23456),
                    lambda row: row["uiImportEvidence"].update(routeWitnesses=row["uiImportEvidence"]["routeWitnesses"][:-1]),
                    lambda row: row["uiImportEvidence"]["probePresentation"].update(visible=False),
-                   lambda row: row["uiImportEvidence"]["probePresentation"].update(text="出站建立 7 ms · HTTP 204")]
+                   lambda row: row["uiImportEvidence"]["probePresentation"].update(text="出站建立 7 ms · HTTP 204"),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][0].update(category="direct", rule="builtin:local-v1"),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][0].update(nodeReference="0" * 12),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][1].update(sourceReference="0" * 12),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][1].update(generation="4"),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][1].update(preexistingConnectionIds=["3"]),
+                   lambda row: row["uiImportEvidence"]["coreRouting"]["requests"][0].update(observedConnectionRevision="21"),
+                   lambda row: row["uiImportEvidence"]["coreRouting"].update(requests=[])]
         for change in changes:
             altered = copy.deepcopy(good); change(altered)
             with self.assertRaises(budget.BudgetError):

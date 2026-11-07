@@ -5,6 +5,26 @@
 #include <QVariantList>
 #include <QJsonObject>
 #include "ProxyNode.h"
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include <memory>
+class PrivateUiQuotaSession;
+// An immutable trust attachment issued only after the paired private grant and
+// owned fixture proof. It is not an imported/persisted DNS configuration field.
+class PrivateUiDnsTrust final {
+public:
+    QString apply(QJsonObject *) const;
+    bool snapshot(QJsonObject *) const;
+    QString bindingDigest() const;
+private:
+    friend class PrivateUiQuotaSession;
+    PrivateUiDnsTrust(QString endpoint,QByteArray ca,QJsonObject binding,QString source)
+        :m_endpoint(std::move(endpoint)),m_ca(std::move(ca)),m_binding(std::move(binding)),m_source(std::move(source)){}
+    const QString m_endpoint;
+    const QByteArray m_ca;
+    const QJsonObject m_binding;
+    const QString m_source;
+};
+#endif
 
 // Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
 struct EngineStartOptions {
@@ -38,6 +58,9 @@ struct EngineStartOptions {
     QVariantMap lanConfiguration;
     bool lanSkipLocalAuthentication = true;
     QVariantMap dnsConfig;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    std::shared_ptr<const PrivateUiDnsTrust> privateUiDnsTrust;
+#endif
     QStringList customRules;
     QVariantList customGroups;
     QString inboundUsername,inboundPassword;

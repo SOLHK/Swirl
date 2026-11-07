@@ -535,6 +535,40 @@ print(json.dumps({"schema": 1, "factory": "PrivateSubscriptionSupervisor.WorkerI
         }
         $receipt.import_test_inventory = [ordered]@{tests_run=14; passed=14; failures=0; errors=0; skipped=@()
             original_report=(Get-QuotaFile $importTestPath); identities=$importResult.identities}
+        # Separate DoT variant: retain the original 14 import assertions above.
+        # Six is the Rust outbound attempt cap, not the local HMAC IPC count.
+        $dnsTests = Join-Path $output 'dns-tests'
+        if (Test-Path -LiteralPath $dnsTests) { throw 'Private UI DNS evidence must be new.' }
+        $null = Invoke-QuotaTool 'dns-tests' $python @(
+            (Join-Path $repo 'tools/tests/test_private_subscription_ui_dns.py'),'--evidence',$dnsTests) `
+            -Environment $billingTestEnvironment -RemoveEnvironment @('SWIRL_PRIVATE_UI_QT_ROOT')
+        $dnsTestPath = Join-Path $dnsTests 'private-ui-dns-results.json'
+        $dnsResult = Get-Content -LiteralPath $dnsTestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($dnsResult.schema -ne 1 -or $dnsResult.platform -cne 'win32' -or
+            $dnsResult.testsRun -ne 11 -or $dnsResult.failures -ne 0 -or $dnsResult.errors -ne 0 -or
+            @($dnsResult.skipped).Count -ne 0 -or $dnsResult.realNodeRequests -ne 0 -or
+            $dnsResult.providerRequests -ne 0 -or $dnsResult.providerStatisticsAuthenticated -ne $false -or
+            $dnsResult.liveReady -ne $false) {
+            throw 'Private Qt DNS inventory differs from 11 Windows tests / 11 passes / zero skips.'
+        }
+        $dnsWorker = $dnsResult.identities.billingWorker
+        foreach ($entry in $billingMetadata.PSObject.Properties) {
+            if ($dnsWorker.PSObject.Properties[$entry.Name].Value -cne $entry.Value) {
+                throw 'DNS suite billing worker differs from its designated factory identity.'
+            }
+        }
+        $dnsUi = $dnsResult.identities.qtUi
+        if ($dnsWorker.exe_sha256 -cne $billingWorkerBefore.sha256 -or
+            $dnsUi.source_sha -cne $env:GITHUB_SHA -or $dnsUi.build_id -cne $pair.build_id -or
+            $dnsUi.target -cne $pair.target -or $dnsUi.role -cne 'swirl_private_qt_ui' -or
+            $dnsUi.exe_sha256 -cne $exeIdentity.sha256 -or $dnsUi.core_sha256 -cne $coreIdentity.sha256 -or
+            $dnsUi.qt_version -cne '6.12.0' -or $dnsUi.guard_mode -cne 'mandatory_before_grant' -or
+            $dnsUi.abi_version -ne 1 -or $dnsUi.private_worker_schema -ne 1 -or $dnsUi.live -ne $false) {
+            throw 'DNS suite Qt/worker identity differs from the separate designated binaries.'
+        }
+        $receipt.dns_test_inventory = [ordered]@{tests_run=11; passed=11; failures=0; errors=0; skipped=@()
+            original_report=(Get-QuotaFile $dnsTestPath); identities=$dnsResult.identities
+            scope='fixed DoT through production Resolver; six Rust outbound attempts and separate local ownership IPC'}
     } finally {
         # Run even after a failed test. Keep the original error while recording
         # any changed or missing private binary; the outer ordinary-runtime
@@ -584,3 +618,4 @@ if (-not $receipt.success) { throw 'Private Qt quota profile acceptance or evide
 Write-Host 'Verified separate private Qt quota profile: 9 Windows-applicable tests passed; one POSIX-only control skipped.'
 Write-Host 'Verified same-ledger synthetic Qt billing: 10 Windows tests passed; zero skips; live remains unavailable.'
 Write-Host 'Verified owned HTTPS subscription UI: 14 Windows tests passed; zero skips; no real-provider authority.'
+Write-Host 'Verified fixed DoT UI variant: 11 Windows tests passed; zero skips; original six-attempt/eight-second grant unchanged.'

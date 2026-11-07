@@ -2,7 +2,12 @@
 #include <QString>
 #include <QByteArray>
 #include <QUrl>
+#include <QVariantMap>
 #include <thread>
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include <memory>
+class PrivateUiDnsTrust;
+#endif
 class QQuickWindow;
 class EngineController;
 class SystemDataProvider;
@@ -23,6 +28,14 @@ struct ControlledNodeSession {
     // controlled session keeps imports shut down and does not accept this mode.
     bool uiImportPolicy=false;
     QString uiImportControl;
+    bool uiDnsPolicy=false;
+    QString uiDnsControl;
+    QByteArray fixtureDnsCa;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    std::shared_ptr<const PrivateUiDnsTrust> dnsTrust;
+#endif
+    QVariantMap dnsConfiguration() const;
+    QString originHost() const;
     QUrl subscriptionUrl() const;
     QByteArray subscriptionBody() const;
 };

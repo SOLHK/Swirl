@@ -40,6 +40,9 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
  // routing, inbound authentication or system-network ownership.
  EngineStartOptions result;
  result.nodes=source.nodes;result.dnsConfig=source.dnsConfig;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+  result.privateUiDnsTrust=source.privateUiDnsTrust;
+#endif
  result.internalProbePhysicalEgress=source.internalProbePhysicalEgress;
  result.proxyPort=0;result.internalProbeListener=true;
  result.routingMode="global";result.smartRouting=false;

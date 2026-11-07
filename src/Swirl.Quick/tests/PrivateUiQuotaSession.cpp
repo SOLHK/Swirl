@@ -1,11 +1,13 @@
 #include "PrivateUiQuotaSession.h"
 #include "RuntimeEvidence.h"
 #include "engine/NodeImportService.h"
+#include "engine/EngineController.h"
 
 #include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QSslCertificate>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #else
@@ -147,6 +149,20 @@ bool PrivateUiQuotaSession::attachImportCapability(NodeImportService *imports,co
     capability->proxyPort=quint16(session.proxyPort);
     capability->guardActive=[this]{return runningQuota();};
     imports->m_privateUiImport=std::move(capability);
+    return true;
+}
+
+bool PrivateUiQuotaSession::attachDnsCapability(EngineController *controller,ControlledNodeSession *session) {
+    if(!controller||!session||!session->uiDnsPolicy||!session->uiImportPolicy||!session->uiImportControl.isEmpty()
+        ||!runningQuota()||controller->m_options.privateUiDnsTrust||!controller->canStart()
+        ||session->nonce!=m_binding.value("nonce").toString()||session->sourceSha!=m_grant.value("source_sha").toString()
+        ||session->fixtureSocksPort!=m_grant.value("endpoint").toObject().value("port").toInt()
+        ||session->proxyPort!=m_grant.value("listener").toObject().value("port").toInt())return false;
+    const auto certificates=QSslCertificate::fromData(session->fixtureDnsCa);
+    if(certificates.size()!=1||certificates.first().isNull())return false;
+    session->dnsTrust=std::shared_ptr<const PrivateUiDnsTrust>(new PrivateUiDnsTrust(
+        QStringLiteral("127.0.0.1:%1").arg(session->fixtureSocksPort),certificates.first().toDer(),m_binding,session->sourceSha));
+    controller->m_options.privateUiDnsTrust=session->dnsTrust;
     return true;
 }
 

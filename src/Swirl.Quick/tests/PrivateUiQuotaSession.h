@@ -6,6 +6,7 @@
 
 struct ControlledNodeSession;
 class NodeImportService;
+class EngineController;
 
 // QA-only pipe/ABI boundary. It never reads a private subscription or enables
 // product startup. Rust owns the one process-global raw TCP quota.
@@ -16,6 +17,7 @@ public:
     bool begin();
     bool fixtureReady(const ControlledNodeSession &session);
     bool attachImportCapability(NodeImportService *,const ControlledNodeSession &);
+    bool attachDnsCapability(EngineController *,ControlledNodeSession *);
     bool finish();
 private:
     RustCoreLibrary::Command m_command = nullptr;

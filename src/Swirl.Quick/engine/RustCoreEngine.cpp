@@ -19,6 +19,42 @@
 #include <functional>
 #include <limits>
 
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+QString PrivateUiDnsTrust::bindingDigest() const {
+ return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(m_binding).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
+}
+bool PrivateUiDnsTrust::snapshot(QJsonObject *snapshot) const {
+ auto &library=RustCoreLibrary::instance();
+ if(!snapshot||!library.load()||library.expectedSourceSha()!=m_source)return false;
+ const auto command=library.privateUiQuota();if(!command)return false;
+ auto request=m_binding;request["op"]="snapshot";
+ const auto input=QJsonDocument(request).toJson(QJsonDocument::Compact);QByteArray output(16*1024,Qt::Uninitialized);
+ const auto size=command(reinterpret_cast<const unsigned char *>(input.constData()),size_t(input.size()),
+     reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));
+ if(size<=0||size>output.size())return false;output.resize(size);
+ const auto value=QJsonDocument::fromJson(output).object();
+ if(value.value("ok")!=QJsonValue(true)||value.value("op")!=QJsonValue("snapshot")
+     ||value.value("source_sha")!=QJsonValue(m_source))return false;
+ for(auto it=m_binding.begin();it!=m_binding.end();++it)if(value.value(it.key())!=it.value())return false;
+ const auto guard=value.value("guard").toObject();
+ if(guard.value("connection_limit")!=QJsonValue(6)||guard.value("timeout_ms")!=QJsonValue(8000))return false;
+ *snapshot=guard;return true;
+}
+QString PrivateUiDnsTrust::apply(QJsonObject *dns) const {
+ const QJsonObject tlsConfig{{"server_name","127.0.0.1"},{"alpn",QJsonArray{"dot"}}};
+ const QJsonObject serverConfig{{"address",m_endpoint},{"tls",tlsConfig}};
+ const QJsonObject expected{{"hosts",QJsonArray{}},{"force_proxy_hosts",false},{"servers",QJsonArray{}},
+     {"use_system_hosts",false},{"query_family","ipv4_only"},{"tls_servers",QJsonArray{serverConfig}}};
+ QJsonObject guard;
+ if(!dns||*dns!=expected||m_ca.isEmpty()||m_ca.size()>16384||!snapshot(&guard)
+     ||guard.value("stopped")!=QJsonValue(false)||guard.value("timed_out")!=QJsonValue(false))
+     return QStringLiteral("PrivateUiDnsTrustRejected");
+ auto servers=dns->value("tls_servers").toArray();auto server=servers.first().toObject();auto tls=server.value("tls").toObject();
+ tls["ca_der_base64"]=QString::fromLatin1(m_ca.toBase64());server["tls"]=tls;servers[0]=server;(*dns)["tls_servers"]=servers;
+ return {};
+}
+#endif
+
 namespace {
 QString recoveryRequiredMessage(){
  return QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
@@ -28,7 +64,11 @@ const QStringList &privateSubnets(){
  return values;
 }
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
- return SwirlRustDns::configuration(o.dnsConfig,output);
+ const auto error=SwirlRustDns::configuration(o.dnsConfig,output);if(!error.isEmpty())return error;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+ if(o.privateUiDnsTrust)return o.privateUiDnsTrust->apply(output);
+#endif
+ return {};
 }
 
 QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules,QJsonArray *selectors){

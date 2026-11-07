@@ -267,6 +267,9 @@ signals:
     void nodesChanged();
 private:
     friend class PolicyConfigurationTests;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    friend class PrivateUiQuotaSession;
+#endif
     QString nodeConnectionState(const QString &id) const;
     QList<ProxyNode> availableNodes() const;
     void refreshLanAddresses();

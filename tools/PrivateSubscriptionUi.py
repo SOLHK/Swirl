@@ -35,12 +35,61 @@ _IMPORT_ROUTE_STAGES = {"policy-applied", "probe-click", "probe-result", "proxy-
                         "proxy-http-complete", "proxy-https-complete"}
 
 
+def _validate_actual_core_routes(evidence, fixture, *, positive):
+    """Main-Core observations are independent of UI selection/model witnesses."""
+    from RunControlledNodeAcceptance import UI_IMPORT_ORIGIN_HOST
+    value = evidence["coreRouting"]
+    receipt_fields = {"engine_epoch", "generation", "store_id", "request_id", "applied_revision", "plan_digest"}
+    row_fields = {"scheme", "id", "host", "port", "category", "nodeReference", "leafNodeReference", "sourceReference",
+                  "rule", "ruleId", "mode", "tier", "revision", "generation", "beforeConnectionRevision",
+                  "responseConnectionRevision", "observedConnectionRevision", "preexistingConnectionIds", "closed"}
+    def number(text, minimum=1):
+        return (type(text) is str and re.fullmatch(r"0|[1-9][0-9]{0,19}", text) is not None
+                and minimum <= int(text) <= 2**64 - 1)
+    if (type(value) is not dict or set(value) != {"scope", "receipt", "requests"}
+            or value["scope"] != "actual-main-core-records-v1" or type(value["receipt"]) is not dict
+            or type(value["requests"]) is not list or len(value["requests"]) > 2):
+        raise BudgetError("ActualUiCoreRouteEvidenceRejected")
+    receipt, rows = value["receipt"], value["requests"]
+    if not receipt:
+        if positive or rows:
+            raise BudgetError("ActualUiCoreRouteEvidenceRejected")
+        return
+    committed = evidence["committedReceipts"]
+    if (set(receipt) != receipt_fields or len(committed) != 6
+            or any(not number(receipt[key]) for key in ("engine_epoch", "generation", "applied_revision"))
+            or any(receipt[key] != committed[-1][key] for key in ("store_id", "request_id", "applied_revision", "plan_digest"))):
+        raise BudgetError("ActualUiCoreRouteEvidenceRejected")
+    node = hashlib.sha256(evidence["importedNodeId"].encode("ascii")).hexdigest()[:12]
+    source = hashlib.sha256(evidence["sourceId"].encode("ascii")).hexdigest()[:12]
+    schemes, ids = set(), set()
+    for row in rows:
+        if (type(row) is not dict or set(row) != row_fields or row["scheme"] not in ("http", "https")
+                or row["scheme"] in schemes or not number(row["id"]) or row["id"] in ids
+                or row["host"] != UI_IMPORT_ORIGIN_HOST or type(row["port"]) is not int
+                or row["port"] != (fixture.http if row["scheme"] == "http" else fixture.https)
+                or row["category"] != "proxy" or row["nodeReference"] != node or row["leafNodeReference"] != node
+                or row["sourceReference"] != source or row["rule"] != "policy:default" or row["ruleId"] != "policy:default"
+                or row["mode"] != "global" or type(row["tier"]) is not int or row["tier"] != 5
+                or row["revision"] != receipt["applied_revision"] or row["generation"] != receipt["generation"]
+                or any(not number(row[key], 0) for key in ("beforeConnectionRevision", "responseConnectionRevision", "observedConnectionRevision"))
+                or not int(row["beforeConnectionRevision"]) <= int(row["responseConnectionRevision"]) < int(row["observedConnectionRevision"])
+                or type(row["preexistingConnectionIds"]) is not list or len(row["preexistingConnectionIds"]) > 128
+                or any(not number(old) for old in row["preexistingConnectionIds"])
+                or len(set(row["preexistingConnectionIds"])) != len(row["preexistingConnectionIds"])
+                or row["id"] in row["preexistingConnectionIds"] or type(row["closed"]) is not bool):
+            raise BudgetError("ActualUiCoreRouteEvidenceRejected")
+        schemes.add(row["scheme"]); ids.add(row["id"])
+    if positive and schemes != {"http", "https"}:
+        raise BudgetError("ActualUiCoreRouteSuccessUnproven")
+
+
 def _validate_import_observations(result, fixture, control, *, positive, proxy_port):
     """Validate observed UI facts only; never manufacture admission/ExitProof."""
     from RunControlledNodeAcceptance import UI_IMPORT_WORKFLOW
     evidence = result.get("uiImportEvidence")
     fields = {"workflow", "control", "phase", "inputEvents", "committedReceipts", "readbacks", "routeWitnesses", "probePresentation", "sourceId",
-              "importedNodeId", "bootstrapNodeId", "probeButtonClicked", "download"}
+              "importedNodeId", "bootstrapNodeId", "probeButtonClicked", "download", "coreRouting"}
     download_fields = {"capabilityInstalled", "requests", "tlsVerified", "responseVerified", "responseBytes",
                        "httpStatus", "expectedBodySha256", "failureCode", "route", "bodyLimit", "revoked"}
     receipt_fields = {"stage", "request_id", "store_id", "saved_revision", "applied_revision", "plan_digest"}
@@ -127,6 +176,7 @@ def _validate_import_observations(result, fixture, control, *, positive, proxy_p
             or any(type(presentation[key]) is not int or presentation[key] < -1 for key in ("latency", "outboundConnectMs"))
             or type(presentation["httpStatus"]) is not int or not 0 <= presentation["httpStatus"] <= 599):
         raise BudgetError("ActualUiImportEvidenceRejected")
+    _validate_actual_core_routes(evidence, fixture, positive=positive)
     if not positive:
         return
     if (control is not None or result.get("uiSubscriptionImportExercised") is not True
@@ -236,24 +286,85 @@ class UiIdentity(WorkerIdentity):
             raise BudgetError("PrivateUiCoreChanged")
 
 
+def _validate_dns_observations(result, fixture, control, *, plan, binding, final_guard, positive):
+    """Require production-resolver and native-quota facts, never a DNS-ready flag."""
+    from RunControlledNodeAcceptance import (UI_DNS_WORKFLOW, UI_DNS_HOST, FIXTURE_CERT_SHA256,
+        WRONG_CA_SHA256, fixed_dns_configuration, json_bytes)
+    value = result.get("uiDnsEvidence")
+    fields = {"workflow", "control", "configured", "configurationSha256", "trustBindingSha256",
+              "caSha256", "queryHost", "resolverAddress", "snapshots"}
+    if (type(value) is not dict or set(value) != fields or value["workflow"] != UI_DNS_WORKFLOW
+            or value["control"] != (control or "") or type(value["configured"]) is not bool
+            or value["queryHost"] != UI_DNS_HOST or value["resolverAddress"] != f"127.0.0.1:{fixture.socks}"
+            or value["caSha256"] != (WRONG_CA_SHA256 if control == "wrong-ca" else FIXTURE_CERT_SHA256)
+            or value["trustBindingSha256"] != digest(binding)
+            or type(value["snapshots"]) is not list or len(value["snapshots"]) > len(_IMPORT_ROUTE_STAGES)
+            or any(type(row) is not dict or set(row) != {"stage", "guard"} for row in value["snapshots"])):
+        raise BudgetError("ActualUiDnsEvidenceRejected")
+    expected_config = hashlib.sha256(json_bytes(fixed_dns_configuration(fixture.socks))).hexdigest()
+    if value["configurationSha256"] != (expected_config if value["configured"] else ""):
+        raise BudgetError("ActualUiDnsEvidenceRejected")
+    routes = result.get("uiImportEvidence", {}).get("routeWitnesses", [])
+    if [row.get("stage") for row in value["snapshots"]] != [row.get("stage") for row in routes]:
+        raise BudgetError("ActualUiDnsEvidenceRejected")
+    last = {"upload": 0, "download": 0, "connection_attempts": 0}
+    from PrivateSubscriptionBudget import validate_guard_receipt
+    for row in value["snapshots"]:
+        if type(row) is not dict or set(row) != {"stage", "guard"}:
+            raise BudgetError("ActualUiDnsEvidenceRejected")
+        validate_guard_receipt(row["guard"], plan, terminal=False)
+        if any(not last[key] <= row["guard"][key] <= final_guard[key] for key in last):
+            raise BudgetError("ActualUiDnsCounterRegression")
+        last = {key: row["guard"][key] for key in last}
+    if not positive:
+        return
+    observed = fixture.dns_report()
+    stages = [row["stage"] for row in routes]
+    guards = {row["stage"]: row["guard"] for row in value["snapshots"]}
+    expected_attempts = {"policy-applied": 1, "probe-click": 1, "probe-result": 3,
+                        "proxy-http-start": 3, "proxy-http-complete": 5,
+                        "proxy-https-start": 5, "proxy-https-complete": 6}
+    if (control is not None or value["configured"] is not True or len(observed["queries"]) != 2
+            or observed["tlsAttempts"] != 2 or observed["tlsCompleted"] != 2
+            or final_guard["timed_out"] is not False
+            or any(row["guard"]["timed_out"] is not False or row["guard"]["stopped"] is not False
+                   for row in value["snapshots"])
+            or set(guards) != set(expected_attempts)
+            or stages.index("probe-result") > stages.index("proxy-http-start")
+            or stages.index("proxy-http-complete") > stages.index("proxy-https-start")
+            or any(guards[stage]["connection_attempts"] != count for stage, count in expected_attempts.items())
+            or any(row["queryHost"] != UI_DNS_HOST or row["queryType"] != "A"
+                   or row["answerAddress"] != "127.0.0.1" or row["questionMatched"] is not True
+                   or row["responseSent"] is not True for row in observed["queries"])):
+        raise BudgetError("ActualUiDnsSuccessUnproven")
+
+
 class SyntheticUiSession:
     """One exact parent-owned fixed TLS/SOCKS fixture, never an endpoint API."""
 
-    def __init__(self, identity, output, fixture_directory, *, qt_root=None, import_workflow=False, import_control=None):
+    def __init__(self, identity, output, fixture_directory, *, qt_root=None, import_workflow=False, import_control=None,
+                 dns_workflow=False, dns_control=None):
         if type(identity) is not UiIdentity or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
             raise BudgetError("PrivateUiIdentityRequired")
         from RunControlledNodeAcceptance import UI_IMPORT_CONTROLS
         if (type(import_workflow) is not bool or import_control is not None and import_control not in UI_IMPORT_CONTROLS
                 or import_control is not None and not import_workflow):
             raise BudgetError("PrivateUiImportWorkflowRequired")
+        from RunControlledNodeAcceptance import UI_DNS_CONTROLS
+        if (type(dns_workflow) is not bool or dns_control is not None and dns_control not in UI_DNS_CONTROLS
+                or dns_control is not None and not dns_workflow
+                or dns_workflow and (not import_workflow or import_control is not None)):
+            raise BudgetError("PrivateUiDnsWorkflowRequired")
         self._issuer, self.identity = _UI_ISSUER, identity
         self.import_workflow, self.import_control = import_workflow, import_control
+        self.dns_workflow, self.dns_control = dns_workflow, dns_control
         self.root, self.fixture_directory = _local_path(Path(output)), _local_path(Path(fixture_directory))
         self.qt_root = None if qt_root is None else _local_path(Path(qt_root))
         self.fixture = self.storage = self.native_receipt = None
         self.manifest = self.proof = self.native_handle = self.child_environment = None
         self.ui_result = self.native_stop = None
         self.import_success_verified = False
+        self.dns_success_verified = False
         self.quota_proof = None
         self.closed = False
 
@@ -280,8 +391,12 @@ class SyntheticUiSession:
                        "core": self.identity.core_sha256, "plan": plan,
                        "ca": FIXTURE_CERT_SHA256, "key": FIXTURE_KEY_SHA256}
         if self.import_workflow:
-            from RunControlledNodeAcceptance import UI_IMPORT_WORKFLOW
-            configuration.update(uiWorkflow=UI_IMPORT_WORKFLOW, uiImportControl=self.import_control)
+            from RunControlledNodeAcceptance import UI_IMPORT_WORKFLOW, fixed_ui_origin
+            configuration.update(uiWorkflow=UI_IMPORT_WORKFLOW, uiImportControl=self.import_control,
+                                 uiOrigin=fixed_ui_origin())
+        if self.dns_workflow:
+            from RunControlledNodeAcceptance import UI_DNS_WORKFLOW
+            configuration.update(uiDnsWorkflow=UI_DNS_WORKFLOW, uiDnsControl=self.dns_control)
         return digest(configuration)
 
     def open(self, nonce):
@@ -309,8 +424,21 @@ class SyntheticUiSession:
                                      "socksPort": self.fixture.socks, "caSha256": hashlib.sha256(ca.read_bytes()).hexdigest()}}
         if self.import_workflow:
             self.manifest["uiWorkflow"] = UI_IMPORT_WORKFLOW
+            from RunControlledNodeAcceptance import fixed_ui_origin
+            self.manifest["uiOrigin"] = fixed_ui_origin()
             if self.import_control is not None:
                 self.manifest["uiImportControl"] = self.import_control
+        if self.dns_workflow:
+            from RunControlledNodeAcceptance import UI_DNS_WORKFLOW
+            dns_ca = certificate
+            if self.dns_control == "wrong-ca":
+                dns_ca = local_file(self.fixture_directory / "xray-download-server-cert.pem")
+                if hashlib.sha256(dns_ca.read_bytes()).hexdigest() != WRONG_CA_SHA256:
+                    raise BudgetError("CommittedSyntheticTlsFixtureRequired")
+            self.manifest["uiDns"] = {"workflow": UI_DNS_WORKFLOW, "control": self.dns_control or "",
+                                      "caSha256": hashlib.sha256(dns_ca.read_bytes()).hexdigest()}
+            with (self.root / "dns-ca.pem").open("xb") as destination:
+                destination.write(dns_ca.read_bytes())
         self.proof = self.fixture.bind_session(self.manifest)
         with (self.root / "fixture-ca.pem").open("xb") as destination:
             destination.write(ca.read_bytes())
@@ -367,6 +495,7 @@ class SyntheticUiSession:
 
     def validate_finished(self, reply, exit_proof, child):
         self.import_success_verified = False
+        self.dns_success_verified = False
         self.observe_exit(child)
         path = self.root / "result.json"
         if not path.is_file() or path.is_symlink() or path.stat().st_size > 65536:
@@ -384,6 +513,8 @@ class SyntheticUiSession:
                       "elapsedMs", "exitIpSha256", "responseEncrypted"}
         if self.import_workflow:
             fields.update({"uiImportEvidence", "uiProbeButtonExercised", "uiDisplayedLatencyMatches"})
+        if self.dns_workflow:
+            fields.add("uiDnsEvidence")
         if (not isinstance(result, dict) or set(result) != fields or type(result["schema"]) is not int or result["schema"] != 1
                 or result.get("nonce") != self.manifest["nonce"]
                 or result.get("sourceSha") != self.identity.metadata["source_sha"]
@@ -404,6 +535,12 @@ class SyntheticUiSession:
         if self.import_workflow:
             _validate_import_observations(result, self.fixture, self.import_control, positive=False, proxy_port=self.manifest["proxyPort"])
         guard = reply["guard"]
+        if self.dns_workflow:
+            from PrivateSubscriptionBudget import tcp_plan
+            plan = tcp_plan(guard["byte_limit"], guard["connection_limit"], guard["timeout_ms"])
+            binding = {key: reply[key] for key in ("schema", "reservation_id", "nonce", "plan_digest")}
+            _validate_dns_observations(result, self.fixture, self.dns_control, plan=plan, binding=binding,
+                                       final_guard=guard, positive=False)
         if reply.get("raw_tcp_quota_exercised") is not True:
             raise BudgetError("ActualUiRawQuotaUnproven")
         self.quota_proof = {"scope": reply["scope"], "rawTcpQuotaExercised": reply["raw_tcp_quota_exercised"],
@@ -434,6 +571,12 @@ class SyntheticUiSession:
             _validate_import_observations(result, self.fixture, self.import_control, positive=True, proxy_port=self.manifest["proxyPort"])
             if guard["connection_attempts"] < 4 or self.fixture.forwarded < 4:
                 raise BudgetError("ActualUiImportTransportUnproven")
+            if self.dns_workflow:
+                _validate_dns_observations(result, self.fixture, self.dns_control, plan=plan, binding=binding,
+                                           final_guard=guard, positive=True)
+                if guard["connection_attempts"] != 6 or self.fixture.socks_connections != 4 or self.fixture.forwarded != 4:
+                    raise BudgetError("ActualUiDnsTransportUnproven")
+                self.dns_success_verified = True
             self.import_success_verified = True
         return "QtUiSucceeded"
 
@@ -453,6 +596,9 @@ class SyntheticUiSession:
             result.update(uiWorkflow="subscription-policy-v1", uiImportControl=self.import_control,
                 subscriptionRequests=0 if self.fixture is None else self.fixture.subscription_requests,
                 subscriptionDeclaredBodyBytes=0 if self.fixture is None else self.fixture.subscription_declared_body_bytes)
+        if self.dns_workflow:
+            result.update(uiDnsExercised=self.dns_success_verified,
+                          dns=None if self.fixture is None else self.fixture.dns_report())
         return result
 
     def close(self):
@@ -463,6 +609,11 @@ class SyntheticUiSession:
             if resource is not None:
                 try:
                     resource.close()
+                    if self.dns_workflow and resource is self.fixture:
+                        observed = resource.dns_report()
+                        if (type(observed) is not dict or observed.get("listenersClosed") is not True
+                                or observed.get("tasksReleased") is not True):
+                            raise BudgetError("UiFixtureExitUnconfirmed")
                 except (OSError, ValueError, BudgetError):
                     failures.append(True)
         if failures:
@@ -488,6 +639,8 @@ def main(argv=None):
     parser.add_argument("--byte-limit", type=int, default=65536)
     parser.add_argument("--synthetic-ui-import-policy", action="store_true")
     parser.add_argument("--synthetic-ui-import-control", choices=("wrong-ca", "over-limit", "wrong-url", "missing-capability"))
+    parser.add_argument("--synthetic-ui-dns", action="store_true")
+    parser.add_argument("--synthetic-ui-dns-control", choices=("wrong-ca", "wrong-address", "wrong-question", "stall"))
     parser.add_argument("--synthetic-billing", action="store_true")
     parser.add_argument("--billing-worker", type=Path)
     parser.add_argument("--billing-worker-sha256")
@@ -496,6 +649,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.synthetic_ui_import_control is not None and not args.synthetic_ui_import_policy:
         raise BudgetError("PrivateUiImportWorkflowRequired")
+    if ((args.synthetic_ui_dns_control is not None and not args.synthetic_ui_dns)
+            or args.synthetic_ui_dns and (not args.synthetic_ui_import_policy or args.synthetic_ui_import_control is not None)):
+        raise BudgetError("PrivateUiDnsWorkflowRequired")
     if ((args.synthetic_billing and (args.billing_worker is None or args.billing_worker_sha256 is None))
             or (not args.synthetic_billing and (args.billing_worker is not None or args.billing_worker_sha256 is not None
                                               or args.billing_response_contract != "synthetic_qa_v1"))):
@@ -518,7 +674,8 @@ def main(argv=None):
                 billing_identity = WorkerIdentity.inspect(args.billing_worker, args.expected_source, args.billing_worker_sha256)
                 billing = BillingSession.register(ledger)
             session = SyntheticUiSession(identity, args.output_directory, args.fixture_directory, qt_root=args.qt_root,
-                import_workflow=args.synthetic_ui_import_policy, import_control=args.synthetic_ui_import_control)
+                import_workflow=args.synthetic_ui_import_policy, import_control=args.synthetic_ui_import_control,
+                dns_workflow=args.synthetic_ui_dns, dns_control=args.synthetic_ui_dns_control)
             result = Supervisor(ledger, identity, billing, billing_worker_identity=billing_identity,
                 billing_response_contract=args.billing_response_contract).run_ui(session, byte_limit=args.byte_limit)
         finally:

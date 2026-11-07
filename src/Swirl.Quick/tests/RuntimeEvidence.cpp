@@ -19,6 +19,7 @@
 #include <QtCore/qfloat16.h>
 #include <memory>
 #include <atomic>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -130,13 +131,21 @@ void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,Syst
  QTimer::singleShot(30*60*1000,window,[controller]{controller->stop();qApp->quit();});
 }
 
+QString ControlledNodeSession::originHost() const {
+    return uiImportPolicy?QStringLiteral("203.0.113.1"):QStringLiteral("127.0.0.1");
+}
 QUrl ControlledNodeSession::subscriptionUrl() const {
-    return QUrl(QStringLiteral("https://127.0.0.1:%1/swirl-private-subscription/%2.yaml")
-        .arg(fixtureHttpsPort).arg(nonce));
+    return QUrl(QStringLiteral("https://%1:%2/swirl-private-subscription/%3.yaml")
+        .arg(originHost()).arg(fixtureHttpsPort).arg(nonce));
 }
 QByteArray ControlledNodeSession::subscriptionBody() const {
-    return QByteArray("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: 127.0.0.1\n    port: ")
+    return QByteArray("proxies:\n  - name: Synthetic imported SOCKS5\n    type: socks5\n    server: ")
+        +(uiDnsPolicy?QByteArray("swirl-node.fixture.invalid"):QByteArray("127.0.0.1"))+"\n    port: "
         +QByteArray::number(fixtureSocksPort)+"\n    username: fixture\n    password: \""+fixturePassword.toLatin1()+"\"\n";
+}
+QVariantMap ControlledNodeSession::dnsConfiguration() const {
+    return {{"mode",0},{"servers",QString{}},{"encrypted",QStringLiteral("tls://127.0.0.1:%1").arg(fixtureSocksPort)},
+        {"hosts",QVariantList{}},{"useHosts",false},{"respectRules",false},{"queryFamily",QStringLiteral("ipv4_only")}};
 }
 
 namespace {
@@ -344,9 +353,90 @@ public:
         return {{"workflow","subscription-policy-v1"},{"control",m_session.uiImportControl},
             {"phase",int(m_phase)},{"inputEvents",m_inputs},{"committedReceipts",m_receipts},
             {"readbacks",m_readbacks},{"routeWitnesses",m_routes},{"probePresentation",probePresentation()},
+            {"coreRouting",QJsonObject{{"scope","actual-main-core-records-v1"},{"receipt",m_coreReceipt},{"requests",m_coreRoutes}}},
             {"sourceId",m_sourceId},{"importedNodeId",m_importedId},
             {"bootstrapNodeId",m_session.fixtureNodeId},{"probeButtonClicked",m_probeClicked},
             {"download",QJsonObject::fromVariantMap(m_controller->imports()->privateUiImportEvidence())}};
+    }
+    QJsonArray dnsSnapshots() const{return m_dnsSnapshots;}
+    bool prepareCoreRequests() {
+        if(m_corePrepared)return coreReceiptUnchanged();
+        if(!m_coreBaselineRequested){
+            m_coreBaselineRequested=true;
+            m_coreBaselineRevision=m_controller->telemetry()->connectionRevision();
+            m_controller->refresh();return false;
+        }
+        if(m_controller->telemetry()->connectionRevision()<=m_coreBaselineRevision)return false;
+        if(!m_controller->telemetry()->connectionsSampled()||!routeMatches(m_importedId)){
+            m_error="PrivateUiCoreRouteBaselineRejected";return false;
+        }
+        const auto receipt=m_controller->policyReceipt();
+        const auto number=[](const QString &value){bool valid=false;const auto n=value.toULongLong(&valid);
+            return valid&&n>0&&QRegularExpression("^[1-9][0-9]{0,19}$").match(value).hasMatch();};
+        for(const auto &key:QStringList{"engine_epoch","generation","applied_revision"})
+            if(!number(receipt.value(key).toString())){m_error="PrivateUiCoreRouteReceiptRejected";return false;}
+        if(receipt.value("request_id").toString()!=m_recordedRequest||QUuid(receipt.value("store_id").toString()).isNull()
+            ||receipt.value("applied_revision").toString()!=m_controller->savedRevision()
+            ||!QRegularExpression("^[0-9a-f]{64}$").match(receipt.value("plan_digest").toString()).hasMatch()){
+            m_error="PrivateUiCoreRouteReceiptRejected";return false;
+        }
+        for(const auto &key:QStringList{"engine_epoch","generation","store_id","request_id","applied_revision","plan_digest"})
+            m_coreReceipt.insert(key,receipt.value(key).toString());
+        m_corePrepared=true;return true;
+    }
+    bool beginCoreRequest(const QString &scheme,const QUrl &url) {
+        if(!m_corePrepared||!coreReceiptUnchanged()||m_coreRequests.contains(scheme)
+            ||(scheme!=QStringLiteral("http")&&scheme!=QStringLiteral("https"))
+            ||url.host()!=m_session.originHost()||url.scheme()!=scheme
+            ||url.port()!=(scheme==QStringLiteral("http")?m_session.fixtureHttpPort:m_session.fixtureHttpsPort))return false;
+        CoreRequest request;request.port=url.port();request.beforeRevision=m_controller->telemetry()->connectionRevision();
+        for(const auto &value:m_controller->connections())request.beforeIds.insert(value.toMap().value("id").toString());
+        request.beforeIds.remove(QString{});m_coreRequests.insert(scheme,std::move(request));return true;
+    }
+    bool coreResponseFinished(const QString &scheme) {
+        auto found=m_coreRequests.find(scheme);
+        if(found==m_coreRequests.end()||found->finished||!coreReceiptUnchanged())return false;
+        found->finished=true;found->responseRevision=m_controller->telemetry()->connectionRevision();
+        // ThreadedEngine refresh is queued. Its return is not a new sample.
+        m_controller->refresh();return true;
+    }
+    bool collectCoreRoutes() {
+        if(!m_corePrepared||!coreReceiptUnchanged())return false;
+        const auto revision=m_controller->telemetry()->connectionRevision();
+        for(auto it=m_coreRequests.begin();it!=m_coreRequests.end();++it){
+            auto &request=it.value();if(!request.finished||request.verified||revision<=request.responseRevision)continue;
+            QVariantList candidates;
+            for(const auto &value:m_controller->connections()){
+                const auto row=value.toMap();
+                if(!request.beforeIds.contains(row.value("id").toString())&&row.value("host")==m_session.originHost()
+                    &&row.value("port").toInt()==request.port)candidates.append(value);
+            }
+            if(candidates.isEmpty()){m_controller->refresh();continue;}
+            if(candidates.size()!=1){m_error="PrivateUiCoreRouteAmbiguous";return false;}
+            const auto row=candidates.first().toMap(),route=row.value("route").toMap();
+            const auto id=row.value("id").toString();bool idValid=false;const auto numericId=id.toULongLong(&idValid);
+            if(!idValid||!numericId||QString::number(numericId)!=id||row.value("policy")!=m_importedId
+                ||row.value("category")!=QStringLiteral("proxy")||row.value("rule")!=QStringLiteral("policy:default")
+                ||route.value("leaf_node_id")!=m_importedId||route.value("source_id")!=m_sourceId
+                ||route.value("mode")!=QStringLiteral("global")||route.value("rule_id")!=QStringLiteral("policy:default")
+                ||route.value("tier").toInt()!=5||route.value("revision").toString()!=m_coreReceipt.value("applied_revision").toString()
+                ||route.value("generation").toString()!=m_coreReceipt.value("generation").toString()){
+                m_error="PrivateUiActualCoreRouteMismatch";return false;
+            }
+            auto old=request.beforeIds.values();std::sort(old.begin(),old.end());QJsonArray before;
+            for(const auto &value:old)before.append(value);
+            m_coreRoutes.append(QJsonObject{{"scheme",it.key()},{"id",id},{"host",row.value("host").toString()},{"port",request.port},
+                {"category",row.value("category").toString()},{"nodeReference",NodeTestService::nodeReference(row.value("policy").toString())},
+                {"leafNodeReference",NodeTestService::nodeReference(route.value("leaf_node_id").toString())},
+                {"sourceReference",NodeTestService::nodeReference(route.value("source_id").toString())},
+                {"rule",row.value("rule").toString()},{"ruleId",route.value("rule_id").toString()},{"mode",route.value("mode").toString()},
+                {"tier",route.value("tier").toInt()},{"revision",route.value("revision").toString()},{"generation",route.value("generation").toString()},
+                {"beforeConnectionRevision",QString::number(request.beforeRevision)},
+                {"responseConnectionRevision",QString::number(request.responseRevision)},
+                {"observedConnectionRevision",QString::number(revision)},{"preexistingConnectionIds",before},{"closed",row.value("closed").toBool()}});
+            request.verified=true;
+        }
+        return m_coreRoutes.size()==2;
     }
     bool displayedProbe(qint64 latency,int status,qint64 outboundMs) const {
         auto *label=item("nodeRequestState");
@@ -375,6 +465,11 @@ public:
             ||target.value("id")!=m_importedId||receipt.value("request_id").toString()!=m_recordedRequest
             ||(stage==QStringLiteral("probe-result")?resultReference!=reference:!resultReference.isEmpty()))return false;
         for(const auto &entry:m_routes)if(entry.toObject().value("stage")==stage)return false;
+        if(m_session.uiDnsPolicy){
+            QJsonObject guard;
+            if(!m_session.dnsTrust||!m_session.dnsTrust->snapshot(&guard))return false;
+            m_dnsSnapshots.append(QJsonObject{{"stage",stage},{"guard",guard}});
+        }
         m_routes.append(QJsonObject{{"stage",stage},{"selectedNodeReference",NodeTestService::nodeReference(m_controller->selectedNodeId())},
             {"activeNodeReference",NodeTestService::nodeReference(m_controller->activeNodeId())},
             {"defaultNodeReference",NodeTestService::nodeReference(target.value("id").toString())},
@@ -487,7 +582,7 @@ public:
         case ProbeField:
             if(auto *hero=item("nodeHero");hero&&hero->property("opened").toBool()&&!hero->property("moving").toBool()){
                 if(value("pageLoader.item.selectedId").toString()!=m_importedId||!routeMatches(m_importedId)){m_error="PrivateUiInspectedNodeMismatch";return;}
-                if(fill("nodeTestUrl",QStringLiteral("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort),"probe-url"))m_phase=ProbeButton;
+                if(fill("nodeTestUrl",QStringLiteral("http://%1:%2/generate_204").arg(m_session.originHost()).arg(m_session.fixtureHttpPort),"probe-url"))m_phase=ProbeButton;
             }break;
         case ProbeButton:
             if(auto *button=item("nodeTestButton");stable(button)){
@@ -505,7 +600,10 @@ private:
     QQuickWindow *m_window;EngineController *m_controller;ControlledNodeSession m_session;
     std::function<bool()> m_networkPhase;Phase m_phase=PolicyPage;
     QString m_error,m_sourceId,m_importedId,m_beforeRequest,m_recordedRequest;
-    QHash<QString,bool> m_completions;QJsonArray m_inputs,m_receipts,m_readbacks,m_routes;
+    QHash<QString,bool> m_completions;QJsonArray m_inputs,m_receipts,m_readbacks,m_routes,m_dnsSnapshots;
+    struct CoreRequest {int port=0;quint64 beforeRevision=0,responseRevision=0;QSet<QString> beforeIds;bool finished=false,verified=false;};
+    QHash<QString,CoreRequest> m_coreRequests;QJsonObject m_coreReceipt;QJsonArray m_coreRoutes;
+    quint64 m_coreBaselineRevision=0;bool m_coreBaselineRequested=false,m_corePrepared=false;
     QPointer<QQuickItem> m_lastTarget,m_interval;QRectF m_lastRect;
     bool m_imported=false,m_policySelected=false,m_probeClicked=false;
     QVariant value(const QString &expression) const {
@@ -603,12 +701,22 @@ private:
             &&m_controller->activeProxyPort()==m_session.proxyPort&&!m_controller->tunRequested()&&!m_controller->proxyRequested()
             &&m_controller->appliedRevision()==m_controller->savedRevision();
     }
+    bool coreReceiptUnchanged() {
+        const auto receipt=m_controller->policyReceipt();
+        if(!routeMatches(m_importedId)){m_error="PrivateUiCoreRouteReceiptChanged";return false;}
+        for(auto it=m_coreReceipt.begin();it!=m_coreReceipt.end();++it)if(receipt.value(it.key()).toString()!=it.value().toString()){
+            m_error="PrivateUiCoreRouteReceiptChanged";return false;
+        }
+        return true;
+    }
     bool readback(bool selected) {
         NodeStore reopened(m_session.storePath);const auto providers=reopened.subscriptions();const auto nodes=reopened.nodes();
         const auto actualReceipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());
         if(!reopened.error().isEmpty()||reopened.saving()||!reopened.configurationAvailable()||!reopened.configurationV2()
             ||providers.size()!=1||nodes.size()!=2||reopened.configurationReceipt().value("request_id")!=actualReceipt.value("request_id")
             ||reopened.configurationReceipt().value("plan_digest")!=actualReceipt.value("plan_digest"))return false;
+        if(m_session.uiDnsPolicy&&reopened.networkConfiguration().value("dns").toObject()
+            !=QJsonObject::fromVariantMap(m_session.dnsConfiguration()))return false;
         const auto &source=providers.first();
         if(QUuid(source.id).isNull()||source.name!=QStringLiteral("Synthetic owned subscription")||source.url!=m_session.subscriptionUrl()
             ||source.enabled||source.intervalMinutes!=1440||source.formatHint!=QStringLiteral("auto")||source.downloadRoute!=QStringLiteral("system")
@@ -674,6 +782,19 @@ public:
         m_controller->setProxyPort(m_session.proxyPort);
 #ifdef SWIRL_PRIVATE_UI_QUOTA
         if(m_session.uiImportPolicy){
+            if(m_session.uiDnsPolicy){
+                if(!m_session.dnsTrust||!m_controller->canStart()
+                    ||!m_controller->configureDns(m_session.dnsConfiguration())){fail("PrivateUiDnsConfigurationRejected");return;}
+                NodeStore reloaded(m_session.storePath);
+                const auto actual=reloaded.networkConfiguration().value("dns").toObject();
+                if(!reloaded.error().isEmpty()||actual!=QJsonObject::fromVariantMap(m_session.dnsConfiguration())
+                    ||m_controller->dnsConfiguration()!=m_session.dnsConfiguration()){
+                    fail("PrivateUiDnsPersistenceUnconfirmed");return;
+                }
+                m_dnsConfigurationSha=QString::fromLatin1(QCryptographicHash::hash(
+                    QJsonDocument(actual).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
+                m_dnsConfigured=true;
+            }
             m_window->resize(1450,884); // Existing node-input fixture geometry; normal animations stay enabled.
             m_importUi=std::make_unique<ControlledImportUi>(m_window,m_controller,m_session,[this]{return beginNetworkPhase();},this);
             if(!publish("ui-import-policy")||!m_importUi->begin()){fail("PrivateUiNavigationFailed");return;}
@@ -704,6 +825,8 @@ private:
 #ifdef SWIRL_PRIVATE_UI_QUOTA
     std::unique_ptr<ControlledImportUi> m_importUi;
     bool m_uiTick=false;
+    bool m_dnsConfigured=false;
+    QString m_dnsConfigurationSha;
 #endif
     qint64 m_uiLatency=-1;
     qint64 m_outboundConnectMs=-1,m_originTlsMs=-1;
@@ -732,18 +855,22 @@ private:
         if(!publish("requests")){fail("PrivateReceiptWriteFailed");return;}
         m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),quint16(m_session.proxyPort)));
         if(!probeAlreadyClicked){
-            const auto probe=QUrl(QString("http://127.0.0.1:%1/generate_204").arg(m_session.fixtureHttpPort));
+            const auto probe=QUrl(QString("http://%1:%2/generate_204").arg(m_session.originHost()).arg(m_session.fixtureHttpPort));
             m_controller->testSelectedNode(m_id,probe);
         }
-        request("http",QUrl(QString("http://127.0.0.1:%1/").arg(m_session.fixtureHttpPort)));
+        request("http",QUrl(QString("http://%1:%2/").arg(m_session.originHost()).arg(m_session.fixtureHttpPort)));
         if(m_stopping||m_done)return;
-        request("https",QUrl(QString("https://127.0.0.1:%1/trace").arg(m_session.fixtureHttpsPort)));
+        if(m_session.uiDnsPolicy)return; // The real HTTP completion admits HTTPS below, without a new clock.
+        request("https",QUrl(QString("https://%1:%2/trace").arg(m_session.originHost()).arg(m_session.fixtureHttpsPort)));
     }
     void request(const char *scheme,const QUrl &url) {
         if(m_stopping||m_done)return;
 #ifdef SWIRL_PRIVATE_UI_QUOTA
         if(m_importUi&&!m_importUi->witnessRoute(QStringLiteral("proxy-%1-start").arg(QString::fromLatin1(scheme)))){
             fail("PrivateUiNormalProxyRouteMismatch");return;
+        }
+        if(m_importUi&&!m_importUi->beginCoreRequest(QString::fromLatin1(scheme),url)){
+            fail("PrivateUiCoreRouteRequestRejected");return;
         }
 #endif
         QNetworkRequest input(url);SwirlNetwork::applyHttp1OnlyPolicy(input);
@@ -793,9 +920,33 @@ private:
             // Store this completed response before aborting peers: abort can
             // synchronously run their finished handlers and finish the run.
             if(routeRejected){stop();return;}
+            if(m_importUi&&!m_stopping&&!m_done){
+                if(!succeeded||!sealed){fail("PrivateUiNormalProxyResponseFailed");return;}
+                if(!m_importUi->coreResponseFinished(QString::fromLatin1(scheme))){
+                    fail("PrivateUiCoreRouteResponseRejected");return;
+                }
+            }
 #endif
+            if(m_session.uiDnsPolicy&&QByteArray(scheme)=="http"&&!m_stopping&&!m_done){
+                if(!succeeded||!sealed){fail("PrivateUiDnsHttpFailed");return;}
+                request("https",QUrl(QString("https://%1:%2/trace").arg(m_session.originHost()).arg(m_session.fixtureHttpsPort)));
+            }
             tick();
         });
+    }
+    bool collectProbe() {
+        if(m_probeCompleted||m_controller->tests()->busy())return true;
+        const auto probe=m_controller->tests()->result(m_id);if(probe.isEmpty())return true;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_importUi&&!m_importUi->witnessRoute("probe-result",probe.value("nodeReference").toString())){
+            fail("PrivateUiProbeResultReferenceMismatch");return false;
+        }
+#endif
+        m_probeCompleted=true;m_probeSuccess=probe.value("success").toBool();m_uiLatency=probe.value("latency",-1).toLongLong();
+        m_probeHttp=probe.value("http").toInt();m_probePhase=probe.value("phase").toString();
+        m_probeFailureCode=probe.value("failureCode").toString();
+        m_outboundConnectMs=probe.value("outboundConnectMs",-1).toLongLong();m_originTlsMs=probe.value("originTlsMs",-1).toLongLong();
+        return true;
     }
     void tick() {
 #ifdef SWIRL_PRIVATE_UI_QUOTA
@@ -816,7 +967,16 @@ private:
                 m_importUi->advance();
                 if(!m_importUi->error().isEmpty()){fail(m_importUi->error());return;}
                 if(!m_importUi->ready())return;
-                m_id=m_importUi->importedId();proxyRequests(true);
+                m_id=m_importUi->importedId();
+                if(m_session.uiDnsPolicy){
+                    if(!collectProbe()||!m_probeCompleted)return;
+                    if(!m_probeSuccess){fail("PrivateUiDnsProbeFailed");return;}
+                }
+                if(!m_importUi->prepareCoreRequests()){
+                    if(!m_importUi->error().isEmpty())fail(m_importUi->error());
+                    return;
+                }
+                proxyRequests(true);
             }else
 #endif
             {
@@ -837,21 +997,25 @@ private:
             }
         }
         if(m_stopping||m_done||!m_requestsStarted)return;
-        if(!m_probeCompleted&&!m_controller->tests()->busy()){
-            const auto probe=m_controller->tests()->result(m_id);
-            if(!probe.isEmpty()){
 #ifdef SWIRL_PRIVATE_UI_QUOTA
-                if(m_importUi&&!m_importUi->witnessRoute("probe-result",probe.value("nodeReference").toString())){
-                    fail("PrivateUiProbeResultReferenceMismatch");return;
-                }
+        if(m_importUi&&m_requestsClock.elapsed()>=8000){fail("RequestDeadlineExceeded");return;}
 #endif
-                m_probeCompleted=true;m_probeSuccess=probe.value("success").toBool();m_uiLatency=probe.value("latency",-1).toLongLong();
-                m_probeHttp=probe.value("http").toInt();m_probePhase=probe.value("phase").toString();
-                m_probeFailureCode=probe.value("failureCode").toString();
-                m_outboundConnectMs=probe.value("outboundConnectMs",-1).toLongLong();m_originTlsMs=probe.value("originTlsMs",-1).toLongLong();
-            }
+        if(!collectProbe())return;
+        bool coreRoutesComplete=true;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_importUi){
+            coreRoutesComplete=m_importUi->collectCoreRoutes();
+            if(!m_importUi->error().isEmpty()){fail(m_importUi->error());return;}
         }
-        if(m_probeCompleted&&m_completed==2){stop();return;}
+#endif
+        if(m_probeCompleted&&m_completed==2&&coreRoutesComplete){
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+            // Evidence may arrive asynchronously. Recheck the same clock after
+            // sampling; a late route record cannot turn timeout into success.
+            if(m_importUi&&m_requestsClock.elapsed()>=8000){fail("RequestDeadlineExceeded");return;}
+#endif
+            stop();return;
+        }
         if(m_requestsClock.elapsed()>=8000)fail("RequestDeadlineExceeded");
     }
     void stop() {
@@ -892,6 +1056,14 @@ private:
             result.insert("uiImportEvidence",m_importUi->evidence());result.insert("uiProbeButtonExercised",uiProbe);
             result.insert("uiDisplayedLatencyMatches",uiDisplay);
         }
+        if(m_session.uiDnsPolicy){
+            result.insert("uiDnsEvidence",QJsonObject{{"workflow","same-endpoint-dot-v1"},{"control",m_session.uiDnsControl},
+                {"configured",m_dnsConfigured},{"configurationSha256",m_dnsConfigurationSha},
+                {"trustBindingSha256",m_session.dnsTrust?m_session.dnsTrust->bindingDigest():QString{}},
+                {"caSha256",QString::fromLatin1(QCryptographicHash::hash(m_session.fixtureDnsCa,QCryptographicHash::Sha256).toHex())},
+                {"queryHost","swirl-node.fixture.invalid"},{"resolverAddress",QStringLiteral("127.0.0.1:%1").arg(m_session.fixtureSocksPort)},
+                {"snapshots",m_importUi?m_importUi->dnsSnapshots():QJsonArray{}}});
+        }
 #endif
         const bool saved=controlledJson(m_session.root+"/result.json",result);publish("finished");
         QCoreApplication::exit(saved&&passed?0:2);
@@ -929,11 +1101,30 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
 #else
         if(nativeControl||input.value("uiWorkflow")!=QJsonValue(QStringLiteral("subscription-policy-v1")))return false;
         manifestKeys.append("uiWorkflow");
+        const auto origin=input.value("uiOrigin").toObject();
+        if(!controlledKeys(origin,{"host","certificateSha256","keySha256"})
+            ||origin.value("host")!=QJsonValue("203.0.113.1")
+            ||origin.value("certificateSha256")!=QJsonValue("650152f76d410e5ae1a2b589002d1dd79a9c2af405021aed50da861fac52d748")
+            ||origin.value("keySha256")!=QJsonValue("e62fd952d2f14fa39e6849032825d4e6a6b46837fce0037f6ed1abd46becc814"))return false;
+        manifestKeys.append("uiOrigin");
         if(input.contains("uiImportControl")){
             if(!input.value("uiImportControl").isString()||!QStringList{"wrong-ca","over-limit","wrong-url","missing-capability"}
                 .contains(input.value("uiImportControl").toString()))return false;
             manifestKeys.append("uiImportControl");
         }
+#endif
+    }
+    const bool uiDns=input.contains("uiDns");
+    if(uiDns){
+#ifndef SWIRL_PRIVATE_UI_QUOTA
+        return false;
+#else
+        if(!uiImport||input.contains("uiImportControl")||!input.value("uiDns").isObject())return false;
+        const auto dns=input.value("uiDns").toObject();
+        if(!controlledKeys(dns,{"workflow","control","caSha256"})
+            ||dns.value("workflow")!=QJsonValue("same-endpoint-dot-v1")||!dns.value("control").isString()
+            ||!QStringList{"","wrong-ca","wrong-address","wrong-question","stall","cancel"}.contains(dns.value("control").toString()))return false;
+        manifestKeys.append("uiDns");
 #endif
     }
     if(!controlledKeys(input,manifestKeys)
@@ -948,6 +1139,7 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     candidate.nonce=input.value("nonce").toString();candidate.nodeOrdinal=1;
     candidate.nativeWatchdog500msControl=nativeControl;
     candidate.uiImportPolicy=uiImport;candidate.uiImportControl=input.value("uiImportControl").toString();
+    candidate.uiDnsPolicy=uiDns;candidate.uiDnsControl=input.value("uiDns").toObject().value("control").toString();
     if(!controlledPort(input.value("proxyPort"),&candidate.proxyPort)
         ||!controlledPort(settings.value("httpPort"),&candidate.fixtureHttpPort)
         ||!controlledPort(settings.value("httpsPort"),&candidate.fixtureHttpsPort)
@@ -967,6 +1159,16 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     if(!controlledPath(caPath)||!ca.open(QIODevice::ReadOnly)||ca.size()>16384)return false;
     candidate.fixtureCa=ca.read(16385);
     if(QString::fromLatin1(QCryptographicHash::hash(candidate.fixtureCa,QCryptographicHash::Sha256).toHex())!=caHash)return false;
+    if(uiDns){
+        const auto expected=candidate.uiDnsControl==QStringLiteral("wrong-ca")
+            ?QStringLiteral("e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b")
+            :QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311");
+        QFile dnsCa(root+"/dns-ca.pem");
+        if(input.value("uiDns").toObject().value("caSha256")!=QJsonValue(expected)
+            ||!controlledPath(dnsCa.fileName())||!dnsCa.open(QIODevice::ReadOnly)||dnsCa.size()>16384)return false;
+        candidate.fixtureDnsCa=dnsCa.read(16385);
+        if(QString::fromLatin1(QCryptographicHash::hash(candidate.fixtureDnsCa,QCryptographicHash::Sha256).toHex())!=expected)return false;
+    }
     QByteArray proof;
     if(!controlledPrivateProof(&proof))return false;
     const auto digest=QCryptographicHash::hash(bytes,QCryptographicHash::Sha256);
