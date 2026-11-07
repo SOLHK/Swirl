@@ -38,6 +38,12 @@ Assert-SwirlPathWithoutLinks $stage
 if (Test-Path -LiteralPath $stage) { throw 'Packaging requires a fresh destination.' }
 $sourceSha = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Source identity is missing.' }
+$files = @('Swirl.exe','swirl_api.dll','swirl-rust-build.json','swirl-tun-broker.exe','swirl-tun-helper.exe','SwirlProxyGuard.exe',
+    'SwirlGatewayGuard.exe','SwirlScriptRunner.exe','SwirlCodexLauncher.exe',
+    'SwirlCodexManage.py','SubscriptionCapture.py')
+foreach ($name in $files) {
+    if (-not (Test-Path -LiteralPath (Join-Path $bin $name) -PathType Leaf)) { throw "Missing build output: $name" }
+}
 # Bind deployment tools to the kit which CMake actually resolved. This also
 # keeps non-CI callers from silently borrowing windeployqt/qtpaths from PATH.
 if ($cache -notmatch '(?m)^Qt6_DIR:PATH=(.+)$') { throw 'Configured Qt SDK location is missing.' }
@@ -60,12 +66,6 @@ if ($QtSdkReceipt) {
     & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify --receipt $QtSdkReceipt `
         --build-dir $build --phase pre-deploy --evidence (Join-Path $QtEvidenceDirectory 'pre-deploy')
     if ($LASTEXITCODE -ne 0) { throw 'Selected Qt SDK or actual product linkage changed before deployment.' }
-}
-$files = @('Swirl.exe','swirl_api.dll','swirl-rust-build.json','swirl-tun-broker.exe','swirl-tun-helper.exe','SwirlProxyGuard.exe',
-    'SwirlGatewayGuard.exe','SwirlScriptRunner.exe','SwirlCodexLauncher.exe',
-    'SwirlCodexManage.py','SubscriptionCapture.py')
-foreach ($name in $files) {
-    if (-not (Test-Path -LiteralPath (Join-Path $bin $name) -PathType Leaf)) { throw "Missing build output: $name" }
 }
 $expected = Get-Content -LiteralPath (Join-Path $bin 'swirl-rust-build.json') -Raw | ConvertFrom-Json
 if ($expected.source_sha -ne $sourceSha -or $expected.target -ne 'x86_64-pc-windows-msvc' -or
