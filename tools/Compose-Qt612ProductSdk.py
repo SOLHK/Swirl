@@ -641,13 +641,14 @@ function(swirl_capture_selected_qt)
   if(NOT dll STREQUAL "@PREFIX@/bin/Qt6Qml.dll" OR NOT implib STREQUAL "@PREFIX@/lib/Qt6Qml.lib")
     message(FATAL_ERROR "Actual Qt6::Qml imports are outside the selected SDK")
   endif()
-  foreach(required IN ITEMS "@PREFIX@/include/QtQml/6.12.0" "@PREFIX@/include/QtQml/6.12.0/QtQml")
-    if(NOT required IN_LIST private_includes)
-      message(FATAL_ERROR "Selected Qml private include closure is missing")
-    endif()
-  endforeach()
+  if(NOT private_includes)
+    message(FATAL_ERROR "Selected Qml private include property is missing")
+  endif()
+  # Qt exports conditional include properties. Capture the evaluated Release
+  # paths at generation; the independent verifier requires both real private
+  # directories and rejects every nonempty path outside this complete SDK.
   file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/swirl-selected-qt-$<CONFIG>.txt"
-    CONTENT "schema=1\\nsource_sha=@SOURCE@\\ncontent_id=@CONTENT@\\nconfiguration=$<CONFIG>\\nqml_dll=$<TARGET_FILE:Qt6::Qml>\\nqml_import_library=$<TARGET_LINKER_FILE:Qt6::Qml>\\nqml_private_includes=${private_includes}\\napplication=$<TARGET_FILE:Swirl>\\ncompiler=${CMAKE_CXX_COMPILER}\\ncompiler_version=${CMAKE_CXX_COMPILER_VERSION}\\ncompiler_id=${CMAKE_CXX_COMPILER_ID}\\ncmake=${CMAKE_COMMAND}\\nsource_directory=${CMAKE_SOURCE_DIR}\\nbuild_directory=${CMAKE_BINARY_DIR}\\n")
+    CONTENT "schema=1\\nsource_sha=@SOURCE@\\ncontent_id=@CONTENT@\\nconfiguration=$<CONFIG>\\nqml_dll=$<TARGET_FILE:Qt6::Qml>\\nqml_import_library=$<TARGET_LINKER_FILE:Qt6::Qml>\\nqml_private_includes=$<TARGET_GENEX_EVAL:Qt6::QmlPrivate,$<TARGET_PROPERTY:Qt6::QmlPrivate,INTERFACE_INCLUDE_DIRECTORIES>>\\napplication=$<TARGET_FILE:Swirl>\\ncompiler=${CMAKE_CXX_COMPILER}\\ncompiler_version=${CMAKE_CXX_COMPILER_VERSION}\\ncompiler_id=${CMAKE_CXX_COMPILER_ID}\\ncmake=${CMAKE_COMMAND}\\nsource_directory=${CMAKE_SOURCE_DIR}\\nbuild_directory=${CMAKE_BINARY_DIR}\\n")
 endfunction()
 cmake_language(DEFER CALL swirl_capture_selected_qt)
 '''.replace("@PREFIX@", prefix).replace("@SOURCE@", source).replace("@CONTENT@", content_id)).encode()
@@ -868,7 +869,9 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
                           ("qml_import_library", selected / "lib/Qt6Qml.lib"),
                           ("source_directory", repository / "src/Swirl.Quick"), ("build_directory", build)):
         require(sdk.plain_path(Path(values[key])) == expected, "CmakeActualTargetPathRejected:" + key)
-    private = values["qml_private_includes"].split(";")
+    # Empty members are the actual result of Qt's conditional export entries;
+    # they grant no header path. Both required directories must still be present.
+    private = [value for value in values["qml_private_includes"].split(";") if value]
     required = {str(selected / "include/QtQml/6.12.0"), str(selected / "include/QtQml/6.12.0/QtQml")}
     actual = {str(sdk.plain_path(Path(value), root=selected)) for value in private}
     require(required <= actual, "CmakePrivateHeaderClosureMissing")

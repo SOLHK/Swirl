@@ -525,34 +525,67 @@ class CmakeObservationBoundaries(unittest.TestCase):
         with self.assertRaisesRegex(product.Rejected, "CmakePrivateHeaderClosureMissing"):
             self.check()
 
-    def test_deferred_capture_runs_in_cmake_without_compiling_or_running_any_image(self):
+    def generate_descriptor_capture(self, *, includes=None, private_headers="TRUE", suffix="plain"):
         if not CMAKE:
             self.skipTest("CMake not available; native Windows product configure remains pending")
         # This is a language-NONE descriptor exercise, not a Qt or application
         # build. The harmless placeholder DLL/EXE contents are never loaded.
         app = self.root / "descriptor-app.exe"
         app.write_bytes(b"descriptor only; not an executable")
-        source, build = self.root / "descriptor-source", self.root / "descriptor-build"
+        source, build = self.root / ("descriptor-source-" + suffix), self.root / ("descriptor-build-" + suffix)
         source.mkdir()
         text = '''cmake_minimum_required(VERSION 3.24)
 project(SelectedQtObservation LANGUAGES NONE)
 add_library(Qt6::Qml SHARED IMPORTED)
-set_target_properties(Qt6::Qml PROPERTIES IMPORTED_LOCATION_RELEASE "@DLL@" IMPORTED_IMPLIB_RELEASE "@LIB@")
+set_target_properties(Qt6::Qml PROPERTIES IMPORTED_LOCATION_RELEASE "@DLL@" IMPORTED_IMPLIB_RELEASE "@LIB@" _qt_module_has_private_headers "@PRIVATE_HEADERS@")
 add_library(Qt6::QmlPrivate INTERFACE IMPORTED)
 set_target_properties(Qt6::QmlPrivate PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "@INC@")
 add_executable(Swirl IMPORTED)
 set_target_properties(Swirl PROPERTIES IMPORTED_LOCATION_RELEASE "@APP@")
-'''.replace("@DLL@", (self.selected / "bin/Qt6Qml.dll").as_posix()).replace("@LIB@", (self.selected / "lib/Qt6Qml.lib").as_posix()).replace("@INC@", self.capture["qml_private_includes"].replace("\\", "/")).replace("@APP@", app.as_posix())
+'''.replace("@DLL@", (self.selected / "bin/Qt6Qml.dll").as_posix()).replace("@LIB@", (self.selected / "lib/Qt6Qml.lib").as_posix()).replace("@INC@", includes if includes is not None else self.capture["qml_private_includes"].replace("\\", "/")).replace("@APP@", app.as_posix()).replace("@PRIVATE_HEADERS@", private_headers)
         (source / "CMakeLists.txt").write_text(text)
         command = [str(CMAKE), "-S", str(source), "-B", str(build), "-DCMAKE_SYSTEM_NAME=Windows",
                    "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_CONFIGURATION_TYPES=Release",
                    "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=" + self.hook.as_posix()]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr).decode(errors="replace"))
-        capture = product.capture_values((build / "swirl-selected-qt-Release.txt").read_text())
+        return product.capture_values((build / "swirl-selected-qt-Release.txt").read_text())
+
+    def test_deferred_capture_runs_in_cmake_without_compiling_or_running_any_image(self):
+        capture = self.generate_descriptor_capture()
         self.assertEqual(Path(capture["qml_import_library"]), self.selected / "lib/Qt6Qml.lib")
         self.assertEqual(Path(capture["qml_dll"]), self.selected / "bin/Qt6Qml.dll")
-        self.assertEqual(Path(capture["application"]), app)
+        self.assertEqual(Path(capture["application"]), self.root / "descriptor-app.exe")
+
+    def conditional_private_includes(self, prefix):
+        # Exact four-element form from the pinned Qt6QmlPrivateTargets.cmake.
+        # The first two generator expressions produce empty list members.
+        condition = "$<BOOL:$<TARGET_PROPERTY:Qt6::Qml,_qt_module_has_private_headers>>"
+        return ";".join("$<" + condition + ":" + value + ">" for value in
+                        ("", "", (prefix / "include/QtQml/6.12.0").as_posix(),
+                         (prefix / "include/QtQml/6.12.0/QtQml").as_posix()))
+
+    def test_actual_export_form_evaluates_before_private_header_validation(self):
+        capture = self.generate_descriptor_capture(includes=self.conditional_private_includes(self.selected))
+        self.assertNotIn("$<", capture["qml_private_includes"])
+        self.assertEqual([p for p in capture["qml_private_includes"].split(";") if p],
+                         [(self.selected / "include/QtQml/6.12.0").as_posix(),
+                          (self.selected / "include/QtQml/6.12.0/QtQml").as_posix()])
+        self.capture["qml_private_includes"] = capture["qml_private_includes"]
+        self.check()
+
+    def test_evaluated_disabled_private_headers_and_foreign_prefix_still_rejected(self):
+        capture = self.generate_descriptor_capture(includes=self.conditional_private_includes(self.selected),
+                                                   private_headers="FALSE", suffix="disabled")
+        self.capture["qml_private_includes"] = capture["qml_private_includes"]
+        with self.assertRaisesRegex(product.Rejected, "CmakePrivateHeaderClosureMissing"):
+            self.check()
+        foreign = self.root / "foreign"
+        (foreign / "include/QtQml/6.12.0/QtQml").mkdir(parents=True)
+        capture = self.generate_descriptor_capture(includes=self.conditional_private_includes(foreign), suffix="foreign")
+        self.capture["qml_private_includes"] = capture["qml_private_includes"]
+        with self.assertRaisesRegex(RuntimeError, "OutputEscapesOwnedRoot"):
+            self.check()
 
 
 if __name__ == "__main__":
