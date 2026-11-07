@@ -283,6 +283,7 @@ jobs:
           SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
         run: |
           set -euo pipefail
+          python -m unittest discover -s tools/tests -p test_reality_clock_hold.py -v
           python tools/tests/test_reality_runtime.py
       - name: Preserve production REALITY Runtime rust evidence
         if: always()
@@ -431,6 +432,25 @@ jobs:
           name: Swirl-Core-Public-Network
           path: CORE_PUBLIC_NETWORK.json
           retention-days: 7
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/private-ui-quota-rust-evidence"
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/tests.log"
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/clippy.log"
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
   windows-rust:
     runs-on: windows-2022
     # A verified cold run took 59m20s; the next was still compiling the final
@@ -794,6 +814,8 @@ jobs:
           SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
         run: |
           $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s tools/tests -p test_reality_clock_hold.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_reality_runtime.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve production REALITY Runtime rust evidence
@@ -1202,3 +1224,25 @@ jobs:
             build/removed-runtime/rejection.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: pwsh
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:RUNNER_TEMP 'private-ui-quota-rust-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'tests.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI controls failed.' }
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'clippy.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI Clippy failed.' }
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14

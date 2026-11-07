@@ -6,6 +6,7 @@ publish.workspace = true
 [features]
 private-acceptance = []
 private-acceptance-worker = ["private-acceptance"]
+private-acceptance-ui = ["private-acceptance-worker"]
 [dependencies]
 tokio.workspace = true
 h2.workspace = true

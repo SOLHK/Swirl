@@ -19,9 +19,23 @@ MAGIC = b"SWIRL-STOP-V1\0\0\0"
 STARTUP_NS = 20_000_000_000
 REQUEST_NS = 8_000_000_000
 ABSOLUTE_NS = 28_000_000_000
+NATIVE_REQUEST_500MS_CONTROL = "native-watchdog-500ms"
+
+
+def control_for_manifest(manifest):
+    """Only the fixed fixture control can change the native request interval."""
+    if type(manifest) is not dict:
+        raise ValueError("NativeWatchdogControlRejected")
+    if "nativeWatchdogControl" not in manifest:
+        return 0
+    if (type(manifest["nativeWatchdogControl"]) is not str
+            or manifest["nativeWatchdogControl"] != NATIVE_REQUEST_500MS_CONTROL):
+        raise ValueError("NativeWatchdogControlRejected")
+    return 1
 
 
 def initial_record(pid, manifest, ready_qpc, frequency):
+    control = control_for_manifest(manifest)
     if (type(pid) is not int or not 0 < pid < 2**32
             or not re.fullmatch(r"[0-9a-f]{64}", manifest.get("nonce", ""))
             or not re.fullmatch(r"[0-9a-f]{40}", manifest.get("sourceSha", ""))
@@ -35,16 +49,24 @@ def initial_record(pid, manifest, ready_qpc, frequency):
     data[88:128] = manifest["sourceSha"].encode("ascii")
     struct.pack_into("<Q", data, 168, ready_qpc)
     struct.pack_into("<Q", data, 184, frequency)
+    # Parent-created contract, covered by the complete manifest fixture proof.
+    # The writable child view must leave it unchanged; read-back checks bytes.
+    struct.pack_into("<I", data, 200, control)
     return bytes(data)
 
 
 def verify_record(data, *, initial, exit_code, exited_qpc):
     """Decode only after the held process is signaled and its Job is empty."""
-    if (type(data) is not bytes or len(data) != SIZE or len(initial) != SIZE
+    if (type(data) is not bytes or len(data) != SIZE or type(initial) is not bytes or len(initial) != SIZE
             or initial[:16] != MAGIC or data[:128] != initial[:128]
             or data[168:176] != initial[168:176] or data[184:192] != initial[184:192]
-            or any(data[200:])):
+            or data[200:204] != initial[200:204] or any(data[204:])
+            or any(initial[204:])):
         raise ValueError("NativeWatchdogReceiptIdentityMismatch")
+    control = struct.unpack_from("<I", initial, 200)[0]
+    if control not in (0, 1):
+        raise ValueError("NativeWatchdogReceiptIdentityMismatch")
+    request_ns = 500_000_000 if control else REQUEST_NS
     started, absolute, request, deadline, fired, ready, fired_qpc, frequency = struct.unpack_from("<8Q", data, 128)
     phase, committed = struct.unpack_from("<II", data, 192)
     if committed not in (0, 1) or type(exited_qpc) is not int or exited_qpc < ready:
@@ -54,16 +76,19 @@ def verify_record(data, *, initial, exit_code, exited_qpc):
         # An incomplete record never supplies a native timeout assertion.
         if exit_code == 124:
             raise ValueError("NativeWatchdogExitUnproven")
-        return {"triggered": False, "uncommittedRecord": bool(any(data[128:168]) or fired_qpc or phase)}
-    if (exit_code not in (124, 125) or started <= 0 or absolute != started + ABSOLUTE_NS
+        return {"triggered": False, "committed": False, "controlCode": control,
+                "uncommittedRecord": bool(any(data[128:168]) or fired_qpc or phase)}
+    if (exit_code not in (124, 125) or control == 1 and exit_code != 124
+            or started <= 0 or absolute != started + ABSOLUTE_NS
             or phase != (2 if request else 1)
             or request and not started <= request < started + STARTUP_NS
-            or deadline != (min(absolute, request + REQUEST_NS) if request else started + STARTUP_NS)
+            or deadline != (min(absolute, request + request_ns) if request else started + STARTUP_NS)
             or not deadline <= fired < 2**63 or not ready <= fired_qpc <= exited_qpc
             or frequency <= 0):
         raise ValueError("NativeWatchdogDeadlineUnproven")
-    return {"triggered": True, "phase": "requests" if request else "startup",
-            "deadlineMs": 8000 if request else 20000,
+    return {"triggered": True, "committed": True, "controlCode": control,
+            "phase": "requests" if request else "startup",
+            "deadlineMs": request_ns // 1_000_000 if request else 20000,
             "absoluteLimitMs": 28000, "deadlineOverrunNs": str(fired - deadline),
             "startedNs": str(started), "requestStartedNs": str(request),
             "deadlineNs": str(deadline), "triggeredNs": str(fired),

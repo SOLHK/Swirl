@@ -82,7 +82,8 @@ jobs:
           foreach ($path in @('scripts/tests/WindowsProxyDiagnostics.ps1','scripts/tests/Test-WindowsProxyQueryOnly.ps1',
               'scripts/tests/Invoke-DisposableWindowsUser.ps1','scripts/tests/Test-WindowsNormalInstaller.ps1',
               'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1',
-              'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1')) {
+              'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1',
+              'scripts/tests/Test-PrivateQtQuotaProfile.ps1')) {
             $tokens = $null; $errors = $null
             $null = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$errors)
             if ($errors.Count) { throw ('PowerShell parser rejected '+$path+': '+($errors.Message -join ' ')) }
@@ -293,6 +294,7 @@ jobs:
             '-G', 'Visual Studio 17 2022', '-A', 'x64',
             '-DSWIRL_BUILD_UI_TESTS=ON',
             '-DSWIRL_BUILD_CORE_TESTS=ON',
+            '-DSWIRL_PRIVATE_UI_QUOTA=OFF',
             "-DSWIRL_RUST_TARGET=$env:GITHUB_WORKSPACE/core/target",
             "-DSWIRL_TEST_FONT_DIRECTORY=$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
           )
@@ -391,11 +393,12 @@ jobs:
           $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/controlled-node-sessions'
           New-Item -ItemType Directory -Path $evidence | Out-Null
           $admissionModes = @('missing-proof','missing-fixture','preexisting-store','wrong-proof')
-          foreach ($mode in (@('positive','wrong-ca','stall') + $admissionModes)) {
+          foreach ($mode in (@('positive','wrong-ca','stall','native-watchdog-500ms') + $admissionModes)) {
             $output = Join-Path $env:RUNNER_TEMP ('swirl-controlled-' + $mode + '-' + [guid]::NewGuid().ToString('N'))
             $arguments = @('tools/RunControlledNodeAcceptance.py','--exe',$exe,'--exe-sha256',$exeHash,'--core-sha256',$coreHash,'--expected-source',$env:GITHUB_SHA,'--output-directory',$output,'--qt-root',$env:QT_ROOT_DIR,'--fixture-directory',$fixture)
             if ($mode -eq 'wrong-ca') { $arguments += '--fixture-wrong-ca' }
-            if ($mode -eq 'stall') { $arguments += '--fixture-stall' }
+            if ($mode -in @('stall','native-watchdog-500ms')) { $arguments += '--fixture-stall' }
+            if ($mode -eq 'native-watchdog-500ms') { $arguments += '--fixture-native-watchdog-500ms' }
             if ($mode -in $admissionModes) { $arguments += @('--fixture-admission-control',$mode) }
             python @arguments
             $exitCode = $LASTEXITCODE
@@ -410,6 +413,9 @@ jobs:
             }
             $case = $summary.cases[0]
             if (!$summary.fixtureOnly -or !$summary.fixture.tasksReleased -or !$case.retirement.processSignaled -or !$case.retirement.ownedJobEmpty -or $case.retirement.error) { throw "Incomplete synthetic UI retirement: $mode" }
+            $expectedNativeControl = 0
+            if ($mode -eq 'native-watchdog-500ms') { $expectedNativeControl = 1 }
+            if ($case.retirement.nativeWatchdog.controlCode -ne $expectedNativeControl) { throw "Native watchdog contract mismatch: $mode" }
             if ($mode -eq 'positive' -and ($exitCode -ne 0 -or !$summary.passed)) { throw 'Selected-node UI HTTP/HTTPS positive control failed.' }
             if ($mode -eq 'wrong-ca' -and ($exitCode -ne 2 -or $summary.passed -or !@($case.result.proxyRequests | Where-Object tlsRejected).Count)) { throw 'Actual UI TLS rejection control failed.' }
             if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut -or
@@ -429,6 +435,14 @@ jobs:
                 }
               } else { throw 'The hard-stop control exited without an identified watchdog.' }
             }
+            if ($mode -eq 'native-watchdog-500ms' -and ($exitCode -ne 2 -or $summary.passed -or
+                $summary.nativeWatchdogControl -ne 'native-watchdog-500ms' -or !$case.retirement.timedOut -or
+                !$case.retirement.requestPhaseObserved -or $case.retirement.exitCode -ne 124 -or
+                $case.retirement.parentTimedOut -or $case.retirement.stopOrigin -ne 'native-watchdog' -or
+                !$case.retirement.nativeWatchdog.triggered -or !$case.retirement.nativeWatchdog.committed -or
+                $case.retirement.nativeWatchdog.phase -ne 'requests' -or $case.retirement.nativeWatchdog.deadlineMs -ne 500 -or
+                $case.retirement.nativeWatchdog.absoluteLimitMs -ne 28000 -or $summary.fixture.ownershipProofs -ne 1 -or
+                $summary.fixture.socksConnections -lt 1)) { throw 'Fixed native 500ms producer control has no committed request stop and retirement proof.' }
             if ($mode -in $admissionModes -and ($exitCode -ne 2 -or $summary.passed -or !$summary.admissionRefused -or
                 $case.retirement.exitCode -ne 64 -or $case.retirement.timedOut -or
                 $case.result -isnot [pscustomobject] -or @($case.result.psobject.Properties).Count -ne 0 -or
@@ -941,7 +955,7 @@ jobs:
         run: |
           . ./scripts/Assert-BuildSource.ps1
           Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
-          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_PRIVATE_UI_QUOTA=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
@@ -1615,6 +1629,18 @@ jobs:
             out/delivery.json
             installer-bin/package-manifest.json
           if-no-files-found: warn
+          retention-days: 14
+      - name: Verify the same persistent ledger controls the actual quota Qt profile
+        shell: pwsh
+        timeout-minutes: 35
+        run: ./scripts/tests/Test-PrivateQtQuotaProfile.ps1
+      - name: Preserve independent private Qt quota originals
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Qt-Quota-Evidence
+          path: build-evidence/private-ui-quota/
+          if-no-files-found: ignore
           retention-days: 14
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -16,6 +16,8 @@ struct ControlledNodeSession {
     int fixtureHttpPort=0,fixtureHttpsPort=0,fixtureSocksPort=0;
     QString fixturePassword,fixtureNodeId;
     QByteArray fixtureCa;
+    // Fixed owned-loopback negative control; ordinary deadlines stay unchanged.
+    bool nativeWatchdog500msControl=false;
 };
 bool loadControlledNodeSession(const QString &,ControlledNodeSession *);
 void startControlledNodeSession(QQuickWindow *,EngineController *,const ControlledNodeSession &);

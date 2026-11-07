@@ -133,6 +133,7 @@ std::int64_t controlledDeadlineFor(std::int64_t requestStarted) {
 }
 #ifdef Q_OS_WIN
 std::atomic<unsigned char *> controlledStopReceipt{nullptr};
+std::atomic<bool> controlledNativeWatchdog500ms{false};
 bool controlledAttachStopReceipt(const ControlledNodeSession &session,const QByteArray &handleBytes) {
     if(handleBytes.size()!=8||controlledStopReceipt.load(std::memory_order_acquire))return false;
     quint64 encoded=0;std::memcpy(&encoded,handleBytes.constData(),8);
@@ -142,21 +143,26 @@ bool controlledAttachStopReceipt(const ControlledNodeSession &session,const QByt
     const bool closed=CloseHandle(handle);
     if(!view)return false;
     const auto read64=[view](int offset){quint64 result=0;std::memcpy(&result,view+offset,8);return result;};
-    DWORD version=0,pid=0;std::memcpy(&version,view+16,4);std::memcpy(&pid,view+20,4);
+    DWORD version=0,pid=0,control=0;std::memcpy(&version,view+16,4);std::memcpy(&pid,view+20,4);
+    std::memcpy(&control,view+200,4);
     LARGE_INTEGER frequency{},now{};
     bool valid=closed&&std::memcmp(view,"SWIRL-STOP-V1\0\0\0",16)==0&&version==1&&pid==GetCurrentProcessId()
         &&session.nonce.toLatin1()==QByteArray(reinterpret_cast<const char *>(view+24),64)
         &&session.sourceSha.toLatin1()==QByteArray(reinterpret_cast<const char *>(view+88),40)
         &&QueryPerformanceFrequency(&frequency)&&QueryPerformanceCounter(&now)
         &&frequency.QuadPart>0&&read64(184)==quint64(frequency.QuadPart)
-        &&read64(168)>0&&read64(168)<=quint64(now.QuadPart);
+        &&read64(168)>0&&read64(168)<=quint64(now.QuadPart)
+        &&control==(session.nativeWatchdog500msControl?1u:0u);
     for(int offset=128;offset<256;++offset){
-        if((offset>=168&&offset<176)||(offset>=184&&offset<192))continue;
+        if((offset>=168&&offset<176)||(offset>=184&&offset<192)||(offset>=200&&offset<204))continue;
         valid=valid&&view[offset]==0;
     }
     if(!valid){UnmapViewOfFile(view);return false;}
     // Touch the already committed page before any request. The hard-stop path
     // below performs only bounded memory stores, QPC and TerminateProcess.
+    // Offset 200 is the parent's initial bound contract, not read-only memory.
+    // It matches the HMAC-proved manifest and remains untouched by the child.
+    controlledNativeWatchdog500ms.store(session.nativeWatchdog500msControl,std::memory_order_release);
     controlledStopReceipt.store(view,std::memory_order_release);return true;
 }
 void controlledRecordHardStop(std::int64_t requestStarted,std::int64_t deadline,std::int64_t fired) {
@@ -483,7 +489,13 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     const auto document=QJsonDocument::fromJson(bytes,&parse);
     if(parse.error!=QJsonParseError::NoError||!document.isObject())return false;
     const auto input=document.object();
-    if(!controlledKeys(input,{"schema","sourceSha","nonce","nodeOrdinal","proxyPort","fixture"})
+    QStringList manifestKeys{"schema","sourceSha","nonce","nodeOrdinal","proxyPort","fixture"};
+    const bool nativeControl=input.contains("nativeWatchdogControl");
+    if(nativeControl){
+        if(input.value("nativeWatchdogControl")!=QJsonValue(QStringLiteral("native-watchdog-500ms")))return false;
+        manifestKeys.append("nativeWatchdogControl");
+    }
+    if(!controlledKeys(input,manifestKeys)
         ||input.value("schema")!=QJsonValue(2)||input.value("nodeOrdinal")!=QJsonValue(1)
         ||input.value("sourceSha").toString()!=RustCoreLibrary::expectedSourceSha()
         ||!QRegularExpression("^[0-9a-f]{64}$").match(input.value("nonce").toString()).hasMatch())return false;
@@ -493,6 +505,7 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
     ControlledNodeSession candidate;
     candidate.root=QDir::cleanPath(root);candidate.sourceSha=input.value("sourceSha").toString();
     candidate.nonce=input.value("nonce").toString();candidate.nodeOrdinal=1;
+    candidate.nativeWatchdog500msControl=nativeControl;
     if(!controlledPort(input.value("proxyPort"),&candidate.proxyPort)
         ||!controlledPort(settings.value("httpPort"),&candidate.fixtureHttpPort)
         ||!controlledPort(settings.value("httpsPort"),&candidate.fixtureHttpsPort)
@@ -501,6 +514,7 @@ bool loadControlledNodeSession(const QString &root,ControlledNodeSession *sessio
         ||!QDir(root).entryList(QStringList{"nodes.dpapi*","fixture-store-*"},QDir::AllEntries|QDir::Hidden|QDir::System|QDir::NoDotAndDotDot).isEmpty()
         ||QFileInfo::exists(root+"/result.json")||QFileInfo::exists(root+"/state.json"))return false;
     const auto caHash=settings.value("caSha256").toString();
+    if(nativeControl&&caHash!=QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311"))return false;
     if(caHash!=QStringLiteral("a2fd461d4090889bd26e0eaea5bc974cffbdcced8d7aa0198221e5b9f5b05311")
         &&caHash!=QStringLiteral("e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b"))return false;
     const auto caPath=root+"/fixture-ca.pem";
@@ -533,10 +547,16 @@ std::jthread startControlledNodeWatchdog(bool enabled) {
     if(!enabled)return {};
     const auto now=controlledNowNs();controlledStartedNs=now;controlledAbsoluteNs=now+28'000'000'000LL;
     controlledRequestStartedNs.store(0,std::memory_order_release);
+    controlledNativeWatchdog500ms.store(false,std::memory_order_release);
     return std::jthread([](std::stop_token stop){
         while(!stop.stop_requested()){
             const auto requestStarted=controlledRequestStartedNs.load(std::memory_order_acquire);
-            const auto deadline=controlledDeadlineFor(requestStarted);const auto now=controlledNowNs();
+            // Only this independent native producer uses the fixed 500ms
+            // control. Qt request timers and the parent keep their normal 8s.
+            const auto deadline=requestStarted&&controlledNativeWatchdog500ms.load(std::memory_order_acquire)
+                ?std::min<std::int64_t>(controlledAbsoluteNs,requestStarted+500'000'000LL)
+                :controlledDeadlineFor(requestStarted);
+            const auto now=controlledNowNs();
             if(now>=deadline){
                 // This QA process has no system-network ownership. Even a
                 // completely stalled Qt/Rust event loop cannot keep its sockets.

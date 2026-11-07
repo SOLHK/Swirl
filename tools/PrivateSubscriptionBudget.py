@@ -543,7 +543,7 @@ class Ledger:
             is_control = kind == "control"
             if (not isinstance(h["buildId"], str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", h["buildId"])
                     or h["phase"] not in (SUPERVISED_PHASES | _BILLING_PHASES if d["schema"] == 4 else SUPERVISED_PHASES)
-                    or h["workload"] not in (SUPERVISED_WORKLOADS | {"billing_snapshot"} if is_control else SUPERVISED_WORKLOADS)
+                    or h["workload"] not in (SUPERVISED_WORKLOADS | {"billing_snapshot"} if is_control else SUPERVISED_WORKLOADS | {"qt_ui_session"})
                     or type(h["node"]) is not int or not (h["node"] == 0 if is_control else 1 <= h["node"] <= 100000)):
                 raise BudgetError("InvalidSupervisedHistory")
             if is_control:

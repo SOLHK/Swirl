@@ -85,6 +85,20 @@ class AdmissionTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError,"OwnedLoopbackFixtureRequired"):
             qa.execute(Path("absent.exe"),Path("absent-output"),{}, {}, {"fixture":True})
 
+    def test_fixed_native_control_rejects_other_modes_before_any_side_effect(self):
+        base=["--exe","absent.exe","--exe-sha256","a"*64,"--core-sha256","b"*64,
+              "--expected-source","c"*40,"--output-directory","absent-output",
+              "--fixture-directory","absent-fixtures","--fixture-native-watchdog-500ms"]
+        for extra in ([],["--fixture-stall","--fixture-wrong-ca"],
+                      ["--fixture-stall","--fixture-admission-control","wrong-proof"],
+                      ["--fixture-stall","--nodes","1,2"]):
+            with self.subTest(extra=extra),\
+                    patch.object(qa,"local_file",side_effect=AssertionError("must not read")),\
+                    patch.object(qa,"LoopbackFixture",side_effect=AssertionError("must not listen")),\
+                    patch.object(qa,"_WindowsStorage",side_effect=AssertionError("must not create")),\
+                    self.assertRaisesRegex(ValueError,"SingleSyntheticNodeRequired|FixedNativeWatchdogControlRequired"):
+                qa.main(base+extra)
+
 
 class LoopbackTlsTests(unittest.TestCase):
     def setUp(self):
@@ -289,6 +303,99 @@ class NativeWatchdogReceiptTests(unittest.TestCase):
         for pid in (0,-1,True,2**32):
             with self.subTest(pid=pid),self.assertRaisesRegex(ValueError,"IdentityRejected"):
                 watchdog_receipt.initial_record(pid,{"nonce":"a"*64,"sourceSha":"b"*40},1000,1)
+
+    def fixed_initial(self):
+        return watchdog_receipt.initial_record(123,dict(nonce="a"*64,sourceSha="b"*40,
+            nativeWatchdogControl=qa.NATIVE_REQUEST_500MS_CONTROL),1000,10_000_000)
+
+    def fixed_record(self, *, committed=1):
+        data=bytearray(self.record(fired=2_500_000_001,committed=committed))
+        struct.pack_into("<Q",data,152,2_500_000_000)
+        struct.pack_into("<I",data,200,1)
+        return bytes(data)
+
+    def test_fixed_native_contract_requires_parent_bound_exact_500ms_record(self):
+        initial=self.fixed_initial()
+        self.assertEqual(initial[:200],self.initial[:200])
+        self.assertEqual(struct.unpack_from("<I",initial,200)[0],1)
+        self.assertEqual(initial[204:],bytes(52))
+        result=watchdog_receipt.verify_record(self.fixed_record(),initial=initial,
+                                              exit_code=124,exited_qpc=91_000_000)
+        self.assertTrue(result["triggered"] and result["committed"])
+        self.assertEqual((result["controlCode"],result["phase"],result["deadlineMs"]),(1,"requests",500))
+        self.assertEqual(result["absoluteLimitMs"],28000)
+        normal=self.verify(self.record())
+        self.assertEqual((normal["controlCode"],normal["deadlineMs"]),(0,8000))
+
+    def test_fixed_and_normal_contracts_or_intervals_cannot_be_interchanged(self):
+        for data,initial in ((self.record(),self.fixed_initial()),(self.fixed_record(),self.initial)):
+            with self.subTest(code=initial[200]),self.assertRaisesRegex(ValueError,"IdentityMismatch"):
+                watchdog_receipt.verify_record(data,initial=initial,exit_code=124,exited_qpc=91_000_000)
+        for data,initial in ((self.record(),self.fixed_initial()),(self.fixed_record(),self.initial)):
+            changed=bytearray(data);changed[200:204]=initial[200:204]
+            with self.subTest(code=initial[200]),self.assertRaisesRegex(ValueError,"DeadlineUnproven"):
+                watchdog_receipt.verify_record(bytes(changed),initial=initial,exit_code=124,exited_qpc=91_000_000)
+        bad=bytearray(self.fixed_initial());struct.pack_into("<I",bad,200,2)
+        with self.assertRaisesRegex(ValueError,"IdentityMismatch"):
+            watchdog_receipt.verify_record(bytes(bad),initial=bytes(bad),exit_code=0,exited_qpc=91_000_000)
+
+    def test_fixed_native_control_needs_real_124_and_committed_record(self):
+        initial=self.fixed_initial()
+        with self.assertRaisesRegex(ValueError,"DeadlineUnproven"):
+            watchdog_receipt.verify_record(self.fixed_record(),initial=initial,exit_code=125,exited_qpc=91_000_000)
+        for data in (initial,self.fixed_record(committed=0)):
+            with self.subTest(partial=data!=initial),self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
+                watchdog_receipt.verify_record(data,initial=initial,exit_code=124,exited_qpc=91_000_000)
+            result=watchdog_receipt.verify_record(data,initial=initial,exit_code=125,exited_qpc=91_000_000)
+            self.assertFalse(result["triggered"] or result["committed"])
+
+    def test_unknown_or_numeric_native_control_is_rejected(self):
+        for control in (None,True,1,500,"normal","native-watchdog-501ms",{}):
+            with self.subTest(control=control),self.assertRaisesRegex(ValueError,"NativeWatchdogControlRejected"):
+                watchdog_receipt.initial_record(123,dict(nonce="a"*64,sourceSha="b"*40,
+                    nativeWatchdogControl=control),1000,10_000_000)
+
+
+class FixedNativeFixtureTests(unittest.TestCase):
+    def test_fixed_control_needs_the_owned_stall_and_correct_tls_fixture(self):
+        for stall in (False,True):
+            fixture=qa.LoopbackFixture(FIXTURES/"localhost-cert.pem",FIXTURES/"localhost-key.pem",stall=stall)
+            try:
+                manifest=manifest_for(fixture)
+                manifest["nativeWatchdogControl"]=qa.NATIVE_REQUEST_500MS_CONTROL
+                if stall:
+                    manifest["fixture"]["caSha256"]=qa.WRONG_CA_SHA256
+                with self.assertRaisesRegex(ValueError,"OwnedLoopbackFixtureRequired"):
+                    fixture.bind_session(manifest)
+                self.assertEqual((fixture.proofs,fixture.socks_connections,fixture.forwarded),(0,0,0))
+            finally:
+                fixture.close()
+
+    def test_complete_manifest_hmac_binds_fixed_control_without_changing_proof_size(self):
+        fixture=qa.LoopbackFixture(FIXTURES/"localhost-cert.pem",FIXTURES/"localhost-key.pem",stall=True)
+        try:
+            manifest=manifest_for(fixture)
+            manifest["nativeWatchdogControl"]=qa.NATIVE_REQUEST_500MS_CONTROL
+            proof=fixture.bind_session(manifest)
+            frame=proof.pipe_frame(manifest)
+            self.assertEqual(len(frame),len(qa.PROOF_MAGIC)+96)
+            self.assertEqual(len(frame+struct.pack("<Q",123)),len(qa.PROOF_MAGIC)+104)
+            payload=frame[len(qa.PROOF_MAGIC):]
+            self.assertEqual(payload[:32],hashlib.sha256(qa.json_bytes(manifest)).digest())
+            changed=dict(manifest);changed.pop("nativeWatchdogControl")
+            with self.assertRaisesRegex(ValueError,"OwnedLoopbackFixtureRequired"):
+                proof.pipe_frame(changed)
+            for admission in qa.ADMISSION_CONTROLS:
+                with self.subTest(admission=admission),self.assertRaisesRegex(ValueError,"OwnedLoopbackFixtureRequired"):
+                    proof.pipe_frame(manifest,admission)
+            request=qa.FIXTURE_MAGIC+payload[:32]+b"c"*32
+            with socket.create_connection(("127.0.0.1",fixture.socks),timeout=2) as peer:
+                peer.sendall(request)
+                response=qa.LoopbackFixture.exact(peer,32)
+            self.assertTrue(hmac.compare_digest(response,hmac.digest(payload[32:64],request,"sha256")))
+            self.assertEqual((fixture.proofs,fixture.socks_connections,fixture.forwarded),(1,0,0))
+        finally:
+            fixture.close()
 
 
 class ControlledCleanupTests(unittest.TestCase):

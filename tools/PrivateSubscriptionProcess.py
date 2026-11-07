@@ -387,7 +387,7 @@ class OwnedProcess:
     Failure to prove exit returns no proof. Cleanup errors cannot refund holds.
     """
 
-    def __init__(self, arguments, *, deadline, environment=None):
+    def __init__(self, arguments, *, deadline, environment=None, suspended=False):
         self.owner_token = secrets.token_hex(32)
         self.deadline = deadline
         self.process = None
@@ -398,6 +398,9 @@ class OwnedProcess:
         self._done = threading.Event()
         self.timed_out = False
         self.stop_error = None
+        self._resumed = False
+        if type(suspended) is not bool or suspended and os.name != "nt":
+            raise BudgetError("WindowsSuspendedOwnerRequired")
         if os.name not in {"nt", "posix"}:
             raise BudgetError("ProcessContainmentUnavailable")
         if not 0 < deadline - time.monotonic() <= 8.0:
@@ -414,8 +417,9 @@ class OwnedProcess:
                                                     start_new_session=True, bufsize=0)
                 if time.monotonic() >= deadline:
                     raise BudgetError("ParentDeadlineBeforeResume")
-                if self.job:
+                if self.job and not suspended:
                     self.job.resume(self.process)
+                self._resumed = not suspended
             self._watchdog = threading.Thread(target=self._deadline_watchdog, name="Swirl private parent deadline", daemon=True)
             self._watchdog.start()
         except BaseException as error:
@@ -436,6 +440,22 @@ class OwnedProcess:
             if isinstance(error, BudgetError):
                 raise
             raise BudgetError("OwnedProcessLaunchFailed") from None
+
+    def resume(self):
+        """Release this exact suspended Windows child once, without a new clock.
+
+        The independent owner deadline already runs while a caller prepares a
+        private mapping. The caller gets no Job/ExitProof construction power.
+        """
+        with self._lock:
+            if (not self.job or self._resumed or self._proof is not None
+                    or self.process.poll() is not None):
+                raise BudgetError("OwnedSuspendedProcessRequired")
+            if time.monotonic() >= self.deadline:
+                raise BudgetError("ParentDeadlineBeforeResume")
+            self.job.verify_member(self.process)
+            self.job.resume(self.process)
+            self._resumed = True
 
     @property
     def pid(self):

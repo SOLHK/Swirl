@@ -31,6 +31,8 @@ mod node_import;
 pub use node_import::swirl_import_node_v1;
 mod profile_import;
 pub use profile_import::swirl_import_profile_v1;
+#[cfg(feature = "private-acceptance-ui")]
+pub mod private_ui_quota;
 #[cfg(feature = "private-acceptance-worker")]
 pub mod private_worker;
 mod xray_import;

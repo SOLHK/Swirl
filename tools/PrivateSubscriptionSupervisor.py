@@ -40,7 +40,7 @@ OUTCOMES = {"quota_stopped": "QuotaStopped", "deadline_expired": "DeadlineExpire
             "fixture_closed": "FixtureClosed", "core_probe_succeeded": "CoreProbeSucceeded",
             "core_probe_failed": "CoreProbeFailed", "worker_protocol_error": "WorkerProtocolError",
             "worker_io_error": "WorkerIoError", "billing_snapshot_succeeded": "BillingSnapshotSucceeded",
-            "billing_snapshot_failed": "BillingSnapshotFailed"}
+            "billing_snapshot_failed": "BillingSnapshotFailed", "qt_ui_finished": "QtUiFinished"}
 
 
 def canonical(value):
@@ -499,6 +499,8 @@ def _check_envelope(value, envelope, identity, op):
         fields.add("fixture_verified")
     if op == "finished":
         fields |= {"fixture_verified", "outcome"}
+        if identity.metadata["role"] == "swirl_private_qt_ui":
+            fields |= {"scope", "raw_tcp_quota_exercised"}
     allowed = fields | ({"metrics", "billing"} if op == "finished" else set())
     if (not isinstance(value, dict) or not fields <= set(value) <= allowed
             or value.get("ok") is not True or value.get("guard_mode") != GUARD_MODE):
@@ -508,6 +510,10 @@ def _check_envelope(value, envelope, identity, op):
             raise BudgetError("WorkerReceiptBindingMismatch")
     if value.get("op") != op or value.get("identity") != identity.metadata:
         raise BudgetError("WorkerReceiptIdentityMismatch")
+    if op == "finished" and identity.metadata["role"] == "swirl_private_qt_ui":
+        if (value.get("scope") != "synthetic-qt-ui-raw-tcp-v1"
+                or type(value.get("raw_tcp_quota_exercised")) is not bool):
+            raise BudgetError("PrivateUiRawScopeRequired")
     if value.get("source_sha", identity.metadata["source_sha"]) != identity.metadata["source_sha"] or value.get("build_id", identity.metadata["build_id"]) != identity.metadata["build_id"]:
         raise BudgetError("WorkerReceiptIdentityMismatch")
 
@@ -553,7 +559,7 @@ class Supervisor:
         return {"source_sha": self.identity.metadata["source_sha"], "worker_sha256": self.identity.sha256,
                 "build_id": self.identity.metadata["build_id"]}
 
-    def _execute_reserved(self, ticket, workload, plan, nonce, fingerprint, *, cancel_event=None, billing_query=None):
+    def _execute_reserved(self, ticket, workload, plan, nonce, fingerprint, *, cancel_event=None, billing_query=None, ui_session=None):
         """One real reserve/grant/OS-exit boundary shared by node and billing I/O.
 
         This method never refunds. A typed result carries the actual ExitProof
@@ -563,6 +569,7 @@ class Supervisor:
         challenge = secrets.token_hex(32)
         fixture = child = frames = None
         child_closed = fixture_closed = frames_finished = False
+        ui_frames_finish_attempted = False
         final_guard = exit_proof = metrics = final_receipt = received = None
         observed_running = complete = False
         outcome = "CoordinatorFailure"
@@ -584,13 +591,25 @@ class Supervisor:
                 _diagnostic_phases[name] = int(((time.monotonic() if observed is None else observed) - started) * 1000)
 
         try:
-            fixture = _OwnedFixture(self.ledger.root, workload, plan["byteLimit"], challenge, nonce, billing_query)
+            if ui_session is None:
+                fixture = _OwnedFixture(self.ledger.root, workload, plan["byteLimit"], challenge, nonce, billing_query)
+            else:
+                from PrivateSubscriptionUi import SyntheticUiSession, UiIdentity, UI_WORKLOAD, _UI_ISSUER
+                if (type(ui_session) is not SyntheticUiSession or ui_session._issuer is not _UI_ISSUER
+                        or type(self.identity) is not UiIdentity or ui_session.identity is not self.identity
+                        or workload != UI_WORKLOAD or billing_query is not None or self.billing is not None):
+                    raise BudgetError("OwnedSyntheticUiSessionRequired")
+                fixture = ui_session
+                fixture.open(nonce)
             grant = {"task_id": TASK, "ledger_id": self.ledger.data["ledgerId"], "sequence": int(ticket),
                      "source_sha": self.identity.metadata["source_sha"], "build_id": self.identity.metadata["build_id"],
                      "role": "synthetic_loopback", "byte_limit": plan["byteLimit"], "connection_limit": plan["connectionLimit"],
                      "receive_reservation": plan["receiveReservation"], "timeout_ms": timeout_ms,
-                     "endpoint": {"host": "127.0.0.1", "port": fixture.port}, "challenge": challenge,
-                     "workload": workload, "config_fingerprint": fingerprint, "tls": fixture.tls}
+                     "workload": workload, "config_fingerprint": fingerprint}
+            if ui_session is None:
+                grant.update(endpoint={"host": "127.0.0.1", "port": fixture.port}, challenge=challenge, tls=fixture.tls)
+            else:
+                grant.update(ui_session.grant_fields())
             if billing_query is not None:
                 grant["billing"] = billing_query.grant()
             envelope = {"schema": 1, "reservation_id": ticket, "nonce": nonce, "plan_digest": digest(grant)}
@@ -599,8 +618,9 @@ class Supervisor:
             started = time.monotonic()
             deadline = started + timeout_ms / 1000
             _diagnostic_phases["clock_started"] = 0
-            child = OwnedProcess([str(self.identity.path), "--internal-private-acceptance-worker"],
-                                 deadline=deadline, environment=_environment())
+            child = (OwnedProcess([str(self.identity.path), "--internal-private-acceptance-worker"],
+                                  deadline=deadline, environment=_environment())
+                     if ui_session is None else ui_session.spawn(deadline))
             _diagnostic_mark("spawn_returned")
             self.ledger.advance_supervised(ticket, "spawned", process=child)
             _diagnostic_mark("spawn_state_persisted")
@@ -622,10 +642,18 @@ class Supervisor:
             _diagnostic_last_send = "start"
             _diagnostic_mark("start_send_started")
             frames.send({**envelope, "op": "start"})
+            if ui_session is not None:
+                # The original binary fixture proof and EOF follow the one
+                # START line; Qt does not prefetch across that line boundary.
+                ui_session.send_fixture_proof(child)
             _diagnostic_mark("start_sent")
             cancelled = False
             while True:
                 if cancel_event is not None and cancel_event.is_set() and not cancelled:
+                    if ui_session is not None:
+                        exit_proof = child.terminate_and_wait()
+                        _diagnostic_mark("os_exit_proved")
+                        raise BudgetError("UiCancelledWithoutFinalReceipt")
                     _diagnostic_last_send = "cancel"
                     _diagnostic_mark("cancel_send_started")
                     frames.send({**envelope, "op": "cancel"})
@@ -681,10 +709,20 @@ class Supervisor:
                     raise BudgetError("UnexpectedBillingReceipt")
                 exit_proof = child.wait(timeout=max(0.001, deadline - time.monotonic()))
                 _diagnostic_mark("os_exit_proved")
-                if (exit_proof.record()["exitCode"] != 0 or not reply["fixture_verified"]
-                        or not observed_running or fixture.authenticated_connections != 1 or fixture.protocol_errors):
+                if not reply["fixture_verified"] or not observed_running:
                     raise BudgetError("IncompleteSyntheticEvidence")
-                if workload == "billing_snapshot":
+                if ui_session is not None:
+                    # The native mapping is consumed only after every child
+                    # reader has retired and the complete output is valid.
+                    # Never retry a failed tail check into a passing result.
+                    ui_frames_finish_attempted = True
+                    frames.finish()
+                    frames_finished = True
+                    _diagnostic_mark("readers_finished")
+                    outcome = ui_session.validate_finished(reply, exit_proof, child)
+                elif (exit_proof.record()["exitCode"] != 0 or fixture.authenticated_connections != 1 or fixture.protocol_errors):
+                    raise BudgetError("IncompleteSyntheticEvidence")
+                elif workload == "billing_snapshot":
                     if outcome != "BillingSnapshotSucceeded" or fixture.http_status != 200:
                         raise BudgetError("BillingSnapshotFailed")
                 elif (outcome not in {"QuotaStopped", "Cancelled", "CoreProbeSucceeded", "DeadlineExpired"}
@@ -704,7 +742,7 @@ class Supervisor:
                         _diagnostic_mark("os_exit_proved")
                 except BudgetError:
                     outcome = "ProcessExitUnconfirmed"
-                if frames is not None:
+                if frames is not None and not frames_finished and not ui_frames_finish_attempted:
                     try:
                         frames.finish()
                         frames_finished = True
@@ -712,6 +750,12 @@ class Supervisor:
                     except BudgetError as error:
                         if complete or outcome == "CoordinatorFailure":
                             outcome = str(error)
+                if ui_session is not None and exit_proof is not None and frames_finished:
+                    try:
+                        ui_session.observe_exit(child)
+                    except (BudgetError, ValueError, OSError):
+                        complete = False
+                        outcome = "NativeWatchdogExitUnconfirmed"
                 try:
                     child.close()
                     child_closed = True
@@ -746,6 +790,8 @@ class Supervisor:
                                   complete=complete, cleanup=cleanup)
 
     def run(self, workload, *, node=1, byte_limit=65536, timeout_ms=2000, cancel_event=None):
+        if self.identity.metadata["role"] != WORKER_ROLE:
+            raise BudgetError("SyntheticUiSessionRequired")
         if workload not in SUPERVISED_WORKLOADS:
             raise BudgetError("SyntheticWorkloadRequired")
         if self.billing is not None:
@@ -764,6 +810,40 @@ class Supervisor:
             evidence.record.update(settled=True, localMeasurement="socket-counters")
         else:
             self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+        return {**evidence.record, "ledger": self.ledger.summary()}
+
+    def run_ui(self, session, *, byte_limit=65536, timeout_ms=8000, cancel_event=None):
+        from PrivateSubscriptionUi import SyntheticUiSession, UiIdentity, UI_WORKLOAD, _UI_ISSUER
+        if (type(session) is not SyntheticUiSession or session._issuer is not _UI_ISSUER
+                or type(self.identity) is not UiIdentity or self.billing is not None):
+            raise BudgetError("OwnedSyntheticUiSessionRequired")
+        session.check(self.ledger, self.identity)
+        plan = tcp_plan(byte_limit, 6, timeout_ms)
+        if timeout_ms < 100:
+            raise BudgetError("InvalidTcpTimeout")
+        self.identity.recheck()
+        fingerprint, nonce = session.fingerprint(plan), secrets.token_hex(32)
+        ticket = self.ledger.reserve_supervised(1, byte_limit, 6, timeout_ms,
+            config_fingerprint=fingerprint, nonce=nonce, workload=UI_WORKLOAD, **self._identity_fields())
+        evidence = self._execute_reserved(ticket, UI_WORKLOAD, plan, nonce, fingerprint,
+                                          cancel_event=cancel_event, ui_session=session)
+        if evidence.complete:
+            self.ledger.settle_synthetic(ticket, evidence.guard, evidence.exit_proof, evidence.record["outcome"])
+            evidence.record.update(settled=True, localMeasurement="actual-shared-rust-raw-tcp-bytes")
+        else:
+            self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+        evidence.record["persistentBudgetGuardExercised"] = bool(evidence.complete and evidence.record["settled"])
+        evidence.record["uiSubscriptionImportExercised"] = False
+        with self.ledger.mutex:
+            history = self.ledger.data["history"][str(ticket)]
+            receipt = history["receipt"]
+            evidence.record["parentBudgetEvidence"] = {
+                "scope": "existing-synthetic-Ledger-and-current-OS-owner; no provider authority",
+                "ledgerId": self.ledger.data["ledgerId"], "reservationId": str(ticket),
+                "planDigest": history["planDigest"], "durableHistoryPhase": history["phase"],
+                "guardDigest": None if receipt is None else receipt["guardDigest"],
+                "settledNativeExit": None if receipt is None else receipt["exit"],
+                "fullHoldRetained": str(ticket) in self.ledger.data["reservations"]}
         return {**evidence.record, "ledger": self.ledger.summary()}
 
     def _billing_query(self, purpose, parent_ticket=None, *, timeout_ms=2000):

@@ -35,7 +35,7 @@ def snapshot(root):
             for path in sorted(root.rglob("*"))}
 
 
-def run_case(name, command, private, environment, output, expected_error=ERROR):
+def run_case(name, command, private, environment, output, expected_error=ERROR, *, exact_error=False):
     before = snapshot(private)
     started = time.monotonic()
     process = None
@@ -61,7 +61,8 @@ def run_case(name, command, private, environment, output, expected_error=ERROR):
             phase = "output-evidence"
             stdout, stderr = stdout_path.read_bytes(), stderr_path.read_bytes()
             row.update({"stdout_sha256": sha256(stdout_path), "stderr_sha256": sha256(stderr_path),
-                        "stdout_empty": not stdout, "fixed_error": stderr.strip() == expected_error,
+                        "stdout_empty": not stdout,
+                        "fixed_error": (stderr == expected_error if exact_error else stderr.strip() == expected_error),
                         "argument_value_redacted": MARKER.encode() not in stdout + stderr,
                         "synthetic_tree_unchanged": snapshot(private) == before})
             row["success"] = (row["exit_code"] == 64 and not row["timed_out"] and row["exit_confirmed"]
@@ -164,6 +165,16 @@ def main():
                 report["cases"].append(row)
                 if not row["success"]:
                     raise RuntimeError("ControlledSessionRefusalFailed")
+            # These switches belong only to the separately paired quota QA
+            # executable. Both ordinary QA and Release must reject before Qt,
+            # with the same absent-QPA and unchanged-private-tree controls.
+            for index, flag in enumerate(("--private-ui-quota", "--private-ui-quota-build-info")):
+                row = run_case("private-quota-profile-refusal-" + str(index + 1),
+                               [str(executable), flag], private, environment, output,
+                               expected_error=b"", exact_error=True)
+                report["cases"].append(row)
+                if not row["success"]:
+                    raise RuntimeError("PrivateQuotaProfileRefusalFailed")
             for flag in ("--live", "--store"):
                 for form, arguments in (("bare",[flag]),("empty",[flag+"="]),
                                         ("value",[flag+"="+str(paths[0])]),("separate",[flag,str(paths[0])])):

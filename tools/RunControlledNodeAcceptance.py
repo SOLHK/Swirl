@@ -24,7 +24,7 @@ import time
 
 from PrivateSubscriptionBudget import BudgetError, _WindowsStorage
 from PrivateSubscriptionProcess import _WindowsJob, _WindowsProcess
-from ControlledNodeWatchdog import NativeWatchdogReceipt
+from ControlledNodeWatchdog import NativeWatchdogReceipt, NATIVE_REQUEST_500MS_CONTROL, control_for_manifest
 
 
 LIVE_REFUSAL = "LiveAcceptanceRequiresPersistentBudgetAndRustWorker"
@@ -62,7 +62,8 @@ class _FixtureProof:
         if (self._issuer is not _PROOF_ISSUER or fixture._admission is not self
                 or fixture.done.is_set() or not fixture._listeners_alive()
                 or not hmac.compare_digest(self._manifest_digest, hashlib.sha256(json_bytes(manifest)).digest())
-                or control not in (None, *ADMISSION_CONTROLS)):
+                or control not in (None, *ADMISSION_CONTROLS)
+                or control_for_manifest(manifest) == 1 and control is not None):
             raise ValueError("OwnedLoopbackFixtureRequired")
         if control == "missing-proof":
             return b""
@@ -205,9 +206,13 @@ class LoopbackFixture:
         """Bind only this fixed schema and our currently owned listening sockets."""
         if type(manifest) is not dict:
             raise ValueError("OwnedLoopbackFixtureRequired")
+        native_control = control_for_manifest(manifest)
+        fields = {"schema", "sourceSha", "nonce", "nodeOrdinal", "proxyPort", "fixture"}
+        if native_control:
+            fields.add("nativeWatchdogControl")
         fixture = manifest.get("fixture")
         if (self._admission is not None or self.done.is_set() or not self._listeners_alive()
-                or set(manifest) != {"schema", "sourceSha", "nonce", "nodeOrdinal", "proxyPort", "fixture"}
+                or set(manifest) != fields
                 or type(manifest["schema"]) is not int or manifest["schema"] != 2
                 or type(manifest["nodeOrdinal"]) is not int or manifest["nodeOrdinal"] != 1
                 or not isinstance(manifest["sourceSha"], str) or not re.fullmatch(r"[0-9a-f]{40}", manifest["sourceSha"])
@@ -217,7 +222,8 @@ class LoopbackFixture:
                 or any(type(fixture[key]) is not int for key in ("httpPort", "httpsPort", "socksPort"))
                 or (fixture["httpPort"], fixture["httpsPort"], fixture["socksPort"]) != (self.http, self.https, self.socks)
                 or fixture["caSha256"] not in (FIXTURE_CERT_SHA256, WRONG_CA_SHA256)
-                or len({manifest["proxyPort"], self.http, self.https, self.socks}) != 4):
+                or len({manifest["proxyPort"], self.http, self.https, self.socks}) != 4
+                or native_control and (self.stall is not True or fixture["caSha256"] != FIXTURE_CERT_SHA256)):
             raise ValueError("OwnedLoopbackFixtureRequired")
         proof = _FixtureProof(_PROOF_ISSUER, self, hashlib.sha256(json_bytes(manifest)).digest())
         self._admission = proof
@@ -485,11 +491,14 @@ def main(argv=None):
     parser.add_argument("--fixture-directory",type=Path,required=True)
     parser.add_argument("--fixture-wrong-ca",action="store_true")
     parser.add_argument("--fixture-stall",action="store_true")
+    parser.add_argument("--fixture-native-watchdog-500ms",action="store_true")
     parser.add_argument("--fixture-admission-control",choices=ADMISSION_CONTROLS)
     args=parser.parse_args(argv)
     nodes=ordinals(args.nodes)
     if nodes != [1] or (args.fixture_admission_control and (args.fixture_wrong_ca or args.fixture_stall)):
         raise ValueError("SingleSyntheticNodeRequired")
+    if args.fixture_native_watchdog_500ms and (not args.fixture_stall or args.fixture_wrong_ca or args.fixture_admission_control):
+        raise ValueError("FixedNativeWatchdogControlRequired")
     if os.name!="nt":
         raise ValueError("NativeWindowsAcceptanceRequired")
     executable=local_file(args.exe)
@@ -525,6 +534,8 @@ def main(argv=None):
                               nodeOrdinal=1,proxyPort=port,
                               fixture=dict(httpPort=fixture.http,httpsPort=fixture.https,
                                            socksPort=fixture.socks,caSha256=digest(ca)))
+                if args.fixture_native_watchdog_500ms:
+                    manifest["nativeWatchdogControl"] = NATIVE_REQUEST_500MS_CONTROL
                 proof=fixture.bind_session(manifest)
                 (root/"fixture-ca.pem").write_bytes(ca.read_bytes())
                 submitted=dict(manifest)
@@ -557,6 +568,8 @@ def main(argv=None):
         summary["fixture"]=dict(forwarded=fixture.forwarded,rejected=fixture.rejected,
                                 ownershipProofs=fixture.proofs,socksConnections=fixture.socks_connections,
                                 tasksReleased=True)
+        if args.fixture_native_watchdog_500ms:
+            summary["nativeWatchdogControl"] = NATIVE_REQUEST_500MS_CONTROL
         if args.fixture_admission_control:
             summary["admissionControl"]=args.fixture_admission_control
             summary["admissionRefused"]=(len(cases)==1 and not cases[0]["result"]

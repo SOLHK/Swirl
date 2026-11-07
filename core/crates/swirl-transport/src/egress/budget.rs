@@ -49,6 +49,7 @@ pub struct Snapshot {
 
 struct State {
     receipt: Snapshot,
+    enabled: bool,
     sockets: Vec<Weak<Socket>>,
     deadline: Instant,
     cancelled: watch::Sender<bool>,
@@ -67,6 +68,13 @@ impl State {
         // The watchdog also closes idle sockets. This check prevents a late
         // scheduler wake from granting another read/write after the deadline.
         self.expire_if_due();
+        if !self.enabled {
+            self.stop();
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "PrivateQuotaAwaitingStart",
+            ));
+        }
         if self.receipt.stopped {
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -110,6 +118,8 @@ pub struct TcpQuota {
     // Only the dedicated synthetic worker installs this immutable endpoint.
     // Ordinary opt-in quota callers keep their existing transport behavior.
     endpoint: Option<SocketAddr>,
+    #[cfg(feature = "private-acceptance-worker")]
+    listener: Option<SocketAddr>,
 }
 
 impl TcpQuota {
@@ -129,7 +139,10 @@ impl TcpQuota {
         let (cancelled, _) = watch::channel(false);
         Ok(Self {
             endpoint: None,
+            #[cfg(feature = "private-acceptance-worker")]
+            listener: None,
             state: Mutex::new(State {
+                enabled: true,
                 receipt: Snapshot {
                     byte_limit: bytes,
                     upload: 0,
@@ -157,6 +170,26 @@ impl TcpQuota {
             .map_err(|_| io::Error::other("PrivateQuotaState"))?;
         state.expire_if_due();
         Ok(state.receipt)
+    }
+
+    /// Release only an installed UI grant. The installation deadline is never
+    /// restarted, and an attempted early operation permanently stops the grant.
+    #[cfg(feature = "private-acceptance-ui")]
+    pub fn start_ui(&self) -> io::Result<()> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| io::Error::other("PrivateQuotaState"))?;
+        state.expire_if_due();
+        if state.enabled || state.receipt.stopped {
+            state.stop();
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "PrivateQuotaStartRejected",
+            ));
+        }
+        state.enabled = true;
+        Ok(())
     }
 
     fn start_watchdog(self: &Arc<Self>) -> io::Result<std::thread::JoinHandle<()>> {
@@ -302,6 +335,49 @@ fn install_inner(
     timeout_ms: u32,
     endpoint: Option<SocketAddr>,
 ) -> io::Result<Arc<TcpQuota>> {
+    install_scoped(bytes, connections, timeout_ms, endpoint, None, false)
+}
+
+/// A dedicated QA Qt process gets one immutable fixture endpoint and one
+/// main proxy listener. Probe listeners may still bind loopback port zero.
+/// No operation is admitted until the private parent START is accepted.
+#[cfg(feature = "private-acceptance-ui")]
+pub fn install_ui(
+    bytes: u64,
+    connections: u32,
+    timeout_ms: u32,
+    endpoint: SocketAddr,
+    listener: SocketAddr,
+) -> io::Result<Arc<TcpQuota>> {
+    if endpoint.ip() != std::net::Ipv4Addr::LOCALHOST
+        || listener.ip() != std::net::Ipv4Addr::LOCALHOST
+        || endpoint.port() == 0
+        || listener.port() == 0
+        || endpoint == listener
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PrivateQuotaUiScopeDenied",
+        ));
+    }
+    install_scoped(
+        bytes,
+        connections,
+        timeout_ms,
+        Some(endpoint),
+        Some(listener),
+        true,
+    )
+}
+
+fn install_scoped(
+    bytes: u64,
+    connections: u32,
+    timeout_ms: u32,
+    endpoint: Option<SocketAddr>,
+    listener: Option<SocketAddr>,
+    paused: bool,
+) -> io::Result<Arc<TcpQuota>> {
     if cfg!(feature = "private-acceptance-worker") && endpoint.is_none() {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
@@ -322,6 +398,19 @@ fn install_inner(
     }
     let mut guard = TcpQuota::new(bytes, connections, timeout_ms)?;
     guard.endpoint = endpoint;
+    #[cfg(feature = "private-acceptance-worker")]
+    {
+        guard.listener = listener;
+    }
+    #[cfg(not(feature = "private-acceptance-worker"))]
+    if listener.is_some() || paused {
+        return Err(io::Error::other("PrivateQuotaUiUnavailable"));
+    }
+    guard
+        .state
+        .get_mut()
+        .map_err(|_| io::Error::other("PrivateQuotaState"))?
+        .enabled = !paused;
     let guard = Arc::new(guard);
     let watchdog = guard.start_watchdog()?;
     GUARD.set(Arc::clone(&guard)).map_err(|_| {
@@ -362,7 +451,7 @@ pub(super) fn check_listener(address: SocketAddr) -> io::Result<()> {
             "PrivateQuotaWorkerGrantRequired",
         )
     })?;
-    if !address.ip().is_loopback() || address.port() != 0 {
+    if !address.ip().is_loopback() || address.port() != 0 && guard.listener != Some(address) {
         guard.cancel();
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,

@@ -76,6 +76,9 @@
 #include "tests/NativeTunBrokerChecks.h"
 #endif
 #include "tests/RuntimeEvidence.h"
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include "tests/PrivateUiQuotaSession.h"
+#endif
 #include "tests/CaptureChecks.h"
 #include "tests/GatewayChecks.h"
 #include "tests/WindowChecks.h"
@@ -443,12 +446,22 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 int main(int argc, char *argv[])
 {
     QString controlledSessionRoot;
+    bool privateUiQuotaRequested=false,privateUiQuotaIdentity=false;
+    for(int i=1;i<argc;++i){
+        const QByteArray argument(argv[i]);
+        if(argument=="--private-ui-quota")privateUiQuotaRequested=true;
+        else if(argument=="--private-ui-quota-build-info")privateUiQuotaIdentity=true;
+        else if(argument.startsWith("--private-ui-quota"))return 64;
+    }
+#ifndef SWIRL_PRIVATE_UI_QUOTA
+    if(privateUiQuotaRequested||privateUiQuotaIdentity)return 64;
+#endif
     for(int i=1;i<argc;++i){
         const QByteArray argument(argv[i]);
         if(argument=="--controlled-node-session"||argument.startsWith("--controlled-node-session=")){
 #ifdef SWIRL_UI_TESTS
             constexpr auto prefix="--controlled-node-session=";
-            if(argc!=2||!argument.startsWith(prefix)||argument.size()==int(sizeof("--controlled-node-session=")-1))return 64;
+            if((argc!=2&&!(privateUiQuotaRequested&&argc==3))||!argument.startsWith(prefix)||argument.size()==int(sizeof("--controlled-node-session=")-1))return 64;
             controlledSessionRoot=QString::fromLocal8Bit(argument.mid(sizeof("--controlled-node-session=")-1));
 #else
             return 64;
@@ -468,6 +481,16 @@ int main(int argc, char *argv[])
             }
         }
     }
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(privateUiQuotaIdentity){
+        if(argc!=2||privateUiQuotaRequested||!controlledSessionRoot.isEmpty())return 64;
+        QCoreApplication identityApplication(argc,argv);
+        return PrivateUiQuotaSession::writeBuildIdentity();
+    }
+    // A QA quota binary has no ordinary startup/profile path. The production
+    // binary rejects both new options above and retains its existing behavior.
+    if(!privateUiQuotaRequested||controlledSessionRoot.isEmpty()||argc!=3)return 64;
+#endif
 #ifdef SWIRL_UI_TESTS
     // This guard outlives the application, engine and their destructors.
     auto controlledWatchdog=startControlledNodeWatchdog(!controlledSessionRoot.isEmpty());
@@ -523,6 +546,10 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
     app.setApplicationVersion(QStringLiteral(SWIRL_APP_VERSION));
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    PrivateUiQuotaSession privateUiQuota;
+    if(!privateUiQuota.begin())return 64;
+#endif
 #ifdef SWIRL_UI_TESTS
     if (app.arguments().contains(QStringLiteral("--capture-self-test"))) {
         const auto backend = qEnvironmentVariable("SWIRL_CAPTURE_TEST_TLS_BACKEND");
@@ -609,6 +636,9 @@ int main(int argc, char *argv[])
     ControlledNodeSession controlledSession;
     if(!controlledSessionRoot.isEmpty()){
         if(!loadControlledNodeSession(controlledSessionRoot,&controlledSession))return 64;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(!privateUiQuota.fixtureReady(controlledSession))return 64;
+#endif
         runtimeStore=controlledSession.storePath;
     }
     for(const auto &argument:app.arguments()){
@@ -1246,5 +1276,8 @@ int main(int argc, char *argv[])
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
         if(finalResult==0)qInfo()<<"XRAY_UI_PASS";
     }
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!privateUiQuota.finish())return 64;
+#endif
     return finalResult;
 }

@@ -6,6 +6,7 @@ publish.workspace = true
 [features]
 private-acceptance = ["swirl-transport/private-acceptance"]
 private-acceptance-worker = ["private-acceptance", "swirl-transport/private-acceptance-worker", "dep:base64", "dep:tokio-rustls"]
+private-acceptance-ui = ["private-acceptance-worker", "swirl-transport/private-acceptance-ui"]
 [[bin]]
 name = "swirl-private-worker"
 path = "src/bin/swirl-private-worker.rs"
@@ -14,6 +15,10 @@ required-features = ["private-acceptance-worker"]
 name = "private_worker"
 path = "tests/private_worker.rs"
 required-features = ["private-acceptance-worker"]
+[[test]]
+name = "private_ui_quota"
+path = "tests/private_ui_quota.rs"
+required-features = ["private-acceptance-ui"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 [dependencies]
