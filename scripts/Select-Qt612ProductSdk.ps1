@@ -24,7 +24,12 @@ $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
 foreach ($path in @($stock,$selected,$evidence)) { Assert-SwirlPathWithoutLinks $path }
 if (Test-Path -LiteralPath $selected) { throw 'Qt product SDK composition requires a fresh selected kit.' }
 if (Test-Path -LiteralPath $evidence) { throw 'Existing Qt product SDK evidence will not be replaced.' }
-$python = (Get-Command python.exe -CommandType Application -ErrorAction Stop).Source
+if ([string]::IsNullOrWhiteSpace($env:pythonLocation) -or -not [IO.Path]::IsPathFullyQualified($env:pythonLocation)) {
+    throw 'The prepared Python installation location is unavailable.'
+}
+$python = Join-Path $env:pythonLocation 'python.exe'
+Assert-SwirlPathWithoutLinks $python
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw 'The prepared Python executable is unavailable.' }
 & $python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') compose `
     --stock-kit $stock --selected-kit $selected --evidence $evidence
 if ($LASTEXITCODE -ne 0) { throw 'The pinned complete Qt product SDK could not be composed.' }

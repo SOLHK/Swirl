@@ -990,7 +990,7 @@ jobs:
           # deployment lookups resolve to the selected complete kit before any
           # of those unchanged commands run; they never borrow another Qt kit.
           foreach ($name in @('windeployqt.exe','qtpaths.exe')) {
-            $actual = (Get-Command $name -CommandType Application -ErrorAction Stop).Source
+            $actual = (Get-Command $name -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
             $expected = Join-Path $env:QT_ROOT_DIR ('bin/'+$name)
             if (-not $actual.Equals($expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Qt deployment command lookup differs from the selected SDK.' }
           }

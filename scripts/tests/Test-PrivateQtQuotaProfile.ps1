@@ -207,8 +207,14 @@ try {
     }
     $qtRoot = Resolve-SwirlMsvcPath $env:QT_ROOT_DIR
     $sslRoot = Resolve-SwirlMsvcPath $env:SWIRL_OPENSSL_ROOT
-    $cmake = (Get-Command cmake.exe -CommandType Application).Source
-    $python = (Get-Command python.exe -CommandType Application).Source
+    # Get-Command -CommandType Application can enumerate both the standalone
+    # and Visual Studio copies. Reuse the exact command recorded by the real
+    # ordinary builds instead of coercing that result array into one filename.
+    $cmake = Resolve-SwirlMsvcPath $ordinaryCompiler.cmake_command
+    if (-not (Test-QuotaSamePath $releaseCompiler.cmake_command $cmake)) {
+        throw 'Ordinary QA and Release used different CMake executables.'
+    }
+    $python = Resolve-SwirlMsvcPath $env:SWIRL_PROFILE_OWNER_PYTHON
     $pwsh = Join-Path $PSHOME 'pwsh.exe'
     $windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
     $qtpaths = Join-Path $qtRoot 'bin/qtpaths.exe'
@@ -407,7 +413,7 @@ try {
     if ((Test-Path -LiteralPath $billingRust) -or (Test-Path -LiteralPath $billingTests)) {
         throw 'Synthetic Qt billing requires a new independent Cargo target and evidence directory.'
     }
-    $cargo = (Get-Command cargo.exe -CommandType Application).Source
+    $cargo = Resolve-SwirlMsvcPath (Get-QuotaCacheValue $privateCache 'SWIRL_CARGO')
     $null = Get-QuotaFile $cargo
     $billingWorkerBefore = $null
     $receipt.billing_scope = 'Same synthetic ledger, guarded Rust billing worker and actual Windows Qt quota; no provider authority or live readiness'
