@@ -2,6 +2,73 @@
 
 Continue on `work/node-probe-render-20261105` in [PR #61](https://github.com/SOLHK/Swirl/pull/61), targeting `test`. Fetch the current head before editing. This is a development checkpoint. Release acceptance and promotion remain open.
 
+## Correct the online import receipt contract after actual Windows acceptance (2026-11-07)
+
+The fully observed predecessor is development HEAD `2392ca0193600ab3456879e3da803548546a3f4b`, GitHub tested merge `30e18b6acea2d9cb5259494ab09e684a1d82f832`, and tree `a654558e964402acbb3db14f65667e437e0cd941`. Its base remains `test` / `acd7005c99a99c4f81b62d328fcc15883d51b62a`. All eight first attempts ended before the formal original-body reader ran:
+
+| Gate | Run | Original final conclusion |
+| --- | --- | --- |
+| Windows UI / installer / private | [42405860933](https://github.com/SOLHK/Swirl/actions/runs/42405860933) | failure |
+| Rust Core | [42405860873](https://github.com/SOLHK/Swirl/actions/runs/42405860873) | success |
+| Qt HTTP | [42405860950](https://github.com/SOLHK/Swirl/actions/runs/42405860950) | failure, mac artifact finalization only |
+| Isolated TUN | [42405861007](https://github.com/SOLHK/Swirl/actions/runs/42405861007) | success |
+| Native TUN | [42405860992](https://github.com/SOLHK/Swirl/actions/runs/42405860992) | success |
+| Native LAN | [42405860975](https://github.com/SOLHK/Swirl/actions/runs/42405860975) | success |
+| Fonts | [42405860940](https://github.com/SOLHK/Swirl/actions/runs/42405860940) | success |
+| Source | [42405860924](https://github.com/SOLHK/Swirl/actions/runs/42405860924) | success |
+
+### Actual failure and minimal correction
+
+The UI main job `128503381163` ran the private step from **20:46:18 to 21:14:33 UTC (28m15s)**. This was not the 50-minute timeout. Its complete decoded log is **1,944,332 bytes / SHA256 `89afc660e5adda8104ea3cc40607f80a275110358261b26e1e38b0dcd98000ed`**.
+
+Actual original receipts now establish:
+- all eight environment controls behaved as required: five exit 0 and three designated exit 29 cases, with exact restoration and matching inventoried child-log identities;
+- quota: 9 pass plus the one explicitly POSIX-only skip; billing: 10 pass;
+- import: 11 pass, 2 fail, 1 error; DNS was not executed;
+- the quota suite's real 31-byte stop measured 29 uploaded + 2 downloaded, taking its same-ledger cumulative measured count from 4,601 to 4,632 bytes; durable-write fault injection started neither fixture nor Qt and preserved the previous ledger bytes;
+- ordinary runtime inventories stayed byte-identical, and the failure-finally EXE/DLL/billing-worker hashes were preserved and unchanged.
+
+The first and seventh import tests actually fetched and verified the 203-byte synthetic subscription over certificate-checked HTTPS through the granted Core listener (HTTP 200, one SOCKS/forward). They then stopped at phase 20 with `PrivateUiImportedStoreMismatch`, before source/node IDs, independent readback, probe, or normal proxy requests were recorded. Cleanup was confirmed; conservative holds were retained.
+
+The cause is a receipt-schema mismatch in the QA `captureCurrentReceipt` helper. It always required a top-level `saved_revision`. The real online Core receipt exposes `applied_revision`; its durable receipt is separately nested, while offline NodeStore receipts expose `saved_revision`. RustCoreEngine and EngineController preserve that online shape. Consequently the first online subscription transaction fails capture before the readback expression is evaluated. This is not evidence of encrypted-store corruption.
+
+This change touches only `src/Swirl.Quick/tests/RuntimeEvidence.cpp` and this handoff:
+- choose the revision field from the actual engine online/offline state, require a nonempty saved revision and a typed equal receipt value, and require API health online;
+- retain completed request identity, idle state, UUID, digest and all existing UI/protocol assertions;
+- independently reopen NodeStore and additionally compare its store ID, durable saved revision, configuration revision, request ID and plan digest;
+- preserve the exact six-field exported receipt schema and the Python exact-key validation; do not add fields to the production Core receipt;
+- retain the later actual applied-route/telemetry gate, all 14 import tests, the other original suites, 8-second request bounds, six-attempt cap, TLS/authentication checks and normal motion.
+
+The reviewed C++ candidate is **82,244 bytes / SHA256 `4e6e703a6e59260d23f52d876a1cc712fe448997d47f94a5716063dc37441440`**, based on **81,229 bytes / `98c8b381ec3654fc3f41c0855955dc71fc0c1f13cb0c1bd4a778323f5f8f24b2`**. Two exact replacements reverse to the original file byte for byte. Review rejected an extra instantaneous ThreadedEngine status comparison because completion and status delivery are separately queued, and rejected an extra diagnostic JSON field because the consumer requires exactly six keys. Neither rejected draft was published. Independent final source review: **7,865 bytes / `e75e9f357b0e08be86d6259074e4e05a3eaf63cf474734b5186333b98a271f1a`**. These are static checks; this new source still requires its own CI and Windows execution.
+
+The import 31-byte test's `JSONDecodeError` establishes only failure at the first JSON character. The original test did not preserve that CLI invocation's stdout/stderr or exit code. The preceding failed test retained the same node's hold; the source therefore supports a cascading `NodeAlreadyReserved` refusal, but the precise second invocation's code and output were not directly observed. Do not report the import hard-stop test as executed or passed. Its original test remains for the new source's actual acceptance.
+
+### Preserved originals and completed independent audits
+
+The single label-triggered [reader run 42415057573](https://github.com/SOLHK/Swirl/actions/runs/42415057573) read all seven producer kinds after all original workflows were terminal. Its 23 controls passed, six artifact readers passed, and Private failed correctly because the DNS result does not exist. Original UI/Qt HTTP failures and `current_ci_eligible=false` remain unchanged. No mac job rerun occurred: the earlier infrastructure-only retry plan was suspended when the genuine UI failure appeared.
+
+The complete original-source index covers 23 key-job logs, 76 producer artifact references and, separately, seven forensic outputs: **401,573 bytes / SHA256 `47634d7405a3ed84fd35f970b5791dbd4180e859547e12581fa2a5c27272b706`**. The original ten workflows / 26 checks are distinct from later label-triggered diagnostic skips. The formal reader index is **55,490 bytes / `0b56e4d70676a905b04f6f44f61b158a3c020e12122c4d2da4c225a016504673`**.
+
+- Node: all 28 primary JSONs for 104/88 nodes across software DPR 1 and Windows D3D11 DPR 1.5 were independently reconstructed; maximum matched-cell difference 0, lifecycle warnings 0, all geometry/transition negative controls and active producers retained. Critical UI 12, network 13 and recovery 19 passed; NodeChain has 53 passes and its explicit unavailable-private-input skip. These are synthetic UI/model regressions, not real-provider node results.
+- Controlled: all eight originals conform to the existing contract. Positive probe 204 / HTTP 200 / HTTPS 200 / UI 11 ms, wrong CA rejected, and four admission refusals made zero forwards. Ordinary stall used parent exit 125 with confirmed process/Job/fixture retirement; the existing workflow explicitly allows this branch. Its 8,594 ms is a combined supervision duration, not a measured request duration. The independent 500 ms native control committed its deadline record and exited 124, with 8,961,800 ns recorded overrun. The old analysis helper's assumption that ordinary stall always used native exit 124 was corrected against unchanged source; no product gate was relaxed.
+- Engine/Installer: 52 identity/archive/completion checks passed; eight Engine XMLs were independently reconstructed with SHA/CRC. Two producer-embedded CTest stdout truncation markers remain disclosed. Recovery/marker tests do not establish physical TUN acceptance.
+- Package/QtSource: 60 selected original texts, 4,679,921 bytes, independently matched SHA/CRC; 98 semantic groups had no mismatch. Four normal-motion runs each covered 61 routes with 360 ms motion, natural exit and zero VME/warnings. The 1,480 Qt runtime and 182 notice mappings and six module sources match the actual payload. Package/source semantic audit: **30,766 bytes / `a2b83275d8a0d9d7cb655cac984e65174e8108194efa5b7570d518d9c9cdb4b2`**. This does not erase either failed workflow or prove permanent absence of the intermittent VME defect.
+- Private: 63 outer members passed original-reader CRC/SHA; 13 selected texts, 1,838,342 bytes, were independently reconstructed with SHA/CRC. The sole missing selected result is DNS. The eight environment child stdout files were inventoried and hash-bound, but their bodies are outside the fixed selected-text list; the eight receipt rows and steps were actually read.
+
+The actual current-source cold-profile diagnostic was also read. Both registry views remain identical from cold baseline through old installation and before the old UI. The first observed change occurs during actual 0.2.39 normal UI execution and natural exit: `ProxyEnable` becomes a DWORD zero, and both Connections values become 56-byte entries. ProxyServer/Override/AutoConfigURL/AutoDetect have no differences. All subsequent candidate installation/UI/uninstall phases and the final state exactly match the old-exit oracle. The final post-assertion WinINet query reports flags 9 and null server/bypass/PAC without further raw changes. The original cold bytes were not restored; the precise writer and pre-query effective cold flags remain unproven. Do not backfill these new observations into the earlier b741 archive or call the difference harmless.
+
+### Failed candidate executable, not final delivery
+
+The actual immutable [Installer artifact 13589679035](https://github.com/SOLHK/Swirl/actions/runs/42405860933/artifacts/13589679035) contains exactly **`Swirl-Setup.exe`, 60,367,308 bytes**, independently streamed by reader job `128531264376` at **21:17:47.2419813 UTC**. Its EXE-body SHA256 is:
+
+`76a2677bebce80f72ee6094f231d199c93186680acc954bbf4ed5675bfa573d4`
+
+The enclosing ZIP is 59,942,005 bytes / `53f4594bd84a0d88a25b702e4cf2496f89ff4b2e06d033ea031f051a1863a530`, a separate hash. Delivery and package binding match tested merge `30e18b6...`, development `2392ca0...`, tree `a654558...`, Qt 6.12, the Rust Core and OpenSSL pair. The whole UI workflow failed, so this is preserved failure evidence only. The new commit requires a new installer and its own final CI, original-body hash and package/source audits.
+
+The primary local runtime remained unavailable at the read-only 21:01:12 UTC probe; no shell command executed. Cloud GitHub originals and server references are preserved, without claiming new local saves or a second local EXE hash. Preserve and compare the last known staged local worktree if the environment returns.
+
+New real-provider and real-node requests in this environment remain **0**. Whole-task historical usage, official-account delta and remaining allowance remain unknown. The production account/period/freshness authority, real-node admission issuer, complete billable-wire worst-case proof, original unique historical ledger and safe private physical Windows environment are still missing. Synthetic raw bytes, conservative debits and retained holds are distinct from official billing. Keep `--live` closed, the decimal 2/5/10/15/20 GB limits and at least 80 GB account remainder. PR #61 remains open; only `test` is an allowed merge target, and no merge, Release publication or force push is authorized by a failed candidate.
+
 ## Read the missing cold-profile proxy snapshots (2026-11-07)
 
 The environment-state fix was ordinarily published as `af57ea199c87f8543575b8298afe90e08acbcf3c`, with GitHub merge `2f830fa0022b0dc6718e370a5f038b77ce30f4d7` and tree `f89ebb92180743d22ccdafab8cb163a0fe0c001c`. Its new [UI run 42404186185](https://github.com/SOLHK/Swirl/actions/runs/42404186185) started at 19:01:50 UTC and passed PowerShell parsing before building the UI. At the 19:13:35 observation, Source, Fonts, Native TUN and LAN were terminal success, while the other key runs were still running. The eight private environment controls and original 45-test suite were not reached. Preserve each run's eventual actual conclusion if a subsequent ordinary update invokes the existing concurrency policy; do not convert cancellation into product failure or a new-source pass.

@@ -675,14 +675,22 @@ private:
     }
     bool captureCurrentReceipt(const char *label) {
         const auto receipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());const auto id=receipt.value("request_id").toString();
+        const bool online=m_controller->processAlive();const auto savedRevision=m_controller->savedRevision();
+        // Online Core receipts expose applied_revision; saved_revision belongs
+        // to the durable NodeStore receipt. Select by the actual engine state,
+        // never by whichever field happens to be present in the response.
+        const auto revision=receipt.value(online?QStringLiteral("applied_revision"):QStringLiteral("saved_revision"));
         if(id.isEmpty()||id==m_beforeRequest||QUuid(id).isNull()||!m_completions.value(id,false)
             ||m_controller->policyBusy()||m_controller->policyApplyState()!=QStringLiteral("idle")
-            ||receipt.value("saved_revision").toString()!=m_controller->savedRevision()
+            ||savedRevision.isEmpty()||!revision.isString()||revision.toString()!=savedRevision
+            ||(online&&!m_controller->apiHealthy())
             ||QUuid(receipt.value("store_id").toString()).isNull()
             ||!QRegularExpression("^[0-9a-f]{64}$").match(receipt.value("plan_digest").toString()).hasMatch())return false;
         if(id!=m_recordedRequest){
+            // saved_revision below is the observed controller NodeStore value,
+            // not an added field or a replacement for the actual Core receipt.
             m_receipts.append(QJsonObject{{"stage",QString::fromLatin1(label)},{"request_id",id},{"store_id",receipt.value("store_id")},
-                {"saved_revision",receipt.value("saved_revision")},{"applied_revision",receipt.value("applied_revision").toString()},
+                {"saved_revision",savedRevision},{"applied_revision",receipt.value("applied_revision").toString()},
                 {"plan_digest",receipt.value("plan_digest")}});m_recordedRequest=id;
         }
         return true;
@@ -712,9 +720,12 @@ private:
     bool readback(bool selected) {
         NodeStore reopened(m_session.storePath);const auto providers=reopened.subscriptions();const auto nodes=reopened.nodes();
         const auto actualReceipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());
+        const auto durableReceipt=reopened.configurationReceipt();const auto savedRevision=m_controller->savedRevision();
         if(!reopened.error().isEmpty()||reopened.saving()||!reopened.configurationAvailable()||!reopened.configurationV2()
-            ||providers.size()!=1||nodes.size()!=2||reopened.configurationReceipt().value("request_id")!=actualReceipt.value("request_id")
-            ||reopened.configurationReceipt().value("plan_digest")!=actualReceipt.value("plan_digest"))return false;
+            ||providers.size()!=1||nodes.size()!=2||durableReceipt.value("request_id")!=actualReceipt.value("request_id")
+            ||durableReceipt.value("store_id")!=actualReceipt.value("store_id")
+            ||!durableReceipt.value("saved_revision").isString()||durableReceipt.value("saved_revision").toString()!=savedRevision
+            ||reopened.configurationRevision()!=savedRevision||durableReceipt.value("plan_digest")!=actualReceipt.value("plan_digest"))return false;
         if(m_session.uiDnsPolicy&&reopened.networkConfiguration().value("dns").toObject()
             !=QJsonObject::fromVariantMap(m_session.dnsConfiguration()))return false;
         const auto &source=providers.first();
