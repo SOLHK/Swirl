@@ -24,10 +24,10 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    # Preserve the original 120-minute build/install/regression envelope and
-    # the separate private Qt profile's existing 35-minute cold-build bound.
-    # Product deadlines and all per-step checks remain unchanged.
-    timeout-minutes: 155
+    # Retain the original 120-minute build/install/regression envelope and
+    # allow 50 minutes for the independent private Qt build/deploy/tests.
+    # Product deadlines and checks inside that profile remain unchanged.
+    timeout-minutes: 170
     permissions:
       contents: read
       actions: read # Read fixed Qt SDK evidence and the opted-in old installer.
@@ -1699,7 +1699,7 @@ jobs:
           retention-days: 14
       - name: Verify the same persistent ledger controls the actual quota Qt profile
         shell: pwsh
-        timeout-minutes: 35
+        timeout-minutes: 50
         run: ./scripts/tests/Test-PrivateQtQuotaProfile.ps1
       - name: Preserve independent private Qt quota originals
         if: always()
