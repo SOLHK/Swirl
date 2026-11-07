@@ -1,4 +1,4 @@
-#Requires -Version 7.4
+#Requires -Version 7.5
 param()
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -70,6 +70,30 @@ function Save-QuotaFile([string]$Source, [string]$Relative) {
     [IO.File]::Copy($Source,$target,$false)
     if ((Get-SwirlMsvcHash $Source) -cne (Get-SwirlMsvcHash $target)) { throw 'Evidence copy identity changed.' }
 }
+function Get-QuotaEnvironmentState([string]$Name) {
+    if ($Name -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw 'Invalid fixed tool environment name.' }
+    $path = 'Env:'+$Name
+    $present = Test-Path -LiteralPath $path
+    $value = $null
+    if ($present) { $value = [string](Get-Item -LiteralPath $path -ErrorAction Stop).Value }
+    return [ordered]@{present=[bool]$present; value=$value}
+}
+function Set-QuotaEnvironmentState([string]$Name, [bool]$Present, [AllowEmptyString()][string]$Value) {
+    $null = Get-QuotaEnvironmentState $Name
+    $path = 'Env:'+$Name
+    # In PowerShell 7.5 a null argument to the .NET string overload becomes an
+    # empty value. The Env provider removes the entry and preserves real empty
+    # values separately. Never normalize an empty caller path into absence.
+    if ($Present) {
+        Set-Item -LiteralPath $path -Value $Value -ErrorAction Stop
+    } elseif (Test-Path -LiteralPath $path) {
+        Remove-Item -LiteralPath $path -ErrorAction Stop
+    }
+    $actual = Get-QuotaEnvironmentState $Name
+    if ($actual.present -ne $Present -or ($Present -and $actual.value -cne $Value)) {
+        throw ('Tool environment presence/value could not be set: '+$Name)
+    }
+}
 function Invoke-QuotaTool([string]$Name, [string]$Program, [string[]]$Arguments,
                           [hashtable]$Environment=@{}, [string[]]$RemoveEnvironment=@()) {
     if ($Name -cnotmatch '^[a-z0-9-]+$' -or -not [IO.Path]::IsPathFullyQualified($Program)) {
@@ -79,29 +103,155 @@ function Invoke-QuotaTool([string]$Name, [string]$Program, [string[]]$Arguments,
     $log = Join-Path $output ('logs/'+$Name+'.log')
     if (Test-Path -LiteralPath $log) { throw 'Tool log names must be unique.' }
     $entry = [ordered]@{name=$Name; tool=(Get-QuotaFile $Program); arguments=@($Arguments)
-        started_utc=[DateTime]::UtcNow.ToString('o'); exit_code=$null; log=$null}
+        started_utc=[DateTime]::UtcNow.ToString('o'); exit_code=$null; log=$null
+        environment_restored=$false; cleanup_errors=@()}
     $steps.Add($entry)
     $saved = @{}
     foreach ($nameToSet in @($Environment.Keys)+@($RemoveEnvironment)) {
         if (-not $saved.ContainsKey($nameToSet)) {
-            $saved[$nameToSet] = [Environment]::GetEnvironmentVariable($nameToSet,'Process')
+            $saved[$nameToSet] = Get-QuotaEnvironmentState $nameToSet
         }
     }
+    $toolFailure = $null
+    $cleanupErrors = [Collections.Generic.List[string]]::new()
     try {
-        foreach ($nameToRemove in $RemoveEnvironment) { [Environment]::SetEnvironmentVariable($nameToRemove,$null,'Process') }
-        foreach ($item in $Environment.GetEnumerator()) { [Environment]::SetEnvironmentVariable($item.Key,[string]$item.Value,'Process') }
+        foreach ($nameToRemove in $RemoveEnvironment) { Set-QuotaEnvironmentState $nameToRemove $false '' }
+        foreach ($item in $Environment.GetEnumerator()) { Set-QuotaEnvironmentState $item.Key $true ([string]$item.Value) }
         $global:LASTEXITCODE = 0
         # Native output is public build/test output only. Do not invoke the UI
         # grant protocol here or copy any test session directory into evidence.
         & $Program @Arguments 2>&1 | Tee-Object -FilePath $log | Out-Host
         $entry.exit_code = $LASTEXITCODE
+        if ($entry.exit_code -ne 0) { throw ('Private Qt quota tool failed: '+$Name+'; exit='+$entry.exit_code) }
+    } catch {
+        $toolFailure = $_
     } finally {
-        foreach ($item in $saved.GetEnumerator()) { [Environment]::SetEnvironmentVariable($item.Key,$item.Value,'Process') }
+        foreach ($item in $saved.GetEnumerator()) {
+            try { Set-QuotaEnvironmentState $item.Key $item.Value.present $item.Value.value }
+            catch { $cleanupErrors.Add('EnvironmentRestoreFailed: '+$item.Key+'; '+$_.Exception.GetType().FullName) }
+        }
+        $entry.environment_restored = ($cleanupErrors.Count -eq 0)
         $entry.finished_utc = [DateTime]::UtcNow.ToString('o')
-        if (Test-Path -LiteralPath $log -PathType Leaf) { $entry.log = Get-QuotaFile $log }
+        try { if (Test-Path -LiteralPath $log -PathType Leaf) { $entry.log = Get-QuotaFile $log } }
+        catch { $cleanupErrors.Add('ToolLogEvidenceFailed: '+$_.Exception.GetType().FullName) }
+        $entry.cleanup_errors = $cleanupErrors.ToArray()
     }
-    if ($entry.exit_code -ne 0) { throw ('Private Qt quota tool failed: '+$Name+'; exit='+$entry.exit_code) }
+    if ($null -ne $toolFailure) { throw $toolFailure }
+    if ($cleanupErrors.Count) { throw ('Private Qt quota tool cleanup failed: '+$Name) }
     return $log
+}
+function Test-QuotaToolEnvironment([string]$Python) {
+    $sentinel = 'SWIRL_PRIVATE_UI_ENV_CONTROL'
+    $original = Get-QuotaEnvironmentState $sentinel
+    $previousExitVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    $previousExitPresent = ($null -ne $previousExitVariable)
+    $previousExitValue = if ($previousExitPresent) { $previousExitVariable.Value } else { $null }
+    $control = [ordered]@{schema=1; scope='Fixed public sentinel; actual bound Python children; no environment enumeration'
+        success=$false; cases=@(); original_sentinel_restored=$false; native_exit_state_restored=$false; errors=@()}
+    $receipt.environment_controls = $control
+    $cases = [Collections.Generic.List[object]]::new()
+    $controlErrors = [Collections.Generic.List[string]]::new()
+    $controlFailure = $null
+    $scriptPath = Join-Path $output 'build/environment-child.py'
+    $childScript = @'
+import json
+import os
+import sys
+
+name = "SWIRL_PRIVATE_UI_ENV_CONTROL"
+expected, outcome = sys.argv[1:]
+present = name in os.environ
+value = os.environ.get(name)
+observed = ("absent" if not present else "empty" if value == "" else
+            "value" if value == "swirl-child-control" else "unexpected")
+matches = observed == expected and outcome in ("success", "failure")
+print(json.dumps({"schema": 1, "observed": observed, "matches": matches},
+                 sort_keys=True), flush=True)
+sys.exit(29 if matches and outcome == "failure" else 0 if matches else 97)
+'@
+    try {
+        if (Test-Path -LiteralPath $scriptPath) { throw 'Environment child control must be new.' }
+        [IO.File]::WriteAllText($scriptPath,$childScript,[Text.UTF8Encoding]::new($false))
+        $control.child_source = Get-QuotaFile $scriptPath
+        $descriptors = [Collections.Generic.List[object]]::new()
+        foreach ($initial in @('absent','empty','value')) {
+            foreach ($outcome in @('success','failure')) {
+                $descriptors.Add(@{initial=$initial; expected='absent'; outcome=$outcome; remove=$true})
+            }
+        }
+        foreach ($expected in @('empty','value')) {
+            $descriptors.Add(@{initial='absent'; expected=$expected; outcome='success'; remove=$false})
+        }
+        foreach ($descriptor in $descriptors) {
+            $initialValue = if ($descriptor.initial -ceq 'value') { 'swirl-parent-control' } else { '' }
+            Set-QuotaEnvironmentState $sentinel ($descriptor.initial -cne 'absent') $initialValue
+            $before = Get-QuotaEnvironmentState $sentinel
+            $name = 'env-'+$descriptor.initial+'-'+$descriptor.expected+'-'+$descriptor.outcome
+            $row = [ordered]@{name=$name; initial_state=$descriptor.initial; expected_child_state=$descriptor.expected
+                expected_exit_code=$(if ($descriptor.outcome -ceq 'failure') { 29 } else { 0 })
+                child_observed_state=$null; child_exit_code=$null; exception_observed=$false
+                parent_restored=$false; success=$false}
+            $cases.Add($row)
+            $environment = @{}
+            $remove = @()
+            if ($descriptor.remove) { $remove = @($sentinel) }
+            else { $environment[$sentinel] = $(if ($descriptor.expected -ceq 'value') { 'swirl-child-control' } else { '' }) }
+            $stepIndex = $steps.Count
+            $caught = $null
+            try {
+                $null = Invoke-QuotaTool $name $Python @('-I',$scriptPath,$descriptor.expected,$descriptor.outcome) -Environment $environment -RemoveEnvironment $remove
+            } catch { $caught = $_ }
+            $after = Get-QuotaEnvironmentState $sentinel
+            $row.parent_restored = ($after.present -eq $before.present -and
+                (-not $before.present -or $after.value -ceq $before.value))
+            $row.exception_observed = ($null -ne $caught)
+            if ($steps.Count -ne ($stepIndex+1)) { throw 'Environment control did not record exactly one actual child.' }
+            $entry = $steps[$stepIndex]
+            $row.child_exit_code = $entry.exit_code
+            if (-not $row.parent_restored -or -not $entry.environment_restored -or $entry.cleanup_errors.Count) {
+                throw 'Environment control failed to restore its parent state.'
+            }
+            if ($descriptor.outcome -ceq 'failure') {
+                if ($null -eq $caught -or $caught.Exception.Message -cne ('Private Qt quota tool failed: '+$name+'; exit=29') -or
+                    $entry.exit_code -ne 29) { throw 'Environment control did not preserve its expected native failure.' }
+            } elseif ($null -ne $caught -or $entry.exit_code -ne 0) {
+                if ($null -ne $caught) { throw $caught }
+                throw 'Environment control unexpectedly failed.'
+            }
+            if ($null -eq $entry.log) { throw 'Environment control child output was not preserved.' }
+            $observed = [IO.File]::ReadAllText([string]$entry.log.path) | ConvertFrom-Json
+            if ($observed.schema -ne 1 -or $observed.matches -ne $true -or
+                $observed.observed -cne $descriptor.expected) { throw 'Environment control child observed the wrong state.' }
+            $row.child_observed_state = [string]$observed.observed
+            $row.success = $true
+        }
+        if ($cases.Count -ne 8 -or @($cases | Where-Object { -not $_.success }).Count) {
+            throw 'Environment control inventory is incomplete.'
+        }
+        $control.success = $true
+    } catch {
+        $controlFailure = $_
+        $controlErrors.Add('EnvironmentControlFailed: '+$_.Exception.GetType().FullName)
+    } finally {
+        try {
+            Set-QuotaEnvironmentState $sentinel $original.present $original.value
+            $control.original_sentinel_restored = $true
+        } catch { $controlErrors.Add('OriginalSentinelRestoreFailed: '+$_.Exception.GetType().FullName) }
+        try {
+            if ($previousExitPresent) { $global:LASTEXITCODE = $previousExitValue }
+            else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+            $restoredExit = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+            if (($null -ne $restoredExit) -ne $previousExitPresent -or
+                ($previousExitPresent -and $restoredExit.Value -ne $previousExitValue)) {
+                throw 'Original native exit state changed.'
+            }
+            $control.native_exit_state_restored = $true
+        } catch { $controlErrors.Add('NativeExitStateRestoreFailed: '+$_.Exception.GetType().FullName) }
+        if ($controlErrors.Count) { $control.success = $false }
+        $control.cases = $cases.ToArray(); $control.errors = $controlErrors.ToArray()
+    }
+    if ($null -ne $controlFailure) { throw $controlFailure }
+    if (-not $control.success) { throw 'Environment control cleanup failed.' }
 }
 function Get-QuotaCompiler([string]$Build, [string]$Label) {
     $cachePath = Join-Path $Build 'CMakeCache.txt'
@@ -221,6 +371,7 @@ try {
     $qmake = Join-Path $qtRoot 'bin/qmake.exe'
     $dumpbin = Join-Path ([IO.Path]::GetDirectoryName($ordinaryCompiler.path)) 'dumpbin.exe'
     foreach ($tool in @($cmake,$python,$pwsh,$windeployqt,$qtpaths,$qmake,$dumpbin)) { $null = Get-QuotaFile $tool }
+    Test-QuotaToolEnvironment $python
     $sdkPath = Join-Path $repo 'build-evidence/qt-sdk.json'
     $sdk = Get-Content -LiteralPath $sdkPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $stockRoot = Resolve-SwirlMsvcPath $sdk.kit_root
