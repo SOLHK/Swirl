@@ -1,4 +1,4 @@
-"""Pure boundary controls only: no Qt execution, network, build or private data."""
+"""Boundary and configuration controls: no Qt, compiler, network or private data."""
 
 import copy
 import hashlib
@@ -6,6 +6,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -26,6 +28,51 @@ comparison = load("comparison_boundary_tests", "RunQt612RuntimeComparison.py")
 
 
 class DiagnosticBoundaryTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Actual Windows batch parsing required")
+    def test_initial_cache_survives_batch_reexpansion_and_preserves_release_format(self):
+        cmake, powershell, ninja = shutil.which("cmake"), shutil.which("pwsh"), shutil.which("ninja")
+        if not cmake or not powershell or not ninja:
+            self.skipTest("CMake, Ninja and PowerShell 7 are required for the configuration-only control")
+        with tempfile.TemporaryDirectory(prefix="swirl cache regression ") as directory:
+            root = Path(directory).resolve()
+            source = root / "source"
+            source.mkdir()
+            (source / "CMakeLists.txt").write_text(
+                'cmake_minimum_required(VERSION 3.25)\nproject(FormatBoundary NONE)\n'
+                'file(GENERATE OUTPUT "selected-format.txt" '
+                'CONTENT "${CMAKE_MSVC_DEBUG_INFORMATION_FORMAT}")\n', encoding="utf-8")
+            cache = root / "initial-cache.cmake"
+            cache.write_text(sdk.MSVC_INITIAL_CACHE, encoding="utf-8")
+            wrapper = root / "forward.bat"
+            wrapper.write_text('@echo off\nsetlocal ENABLEEXTENSIONS\nset ARGS=%*\n'
+                               'call :forward %ARGS%\nexit /b %errorlevel%\n:forward\n"'
+                               + cmake + '" %*\nexit /b %errorlevel%\n', encoding="utf-8")
+            def configure(name, arguments):
+                build = root / name
+                script = root / (name + ".ps1")
+                command = [wrapper, "-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=" + ninja,
+                           "-S", source, "-B", build, *arguments]
+                script.write_text("& " + " ".join(sdk.ps_quote(x) for x in command)
+                                  + "\nexit $LASTEXITCODE\n", encoding="utf-8")
+                result = subprocess.run([powershell, "-NoLogo", "-NoProfile", "-NonInteractive",
+                                         "-File", str(script)], cwd=root, capture_output=True,
+                                        text=True, timeout=30)
+                return build, result
+            # This reproduces cmd redirection of the previous direct -D value.
+            _, negative = configure("direct-expression", ["-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="
+                                                          + sdk.MSVC_DEBUG_INFORMATION_FORMAT])
+            self.assertNotEqual(negative.returncode, 0)
+            for config, expected in (("Debug", "Embedded"), ("RelWithDebInfo", "Embedded"),
+                                     ("Release", "")):
+                with self.subTest(configuration=config):
+                    build, result = configure(config, ["-C", cache, "-DCMAKE_BUILD_TYPE=" + config])
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual((build / "selected-format.txt").read_text(), expected)
+                    values = sdk.cache_values((build / "CMakeCache.txt").read_text())
+                    self.assertEqual(values["CMAKE_MSVC_DEBUG_INFORMATION_FORMAT"],
+                                     sdk.MSVC_DEBUG_INFORMATION_FORMAT)
+                    self.assertEqual(values["CMAKE_POLICY_DEFAULT_CMP0141"], "NEW")
+
     def test_compiler_opt_out_is_scoped_and_cannot_forward_parent_secrets(self):
         original = {"PATH": "synthetic-toolchain", "VCTIP_NO_TELEMETRY": "0",
                     "GITHUB_TOKEN": "synthetic-secret", "HTTPS_PROXY": "synthetic-proxy",

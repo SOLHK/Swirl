@@ -35,6 +35,12 @@ SOURCE_INPUTS = NEW_INPUTS + [
 SHA = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 MAX_LOG_BYTES = 64 * 1024 * 1024
+MSVC_DEBUG_INFORMATION_FORMAT = "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>"
+MSVC_INITIAL_CACHE = (
+    'set(CMAKE_POLICY_DEFAULT_CMP0141 NEW CACHE STRING "MSVC debug information policy")\n'
+    'set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "' + MSVC_DEBUG_INFORMATION_FORMAT
+    + '" CACHE STRING "Embedded debug information for compiler probes")\n'
+)
 
 
 def utc():
@@ -955,7 +961,7 @@ def verify_configuration(source, build, stock, tools, evidence, lock, pinned_cma
     expected = {"CMAKE_BUILD_TYPE": "Release", "CMAKE_GENERATOR": "Ninja",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "CMAKE_POLICY_DEFAULT_CMP0141": "NEW",
-                "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
+                "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": MSVC_DEBUG_INFORMATION_FORMAT,
                 "QT_BUILD_TESTS": "OFF", "QT_BUILD_EXAMPLES": "OFF",
                 "QT_BUILD_TOOLS_BY_DEFAULT": "OFF"}
     require(all(cache.get(k) == v for k, v in expected.items()), "UnexpectedBuildConfiguration")
@@ -1203,8 +1209,18 @@ def main():
         build = fresh_directory(work / "build", root=work)
         module_stage = fresh_directory(work / "module-stage", root=work)
         configure = work / "configure-module.ps1"
+        # Qt's .bat wrapper re-expands its arguments through cmd.exe. Keep the
+        # generator expression's < and > out of that command line entirely.
+        # CMP0141 applies before project(); the format propagates to try_compile.
+        # /Z7 avoids compiler PDBs in debug probes, leaving Release unchanged.
+        # https://cmake.org/cmake/help/v3.31/variable/CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.html
+        initial_cache = work / "msvc-initial-cache.cmake"
+        initial_cache.write_text(MSVC_INITIAL_CACHE, encoding="utf-8", newline="\n")
+        shutil.copyfile(initial_cache, evidence / initial_cache.name)
+        report["msvc_initial_cache"] = file_identity(initial_cache)
         configure_args = [
             stock / "bin/qt-configure-module.bat", source, "--", "-G", "Ninja",
+            "-C", initial_cache,
             cmake_path_definition("CMAKE_PREFIX_PATH", stock, "PATH"),
             "-DCMAKE_BUILD_TYPE=Release", cmake_path_definition("CMAKE_INSTALL_PREFIX", module_stage, "PATH"),
             cmake_path_definition("CMAKE_C_COMPILER", tools["cl.exe"], "FILEPATH"),
@@ -1215,12 +1231,6 @@ def main():
             cmake_path_definition("CMAKE_MT", tools["mt.exe"], "FILEPATH"),
             cmake_path_definition("CMAKE_MAKE_PROGRAM", tools["ninja.exe"], "FILEPATH"),
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
-            # CMP0141 must apply before the first project(); this variable is
-            # propagated to try_compile. /Z7 avoids compiler-PDB servers in
-            # debug probes while leaving Release without an added debug flag.
-            # https://cmake.org/cmake/help/v3.31/variable/CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.html
-            "-DCMAKE_POLICY_DEFAULT_CMP0141=NEW",
-            "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
             "-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
         ]
@@ -1233,7 +1243,7 @@ def main():
                    CMAKE_PREFIX_PATH=str(stock), QT_ROOT_DIR=str(stock))
         report["compiler_process_policy"] = {
             "invocation_environment": {"VCTIP_NO_TELEMETRY": env["VCTIP_NO_TELEMETRY"]},
-            "debug_information_format": "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>",
+            "debug_information_format": MSVC_DEBUG_INFORMATION_FORMAT,
             "telemetry_opt_out_effect_verified": False,
             "acceptance": "Unchanged native exit, no forced cleanup and empty owned Job required.",
         }
