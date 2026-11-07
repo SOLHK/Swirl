@@ -1286,7 +1286,7 @@ class Ledger:
                 raise BudgetError("BillingObservationAlreadyAdmitted")
             if any(h["configFingerprint"] == config_fingerprint for h in self.data["history"].values()):
                 raise BudgetError("ConfigurationAlreadyAttempted")
-            if workload not in SUPERVISED_WORKLOADS:
+            if workload not in SUPERVISED_WORKLOADS | {"qt_ui_session"}:
                 raise BudgetError("SyntheticWorkloadRequired")
             plan = tcp_plan(byte_limit, connection_limit, timeout_ms)
             execution = self._execution_record(node, plan, config_fingerprint, source_sha, worker_sha256, build_id, nonce, workload,

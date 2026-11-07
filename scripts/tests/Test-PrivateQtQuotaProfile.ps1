@@ -211,14 +211,16 @@ try {
     $python = (Get-Command python.exe -CommandType Application).Source
     $pwsh = Join-Path $PSHOME 'pwsh.exe'
     $windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
+    $qtpaths = Join-Path $qtRoot 'bin/qtpaths.exe'
     $qmake = Join-Path $qtRoot 'bin/qmake.exe'
     $dumpbin = Join-Path ([IO.Path]::GetDirectoryName($ordinaryCompiler.path)) 'dumpbin.exe'
-    foreach ($tool in @($cmake,$python,$pwsh,$windeployqt,$qmake,$dumpbin)) { $null = Get-QuotaFile $tool }
+    foreach ($tool in @($cmake,$python,$pwsh,$windeployqt,$qtpaths,$qmake,$dumpbin)) { $null = Get-QuotaFile $tool }
     $sdkPath = Join-Path $repo 'build-evidence/qt-sdk.json'
     $sdk = Get-Content -LiteralPath $sdkPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $stockRoot = Resolve-SwirlMsvcPath $sdk.kit_root
     if ($sdk.version -cne '6.12.0' -or $sdk.qmake_version -cne '6.12.0' -or
-        $sdk.arch -cne 'win64_msvc2022_64' -or -not (Test-QuotaSamePath $sdk.kit_root $qtRoot)) {
-        throw 'The private profile must use the already verified official Qt 6.12 MSVC kit.'
+        $sdk.arch -cne 'win64_msvc2022_64' -or -not (Test-QuotaSamePath $stockRoot $env:SWIRL_QT_STOCK_ROOT)) {
+        throw 'The original official Qt 6.12 MSVC receipt or kit identity changed.'
     }
     $sdkNames = @('bin/qmake.exe','bin/Qt6Core.dll','bin/Qt6Gui.dll','bin/Qt6Quick.dll',
         'bin/qt.conf','lib/cmake/Qt6/Qt6ConfigVersionImpl.cmake',
@@ -230,12 +232,33 @@ try {
         if ($entry.Name -cnotmatch '^[A-Za-z0-9_./-]+$' -or $entry.Name.StartsWith('/') -or
             @($entry.Name.Split('/') | Where-Object { $_ -in @('','.', '..') }).Count -or
             [string]$entry.Value -cnotmatch '^[0-9a-f]{64}$' -or
-            (Get-SwirlMsvcHash (Join-Path $qtRoot $entry.Name)) -cne [string]$entry.Value) { throw 'Qt SDK fingerprint changed.' }
+            (Get-SwirlMsvcHash (Join-Path $stockRoot $entry.Name)) -cne [string]$entry.Value) { throw 'Official Qt SDK fingerprint changed.' }
     }
     Save-QuotaFile $sdkPath 'qt-sdk.json'
+    $selectedPath = Resolve-SwirlMsvcPath $env:SWIRL_QT_SELECTED_RECEIPT
+    $selected = Get-Content -LiteralPath $selectedPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $selectedHook = Resolve-SwirlMsvcPath $env:SWIRL_QT_SELECTED_CMAKE
+    if ($selected.schema -ne 1 -or $selected.kind -cne 'swirl-selected-qt612-product-sdk' -or
+        $selected.success -ne $true -or $selected.consumer.source_sha -cne $env:GITHUB_SHA -or
+        -not (Test-QuotaSamePath $selected.kit_root $qtRoot) -or
+        -not (Test-QuotaSamePath $selected.stock_kit_root $stockRoot) -or
+        -not (Test-QuotaSamePath $selected.cmake_capture_hook.path $selectedHook) -or
+        $selected.selected_content_id -cne $env:SWIRL_QT_SELECTED_CONTENT_ID) {
+        throw 'Private QA must use the same complete selected Qt SDK as ordinary QA and Release.'
+    }
+    Save-QuotaFile $selectedPath 'qt-selected-sdk.json'
+    $sdkVerifier = Join-Path $repo 'tools/Compose-Qt612ProductSdk.py'
+    foreach ($normalQt in @(@{name='ordinary-qa';build=(Join-Path $repo 'build/swirl-quick');runtime=$dist},
+                           @{name='ordinary-release';build=(Join-Path $repo 'build/swirl-product');runtime=$product})) {
+        $null = Invoke-QuotaTool ('qt-'+$normalQt.name) $python @($sdkVerifier,'verify','--receipt',$selectedPath,
+            '--build-dir',$normalQt.build,'--phase','post-deploy','--runtime-dir',$normalQt.runtime,
+            '--evidence',(Join-Path $output ('qt-'+$normalQt.name)))
+    }
+    $receipt.selected_qt_sdk = [ordered]@{content_id=$selected.selected_content_id; derivation_id=$selected.derivation_id
+        receipt=(Get-QuotaFile $selectedPath); qml=$selected.qml_files; product_root_cause_claim=$false}
     $qtVersionLog = Invoke-QuotaTool 'qt-version' $qmake @('-query','QT_VERSION')
     if ([IO.File]::ReadAllText($qtVersionLog).Trim() -cne '6.12.0') { throw 'Actual Qt version changed.' }
-    $receipt.qt_tools = [ordered]@{qmake=(Get-QuotaFile $qmake); windeployqt=(Get-QuotaFile $windeployqt)}
+    $receipt.qt_tools = [ordered]@{qmake=(Get-QuotaFile $qmake); windeployqt=(Get-QuotaFile $windeployqt); qtpaths=(Get-QuotaFile $qtpaths)}
     $normalExports = [ordered]@{
         qa=(Read-QuotaExports 'ordinary-qa' (Join-Path $dist 'swirl_api.dll') $dumpbin $false)
         release=(Read-QuotaExports 'ordinary-release' (Join-Path $product 'swirl_api.dll') $dumpbin $false)
@@ -243,8 +266,11 @@ try {
     $receipt.ordinary_exports = $normalExports
     $configure = @('-S',(Join-Path $repo 'src/Swirl.Quick'),'-B',$qaBuild,'-G','Visual Studio 17 2022','-A','x64',
         '-DSWIRL_BUILD_UI_TESTS:BOOL=ON','-DSWIRL_BUILD_CORE_TESTS:BOOL=OFF','-DSWIRL_PRIVATE_UI_QUOTA:BOOL=ON',
-        ('-DSWIRL_RUST_TARGET:PATH='+$qaRust.Replace('\','/')),('-DCMAKE_PREFIX_PATH:PATH='+$qtRoot.Replace('\','/')))
+        ('-DSWIRL_RUST_TARGET:PATH='+$qaRust.Replace('\','/')),('-DCMAKE_PREFIX_PATH:PATH='+$qtRoot.Replace('\','/')),
+        ('-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES:FILEPATH='+$selectedHook.Replace('\','/')))
     $null = Invoke-QuotaTool 'configure' $cmake $configure
+    $null = Invoke-QuotaTool 'qt-configured' $python @($sdkVerifier,'verify','--receipt',$selectedPath,
+        '--build-dir',$qaBuild,'--phase','configured','--evidence',(Join-Path $output 'qt-configured'))
     $privateCompiler = Get-QuotaCompiler $qaBuild 'private-qa'
     if ($privateCompiler.private_ui_quota -cne 'ON' -or $privateCompiler.ui_tests -cne 'ON' -or
         $privateCompiler.core_tests -cne 'OFF' -or -not (Test-QuotaSamePath $privateCompiler.rust_target $qaRust) -or
@@ -284,11 +310,16 @@ try {
     Save-QuotaFile (Join-Path $qaRuntime 'swirl-rust-build.json') 'private-rust-pairing.json'
     $receipt.private_pairing = $pair
     $receipt.private_exports = Read-QuotaExports 'private-qa' $qaCore $dumpbin $true
+    $null = Invoke-QuotaTool 'qt-pre-deploy' $python @($sdkVerifier,'verify','--receipt',$selectedPath,
+        '--build-dir',$qaBuild,'--phase','pre-deploy','--evidence',(Join-Path $output 'qt-pre-deploy'))
     $null = Invoke-QuotaTool 'deploy-openssl' $pwsh @('-NoProfile','-NonInteractive','-File',
         (Join-Path $repo 'scripts/Copy-VerifiedOpenSslRuntime.ps1'),'-OpenSslRoot',$sslRoot,
         '-ApplicationDirectory',$qaRuntime,'-Target','VC-WIN64A','-Python',$python)
-    $null = Invoke-QuotaTool 'deploy-qt' $windeployqt @('--release','--no-compiler-runtime','--openssl-root',$sslRoot,
+    $null = Invoke-QuotaTool 'deploy-qt' $windeployqt @('--qtpaths',$qtpaths,'--release','--no-compiler-runtime','--openssl-root',$sslRoot,
         '--include-plugins','qoffscreen,qopensslbackend','--qmldir',(Join-Path $repo 'src/Swirl.Quick/qml'),$qaExe)
+    $null = Invoke-QuotaTool 'qt-post-deploy' $python @($sdkVerifier,'verify','--receipt',$selectedPath,
+        '--build-dir',$qaBuild,'--phase','post-deploy','--runtime-dir',$qaRuntime,
+        '--evidence',(Join-Path $output 'qt-post-deploy'))
     $ssl = Get-Content -LiteralPath (Join-Path $sslRoot 'openssl-runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($item in @(@('bin/libssl-3-x64.dll','libssl-3-x64.dll'),@('bin/libcrypto-3-x64.dll','libcrypto-3-x64.dll'),
         @('licenses/LICENSE.txt','licenses/OpenSSL-LICENSE.txt'),@('licenses/NOTICE.txt','licenses/OpenSSL-NOTICE.txt'))) {
@@ -301,7 +332,7 @@ try {
     Save-QuotaFile (Join-Path $qaRuntime 'openssl-runtime.json') 'openssl-runtime.json'
     foreach ($name in @('Qt6Core.dll','Qt6Gui.dll','Qt6Quick.dll','Qt6Qml.dll','Qt6Network.dll')) {
         if ((Get-SwirlMsvcHash (Join-Path $qaRuntime $name)) -cne (Get-SwirlMsvcHash (Join-Path $qtRoot ('bin/'+$name)))) {
-            throw 'Private QA Qt runtime differs from the admitted official kit.'
+            throw 'Private QA Qt runtime differs from the complete selected kit.'
         }
     }
     $crtCopies = [Collections.Generic.List[object]]::new()
@@ -366,6 +397,121 @@ try {
     if ((Get-SwirlMsvcHash $qaExe) -cne $exeIdentity.sha256 -or
         (Get-SwirlMsvcHash $qaCore) -cne $coreIdentity.sha256) { throw 'Private QA executable or DLL changed during tests.' }
     $receipt.test_inventory = [ordered]@{tests_run=10; passed=9; failures=0; errors=0; skipped=$skipped; original_report=(Get-QuotaFile $testPath)}
+    # A separately built synthetic billing worker must never share the salted
+    # private Qt DLL Cargo target or overwrite that DLL. The existing UI suite
+    # above remains a separate 9-pass/one-POSIX-skip gate.
+    $billingRust = Join-Path $qaBuild 'billing-rust-target'
+    $billingWorker = Join-Path $billingRust 'x86_64-pc-windows-msvc/debug/swirl-private-worker.exe'
+    $billingTests = Join-Path $output 'billing-tests'
+    foreach ($path in @($billingRust,$billingWorker,$billingTests)) { Assert-SwirlPathWithoutLinks $path }
+    if ((Test-Path -LiteralPath $billingRust) -or (Test-Path -LiteralPath $billingTests)) {
+        throw 'Synthetic Qt billing requires a new independent Cargo target and evidence directory.'
+    }
+    $cargo = (Get-Command cargo.exe -CommandType Application).Source
+    $null = Get-QuotaFile $cargo
+    $billingWorkerBefore = $null
+    $receipt.billing_scope = 'Same synthetic ledger, guarded Rust billing worker and actual Windows Qt quota; no provider authority or live readiness'
+    $receipt.billing_rust_target = $billingRust
+    $receipt.billing_binary_identity_unchanged = $false
+    try {
+        if ((Get-SwirlMsvcHash $qaExe) -cne $exeIdentity.sha256 -or
+            (Get-SwirlMsvcHash $qaCore) -cne $coreIdentity.sha256) { throw 'Private QA identity changed before billing worker build.' }
+        $null = Invoke-QuotaTool 'billing-worker-build' $cargo @('build','--locked',
+            '--manifest-path',(Join-Path $repo 'core/Cargo.toml'),'-p','swirl-api',
+            '--features','private-acceptance-worker','--bin','swirl-private-worker',
+            '--target','x86_64-pc-windows-msvc','--target-dir',$billingRust) `
+            -Environment @{SWIRL_SOURCE_SHA=$env:GITHUB_SHA; SWIRL_BUILD_ID='standalone'}
+        $billingWorkerBefore = Get-QuotaFile $billingWorker
+        if ([SwirlMsvcPackage.PeImage]::Read($billingWorker).Machine -cne '0x8664') {
+            throw 'The designated synthetic billing worker is not AMD64.'
+        }
+        if ((Get-SwirlMsvcHash $qaExe) -cne $exeIdentity.sha256 -or
+            (Get-SwirlMsvcHash $qaCore) -cne $coreIdentity.sha256) { throw 'Independent billing build changed the private QA executable or DLL.' }
+        # WorkerIdentity.inspect executes only the explicitly built, hash-pinned
+        # --build-info entry in OwnedProcess, and validates its exit and identity.
+        # This entry sends no grant and does not execute a billing request.
+        $billingIdentityCode = @'
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from PrivateSubscriptionSupervisor import WorkerIdentity
+identity = WorkerIdentity.inspect(Path(sys.argv[2]), sys.argv[3], sys.argv[4])
+identity.recheck()
+print(json.dumps({"schema": 1, "factory": "PrivateSubscriptionSupervisor.WorkerIdentity.inspect",
+                  "path": str(identity.path), "sha256": identity.sha256, "metadata": identity.metadata}, sort_keys=True))
+'@
+        $identityLog = Invoke-QuotaTool 'billing-worker-identity' $python @('-c',$billingIdentityCode,
+            (Join-Path $repo 'tools'),$billingWorker,$env:GITHUB_SHA,$billingWorkerBefore.sha256) `
+            -Environment @{PYTHONDONTWRITEBYTECODE='1'}
+        $billingIdentity = Get-Content -LiteralPath $identityLog -Raw -Encoding UTF8 | ConvertFrom-Json
+        $billingMetadata = $billingIdentity.metadata
+        if ($billingIdentity.schema -ne 1 -or
+            $billingIdentity.factory -cne 'PrivateSubscriptionSupervisor.WorkerIdentity.inspect' -or
+            -not (Test-QuotaSamePath $billingIdentity.path $billingWorker) -or
+            $billingIdentity.sha256 -cne $billingWorkerBefore.sha256 -or
+            $billingMetadata.source_sha -cne $env:GITHUB_SHA -or
+            $billingMetadata.build_id -cne 'standalone' -or
+            $billingMetadata.target -cne 'x86_64-pc-windows-msvc' -or
+            $billingMetadata.role -cne 'swirl_private_worker' -or
+            $billingMetadata.guard_mode -cne 'mandatory_before_grant' -or
+            $billingMetadata.abi_version -ne 1 -or $billingMetadata.private_worker_schema -ne 1 -or
+            $billingMetadata.live -ne $false -or
+            (Get-SwirlMsvcHash $billingWorker) -cne $billingWorkerBefore.sha256) {
+            throw 'Synthetic billing worker factory identity differs from its designated Debug build.'
+        }
+        $receipt.billing_worker = [ordered]@{binary=$billingWorkerBefore; factory_identity=$billingIdentity
+            original_identity_log=(Get-QuotaFile $identityLog); profile='Debug'; target='x86_64-pc-windows-msvc'}
+        $billingTestEnvironment = $testEnvironment.Clone()
+        $billingTestEnvironment.SWIRL_PRIVATE_WORKER = $billingWorker
+        $billingTestEnvironment.SWIRL_PRIVATE_EXPECTED_WORKER_SHA256 = $billingWorkerBefore.sha256
+        $null = Invoke-QuotaTool 'billing-tests' $python @(
+            (Join-Path $repo 'tools/tests/test_private_subscription_ui_billing.py'),'--evidence',$billingTests) `
+            -Environment $billingTestEnvironment -RemoveEnvironment @('SWIRL_PRIVATE_UI_QT_ROOT')
+        $billingTestPath = Join-Path $billingTests 'private-ui-billing-results.json'
+        $billingResult = Get-Content -LiteralPath $billingTestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($billingResult.schema -ne 1 -or $billingResult.platform -cne 'win32' -or
+            $billingResult.testsRun -ne 10 -or $billingResult.failures -ne 0 -or $billingResult.errors -ne 0 -or
+            @($billingResult.skipped).Count -ne 0 -or $billingResult.realNodeRequests -ne 0 -or
+            $billingResult.providerRequests -ne 0 -or $billingResult.providerStatisticsAuthenticated -ne $false -or
+            $billingResult.liveReady -ne $false) {
+            throw 'Private Qt billing test inventory differs from 10 Windows tests / 10 passes / zero skips.'
+        }
+        $reportedWorker = $billingResult.identities.billingWorker
+        foreach ($entry in $billingMetadata.PSObject.Properties) {
+            if ($reportedWorker.PSObject.Properties[$entry.Name].Value -cne $entry.Value) {
+                throw 'Actual billing suite worker metadata differs from the preflight factory identity.'
+            }
+        }
+        $reportedUi = $billingResult.identities.qtUi
+        if ($reportedWorker.exe_sha256 -cne $billingWorkerBefore.sha256 -or
+            $reportedUi.role -cne 'swirl_private_qt_ui' -or $reportedUi.source_sha -cne $env:GITHUB_SHA -or
+            $reportedUi.build_id -cne $pair.build_id -or $reportedUi.target -cne $pair.target -or
+            $reportedUi.exe_sha256 -cne $exeIdentity.sha256 -or $reportedUi.core_sha256 -cne $coreIdentity.sha256 -or
+            $reportedUi.qt_version -cne '6.12.0' -or $reportedUi.guard_mode -cne 'mandatory_before_grant' -or
+            $reportedUi.abi_version -ne 1 -or $reportedUi.private_worker_schema -ne 1 -or $reportedUi.live -ne $false) {
+            throw 'Actual billing suite Qt and worker identities differ from their separate designated binaries.'
+        }
+        $receipt.billing_test_inventory = [ordered]@{tests_run=10; passed=10; failures=0; errors=0; skipped=@()
+            original_report=(Get-QuotaFile $billingTestPath); identities=$billingResult.identities}
+    } finally {
+        # Run even after a failed test. Keep the original error while recording
+        # any changed or missing private binary; the outer ordinary-runtime
+        # comparison remains unchanged and runs independently below.
+        try {
+            $billingAfter = [ordered]@{exe=(Get-QuotaFile $qaExe); core=(Get-QuotaFile $qaCore); worker=$null}
+            if ($null -ne $billingWorkerBefore) { $billingAfter.worker = Get-QuotaFile $billingWorker }
+            Write-QuotaJson (Join-Path $output 'billing-binary-identity.json') ([ordered]@{schema=1
+                source_sha=$env:GITHUB_SHA
+                before=[ordered]@{exe=$exeIdentity; core=$coreIdentity; worker=$billingWorkerBefore}
+                after=$billingAfter})
+            if ($billingAfter.exe.sha256 -cne $exeIdentity.sha256 -or
+                $billingAfter.core.sha256 -cne $coreIdentity.sha256 -or
+                ($null -ne $billingWorkerBefore -and $billingAfter.worker.sha256 -cne $billingWorkerBefore.sha256)) {
+                throw 'Private Qt executable, paired DLL or independent billing worker changed during billing acceptance.'
+            }
+            $receipt.billing_binary_identity_unchanged = ($null -ne $billingWorkerBefore)
+        } catch { $errors.Add('PrivateBillingBinaryIdentityFailed: '+$_.Exception.Message) }
+    }
     $receipt.status = 'passed'; $receipt.success = $true
 } catch {
     $primary = $_.Exception
@@ -394,3 +540,4 @@ try {
 if ($null -ne $primary) { throw $primary }
 if (-not $receipt.success) { throw 'Private Qt quota profile acceptance or evidence preservation failed.' }
 Write-Host 'Verified separate private Qt quota profile: 9 Windows-applicable tests passed; one POSIX-only control skipped.'
+Write-Host 'Verified same-ledger synthetic Qt billing: 10 Windows tests passed; zero skips; live remains unavailable.'

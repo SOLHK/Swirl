@@ -125,11 +125,17 @@ class SyntheticUiSession:
         self.quota_proof = None
         self.closed = False
 
-    def check(self, ledger, identity):
+    def check(self, ledger, identity, *, billing=None):
         if (self._issuer is not _UI_ISSUER or self.identity is not identity or self.fixture is not None
-                or ledger.data["schema"] != 3 or self.root.exists()
+                or ledger.data["schema"] not in (3, 4) or self.root.exists()
                 or any(path.is_symlink() for path in (self.root, *self.root.parents))):
             raise BudgetError("NewSyntheticUiSessionRequired")
+        if ledger.data["schema"] == 4:
+            if billing is None:
+                raise BudgetError("SyntheticBillingSessionRequired")
+            ledger._require_billing_session(billing)
+        elif billing is not None:
+            raise BudgetError("SyntheticBillingSessionRequired")
         if os.name != "nt":
             raise BudgetError("NativeWindowsUiAcceptanceRequired")
 
@@ -317,7 +323,16 @@ def main(argv=None):
     parser.add_argument("--fixture-directory", type=Path, required=True)
     parser.add_argument("--qt-root", type=Path)
     parser.add_argument("--byte-limit", type=int, default=65536)
+    parser.add_argument("--synthetic-billing", action="store_true")
+    parser.add_argument("--billing-worker", type=Path)
+    parser.add_argument("--billing-worker-sha256")
+    parser.add_argument("--billing-response-contract", choices=("synthetic_qa_v1", "subscription_userinfo_v1"),
+                        default="synthetic_qa_v1")
     args = parser.parse_args(argv)
+    if ((args.synthetic_billing and (args.billing_worker is None or args.billing_worker_sha256 is None))
+            or (not args.synthetic_billing and (args.billing_worker is not None or args.billing_worker_sha256 is not None
+                                              or args.billing_response_contract != "synthetic_qa_v1"))):
+        raise BudgetError("PairedBillingWorkerIdentityRequired")
     if os.name != "nt":
         raise BudgetError("NativeWindowsUiAcceptanceRequired")
     _local_path(args.state_dir)
@@ -328,8 +343,19 @@ def main(argv=None):
             raise BudgetError("SyntheticUiLedgerRequired")
         identity = UiIdentity.inspect(args.exe, args.expected_source, args.exe_sha256,
                                       expected_core_sha256=args.core_sha256)
-        session = SyntheticUiSession(identity, args.output_directory, args.fixture_directory, qt_root=args.qt_root)
-        result = Supervisor(ledger, identity).run_ui(session, byte_limit=args.byte_limit)
+        billing = None
+        try:
+            billing_identity = None
+            if args.synthetic_billing:
+                from PrivateSubscriptionBilling import BillingSession
+                billing_identity = WorkerIdentity.inspect(args.billing_worker, args.expected_source, args.billing_worker_sha256)
+                billing = BillingSession.register(ledger)
+            session = SyntheticUiSession(identity, args.output_directory, args.fixture_directory, qt_root=args.qt_root)
+            result = Supervisor(ledger, identity, billing, billing_worker_identity=billing_identity,
+                billing_response_contract=args.billing_response_contract).run_ui(session, byte_limit=args.byte_limit)
+        finally:
+            if billing is not None:
+                billing.close()
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0 if result["settled"] and result["outcome"] in {"QtUiSucceeded", "QtUiQuotaStopped"} else 2
 

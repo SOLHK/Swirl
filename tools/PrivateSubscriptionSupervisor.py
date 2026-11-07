@@ -540,7 +540,8 @@ class _ExecutionEvidence:
 
 
 class Supervisor:
-    def __init__(self, ledger, identity, billing=None, *, billing_response_contract="synthetic_qa_v1"):
+    def __init__(self, ledger, identity, billing=None, *, billing_response_contract="synthetic_qa_v1",
+                 billing_worker_identity=None):
         from PrivateSubscriptionBilling import QA_RESPONSE_CONTRACT, RESPONSE_CONTRACTS
         ledger.require_synthetic()
         if not isinstance(identity, WorkerIdentity) or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
@@ -552,20 +553,36 @@ class Supervisor:
         if (not isinstance(billing_response_contract, str) or billing_response_contract not in RESPONSE_CONTRACTS
                 or (billing is None and billing_response_contract != QA_RESPONSE_CONTRACT)):
             raise BudgetError("BillingResponseContractRejected")
+        if billing_worker_identity is not None and billing is None:
+            raise BudgetError("BillingWorkerWithoutSession")
+        if billing is not None:
+            if billing_worker_identity is None and identity.metadata["role"] == WORKER_ROLE:
+                billing_worker_identity = identity
+            if (type(billing_worker_identity) is not WorkerIdentity
+                    or billing_worker_identity._issuer is not _IDENTITY_ISSUER
+                    or billing_worker_identity.metadata["role"] != WORKER_ROLE
+                    or billing_worker_identity.metadata["source_sha"] != identity.metadata["source_sha"]):
+                raise BudgetError("PairedBillingWorkerIdentityRequired")
         self.ledger, self.identity, self.billing = ledger, identity, billing
+        self.billing_worker_identity = billing_worker_identity
         self.billing_response_contract = billing_response_contract
 
-    def _identity_fields(self):
-        return {"source_sha": self.identity.metadata["source_sha"], "worker_sha256": self.identity.sha256,
-                "build_id": self.identity.metadata["build_id"]}
+    def _identity_fields(self, identity=None):
+        identity = self.identity if identity is None else identity
+        return {"source_sha": identity.metadata["source_sha"], "worker_sha256": identity.sha256,
+                "build_id": identity.metadata["build_id"]}
 
-    def _execute_reserved(self, ticket, workload, plan, nonce, fingerprint, *, cancel_event=None, billing_query=None, ui_session=None):
+    def _execute_reserved(self, ticket, workload, plan, nonce, fingerprint, *, cancel_event=None,
+                          billing_query=None, ui_session=None, execution_identity=None):
         """One real reserve/grant/OS-exit boundary shared by node and billing I/O.
 
         This method never refunds. A typed result carries the actual ExitProof
         only after bounded process/reader/fixture cleanup. Ledger settlement is
         a separate caller action after all these checks have completed.
         """
+        identity = self.identity if execution_identity is None else execution_identity
+        if not isinstance(identity, WorkerIdentity) or getattr(identity, "_issuer", None) is not _IDENTITY_ISSUER:
+            raise BudgetError("WorkerIdentityRequired")
         challenge = secrets.token_hex(32)
         fixture = child = frames = None
         child_closed = fixture_closed = frames_finished = False
@@ -591,18 +608,33 @@ class Supervisor:
                 _diagnostic_phases[name] = int(((time.monotonic() if observed is None else observed) - started) * 1000)
 
         try:
+            # Check the exact durable ticket before any fixture or child is
+            # created. A control worker never borrows the UI identity and no
+            # concurrent execution temporarily replaces self.identity.
+            with self.ledger.mutex:
+                self.ledger.require_synthetic()
+                history = self.ledger.data["history"].get(str(ticket))
+                if (history is None or history["phase"] != "reserved"
+                        or history["sourceSha"] != identity.metadata["source_sha"]
+                        or history["buildId"] != identity.metadata["build_id"]
+                        or history["workerSha256"] != identity.sha256
+                        or history["nonce"] != nonce or history["configFingerprint"] != fingerprint
+                        or history["workload"] != workload or history["plan"] != plan):
+                    raise BudgetError("ExecutionTicketIdentityMismatch")
             if ui_session is None:
+                if identity.metadata["role"] != WORKER_ROLE:
+                    raise BudgetError("PairedBillingWorkerIdentityRequired")
                 fixture = _OwnedFixture(self.ledger.root, workload, plan["byteLimit"], challenge, nonce, billing_query)
             else:
                 from PrivateSubscriptionUi import SyntheticUiSession, UiIdentity, UI_WORKLOAD, _UI_ISSUER
                 if (type(ui_session) is not SyntheticUiSession or ui_session._issuer is not _UI_ISSUER
-                        or type(self.identity) is not UiIdentity or ui_session.identity is not self.identity
-                        or workload != UI_WORKLOAD or billing_query is not None or self.billing is not None):
+                        or type(identity) is not UiIdentity or ui_session.identity is not identity
+                        or workload != UI_WORKLOAD or billing_query is not None):
                     raise BudgetError("OwnedSyntheticUiSessionRequired")
                 fixture = ui_session
                 fixture.open(nonce)
             grant = {"task_id": TASK, "ledger_id": self.ledger.data["ledgerId"], "sequence": int(ticket),
-                     "source_sha": self.identity.metadata["source_sha"], "build_id": self.identity.metadata["build_id"],
+                     "source_sha": identity.metadata["source_sha"], "build_id": identity.metadata["build_id"],
                      "role": "synthetic_loopback", "byte_limit": plan["byteLimit"], "connection_limit": plan["connectionLimit"],
                      "receive_reservation": plan["receiveReservation"], "timeout_ms": timeout_ms,
                      "workload": workload, "config_fingerprint": fingerprint}
@@ -614,11 +646,11 @@ class Supervisor:
                 grant["billing"] = billing_query.grant()
             envelope = {"schema": 1, "reservation_id": ticket, "nonce": nonce, "plan_digest": digest(grant)}
             self.ledger.bind_supervised_grant(ticket, envelope["plan_digest"])
-            self.identity.recheck()
+            identity.recheck()
             started = time.monotonic()
             deadline = started + timeout_ms / 1000
             _diagnostic_phases["clock_started"] = 0
-            child = (OwnedProcess([str(self.identity.path), "--internal-private-acceptance-worker"],
+            child = (OwnedProcess([str(identity.path), "--internal-private-acceptance-worker"],
                                   deadline=deadline, environment=_environment())
                      if ui_session is None else ui_session.spawn(deadline))
             _diagnostic_mark("spawn_returned")
@@ -631,7 +663,7 @@ class Supervisor:
             _diagnostic_mark("grant_sent")
             ready = frames.receive(deadline)
             _diagnostic_mark("ready_received")
-            _check_envelope(ready, envelope, self.identity, "ready")
+            _check_envelope(ready, envelope, identity, "ready")
             validate_guard_receipt(ready.get("guard"), plan, initial=True)
             _diagnostic_mark("ready_validated")
             previous_guard = ready["guard"]
@@ -669,7 +701,7 @@ class Supervisor:
                 operation = reply.get("op")
                 if operation not in {"running", "snapshot", "finished"}:
                     raise BudgetError("UnexpectedWorkerReceipt")
-                _check_envelope(reply, envelope, self.identity, operation)
+                _check_envelope(reply, envelope, identity, operation)
                 validate_guard_receipt(reply.get("guard"), plan, terminal=operation == "finished")
                 if any(reply["guard"][key] < previous_guard[key] for key in ("upload", "download", "connection_attempts")):
                     raise BudgetError("WorkerCounterRegression")
@@ -773,7 +805,7 @@ class Supervisor:
         cleanup = exit_proof is not None and frames_finished and child_closed and fixture_closed
         complete = complete and cleanup
         _diagnostic_mark("cleanup_checked")
-        record = {"schema": 1, "scope": SYNTHETIC_DOMAIN, **self._identity_fields(),
+        record = {"schema": 1, "scope": SYNTHETIC_DOMAIN, **self._identity_fields(identity),
                   "reservation_id": ticket, "config_fingerprint": fingerprint, "workload": workload,
                   "plan": plan, "outcome": outcome, "settled": False, "guard": final_guard,
                   "metrics": metrics, "observedRunning": observed_running,
@@ -815,50 +847,64 @@ class Supervisor:
     def run_ui(self, session, *, byte_limit=65536, timeout_ms=8000, cancel_event=None):
         from PrivateSubscriptionUi import SyntheticUiSession, UiIdentity, UI_WORKLOAD, _UI_ISSUER
         if (type(session) is not SyntheticUiSession or session._issuer is not _UI_ISSUER
-                or type(self.identity) is not UiIdentity or self.billing is not None):
+                or type(self.identity) is not UiIdentity):
             raise BudgetError("OwnedSyntheticUiSessionRequired")
-        session.check(self.ledger, self.identity)
+        session.check(self.ledger, self.identity, billing=self.billing)
         plan = tcp_plan(byte_limit, 6, timeout_ms)
         if timeout_ms < 100:
             raise BudgetError("InvalidTcpTimeout")
         self.identity.recheck()
-        fingerprint, nonce = session.fingerprint(plan), secrets.token_hex(32)
-        ticket = self.ledger.reserve_supervised(1, byte_limit, 6, timeout_ms,
-            config_fingerprint=fingerprint, nonce=nonce, workload=UI_WORKLOAD, **self._identity_fields())
-        evidence = self._execute_reserved(ticket, UI_WORKLOAD, plan, nonce, fingerprint,
-                                          cancel_event=cancel_event, ui_session=session)
-        if evidence.complete:
-            self.ledger.settle_synthetic(ticket, evidence.guard, evidence.exit_proof, evidence.record["outcome"])
-            evidence.record.update(settled=True, localMeasurement="actual-shared-rust-raw-tcp-bytes")
+        if self.billing is not None:
+            result = self._run_with_billing(UI_WORKLOAD, node=1, byte_limit=byte_limit,
+                timeout_ms=timeout_ms, cancel_event=cancel_event, ui_session=session)
+            ticket = result.get("reservation_id")
+            if result["settled"]:
+                result["localMeasurement"] = "actual-shared-rust-raw-tcp-bytes"
         else:
-            self.ledger.retain_supervised(ticket, evidence.record["outcome"])
-        evidence.record["persistentBudgetGuardExercised"] = bool(evidence.complete and evidence.record["settled"])
-        evidence.record["uiSubscriptionImportExercised"] = False
-        with self.ledger.mutex:
-            history = self.ledger.data["history"][str(ticket)]
-            receipt = history["receipt"]
-            evidence.record["parentBudgetEvidence"] = {
-                "scope": "existing-synthetic-Ledger-and-current-OS-owner; no provider authority",
-                "ledgerId": self.ledger.data["ledgerId"], "reservationId": str(ticket),
-                "planDigest": history["planDigest"], "durableHistoryPhase": history["phase"],
-                "guardDigest": None if receipt is None else receipt["guardDigest"],
-                "settledNativeExit": None if receipt is None else receipt["exit"],
-                "fullHoldRetained": str(ticket) in self.ledger.data["reservations"]}
-        return {**evidence.record, "ledger": self.ledger.summary()}
+            fingerprint, nonce = session.fingerprint(plan), secrets.token_hex(32)
+            ticket = self.ledger.reserve_supervised(1, byte_limit, 6, timeout_ms,
+                config_fingerprint=fingerprint, nonce=nonce, workload=UI_WORKLOAD, **self._identity_fields())
+            evidence = self._execute_reserved(ticket, UI_WORKLOAD, plan, nonce, fingerprint,
+                                              cancel_event=cancel_event, ui_session=session)
+            if evidence.complete:
+                self.ledger.settle_synthetic(ticket, evidence.guard, evidence.exit_proof, evidence.record["outcome"])
+                evidence.record.update(settled=True, localMeasurement="actual-shared-rust-raw-tcp-bytes")
+            else:
+                self.ledger.retain_supervised(ticket, evidence.record["outcome"])
+            result = {**evidence.record, "ledger": self.ledger.summary()}
+        result.update(persistentBudgetGuardExercised=result["settled"],
+                      uiSubscriptionImportExercised=False, providerStatisticsAuthenticated=False,
+                      parentBudgetEvidence=None)
+        if ticket is not None:
+            with self.ledger.mutex:
+                history = self.ledger.data["history"][str(ticket)]
+                receipt = history["receipt"]
+                result["parentBudgetEvidence"] = {
+                    "scope": "existing-synthetic-Ledger-and-current-OS-owner; no provider authority",
+                    "ledgerId": self.ledger.data["ledgerId"], "reservationId": str(ticket),
+                    "planDigest": history["planDigest"], "durableHistoryPhase": history["phase"],
+                    "guardDigest": None if receipt is None else receipt["guardDigest"],
+                    "settledNativeExit": None if receipt is None else receipt["exit"],
+                    "fullHoldRetained": str(ticket) in self.ledger.data["reservations"]}
+        return result
 
     def _billing_query(self, purpose, parent_ticket=None, *, timeout_ms=2000):
         from PrivateSubscriptionBilling import BYTE_LIMIT, CONNECTION_LIMIT, WORKLOAD, HTTP_RESPONSE_CONTRACT
         self.ledger._require_billing_session(self.billing)
-        self.identity.recheck()
+        identity = self.billing_worker_identity
+        if identity is None:
+            raise BudgetError("PairedBillingWorkerIdentityRequired")
+        identity.recheck()
         nonce = secrets.token_hex(32)
         fingerprint = digest({"domain": "synthetic-billing-control-v1", "nonce": nonce,
                               "purpose": purpose, "parent": parent_ticket, "response_contract": self.billing_response_contract})
         ticket = self.ledger.reserve_billing_control(self.billing, purpose=purpose, parent_ticket=parent_ticket,
-            timeout_ms=timeout_ms, config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce,
+            timeout_ms=timeout_ms, config_fingerprint=fingerprint, **self._identity_fields(identity), nonce=nonce,
             response_contract=self.billing_response_contract)
         query = self.billing.query(ticket, nonce)
         plan = tcp_plan(BYTE_LIMIT, CONNECTION_LIMIT, timeout_ms)
-        evidence = self._execute_reserved(ticket, WORKLOAD, plan, nonce, fingerprint, billing_query=query)
+        evidence = self._execute_reserved(ticket, WORKLOAD, plan, nonce, fingerprint,
+                                          billing_query=query, execution_identity=identity)
         observation = http_observation = None
         if evidence.complete:
             try:
@@ -888,12 +934,13 @@ class Supervisor:
         evidence.record["controlDebitIsMeasuredTraffic"] = False
         return observation, evidence.record
 
-    def _run_with_billing(self, workload, *, node, byte_limit, timeout_ms, cancel_event):
+    def _run_with_billing(self, workload, *, node, byte_limit, timeout_ms, cancel_event, ui_session=None):
         from PrivateSubscriptionBilling import DOMAIN
         self.ledger._require_billing_session(self.billing)
-        connections = 2 if workload == "core_probe" else 1
+        connections = (2 if workload == "core_probe" else 1) if ui_session is None else 6
         plan = tcp_plan(byte_limit, connections, timeout_ms)
-        fingerprint = digest({"protocol": 1, "node": node, "workload": workload, "configuration_version": 1})
+        fingerprint = (digest({"protocol": 1, "node": node, "workload": workload, "configuration_version": 1})
+                       if ui_session is None else ui_session.fingerprint(plan))
         with self.ledger.mutex:
             if any(h["configFingerprint"] == fingerprint for h in self.ledger.data["history"].values()):
                 raise BudgetError("ConfigurationAlreadyAttempted")
@@ -911,7 +958,8 @@ class Supervisor:
             nonce = secrets.token_hex(32)
             ticket = self.ledger.reserve_billing_node(self.billing, before, node, byte_limit, connections, timeout_ms,
                 config_fingerprint=fingerprint, **self._identity_fields(), nonce=nonce, workload=workload)
-        evidence = self._execute_reserved(ticket, workload, plan, nonce, fingerprint, cancel_event=cancel_event)
+        evidence = self._execute_reserved(ticket, workload, plan, nonce, fingerprint,
+                                          cancel_event=cancel_event, ui_session=ui_session)
         if not evidence.complete:
             self.ledger.retain_supervised(ticket, evidence.record["outcome"])
         else:

@@ -137,6 +137,30 @@ jobs:
           path: ${{ runner.temp }}/swirl-proxy-compat
           if-no-files-found: error
           retention-days: 14
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: bash
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/private-ui-quota-rust-evidence"
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/tests.log"
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/clippy.log"
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: REALITY authenticated hello clock controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s ../tools/tests -p test_authenticated_hello_hold.py -v
       - name: VMess official peer HTTP HTTPS and transport lifecycle
         working-directory: .
         run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
@@ -283,7 +307,6 @@ jobs:
           SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
         run: |
           set -euo pipefail
-          python -m unittest discover -s tools/tests -p test_reality_clock_hold.py -v
           python tools/tests/test_reality_runtime.py
       - name: Preserve production REALITY Runtime rust evidence
         if: always()
@@ -432,27 +455,11 @@ jobs:
           name: Swirl-Core-Public-Network
           path: CORE_PUBLIC_NETWORK.json
           retention-days: 7
-      - name: Verify the mandatory Qt quota ABI in fresh native processes
-        shell: bash
-        env:
-          SWIRL_SOURCE_SHA: ${{ github.sha }}
-          SWIRL_BUILD_ID: standalone
-          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/private-ui-quota-rust-evidence"
-          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/tests.log"
-          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | tee "$RUNNER_TEMP/private-ui-quota-rust-evidence/clippy.log"
-      - name: Preserve mandatory Qt quota ABI evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
-          if-no-files-found: ignore
-          retention-days: 14
   windows-rust:
     runs-on: windows-2022
+    permissions:
+      contents: read
+      actions: read # Read the immutable, source-verified Qt SDK producer artifact.
     # A verified cold run took 59m20s; the next was still compiling the final
     # application at 60m. Budget the full pipeline while preserving every
     # Qt/Core/public gate and each individual test's existing deadline.
@@ -621,6 +628,34 @@ jobs:
           path: ${{ runner.temp }}/swirl-proxy-compat
           if-no-files-found: error
           retention-days: 14
+      - name: Verify the mandatory Qt quota ABI in fresh native processes
+        shell: pwsh
+        env:
+          SWIRL_SOURCE_SHA: ${{ github.sha }}
+          SWIRL_BUILD_ID: standalone
+          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = Join-Path $env:RUNNER_TEMP 'private-ui-quota-rust-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'tests.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI controls failed.' }
+          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'clippy.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI Clippy failed.' }
+      - name: Preserve mandatory Qt quota ABI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: REALITY authenticated hello clock controls
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s ../tools/tests -p test_authenticated_hello_hold.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: VMess official peer HTTP HTTPS and transport lifecycle
         working-directory: .
         run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
@@ -814,8 +849,6 @@ jobs:
           SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
         run: |
           $ErrorActionPreference = 'Stop'
-          python -m unittest discover -s tools/tests -p test_reality_clock_hold.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_reality_runtime.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve production REALITY Runtime rust evidence
@@ -918,6 +951,14 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
           "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
           (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+          New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
+          Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
+      - name: Select the complete source-verified Qt 6.12 product SDK
+        working-directory: .
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Select-Qt612ProductSdk.ps1 -OfficialReceipt build-evidence/qt-sdk.json -EvidenceDirectory build-evidence/qt-product-sdk
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
@@ -945,9 +986,30 @@ jobs:
       - name: Build Qt to Rust integration test
         working-directory: .
         run: |
-          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+          # Existing protocol fixture blocks use the job PATH. Prove both
+          # deployment lookups resolve to the selected complete kit before any
+          # of those unchanged commands run; they never borrow another Qt kit.
+          foreach ($name in @('windeployqt.exe','qtpaths.exe')) {
+            $actual = (Get-Command $name -CommandType Application -ErrorAction Stop).Source
+            $expected = Join-Path $env:QT_ROOT_DIR ('bin/'+$name)
+            if (-not $actual.Equals($expected,[StringComparison]::OrdinalIgnoreCase)) { throw 'Qt deployment command lookup differs from the selected SDK.' }
+          }
+          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/rust-qt --phase configured --evidence build-evidence/qt-product-rust-configured
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Qt to Rust target differs from the selected SDK.' }
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
+      - name: Preserve the selected Qt SDK and actual control-adapter target identity
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Rust-Qt612-Selected-SDK-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build-evidence/qt-sdk.json
+            build-evidence/qt-product-sdk/
+            build-evidence/qt-product-rust-configured/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Reject the removed runtime build option
         working-directory: .
         shell: pwsh
@@ -1224,25 +1286,3 @@ jobs:
             build/removed-runtime/rejection.log
           if-no-files-found: warn
           retention-days: 7
-      - name: Verify the mandatory Qt quota ABI in fresh native processes
-        shell: pwsh
-        env:
-          SWIRL_SOURCE_SHA: ${{ github.sha }}
-          SWIRL_BUILD_ID: standalone
-          CARGO_TARGET_DIR: ${{ runner.temp }}/private-ui-quota-rust
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $evidence = Join-Path $env:RUNNER_TEMP 'private-ui-quota-rust-evidence'
-          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
-          cargo test --locked -p swirl-api --features private-acceptance-ui --test private_ui_quota -- --test-threads=1 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'tests.log')
-          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI controls failed.' }
-          cargo clippy --locked -p swirl-api --features private-acceptance-ui --all-targets -- -D warnings 2>&1 | Tee-Object -FilePath (Join-Path $evidence 'clippy.log')
-          if ($LASTEXITCODE -ne 0) { throw 'Mandatory Qt quota ABI Clippy failed.' }
-      - name: Preserve mandatory Qt quota ABI evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-Private-UI-Quota-Rust-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/private-ui-quota-rust-evidence/
-          if-no-files-found: ignore
-          retention-days: 14

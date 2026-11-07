@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
-      actions: read # Read this repository's explicitly opted-in old installer only.
+      actions: read # Read fixed Qt SDK evidence and the opted-in old installer.
     steps:
       - name: Checkout original repository and UI branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -83,7 +83,8 @@ jobs:
               'scripts/tests/Invoke-DisposableWindowsUser.ps1','scripts/tests/Test-WindowsNormalInstaller.ps1',
               'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1',
               'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1',
-              'scripts/tests/Test-PrivateQtQuotaProfile.ps1')) {
+              'scripts/tests/Test-PrivateQtQuotaProfile.ps1','scripts/Select-Qt612ProductSdk.ps1',
+              'scripts/Stage-WindowsRustProduct.ps1')) {
             $tokens = $null; $errors = $null
             $null = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$errors)
             if ($errors.Count) { throw ('PowerShell parser rejected '+$path+': '+($errors.Message -join ' ')) }
@@ -171,6 +172,13 @@ jobs:
       - name: Check SDK archive and metadata filesystem boundaries
         shell: pwsh
         run: python tools/tests/test_qt_sdk_installer.py --scratch-root "$env:RUNNER_TEMP/swirl-sdk-installer-tests"
+      - name: Check derived Qt SDK and corresponding source boundaries
+        shell: pwsh
+        run: |
+          python tools/tests/test_qt612_product_sdk.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Derived Qt SDK boundary checks failed.' }
+          python tools/tests/test_qt612_product_source.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Qt corresponding source boundary checks failed.' }
       - name: Check pinned TLS source and fixed package boundaries
         shell: pwsh
         run: |
@@ -226,12 +234,23 @@ jobs:
           "SWIRL_FONT_METADATA_FIXTURES=$fontFixtures" >> $env:GITHUB_ENV
           New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
           Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
+      - name: Select the complete source-verified Qt 6.12 product SDK
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Select-Qt612ProductSdk.ps1 -OfficialReceipt build-evidence/qt-sdk.json -EvidenceDirectory build-evidence/qt-product-sdk
+      - name: Restore fixed Qt corresponding source archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0-source-cache
+          key: qt-corresponding-source-6.12.0-${{ hashFiles('tools/qt612-product-source.lock.json') }}
       - name: Record compiler cache identity
         id: compiler
         shell: pwsh
         run: |
           $tools = @('cl.exe','link.exe','cmake.exe') | ForEach-Object { (Get-FileHash -LiteralPath (Get-Command $_ -ErrorAction Stop).Source -Algorithm SHA256).Hash }
-          $identity = ([ordered]@{rust=(& rustc -vV | Out-String); tools=$tools; msvc=$env:VCToolsVersion; sdk=$env:WindowsSDKVersion; qt=$env:QT_ROOT_DIR; workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
+          $qtLock = (Get-FileHash -LiteralPath 'tools/qt612-product-sdk.lock.json' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $identity = ([ordered]@{rust=(& rustc -vV | Out-String); tools=$tools; msvc=$env:VCToolsVersion; sdk=$env:WindowsSDKVersion; qt=$env:QT_ROOT_DIR; qt_content=$env:SWIRL_QT_SELECTED_CONTENT_ID; qt_product_lock=$qtLock; workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
           $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
           "hash=$hash" >> $env:GITHUB_OUTPUT
           $identity | Set-Content -LiteralPath build-evidence/compiler.json -Encoding utf8
@@ -264,9 +283,9 @@ jobs:
             core/target
             build/swirl-quick
             build/swirl-product
-          key: apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          key: apec-qt612-product-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+            apec-qt612-product-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
       - name: Restore content-verified input timestamps
         shell: pwsh
         run: |
@@ -295,6 +314,7 @@ jobs:
             '-DSWIRL_BUILD_UI_TESTS=ON',
             '-DSWIRL_BUILD_CORE_TESTS=ON',
             '-DSWIRL_PRIVATE_UI_QUOTA=OFF',
+            "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE",
             "-DSWIRL_RUST_TARGET=$env:GITHUB_WORKSPACE/core/target",
             "-DSWIRL_TEST_FONT_DIRECTORY=$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
           )
@@ -306,6 +326,8 @@ jobs:
             cmake @configureArgs
           }
           if ($LASTEXITCODE -ne 0) { throw 'Qt UI configuration failed.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase configured --evidence build-evidence/qt-product-qa-configured
+          if ($LASTEXITCODE -ne 0) { throw 'Actual QA Qt target does not match the selected SDK.' }
       - name: Build UI
         id: ui_build
         shell: pwsh
@@ -318,6 +340,10 @@ jobs:
       - name: Bundle UI runtime
         shell: pwsh
         run: |
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase pre-deploy --evidence build-evidence/qt-product-qa-pre-deploy
+          if ($LASTEXITCODE -ne 0) { throw 'QA Qt source, linkage or SDK changed before deployment.' }
+          $windeployqt = Join-Path $env:QT_ROOT_DIR 'bin/windeployqt.exe'
+          $qtpaths = Join-Path $env:QT_ROOT_DIR 'bin/qtpaths.exe'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
             Copy-Item build/swirl-quick/Release/Swirl-brand-0217-optical.ico dist/
@@ -344,12 +370,16 @@ jobs:
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory dist -Target VC-WIN64A
-          windeployqt --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
           # CTest executes these binaries in the build directory, not dist.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
-          windeployqt --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase post-deploy --runtime-dir dist --evidence build-evidence/qt-product-qa-dist
+          if ($LASTEXITCODE -ne 0) { throw 'Deployed QA Qt runtime differs from the selected SDK.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-quick --phase post-deploy --runtime-dir build/swirl-quick/Release --evidence build-evidence/qt-product-qa-ctest
+          if ($LASTEXITCODE -ne 0) { throw 'CTest Qt runtime differs from the selected SDK.' }
           # Validate only the clean deployment. The test build also contains
           # intentionally invalid loader fixtures and is not a product payload.
           . ./scripts/RustProductPackagePolicy.ps1
@@ -955,8 +985,10 @@ jobs:
         run: |
           . ./scripts/Assert-BuildSource.ps1
           Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
-          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_PRIVATE_UI_QUOTA=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_PRIVATE_UI_QUOTA=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target" "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir build/swirl-product --phase configured --evidence build-evidence/qt-product-release-configured
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Release Qt target does not match the selected SDK.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
           $productionBuild = (Resolve-Path -LiteralPath 'build/swirl-product').Path
@@ -976,7 +1008,7 @@ jobs:
             if (Test-Path -LiteralPath $saved) { Remove-Item -LiteralPath $saved -Force }
           }
           try {
-            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
+            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -QtEvidenceDirectory build-evidence/qt-product-release-deployment -QtSourceDirectory out/qt-corresponding-source -QtSourceCacheDirectory "$env:RUNNER_TEMP/swirl-qt-6.12.0-source-cache"
             ./scripts/tests/Test-WindowsMsvcRuntimePackage.ps1 -ApplicationDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory out/package-evidence/msvc-runtime-policy
             $crt = Get-Content -LiteralPath 'out/package-evidence/msvc-runtime-policy/msvc-runtime-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($crt.schema -ne 1 -or $crt.source_sha -cne $env:GITHUB_SHA -or -not $crt.success -or -not $crt.candidate_unchanged -or -not $crt.fixture_removed -or $crt.forced_termination -or @($crt.negative_controls).Count -ne 5 -or @($crt.negative_controls | Where-Object { -not $_.expected_assertion_failed }).Count) { throw 'The actual app-local CRT dependency and fallback rejection evidence is incomplete.' }
@@ -1168,7 +1200,24 @@ jobs:
           if ($manifest.source_sha -ne $env:GITHUB_SHA) { throw 'Package source identity differs from this workflow commit.' }
           $scope = if ($env:SWIRL_CI_UI_ONLY -eq 'true') { 'ui-only' } else { 'full' }
           $networkRegression = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { 'passed' } else { 'not-run-ui-only' }
-          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;critical_ui_tests='passed';network_regression=$networkRegression;qa_full_motion_all_pages='passed-rapid-and-ready-61';product_full_motion_all_pages='passed-rapid-and-ready-61';scoped_full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $qtProduct = Get-Content -LiteralPath $env:SWIRL_QT_SELECTED_RECEIPT -Raw -Encoding UTF8 | ConvertFrom-Json
+          $qtSource = Get-Content -LiteralPath 'out/qt-corresponding-source/qt-source-bundle.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($qtProduct.consumer.source_sha -cne $env:GITHUB_SHA -or $qtSource.source_sha -cne $env:GITHUB_SHA -or
+              $qtSource.status -cne 'complete') { throw 'Qt binary/source bundle is not paired with this product source.' }
+          $qtDependency = [ordered]@{version=$qtProduct.qt_version;source_commit=$qtProduct.qt_source.commit;
+            upstream_patch_commit=$qtProduct.qt_patch.upstream_commit;patch_sha256=$qtProduct.qt_patch.sha256;
+            selected_content_id=$qtProduct.selected_content_id;derivation_id=$qtProduct.derivation_id;
+            qml_dll=$qtProduct.qml_files.'bin/Qt6Qml.dll';producer_run=$qtProduct.producer.run;
+            producer_artifact=$qtProduct.artifact.artifact;producer_workflow_conclusion=$qtProduct.original_workflow_conclusion}
+          [ordered]@{source_sha=$env:GITHUB_SHA;pr_head_sha=$qtProduct.consumer.pr_head_sha;source_tree_sha=$qtProduct.consumer.tree_sha;
+            version=$appVersion;qt=$env:SWIRL_QT_VERSION;qt_dependency=$qtDependency;qt_source_archive=$qtSource.archive;
+            qt_source_manifest_sha256=(Get-FileHash -LiteralPath 'out/qt-corresponding-source/qt-source-bundle.json' -Algorithm SHA256).Hash.ToLowerInvariant();
+            installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;
+            critical_ui_tests='passed';network_regression=$networkRegression;qa_full_motion_all_pages='passed-rapid-and-ready-61';
+            product_full_motion_all_pages='passed-rapid-and-ready-61';scoped_full_regression='pending';desktop_dpi_acceptance='manual';
+            physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          python tools/Prepare-Qt612ProductSource.py verify-package --bundle-dir out/qt-corresponding-source --package-manifest installer-bin/package-manifest.json --delivery out/delivery.json
+          if ($LASTEXITCODE -ne 0) { throw 'The actual installer, deployed Qt files and corresponding source bundle are not paired.' }
       - name: Verify actual production installer lifecycle in an isolated runner directory
         shell: pwsh
         env:
@@ -1187,7 +1236,7 @@ jobs:
           $delivery | Add-Member -NotePropertyName isolated_installer_lifecycle -NotePropertyValue 'passed' -Force
           $maintenance = if ($env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1') { 'passed-empty-journal-only' } else { 'not-run-ui-only' }
           $delivery | Add-Member -NotePropertyName native_tun_maintenance_uninstall -NotePropertyValue $maintenance -Force
-          $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Verify normal installer ownership and cleanup as an actual standard user
         shell: pwsh
         env:
@@ -1226,7 +1275,7 @@ jobs:
           $delivery | Add-Member -NotePropertyName normal_standard_user_installer_lifecycle -NotePropertyValue 'passed' -Force
           $delivery | Add-Member -NotePropertyName normal_standard_user_same_package_dpapi_preservation -NotePropertyValue 'passed-synthetic-v1-only' -Force
           $delivery | Add-Member -NotePropertyName previous_release_configuration_upgrade -NotePropertyValue 'not-run' -Force
-          $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Admit the explicitly requested previous-version installer
         if: contains(github.event.pull_request.labels.*.name, 'qa-cross-version-upgrade')
         shell: python
@@ -1390,12 +1439,19 @@ jobs:
           $delivery | Add-Member -NotePropertyName previous_release_configuration_upgrade -NotePropertyValue 'passed-0.2.39-to-0.2.40-current-helper-synthetic-v1-only' -Force
           $delivery | Add-Member -NotePropertyName previous_release_baseline_source_sha -NotePropertyValue $upgrade.baseline.source_sha -Force
           $delivery | Add-Member -NotePropertyName previous_release_baseline_installer_sha256 -NotePropertyValue $upgrade.baseline.exe_sha256 -Force
-          $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Windows-Installer-EXE
           path: out/Swirl-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload corresponding Qt sources for the same installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Qt-Corresponding-Source
+          path: out/qt-corresponding-source/
           if-no-files-found: error
           retention-days: 14
       - name: Remaining in-scope regression suite after installer is available
@@ -1430,7 +1486,7 @@ jobs:
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName scoped_full_regression -NotePropertyValue $regression -Force
-            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+            $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
       - name: Verify activity layout and ESC at five effective DPR values
         shell: pwsh
@@ -1508,7 +1564,7 @@ jobs:
             [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, Win32 client and full RHI readback; unchanged five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation. The test HWND may extend beyond the hosted desktop.'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
-            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+            $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
       - name: Preserve independent activity regression after an early UI failure
         if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
@@ -1627,6 +1683,8 @@ jobs:
             build/swirl-quick/font-*.xml
             out/package-evidence/
             out/delivery.json
+            out/qt-corresponding-source/qt-source-bundle.json
+            out/qt-corresponding-source/package-binding.json
             installer-bin/package-manifest.json
           if-no-files-found: warn
           retention-days: 14

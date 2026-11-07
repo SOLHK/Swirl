@@ -3,7 +3,11 @@ param(
     [Parameter(Mandatory=$true)][string]$Destination,
     [string]$OpenSslRoot,
     [string]$Configuration = 'Release',
-    [string]$Python = 'python'
+    [string]$Python = 'python',
+    [string]$QtSdkReceipt = $env:SWIRL_QT_SELECTED_RECEIPT,
+    [string]$QtEvidenceDirectory,
+    [string]$QtSourceDirectory,
+    [string]$QtSourceCacheDirectory
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -34,6 +38,29 @@ Assert-SwirlPathWithoutLinks $stage
 if (Test-Path -LiteralPath $stage) { throw 'Packaging requires a fresh destination.' }
 $sourceSha = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Source identity is missing.' }
+# Bind deployment tools to the kit which CMake actually resolved. This also
+# keeps non-CI callers from silently borrowing windeployqt/qtpaths from PATH.
+if ($cache -notmatch '(?m)^Qt6_DIR:PATH=(.+)$') { throw 'Configured Qt SDK location is missing.' }
+$qtConfig = (Resolve-Path -LiteralPath $Matches[1].Trim()).Path
+$qtRoot = (Resolve-Path -LiteralPath (Join-Path $qtConfig '../../..')).Path
+$windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
+$qtpaths = Join-Path $qtRoot 'bin/qtpaths.exe'
+foreach ($path in @($qtRoot,$windeployqt,$qtpaths)) { Assert-SwirlPathWithoutLinks $path }
+if (-not (Test-Path -LiteralPath $windeployqt -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $qtpaths -PathType Leaf)) { throw 'Configured Qt deployment tools are unavailable.' }
+if ($QtSdkReceipt) {
+    if (-not $QtEvidenceDirectory -or -not $QtSourceDirectory -or -not $QtSourceCacheDirectory) {
+        throw 'Selected Qt packaging requires verification evidence and a corresponding source output/cache.'
+    }
+    Assert-SwirlPathWithoutLinks $QtSdkReceipt
+    $selectedQt = Get-Content -LiteralPath $QtSdkReceipt -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $qtRoot.Equals([IO.Path]::GetFullPath($selectedQt.kit_root),[StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Packaging would use a Qt kit different from the selected SDK.'
+    }
+    & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify --receipt $QtSdkReceipt `
+        --build-dir $build --phase pre-deploy --evidence (Join-Path $QtEvidenceDirectory 'pre-deploy')
+    if ($LASTEXITCODE -ne 0) { throw 'Selected Qt SDK or actual product linkage changed before deployment.' }
+}
 $files = @('Swirl.exe','swirl_api.dll','swirl-rust-build.json','swirl-tun-broker.exe','swirl-tun-helper.exe','SwirlProxyGuard.exe',
     'SwirlGatewayGuard.exe','SwirlScriptRunner.exe','SwirlCodexLauncher.exe',
     'SwirlCodexManage.py','SubscriptionCapture.py')
@@ -82,8 +109,14 @@ foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
 if (-not $OpenSslRoot) { throw 'An explicitly verified OpenSSL runtime root is required.' }
 & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $OpenSslRoot `
     -ApplicationDirectory $stage -Target VC-WIN64A -Python $Python
-& windeployqt --release --no-compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
+& $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
+if ($QtSdkReceipt) {
+    & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify --receipt $QtSdkReceipt `
+        --build-dir $build --phase post-deploy --runtime-dir $stage `
+        --evidence (Join-Path $QtEvidenceDirectory 'post-deploy')
+    if ($LASTEXITCODE -ne 0) { throw 'Deployed Qt files differ from the selected SDK.' }
+}
 & (Join-Path $PSScriptRoot 'Copy-VerifiedMsvcRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
 # windeployqt creates empty QML directories that NSIS File /r would own only
 # implicitly. Prune this freshly created stage before any real runtime checks;
@@ -139,6 +172,15 @@ if (-not $report.success -or -not $report.http_response_verified -or
     --ico (Join-Path $build 'brand/Swirl.ico') --exe (Join-Path $stage 'Swirl.exe') `
     --output (Join-Path $build 'icon-resource-verification.json')
 if ($LASTEXITCODE -ne 0) { throw 'Packaged EXE icon resources differ from the generated 18-frame ICO.' }
+if ($QtSdkReceipt) {
+    # Add the actual source archive identity and original license texts before
+    # the first exact payload manifest is created. Finalize remains a strict
+    # verifier and never blesses files added after the manifest was recorded.
+    & $Python (Join-Path $repo 'tools/Prepare-Qt612ProductSource.py') prepare --runtime-dir $stage `
+        --source-sha $sourceSha --sdk-evidence $selectedQt.sdk_evidence_dir `
+        --cache-dir $QtSourceCacheDirectory --output-dir $QtSourceDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Matching Qt sources and installation notices could not be prepared.' }
+}
 $manifest = [ordered]@{ schema=1; source_sha=$sourceSha; rust=$expected;
     staging=[ordered]@{empty_directory_cleanup_scope='fresh-build-stage-only';empty_directories_removed=$removedEmptyDirectories}; files=@() }
 foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName)) {
