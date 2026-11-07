@@ -1180,7 +1180,9 @@ def parse_dependents(text):
 
 
 def normalized_parser(data):
-    # Source-location strings only; line numbers, tokens and all other bytes remain exact.
+    # Windows SDK source snippets use CRLF, while the pinned Git checkout uses
+    # LF. Preserve every other byte except generated source-location strings.
+    data = data.replace(b"\r\n", b"\n")
     return re.sub(rb'(?m)^(#line [0-9]+ ")[^"\r\n]+(")\r?$', rb'\1<SOURCE_LOCATION>\2', data)
 
 
@@ -1203,13 +1205,17 @@ def verify_headers(source, build, stock):
             other = candidate.read_bytes()
             okay = (normalized_parser(data) == normalized_parser(other)
                     if path.name == "qqmljsparser_p.h" else data == other)
-            method = "source-location-only-normalization" if path.name == "qqmljsparser_p.h" else "exact-generated"
+            method = "source-location-and-crlf-normalization" if path.name == "qqmljsparser_p.h" else "exact-generated"
         else:
             candidates = source_by_name.get(path.name, [])
-            matches = [p for p in candidates if p.read_bytes() == data]
-            okay, candidate, method = bool(matches), matches[0] if matches else None, "exact-source"
+            matches = [p for p in candidates
+                       if p.read_bytes().replace(b"\r\n", b"\n") == data.replace(b"\r\n", b"\n")]
+            okay, candidate = bool(matches), matches[0] if matches else None
+            method = ("exact-source" if candidate and candidate.read_bytes() == data
+                      else "exact-source-after-crlf-to-lf")
         result.append({"path": path.relative_to(stock).as_posix(), "stock": file_identity(path),
-                       "matched": okay, "candidate": str(candidate) if candidate else None, "method": method})
+                       "matched": okay, "candidate": str(candidate) if candidate else None,
+                       "candidate_identity": file_identity(candidate) if candidate else None, "method": method})
     public = stock / "include/QtQml/qtqml-config.h"
     rebuilt = build / "src/qml/qtqml-config.h"
     result.append({"path": "include/QtQml/qtqml-config.h", "stock": file_identity(public),
@@ -1224,6 +1230,8 @@ def permitted_override(path, before, after):
         return True
     if path == "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h":
         return before is not None and normalized_parser(before) == normalized_parser(after)
+    if re.fullmatch(r"include/QtQml/(?:6\.12\.0/QtQml/private/)?[A-Za-z0-9_]+\.h", path):
+        return before is not None and before.replace(b"\r\n", b"\n") == after.replace(b"\r\n", b"\n")
     return bool(re.fullmatch(
         r"(?:bin/Qt6Qml\.(?:dll|pdb)|lib/Qt6Qml\.(?:lib|prl|pdb|debug)"
         r"|modules/Qml\.json|lib/cmake/Qt6Qml(?:Private)?/[^/]+"

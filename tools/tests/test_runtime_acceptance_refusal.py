@@ -34,7 +34,7 @@ def snapshot(root):
             for path in sorted(root.rglob("*"))}
 
 
-def run_case(name, command, private, environment, output):
+def run_case(name, command, private, environment, output, expected_error=ERROR):
     before = snapshot(private)
     started = time.monotonic()
     process = None
@@ -60,7 +60,7 @@ def run_case(name, command, private, environment, output):
             phase = "output-evidence"
             stdout, stderr = stdout_path.read_bytes(), stderr_path.read_bytes()
             row.update({"stdout_sha256": sha256(stdout_path), "stderr_sha256": sha256(stderr_path),
-                        "stdout_empty": not stdout, "fixed_error": stderr.strip() == ERROR,
+                        "stdout_empty": not stdout, "fixed_error": stderr.strip() == expected_error,
                         "argument_value_redacted": MARKER.encode() not in stdout + stderr,
                         "synthetic_tree_unchanged": snapshot(private) == before})
             row["success"] = (row["exit_code"] == 64 and not row["timed_out"] and row["exit_confirmed"]
@@ -152,6 +152,17 @@ def main():
                 report["cases"].append(row)
                 if not row["success"]:
                     raise RuntimeError("ExecutableRefusalFailed:" + name)
+            controlled = [["--controlled-node-session"], ["--controlled-node-session="],
+                          ["--controlled-node-session=" + str(paths[0]), "--recover-tun"],
+                          ["--controlled-node-session=" + str(paths[0]), "--controlled-node-session=" + str(paths[1])]]
+            if args.flavor == "release":
+                controlled.append(["--controlled-node-session=" + str(paths[0])])
+            for index, arguments in enumerate(controlled):
+                row = run_case("controlled-session-refusal-" + str(index + 1),
+                               [str(executable), *arguments], private, environment, output, expected_error=b"")
+                report["cases"].append(row)
+                if not row["success"]:
+                    raise RuntimeError("ControlledSessionRefusalFailed")
             for index, host in enumerate(args.powershell):
                 host = Path(host).resolve(strict=True)
                 command = [str(host), "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",

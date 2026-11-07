@@ -442,6 +442,19 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    QString controlledSessionRoot;
+    for(int i=1;i<argc;++i){
+        const QByteArray argument(argv[i]);
+        if(argument=="--controlled-node-session"||argument.startsWith("--controlled-node-session=")){
+#ifdef SWIRL_UI_TESTS
+            constexpr auto prefix="--controlled-node-session=";
+            if(argc!=2||!argument.startsWith(prefix)||argument.size()==int(sizeof("--controlled-node-session=")-1))return 64;
+            controlledSessionRoot=QString::fromLocal8Bit(argument.mid(sizeof("--controlled-node-session=")-1));
+#else
+            return 64;
+#endif
+        }
+    }
     // The legacy real-node QA harness has no authenticated billing/ledger or
     // complete wire guard. Reject even partial/empty options in BOTH builds,
     // before maintenance dispatch, Qt startup, private stores or networking.
@@ -455,6 +468,10 @@ int main(int argc, char *argv[])
             }
         }
     }
+#ifdef SWIRL_UI_TESTS
+    // This guard outlives the application, engine and their destructors.
+    auto controlledWatchdog=startControlledNodeWatchdog(!controlledSessionRoot.isEmpty());
+#endif
     // Package verification runs the real EXE/DLL, before any UI, NodeStore,
     // system-proxy ownership, or persisted settings are opened.
     for (int i = 1; i < argc; ++i) {
@@ -589,13 +606,19 @@ int main(int argc, char *argv[])
     if(xrayUiTest&&!qEnvironmentVariableIsSet("SWIRL_TEST_ROOT"))return 2;
     QString runtimeStore,runtimeCommands,runtimeState;
 #ifdef SWIRL_UI_TESTS
+    ControlledNodeSession controlledSession;
+    if(!controlledSessionRoot.isEmpty()){
+        if(!loadControlledNodeSession(controlledSessionRoot,&controlledSession))return 64;
+        runtimeStore=controlledSession.storePath;
+    }
     for(const auto &argument:app.arguments()){
         if(argument.startsWith("--runtime-store="))runtimeStore=argument.mid(16);
         if(argument.startsWith("--runtime-commands="))runtimeCommands=argument.mid(19);
         if(argument.startsWith("--runtime-state="))runtimeState=argument.mid(16);
     }
 #endif
-    const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
+    const bool controlledNodeSession=!controlledSessionRoot.isEmpty();
+    const bool realAcceptance=controlledNodeSession||(!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty());
     bool lifecycleTest=false;
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
@@ -659,11 +682,12 @@ int main(int argc, char *argv[])
     // Native node/policy acceptance uses the actual controller and listener,
     // with only host system-proxy I/O replaced by an owned in-memory adapter.
     std::unique_ptr<SystemProxySession::Backend> policyProxyBackend;
-    if(policyTest||nodeTest)policyProxyBackend=std::make_unique<PolicySystemProxyBackend>();
+    if(policyTest||nodeTest||controlledNodeSession)policyProxyBackend=std::make_unique<PolicySystemProxyBackend>();
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance,std::move(policyProxyBackend));
 #else
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
 #endif
+    if(controlledNodeSession)engineController.imports()->shutdown();
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
     DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());
@@ -907,7 +931,8 @@ int main(int argc, char *argv[])
     }
 #endif
 #ifdef SWIRL_UI_TESTS
-    if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
+    if(controlledNodeSession&&rootWindow)startControlledNodeSession(rootWindow,&engineController,controlledSession);
+    else if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
     if(activityLayoutTest) {
         const auto output=argumentValue(QStringLiteral("--activity-layout-output="));
         QTimer::singleShot(450,&app,[&app,rootWindow,output]{app.exit(runActivityLayoutChecks(rootWindow,output));});
@@ -1216,7 +1241,7 @@ int main(int argc, char *argv[])
     recordQmlCreationLifecycle(engine,"after-existing-incubation-drain");
 #endif
     qmlVmeWarnings.phase="main-return";
-    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    const int finalResult=(controlledNodeSession || xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
         if(finalResult==0)qInfo()<<"XRAY_UI_PASS";

@@ -664,6 +664,25 @@ class DiagnosticBoundaryTests(unittest.TestCase):
         self.assertFalse(sdk.permitted_override(path, b'#line 10 "stock/path"\nint field;\n',
                                                b'#line 10 "build/path"\nlong field;\n'))
 
+    def test_windows_header_eol_does_not_hide_abi_or_non_header_changes(self):
+        path = "include/QtQml/6.12.0/QtQml/private/qv4mm_p.h"
+        stock = b"struct MemberData {\r\n    int field;\r\n};\r\n"
+        source = b"struct MemberData {\n    int field;\n};\n"
+        self.assertTrue(sdk.permitted_override(path, stock, source))
+        for changed in (source.replace(b"int", b"long"), source.replace(b"\n", b"\r"),
+                        source + b" ", source.replace(b"    ", b"\t")):
+            with self.subTest(changed=changed):
+                self.assertFalse(sdk.permitted_override(path, stock, changed))
+        self.assertFalse(sdk.permitted_override(path, None, source))
+        self.assertFalse(sdk.permitted_override("bin/Qt6Core.dll", stock, source))
+        parser = "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h"
+        # qlalr's boilerplate is LF; inserted grammar-source snippets retain CRLF.
+        original = b'\n#line 10 "stock/path"\n' + stock
+        rebuilt = b'\n#line 10 "build/path"\n' + source
+        self.assertTrue(sdk.permitted_override(parser, original, rebuilt))
+        self.assertFalse(sdk.permitted_override(parser, original, rebuilt.replace(b"10", b"11")))
+        self.assertFalse(sdk.permitted_override(parser, original, rebuilt.replace(b"int", b"long")))
+
     def test_manifest_byte_change_cannot_pass_by_matching_filenames(self):
         expected = {"Qt6Qml.dll": {"bytes": 1, "sha256": "a" * 64}}
         changed = {"Qt6Qml.dll": {"bytes": 1, "sha256": "b" * 64}}

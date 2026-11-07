@@ -337,7 +337,8 @@ class BillingEndToEndTests(unittest.TestCase):
         self.assertTrue(report["controlQueries"][0]["controlConsumed"])
 
     def test_reservation_commit_failure_prevents_every_workload_spawn(self):
-        with mock.patch.object(budget.os, "replace", side_effect=OSError("injected reservation write")), \
+        storage = self.ledger.windows if self.ledger.windows else budget.os
+        with mock.patch.object(storage, "replace", side_effect=OSError("injected reservation write")), \
              mock.patch.object(supervisor, "OwnedProcess", side_effect=AssertionError("spawn before durable reserve")):
             with self.assertRaises(OSError):
                 self.runner.run("core_probe")
@@ -348,12 +349,13 @@ class BillingEndToEndTests(unittest.TestCase):
         self.assertEqual(disk["billing"]["controlAttempts"], 0)
 
     def test_pending_commit_failure_retains_durable_active_full_hold(self):
-        replace = budget.os.replace
+        storage = self.ledger.windows if self.ledger.windows else budget.os
+        replace = storage.replace
         def fail_pending(source, target):
             if any(h["phase"] == "reconcile_pending" for h in self.ledger.data["history"].values()):
                 raise OSError("injected pending write")
             return replace(source, target)
-        with mock.patch.object(budget.os, "replace", side_effect=fail_pending):
+        with mock.patch.object(storage, "replace", side_effect=fail_pending):
             with self.assertRaises(OSError):
                 self.runner.run("core_probe", timeout_ms=3000)
         durable = json.loads(self.ledger.path.read_text())
@@ -366,12 +368,13 @@ class BillingEndToEndTests(unittest.TestCase):
             self.ledger.summary()
 
     def test_settlement_commit_failure_reopen_keeps_full_hold_and_no_exit_json_reissue(self):
-        replace = budget.os.replace
+        storage = self.ledger.windows if self.ledger.windows else budget.os
+        replace = storage.replace
         def fail_settle(source, target):
             if any(h["phase"] == "settled" for h in self.ledger.data["history"].values()):
                 raise OSError("injected settlement write")
             return replace(source, target)
-        with mock.patch.object(budget.os, "replace", side_effect=fail_settle):
+        with mock.patch.object(storage, "replace", side_effect=fail_settle):
             with self.assertRaises(OSError):
                 self.runner.run("core_probe", timeout_ms=3000)
         durable = self.ledger.path.read_bytes()
