@@ -70,6 +70,137 @@ def minimal_pe(*, dll=True):
     return data
 
 
+class SelectedD3dDeploymentBoundaries(unittest.TestCase):
+    def fixture(self, root, data=None):
+        selected, runtime = root / "selected", root / "runtime"
+        (selected / "bin").mkdir(parents=True)
+        runtime.mkdir()
+        raw = bytes(minimal_pe()) if data is None else bytes(data)
+        source = selected / "bin/d3dcompiler_47.dll"
+        source.write_bytes(raw)
+        return selected, runtime, source, raw, product.byte_id(raw)
+
+    def test_exact_copy_records_replacement_and_does_not_modify_dxc(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            selected, runtime, source, raw, expected = self.fixture(Path(temporary).resolve())
+            destination = runtime / "d3dcompiler_47.dll"
+            destination.write_bytes(b"different deployment source")
+            dxc = runtime / "dxcompiler.dll"
+            dxc.write_bytes(b"unexecuted external fixture")
+            record = {}
+            product.copy_fixed_d3d(selected, runtime, expected, SDK, record)
+            self.assertEqual(destination.read_bytes(), raw)
+            self.assertEqual(source.read_bytes(), raw)
+            self.assertEqual(record["before"], product.byte_id(b"different deployment source"))
+            self.assertEqual(record["after"], expected)
+            self.assertTrue(record["copied"])
+            self.assertEqual(record["source"]["pe"]["machine"], "AMD64")
+            self.assertEqual(record["shader_compilers_outside_selected_kit"],
+                             {"dxcompiler.dll": product.byte_id(dxc.read_bytes())})
+            second = {}
+            product.copy_fixed_d3d(selected, runtime, expected, SDK, second)
+            self.assertFalse(second["copied"])
+            self.assertEqual(dxc.read_bytes(), b"unexecuted external fixture")
+
+    def test_changed_selected_source_cannot_overwrite_existing_runtime(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            selected, runtime, source, raw, expected = self.fixture(Path(temporary).resolve())
+            destination = runtime / "d3dcompiler_47.dll"
+            destination.write_bytes(b"original")
+            source.write_bytes(raw + b"mutation")
+            with self.assertRaisesRegex(product.Rejected, "SelectedD3dCompilerChanged"):
+                product.copy_fixed_d3d(selected, runtime, expected, SDK, {})
+            self.assertEqual(destination.read_bytes(), b"original")
+
+    def test_existing_shader_metadata_is_replaced_with_the_compatible_schema_once(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            selected, runtime, _, _, expected = self.fixture(Path(temporary).resolve())
+            product.copy_fixed_d3d(selected, runtime, expected, SDK, {})
+            path = runtime / "qt-shader-runtime.json"
+            path.write_bytes(b"previous metadata")
+            record = {}
+            product.write_shader_runtime_metadata(runtime, expected, SDK, record)
+            self.assertEqual(product.read_json(path), {"schema": 1, "source": "selected-qt-sdk",
+                "files": {"d3dcompiler_47.dll": {"sha256": expected["sha256"], "bytes": expected["bytes"]}}})
+            self.assertEqual(record["before"], product.byte_id(b"previous metadata"))
+            self.assertEqual(record["after"], product.byte_id(path.read_bytes()))
+            second = {}
+            product.write_shader_runtime_metadata(runtime, expected, SDK, second)
+            self.assertFalse(second["written"])
+
+    def test_x86_or_executable_image_is_rejected_before_copy(self):
+        for mutation in ("x86", "exe"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                raw = minimal_pe(dll=mutation != "exe")
+                if mutation == "x86":
+                    struct.pack_into("<H", raw, 132, 0x14C)
+                selected, runtime, _, _, expected = self.fixture(Path(temporary).resolve(), raw)
+                with self.assertRaisesRegex(product.Rejected, "D3dAmd64DllRequired"):
+                    product.copy_fixed_d3d(selected, runtime, expected, SDK, {})
+                self.assertEqual(list(runtime.iterdir()), [])
+
+    def test_destination_inside_selected_kit_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            selected, _, source, raw, expected = self.fixture(Path(temporary).resolve())
+            with self.assertRaises(product.Rejected):
+                product.copy_fixed_d3d(selected, selected / "bin", expected, SDK, {})
+            self.assertEqual(source.read_bytes(), raw)
+
+    def test_atomic_replace_failure_keeps_previous_bytes_and_removes_owned_temporary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            selected, runtime, source, raw, expected = self.fixture(Path(temporary).resolve())
+            destination = runtime / "d3dcompiler_47.dll"
+            destination.write_bytes(b"original")
+            record = {}
+            with mock.patch.object(product.os, "replace", side_effect=OSError("synthetic replacement failure")):
+                with self.assertRaises(OSError):
+                    product.copy_fixed_d3d(selected, runtime, expected, SDK, record)
+            self.assertEqual(destination.read_bytes(), b"original")
+            self.assertEqual(source.read_bytes(), raw)
+            self.assertFalse(record["copied"])
+            self.assertFalse((runtime / ".swirl-selected-d3dcompiler-47.copy.tmp").exists())
+
+    def test_failed_deployment_preserves_raw_observed_inventory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            selected, runtime, _, _, expected = self.fixture(root)
+            (runtime / "Swirl.exe").write_bytes(b"unexecuted application fixture")
+            (runtime / "Qt6Qml.dll").write_bytes(b"unexecuted Qml fixture")
+            (runtime / "d3dcompiler_47.dll").write_bytes(b"actual mismatched bytes")
+            application = {"path": str(runtime / "Swirl.exe"),
+                           **product.byte_id((runtime / "Swirl.exe").read_bytes()),
+                           "actual_pe_imports": ["qt6qml.dll"]}
+            files = {"bin/Qt6Qml.dll": product.byte_id((runtime / "Qt6Qml.dll").read_bytes()),
+                     "bin/d3dcompiler_47.dll": expected}
+            observation = root / "evidence/runtime-files-observed.json"
+            with self.assertRaisesRegex(product.Rejected, "DeployedQtFileMismatch:d3dcompiler_47.dll"):
+                product.verify_deployment(runtime, files, application, SDK,
+                                          observed_inventory_path=observation)
+            observed = product.read_json(observation)
+            self.assertEqual(observed["d3dcompiler_47.dll"], product.byte_id(b"actual mismatched bytes"))
+            self.assertEqual((runtime / "d3dcompiler_47.dll").read_bytes(), b"actual mismatched bytes")
+
+    def test_true_receipt_without_source_and_lock_binding_cannot_copy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            selected, runtime, _, _, _ = self.fixture(root)
+            stock = root / "stock"
+            stock.mkdir()
+            receipt = root / "untrusted-selected-sdk.json"
+            product.write_json(receipt, {"schema": 1, "kind": "swirl-selected-qt612-product-sdk",
+                "success": True, "consumer": {}, "producer": LOCK["producer"], "artifact": LOCK["artifact"],
+                "stock_kit_root": str(stock), "kit_root": str(selected),
+                "lock": {"bytes": 1, "sha256": "0" * 64}})
+            evidence = root / "evidence"
+            with mock.patch.object(product, "current_context", return_value={}), contextlib.redirect_stdout(io.StringIO()):
+                result = product.main(["--repository", str(REPOSITORY), "copy-d3d", "--receipt", str(receipt),
+                    "--runtime-dir", str(runtime), "--evidence", str(evidence)])
+            self.assertEqual(result, 1)
+            self.assertEqual(product.read_json(evidence / "receipt.json")["errors"],
+                             ["SelectedReceiptBindingRejected"])
+            self.assertEqual(list(runtime.iterdir()), [])
+
+
 class ProductSdkBoundaries(unittest.TestCase):
     def test_compiler_metadata_cannot_replace_binary_inventory_identity(self):
         binary = LOCK["content"]["producer_compiler_binary"]

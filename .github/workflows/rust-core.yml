@@ -19,7 +19,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # An unchanged cold macOS job reached final Vision compilation at 29m35s.
+    # Allow the complete build and evidence sequence; individual tests retain
+    # their existing deadlines, and Linux keeps its original job budget.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 30 }}
     defaults:
       run:
         working-directory: core
@@ -1032,8 +1035,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           if (-not $IsWindows -or -not (Test-Path -LiteralPath $env:SWIRL_CAPTURE_INSPECTOR -PathType Leaf)) { throw 'Required Windows Qt capture inspector is missing.' }
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_CAPTURE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_CAPTURE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-capture"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_offline_cpp_import_and_existing_store_protection -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Fetch hash-pinned independent QUIC server fixtures
@@ -1056,8 +1061,10 @@ jobs:
           foreach ($binary in @($env:SWIRL_RUST_QT_TESTS, $env:HY2_SERVER, $env:SWIRL_TUIC_SERVER)) {
             if ([string]::IsNullOrWhiteSpace($binary) -or -not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'Required QUIC fixture binary missing.' }
           }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_RUST_QT_TESTS"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_RUST_QT_TESTS"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-quic"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           # Evidence is never restored from a cache or mixed with another run.
           if (Test-Path -LiteralPath $env:SWIRL_SINGBOX_QUIC_EVIDENCE) { throw 'QUIC evidence directory already exists.' }
           New-Item -ItemType Directory -Path $env:SWIRL_SINGBOX_QUIC_EVIDENCE | Out-Null
@@ -1115,8 +1122,10 @@ jobs:
           QT_FORCE_STDERR_LOGGING: '1'
         run: |
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend build/rust-qt/Release/SwirlRustCoreTests.exe
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend build/rust-qt/Release/SwirlRustCoreTests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-integration"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure -V
@@ -1256,8 +1265,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           if (-not $IsWindows -or [string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or -not (Test-Path -LiteralPath $env:SWIRL_QT_PRIVATE_INSPECTOR -PathType Leaf)) { throw "Required Windows Qt DPAPI inspector is missing" }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_public_qt_reality.py
@@ -1287,5 +1298,9 @@ jobs:
             build/rust-qt/swirl-rust-qt-integration.xml
             build/rust-qt/swirl-import-boundaries.xml
             build/removed-runtime/rejection.log
+            build-evidence/qt-product-rust-d3d-capture/
+            build-evidence/qt-product-rust-d3d-quic/
+            build-evidence/qt-product-rust-d3d-integration/
+            build-evidence/qt-product-rust-d3d-public/
           if-no-files-found: warn
           retention-days: 7

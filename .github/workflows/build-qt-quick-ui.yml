@@ -376,8 +376,8 @@ jobs:
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
           & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
-          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory dist
-          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory build/swirl-quick/Release
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory dist -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -EvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist-d3d" -Python $env:SWIRL_PROFILE_OWNER_PYTHON
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory build/swirl-quick/Release -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -EvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest-d3d" -Python $env:SWIRL_PROFILE_OWNER_PYTHON
           python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist"
           if ($LASTEXITCODE -ne 0) { throw 'Deployed QA Qt runtime differs from the selected SDK.' }
           python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/build/swirl-quick/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest"

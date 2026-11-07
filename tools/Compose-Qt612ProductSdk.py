@@ -912,8 +912,12 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
     return result
 
 
-def verify_deployment(runtime, selected_files, application, sdk):
+def verify_deployment(runtime, selected_files, application, sdk, *, observed_inventory_path=None):
     files = sdk.inventory(runtime)
+    # Preserve the actual disk observation even when a later comparison fails.
+    # This file is not a successful deployment receipt.
+    if observed_inventory_path is not None:
+        write_json(observed_inventory_path, files)
     require(files.get("Qt6Qml.dll") == selected_files["bin/Qt6Qml.dll"], "DeployedQtQmlMismatch")
     app_name = Path(application["path"]).name
     require(files.get(app_name) == {k: application[k] for k in ("bytes", "sha256")},
@@ -933,11 +937,14 @@ def verify_deployment(runtime, selected_files, application, sdk):
         if name.startswith("qt6"):
             matches = [relative for relative in qt_files if "/" not in relative and relative.casefold() == name]
             require(len(matches) == 1, "ApplicationQtImportNotDeployed")
+    external_shader_compilers = {name: value for name, value in files.items()
+        if Path(name).name.casefold() in ("dxcompiler.dll", "dxil.dll") and name not in qt_files}
     return {"runtime_content_id": canonical(files), "runtime_files": files, "qt_files": qt_files,
+            "shader_compilers_outside_selected_kit": external_shader_compilers,
             "scope": "Disk bytes and PE imports; not process module sampling or Rust/OpenSSL/CRT acceptance"}
 
 
-def verify(args, lock, sdk, transport, report):
+def verified_selection(args, lock, sdk, transport):
     repository = sdk.plain_path(Path(args.repository))
     context = current_context(repository, lock, sdk)
     receipt_path = sdk.plain_path(Path(args.receipt))
@@ -963,6 +970,146 @@ def verify(args, lock, sdk, transport, report):
     artifact = verify_artifact(extracted, inventory, lock, sdk, transport)
     before, actual, installation = actual_kit_check(stock, selected, artifact, lock, sdk)
     validate_installed_identity(receipt, before, actual, installation, lock)
+    return {"repository": repository, "context": context, "receipt_path": receipt_path,
+            "receipt": receipt, "stock": stock, "selected": selected, "evidence": evidence,
+            "before": before, "actual": actual, "artifact": artifact}
+
+
+def d3d_image_identity(data):
+    """Read only the fixed redistributable's PE architecture; never load it."""
+    require(len(data) >= 64 and data[:2] == b"MZ", "D3dImageHeaderRejected")
+    nt = struct.unpack_from("<I", data, 60)[0]
+    require(64 <= nt <= len(data) - 26 and data[nt:nt + 4] == b"PE\0\0",
+            "D3dImageHeaderRejected")
+    machine, _, _, _, _, optional_size, characteristics = struct.unpack_from("<HHIIIHH", data, nt + 4)
+    require(machine == 0x8664 and characteristics & 0x2000
+            and optional_size >= 240 and nt + 24 + optional_size <= len(data)
+            and struct.unpack_from("<H", data, nt + 24)[0] == 0x20B, "D3dAmd64DllRequired")
+    return {"machine": "AMD64", "image_kind": "DLL", "optional_header_magic": 0x20B}
+
+
+def copy_fixed_d3d(selected, runtime, expected, sdk, record):
+    # The caller obtains expected from the complete original-artifact and
+    # installed-kit verification, not from a command-line hash or receipt flag.
+    require_disjoint((selected, runtime))
+    require(isinstance(expected, dict) and set(expected) == {"bytes", "sha256"} and type(expected["bytes"]) is int
+            and 64 <= expected["bytes"] <= 16 * 1024 * 1024
+            and isinstance(expected["sha256"], str) and SHA.fullmatch(expected["sha256"]),
+            "D3dPinnedIdentityMissing")
+    source = sdk.plain_path(selected / "bin/d3dcompiler_47.dll", root=selected)
+    destination = sdk.plain_path(runtime / "d3dcompiler_47.dll", root=runtime, exists=False)
+    require(source != destination and runtime.is_dir(), "D3dDestinationRejected")
+    with source.open("rb") as stream:
+        raw = stream.read(expected["bytes"] + 1)
+    require(byte_id(raw) == expected == sdk.file_identity(source), "SelectedD3dCompilerChanged")
+    pe = d3d_image_identity(raw)
+    matches = [p for p in runtime.iterdir() if p.name.casefold() == "d3dcompiler_47.dll"]
+    require(len(matches) <= 1 and (not matches or matches[0] == destination),
+            "D3dDestinationAmbiguous")
+    before = sdk.file_identity(destination) if destination.exists() else None
+    record.update({"source": {"path": str(source), **expected, "pe": pe},
+                   "destination": str(destination), "before": before,
+                   "copied": False, "after": None})
+    if before != expected:
+        temporary = sdk.plain_path(runtime / ".swirl-selected-d3dcompiler-47.copy.tmp",
+                                   root=runtime, exists=False)
+        require(not temporary.exists(), "D3dTemporaryMustBeFresh")
+        created = False
+        try:
+            with temporary.open("xb") as stream:
+                created = True
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            require(sdk.file_identity(temporary) == expected
+                    and sdk.file_identity(source) == expected, "D3dCopyIdentityChanged")
+            os.replace(temporary, destination)
+            record["copied"] = True
+        except BaseException:
+            if created and temporary.exists():
+                try:
+                    temporary.unlink()
+                except OSError as error:
+                    record["temporary_cleanup_error"] = type(error).__name__
+            raise
+    after = sdk.file_identity(destination)
+    record["after"] = after
+    require(after == expected and sdk.file_identity(source) == expected,
+            "DeployedD3dCompilerChanged")
+    # DXC is not supplied by this fixed Qt kit. Preserve its existing deployment
+    # behavior and record any observed bytes without granting a selected-kit pin.
+    record["shader_compilers_outside_selected_kit"] = {
+        p.name: sdk.file_identity(sdk.plain_path(p, root=runtime)) for p in runtime.iterdir()
+        if p.name.casefold() in ("dxcompiler.dll", "dxil.dll")}
+
+
+def copy_d3d(args, lock, sdk, transport, report):
+    state = verified_selection(args, lock, sdk, transport)
+    stock, selected, evidence = (state[name] for name in ("stock", "selected", "evidence"))
+    runtime = sdk.plain_path(Path(args.runtime_dir))
+    require_disjoint((stock, selected, runtime, evidence))
+    name = "bin/d3dcompiler_47.dll"
+    expected = state["actual"].get(name)
+    artifact = state["artifact"]
+    require(expected is not None and expected == artifact["stock_files"].get(name)
+            == artifact["derived_files"].get(name), "D3dOriginalArtifactBindingRejected")
+    report.update({"consumer": state["context"],
+                   "selected_receipt": sdk.file_identity(state["receipt_path"]),
+                   "selected_content_id": canonical(state["actual"]),
+                   "original_conclusion": "failure", "d3d_compiler": {},
+                   "scope": "Copy only the fixed original-kit D3D compiler; no code execution. "
+                            "DXC/DXIL retain their existing deployment behavior and are not selected-kit pins."})
+    copy_fixed_d3d(selected, runtime, expected, sdk, report["d3d_compiler"])
+    report["runtime_shader_metadata"] = {}
+    write_shader_runtime_metadata(runtime, expected, sdk, report["runtime_shader_metadata"])
+    require(current_context(state["repository"], lock, sdk) == state["context"],
+            "ConsumerSourceChangedDuringD3dCopy")
+    report.update({"success": True, "selected_source_unchanged": True,
+                   "product_acceptance": "not implied by a file copy"})
+
+
+def write_shader_runtime_metadata(runtime, expected, sdk, record):
+    """Preserve the concurrent PS entry point's schema; metadata is not authority."""
+    require(sdk.file_identity(sdk.plain_path(runtime / "d3dcompiler_47.dll", root=runtime)) == expected,
+            "ShaderMetadataD3dIdentityChanged")
+    document = {"schema": 1, "source": "selected-qt-sdk", "files": {
+        "d3dcompiler_47.dll": {"sha256": expected["sha256"], "bytes": expected["bytes"]}}}
+    raw = (json.dumps(document, ensure_ascii=True, indent=2) + "\n").encode()
+    identity = byte_id(raw)
+    target = sdk.plain_path(runtime / "qt-shader-runtime.json", root=runtime, exists=False)
+    before = sdk.file_identity(target) if target.exists() else None
+    record.update({"path": str(target), "before": before, "after": None,
+                   "document": document, "written": False})
+    if before != identity:
+        temporary = sdk.plain_path(runtime / ".swirl-qt-shader-runtime.json.copy.tmp",
+                                   root=runtime, exists=False)
+        require(not temporary.exists(), "ShaderMetadataTemporaryMustBeFresh")
+        created = False
+        try:
+            with temporary.open("xb") as stream:
+                created = True
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            require(sdk.file_identity(temporary) == identity, "ShaderMetadataCopyChanged")
+            os.replace(temporary, target)
+            record["written"] = True
+        except BaseException:
+            if created and temporary.exists():
+                try:
+                    temporary.unlink()
+                except OSError as error:
+                    record["temporary_cleanup_error"] = type(error).__name__
+            raise
+    record["after"] = sdk.file_identity(target)
+    require(record["after"] == identity, "ShaderMetadataChanged")
+
+
+def verify(args, lock, sdk, transport, report):
+    state = verified_selection(args, lock, sdk, transport)
+    repository, context, receipt_path, receipt, stock, selected, evidence, before, actual = (
+        state[name] for name in ("repository", "context", "receipt_path", "receipt", "stock",
+                                "selected", "evidence", "before", "actual"))
     build = sdk.plain_path(Path(args.build_dir))
     require_disjoint((stock, selected, build, evidence))
     configuration = validate_configuration(build, selected, repository, context, receipt, lock, sdk,
@@ -974,7 +1121,12 @@ def verify(args, lock, sdk, transport, report):
         require(args.runtime_dir is not None, "PostDeployRuntimeRequired")
         runtime = sdk.plain_path(Path(args.runtime_dir))
         require_disjoint((stock, selected, runtime, evidence))
-        deployment = verify_deployment(runtime, actual, configuration["application"], sdk)
+        observed = evidence / "runtime-files-observed.json"
+        report["observed_runtime_inventory"] = {"path": str(observed),
+            "scope": "Raw disk observation written before comparisons; it does not indicate acceptance."}
+        deployment = verify_deployment(runtime, actual, configuration["application"], sdk,
+                                       observed_inventory_path=observed)
+        report["observed_runtime_inventory"]["file"] = sdk.file_identity(observed)
         write_json(evidence / "runtime-files.json", deployment.pop("runtime_files"))
         report["deployment"] = deployment
     else:
@@ -1003,6 +1155,10 @@ def main(argv=None):
     verification.add_argument("--runtime-dir", type=Path)
     verification.add_argument("--phase", choices=("configured", "pre-deploy", "post-deploy"), required=True)
     verification.add_argument("--evidence", type=Path, required=True)
+    d3d_copy = commands.add_parser("copy-d3d", help="copy the one fixed selected-kit D3D compiler")
+    d3d_copy.add_argument("--receipt", type=Path, required=True)
+    d3d_copy.add_argument("--runtime-dir", type=Path, required=True)
+    d3d_copy.add_argument("--evidence", type=Path, required=True)
     args = parser.parse_args(argv)
     report = {"schema": 1, "kind": "qt612-product-sdk-" + args.command, "success": False,
               "errors": [], "started_utc": datetime.now(timezone.utc).isoformat(),
@@ -1019,7 +1175,7 @@ def main(argv=None):
             selected = sdk.plain_path(Path(args.selected_kit), exists=False)
             require_disjoint((stock, selected, evidence))
             require(not selected.exists(), "SelectedKitMustBeFresh")
-        elif args.command == "verify":
+        elif args.command in ("verify", "copy-d3d"):
             selected_record = read_json(sdk.plain_path(Path(args.receipt)))
             require_disjoint((sdk.plain_path(Path(selected_record["stock_kit_root"])),
                               sdk.plain_path(Path(selected_record["kit_root"])), evidence))
@@ -1037,6 +1193,8 @@ def main(argv=None):
                            "selected_sdk_created": False})
         elif args.command == "compose":
             compose(args, lock, sdk, transport, report)
+        elif args.command == "copy-d3d":
+            copy_d3d(args, lock, sdk, transport, report)
         else:
             verify(args, lock, sdk, transport, report)
     except BaseException as error:

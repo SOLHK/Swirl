@@ -1000,6 +1000,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             "build/rust-qt/swirl-rust-qt-integration.xml",
             "build/rust-qt/swirl-import-boundaries.xml",
             "build/removed-runtime/rejection.log",
+            "build-evidence/qt-product-rust-d3d-capture/",
+            "build-evidence/qt-product-rust-d3d-quic/",
+            "build-evidence/qt-product-rust-d3d-integration/",
+            "build-evidence/qt-product-rust-d3d-public/",
         ])
         self.assertIn("        if: always()\n", artifact)
         self.assertIn("          retention-days: 7\n", artifact)
@@ -1018,6 +1022,13 @@ class CoreDevelopmentTests(unittest.TestCase):
             (artifact, artifact.replace("          if-no-files-found:",
                                         "            ${{ env.SWIRL_TEST_ROOT }}\n          if-no-files-found:")),
         ]
+        for suffix in ("capture", "quic", "integration", "public"):
+            entry = "            build-evidence/qt-product-rust-d3d-" + suffix + "/\n"
+            broken_blocks.extend((
+                (artifact, artifact.replace(entry, "")),
+                (artifact, artifact.replace(entry, entry * 2)),
+                (artifact, artifact.replace(entry, "            build-evidence/**\n")),
+            ))
         exit_guard = "          if ($nativeQtExit -ne 0) { exit $nativeQtExit }\n"
         capture = "          $nativeQtExit = $LASTEXITCODE\n"
         broken_blocks.extend((
@@ -1721,14 +1732,20 @@ class CoreDevelopmentTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
         block = development.public_qt_steps()
-        deploy = ('          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT '
+        deploy = ('          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT '
                   '--include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"\n')
-        self.assertIn(deploy + development.WINDOWS_STATUS_GUARD, block)
+        d3d = ('          python tools/Compose-Qt612ProductSdk.py copy-d3d '
+               '--receipt "$env:SWIRL_QT_SELECTED_RECEIPT" '
+               '--runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" '
+               '--evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"\n')
+        d3d_status = "          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }\n"
+        self.assertIn(deploy + development.WINDOWS_STATUS_GUARD + d3d + d3d_status, block)
         # The generator owns the public gate, not the reviewed runtime setup,
         # cache or integration deployment elsewhere in this actual workflow.
         self.assertEqual(development.updated_workflow(source), source)
         self.assertEqual(development.without_public_qt_steps(source), source.replace(block, "", 1))
         mutations = (
+            deploy.replace(' --no-system-d3d-compiler', ''),
             deploy.replace(' --openssl-root $env:SWIRL_OPENSSL_ROOT', ''),
             deploy.replace('$env:SWIRL_OPENSSL_ROOT', '$env:PATH'),
             deploy.replace(' --include-plugins qopensslbackend', ''),
@@ -1743,6 +1760,31 @@ class CoreDevelopmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             development.updated_workflow(source.replace(deploy + development.WINDOWS_STATUS_GUARD,
                                                         deploy, 1))
+        for changed in ('', d3d * 2,
+                        d3d.replace('copy-d3d', 'verify'),
+                        d3d.replace('$env:SWIRL_QT_SELECTED_RECEIPT', '$env:PATH'),
+                        d3d.replace('/build/rust-qt/Release', '/unverified-runtime'),
+                        d3d.replace('qt-product-rust-d3d-public', 'reused-evidence')):
+            with self.subTest(d3d_deployment=changed), self.assertRaises(ValueError):
+                development.updated_workflow(source.replace(d3d, changed, 1))
+        with self.assertRaises(ValueError):
+            development.updated_workflow(source.replace(d3d + d3d_status, d3d, 1))
+        # Every selected-kit deployment must copy the fixed D3D compiler before
+        # its next fixture runs. Later windeployqt calls share this directory.
+        deploy_lines = [line for line in source.splitlines()
+                        if line.startswith('          windeployqt ')]
+        self.assertEqual(len(deploy_lines), 4)
+        for line, suffix in zip(deploy_lines, ('capture', 'quic', 'integration', 'public')):
+            self.assertIn(' --no-system-d3d-compiler ', line)
+            self.assertNotIn('--no-system-dxc-compiler', line)
+            copy = d3d.replace('qt-product-rust-d3d-public', 'qt-product-rust-d3d-' + suffix)
+            self.assertIn(line + '\n' + development.WINDOWS_STATUS_GUARD + copy + d3d_status, source)
+        preservation = source.split('      - name: Preserve isolated Qt test reports\n')
+        self.assertEqual(len(preservation), 2)
+        self.assertIn('        if: always()\n', preservation[1])
+        for suffix in ('capture', 'quic', 'integration', 'public'):
+            self.assertIn('            build-evidence/qt-product-rust-d3d-' + suffix + '/\n', preservation[1])
+        self.assertIn(d3d, preservation[0])
 
     def test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group(self):
         final = development.updated_workflow(FIXTURE)

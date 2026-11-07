@@ -354,8 +354,10 @@ def public_qt_steps() -> str:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           if (-not $IsWindows -or [string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or -not (Test-Path -LiteralPath $env:SWIRL_QT_PRIVATE_INSPECTOR -PathType Leaf)) { throw "Required Windows Qt DPAPI inspector is missing" }
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          windeployqt --release --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Compose-Qt612ProductSdk.py copy-d3d --receipt "$env:SWIRL_QT_SELECTED_RECEIPT" --runtime-dir "$env:GITHUB_WORKSPACE/build/rust-qt/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-rust-d3d-public"
+          if ($LASTEXITCODE -ne 0) { throw 'Selected Qt D3D compiler deployment failed.' }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_public_qt_reality.py
@@ -791,6 +793,10 @@ QT_TEST_ARTIFACT = """      - name: Preserve isolated Qt test reports
             build/rust-qt/swirl-rust-qt-integration.xml
             build/rust-qt/swirl-import-boundaries.xml
             build/removed-runtime/rejection.log
+            build-evidence/qt-product-rust-d3d-capture/
+            build-evidence/qt-product-rust-d3d-quic/
+            build-evidence/qt-product-rust-d3d-integration/
+            build-evidence/qt-product-rust-d3d-public/
           if-no-files-found: warn
           retention-days: 7
 """

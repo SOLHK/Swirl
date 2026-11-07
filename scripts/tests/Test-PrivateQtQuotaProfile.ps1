@@ -324,7 +324,8 @@ try {
     $null = Invoke-QuotaTool 'deploy-qt' $windeployqt @('--qtpaths',$qtpaths,'--release','--no-compiler-runtime','--no-system-d3d-compiler','--openssl-root',$sslRoot,
         '--include-plugins','qoffscreen,qopensslbackend','--qmldir',(Join-Path $repo 'src/Swirl.Quick/qml'),$qaExe)
     $null = Invoke-QuotaTool 'deploy-qt-shaders' $pwsh @('-NoProfile','-NonInteractive','-File',
-        (Join-Path $repo 'scripts/Copy-QtSdkShaderRuntime.ps1'),'-QtRoot',$qtRoot,'-ApplicationDirectory',$qaRuntime)
+        (Join-Path $repo 'scripts/Copy-QtSdkShaderRuntime.ps1'),'-QtRoot',$qtRoot,'-ApplicationDirectory',$qaRuntime,
+        '-QtSdkReceipt',$selectedPath,'-EvidenceDirectory',(Join-Path $output 'qt-d3d'),'-Python',$python)
     $null = Invoke-QuotaTool 'qt-post-deploy' $python @($sdkVerifier,'verify','--receipt',$selectedPath,
         '--build-dir',$qaBuild,'--phase','post-deploy','--runtime-dir',$qaRuntime,
         '--evidence',(Join-Path $output 'qt-post-deploy'))
