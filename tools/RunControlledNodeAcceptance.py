@@ -382,6 +382,18 @@ def _cleanup_controlled_owner(process, job, native_receipt, primary_error):
             raise errors[0]
 
 
+def _wait_for_controlled_retirement(process, job):
+    # Process signaling and Job accounting can finish separately. Both must
+    # complete within one retirement budget before native stop proof is read.
+    deadline = time.monotonic()+5
+    process.wait(timeout=max(0,deadline-time.monotonic()))
+    while not job.empty(process):
+        remaining = deadline-time.monotonic()
+        if remaining <= 0:
+            raise ValueError("OwnedJobExitUnconfirmed")
+        time.sleep(min(0.005,remaining))
+
+
 def execute(executable, root, manifest, child_environment, proof, *, admission_control=None):
     """Independent watchdog terminates the whole atomically owned process set."""
     if type(proof) is not _FixtureProof:
@@ -454,9 +466,7 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
         if process.poll() is None:
             guard["timedOut"]=True
             job.terminate()
-        process.wait(timeout=5)
-        if not job.empty(process):
-            raise ValueError("OwnedJobExitUnconfirmed")
+        _wait_for_controlled_retirement(process, job)
         done.set()
         watchdog.join(timeout=1)
         for thread in captures:

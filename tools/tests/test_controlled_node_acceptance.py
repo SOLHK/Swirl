@@ -443,6 +443,40 @@ class ControlledCleanupTests(unittest.TestCase):
         job.close.assert_called_once()
 
 
+class ControlledRetirementTests(unittest.TestCase):
+    def setUp(self):
+        self.process,self.job=Mock(),Mock()
+        self.now=100.0
+        self.sleeps=[]
+
+    def process_wait(self, *, timeout):
+        self.assertEqual(timeout,5)
+        self.now+=4.99
+
+    def sleep(self, duration):
+        self.sleeps.append(duration)
+        self.now=round(self.now+duration,9)
+
+    def test_delayed_job_empty_uses_only_remaining_process_wait_budget(self):
+        self.process.wait.side_effect=self.process_wait
+        self.job.empty.side_effect=[False,False,True]
+        with patch.object(qa.time,"monotonic",side_effect=lambda:self.now),patch.object(qa.time,"sleep",side_effect=self.sleep):
+            qa._wait_for_controlled_retirement(self.process,self.job)
+        self.assertEqual(self.job.empty.call_args_list,[unittest.mock.call(self.process)]*3)
+        self.assertAlmostEqual(self.now,105)
+        self.assertAlmostEqual(sum(self.sleeps),0.01)
+
+    def test_permanently_nonempty_job_fails_within_same_five_second_budget(self):
+        self.process.wait.side_effect=self.process_wait
+        self.job.empty.return_value=False
+        with patch.object(qa.time,"monotonic",side_effect=lambda:self.now),patch.object(qa.time,"sleep",side_effect=self.sleep):
+            with self.assertRaisesRegex(ValueError,"OwnedJobExitUnconfirmed"):
+                qa._wait_for_controlled_retirement(self.process,self.job)
+        self.assertEqual(self.job.empty.call_count,3)
+        self.assertAlmostEqual(self.now,105)
+        self.assertAlmostEqual(sum(self.sleeps),0.01)
+
+
 @unittest.skipUnless(os.name=="nt","Windows atomic Job boundary required")
 class WindowsProcessTests(unittest.TestCase):
     def run_real_child(self,body):
