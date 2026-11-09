@@ -132,12 +132,13 @@ class _WindowsStorage:
         self.kernel.LocalFree(self.descriptor)
         self.descriptor = None
 
-    def validate(self, handle, directory=False):
+    def validate(self, handle, directory=False, *, allow_unlinked=False):
         c = self.c
         info = self.FileInformation()
         if not self.kernel.GetFileInformationByHandle(handle, c.byref(info)):
             raise BudgetError("PrivateStorageRequired")
-        if info.attributes & 0x400 or bool(info.attributes & 0x10) != directory or (not directory and info.links != 1):
+        if (info.attributes & 0x400 or bool(info.attributes & 0x10) != directory
+                or not directory and info.links not in ((0, 1) if allow_unlinked else (1,))):
             raise BudgetError("PrivateStorageRequired")
         owner, dacl, descriptor = c.c_void_p(), c.c_void_p(), c.c_void_p()
         if self.security.GetSecurityInfo(handle, 1, 5, c.byref(owner), None, c.byref(dacl), None, c.byref(descriptor)):

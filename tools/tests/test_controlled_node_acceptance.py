@@ -477,23 +477,148 @@ class ControlledRetirementTests(unittest.TestCase):
         self.assertAlmostEqual(sum(self.sleeps),0.01)
 
 
+@unittest.skipUnless(os.name=="nt","Windows snapshot sharing and ACL boundary required")
+class WindowsStateSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary=tempfile.TemporaryDirectory()
+        self.storage=qa._WindowsStorage()
+        self.root=Path(self.temporary.name)/"owned"
+        self.storage.prepare(self.root)
+        self.path=self.root/"state.json"
+        self.old=dict(nonce="a"*64,sourceSha="b"*40,phase="starting",requestsStarted=False)
+        self.new=dict(self.old,phase="requests",requestsStarted=True)
+        self.path.write_text(json.dumps(self.old),encoding="utf-8")
+
+    def tearDown(self):
+        self.storage.close()
+        self.temporary.cleanup()
+
+    def replacement(self):
+        path=self.root/"replacement.json"
+        path.write_text(json.dumps(self.new),encoding="utf-8")
+        return path
+
+    def replace_snapshot(self,replacement):
+        # ReplaceFileW can replace an open snapshot with FILE_SHARE_DELETE;
+        # MoveFileExW/os.replace rejects an open destination on Windows.
+        c=self.storage.c
+        replace=self.storage.kernel.ReplaceFileW
+        replace.argtypes=[c.c_wchar_p,c.c_wchar_p,c.c_wchar_p,c.c_ulong,c.c_void_p,c.c_void_p]
+        replace.restype=c.c_int
+        self.assertTrue(replace(str(self.path),str(replacement),None,0,None,None),c.get_last_error())
+
+    def test_atomic_replacement_completes_while_snapshot_read_handle_is_open(self):
+        replacement=self.replacement()
+        original_fdopen=qa.os.fdopen
+        reads=[]
+        case=self
+
+        class ReplacingReader:
+            def __init__(self,*args,**kwargs):
+                self.stream=original_fdopen(*args,**kwargs)
+            def __enter__(self):
+                self.stream.__enter__()
+                return self
+            def __exit__(self,*args):
+                return self.stream.__exit__(*args)
+            def read(self,size):
+                case.replace_snapshot(replacement)
+                reads.append(size)
+                return self.stream.read(size)
+
+        with patch.object(qa.os,"fdopen",ReplacingReader):
+            self.assertEqual(qa.read_controlled_state(self.path),self.old)
+        self.assertEqual(reads,[4097])
+        self.assertFalse(replacement.exists())
+        self.assertEqual(qa.read_controlled_state(self.path),self.new)
+
+    def test_replacement_before_validation_accepts_snapshot_but_not_a_ledger_handle(self):
+        replacement=self.replacement()
+        original_validate=qa._WindowsStorage.validate
+        snapshots=[]
+        case=self
+
+        def replace_then_validate(storage,handle,directory=False,*,allow_unlinked=False):
+            case.assertFalse(directory)
+            case.assertTrue(allow_unlinked)
+            case.replace_snapshot(replacement)
+            with case.assertRaisesRegex(qa.BudgetError,"PrivateStorageRequired"):
+                original_validate(storage,handle)
+            snapshots.append(handle)
+            return original_validate(storage,handle,directory,allow_unlinked=allow_unlinked)
+
+        with patch.object(qa._WindowsStorage,"validate",replace_then_validate):
+            self.assertEqual(qa.read_controlled_state(self.path),self.old)
+        self.assertEqual(len(snapshots),1)
+        self.assertEqual(qa.read_controlled_state(self.path),self.new)
+
+    def test_state_bound_accepts_complete_limit_and_rejects_excess_before_json_decode(self):
+        encoded=json.dumps(self.old).encode("utf-8")
+        self.path.write_bytes(encoded+b" "*(4096-len(encoded)))
+        self.assertEqual(qa.read_controlled_state(self.path),self.old)
+        self.path.write_bytes(encoded+b" "*(4097-len(encoded)))
+        with patch.object(qa.json,"loads",side_effect=AssertionError("oversized JSON decoded")),\
+                self.assertRaisesRegex(ValueError,"ControlledStateTooLarge"):
+            qa.read_controlled_state(self.path)
+
+    def test_non_object_state_is_rejected_at_snapshot_boundary(self):
+        for value in ([],None):
+            with self.subTest(value=value):
+                self.path.write_text(json.dumps(value),encoding="utf-8")
+                with self.assertRaisesRegex(ValueError,"ControlledStateObjectRequired"):
+                    qa.read_controlled_state(self.path)
+
+    def test_hard_link_state_is_rejected_even_with_private_acl(self):
+        alias=self.root/"state-alias.json"
+        os.link(self.path,alias)
+        with self.assertRaisesRegex(qa.BudgetError,"PrivateStorageRequired"):
+            qa.read_controlled_state(self.path)
+
+    def test_everyone_readable_state_is_rejected_without_changing_its_acl(self):
+        command=subprocess.run(["icacls.exe",str(self.path),"/grant","*S-1-1-0:(R)"],
+                               capture_output=True,timeout=10)
+        self.assertEqual(command.returncode,0,command.stderr.decode(errors="replace"))
+        before=self.path.read_bytes()
+        with self.assertRaisesRegex(qa.BudgetError,"PrivateAclRequired"):
+            qa.read_controlled_state(self.path)
+        self.assertEqual(self.path.read_bytes(),before)
+        with self.assertRaisesRegex(qa.BudgetError,"PrivateAclRequired"):
+            qa.read_controlled_state(self.path)
+
+    def test_reparse_state_is_rejected(self):
+        link=self.root/"state-link.json"
+        try:
+            os.symlink(self.path,link)
+        except OSError as error:
+            if getattr(error,"winerror",None)==1314:
+                self.skipTest("Windows token lacks symbolic-link privilege")
+            raise
+        with self.assertRaises(qa.BudgetError):
+            qa.read_controlled_state(link)
+
+
 @unittest.skipUnless(os.name=="nt","Windows atomic Job boundary required")
 class WindowsProcessTests(unittest.TestCase):
     def run_real_child(self,body):
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory)
-            fixture=qa.LoopbackFixture(FIXTURES/"localhost-cert.pem",FIXTURES/"localhost-key.pem")
+            root=Path(directory)/"owned"
+            storage=qa._WindowsStorage()
             try:
-                manifest=manifest_for(fixture)
-                proof=fixture.bind_session(manifest)
-                qa.write_json(root/"session.json",manifest)
-                actual=qa._WindowsProcess
-                def launch(arguments,**keywords):
-                    return actual([sys.executable,"-c",body,str(root)],**keywords)
-                with patch.object(qa,"_WindowsProcess",launch):
-                    return qa.execute(Path(sys.executable),root,manifest,dict(os.environ),proof)
+                storage.prepare(root)
+                fixture=qa.LoopbackFixture(FIXTURES/"localhost-cert.pem",FIXTURES/"localhost-key.pem")
+                try:
+                    manifest=manifest_for(fixture)
+                    proof=fixture.bind_session(manifest)
+                    qa.write_json(root/"session.json",manifest)
+                    actual=qa._WindowsProcess
+                    def launch(arguments,**keywords):
+                        return actual([sys.executable,"-c",body,str(root)],**keywords)
+                    with patch.object(qa,"_WindowsProcess",launch):
+                        return qa.execute(Path(sys.executable),root,manifest,dict(os.environ),proof)
+                finally:
+                    fixture.close()
             finally:
-                fixture.close()
+                storage.close()
 
     def test_natural_exit_has_actual_process_and_job_proof(self):
         result=self.run_real_child("print('synthetic natural exit')")
@@ -514,6 +639,22 @@ root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text(
 """
         with self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
             self.run_real_child(body)
+
+    def test_state_identity_mismatch_retires_child_without_accepting_request_phase(self):
+        for key,value in (("nonce","c"*64),("sourceSha","d"*40)):
+            with self.subTest(key=key):
+                body="""import json,os,pathlib,sys,time
+root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text())
+state.update(phase='requests',requestsStarted=True)
+state[%r]=%r
+(root/'state.tmp').write_text(json.dumps(state),encoding='utf-8')
+os.replace(root/'state.tmp',root/'state.json');time.sleep(60)
+"""%(key,value)
+                result=self.run_real_child(body)
+                self.assertEqual(result["error"],"ChildSupervisionFailed")
+                self.assertFalse(result["requestPhaseObserved"])
+                self.assertTrue(result["processSignaled"] and result["ownedJobEmpty"])
+                self.assertFalse(result["nativeWatchdog"]["triggered"])
 
     def test_stalled_request_is_killed_without_renewing_its_deadline(self):
         body="""import json,pathlib,sys,time

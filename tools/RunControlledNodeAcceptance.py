@@ -59,6 +59,42 @@ def json_bytes(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
+def read_controlled_state(path):
+    if os.name == "nt":
+        import msvcrt
+        storage = _WindowsStorage()
+        try:
+            # QSaveFile atomically replaces this snapshot. Unlike ledger reads,
+            # this handle must share deletion and may outlive its directory link.
+            handle = storage.kernel.CreateFileW(str(path), 0x80020000, 7, None, 3, 0x00200000, None)
+            if handle == storage.c.c_void_p(-1).value:
+                raise BudgetError("ControlledStateOpenFailed")
+            try:
+                storage.validate(handle, allow_unlinked=True)
+                descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+            except BaseException:
+                storage.kernel.CloseHandle(handle)
+                raise
+            try:
+                stream = os.fdopen(descriptor, "rb")
+            except BaseException:
+                os.close(descriptor)
+                raise
+            with stream:
+                data = stream.read(4097)
+        finally:
+            storage.close()
+    else:
+        with path.open("rb") as stream:
+            data = stream.read(4097)
+    if len(data) > 4096:
+        raise ValueError("ControlledStateTooLarge")
+    value = json.loads(data.decode("utf-8"))
+    if type(value) is not dict:
+        raise ValueError("ControlledStateObjectRequired")
+    return value
+
+
 def ui_import_contract(manifest):
     """Fixed fixture syntax only. This never issues a quota or admission grant."""
     if "uiWorkflow" not in manifest:
@@ -623,7 +659,7 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
                         return
                     state_path=root/"state.json"
                     if state_path.exists():
-                        state=json.loads(state_path.read_text("utf-8"))
+                        state=read_controlled_state(state_path)
                         if state.get("nonce")!=manifest["nonce"] or state.get("sourceSha")!=manifest["sourceSha"]:
                             raise ValueError("ChildStateIdentityMismatch")
                         if (state.get("phase")=="requests" or state.get("requestsStarted") is True) and not guard["requestPhaseObserved"]:
