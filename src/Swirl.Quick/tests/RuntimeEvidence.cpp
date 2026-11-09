@@ -569,7 +569,10 @@ public:
         case ImportedConfirm: if(commitClick("confirmPolicyTarget","imported-confirm"))m_phase=ImportedWait;break;
         case ImportedWait:
             if(committed("imported-target")&&!modalVisible("policyTargetPicker")){
-                if(!routeMatches(m_importedId)||!readback(true)||!witnessRoute("policy-applied")){m_error="PrivateUiImportedPolicyMismatch";return;}
+                // The finish reply and its status snapshot are queued separately.
+                // Wait under the existing request deadline before admitting probes.
+                if(!routeMatches(m_importedId))break;
+                if(!readback(true)||!witnessRoute("policy-applied")){m_error="PrivateUiImportedPolicyMismatch";return;}
                 m_policySelected=true;if(navigate("proxies"))m_phase=NodesPage;
             }break;
         case NodesPage: if(pageSettled("proxies"))m_phase=NodeDetail;break;
