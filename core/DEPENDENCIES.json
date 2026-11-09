@@ -53,6 +53,17 @@
       ]
     },
     {
+      "name": "argon2",
+      "version": "0.5.3",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/RustCrypto/password-hashes/tree/master/argon2",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
       "name": "arraydeque",
       "version": "0.5.1",
       "license": "MIT/Apache-2.0",
@@ -1183,6 +1194,17 @@
       ]
     },
     {
+      "name": "password-hash",
+      "version": "0.5.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/RustCrypto/traits/tree/master/password-hash",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
       "name": "percent-encoding",
       "version": "2.3.2",
       "license": "MIT OR Apache-2.0",
@@ -1317,6 +1339,18 @@
       "license": "MIT OR Apache-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/rust-random/rand_core",
+      "notices": [
+        "COPYRIGHT",
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "rand_core",
+      "version": "0.6.4",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/rust-random/rand",
       "notices": [
         "COPYRIGHT",
         "LICENSE-APACHE",

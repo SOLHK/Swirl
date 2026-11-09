@@ -30,6 +30,9 @@ pub struct NetworkAdapter {
     pub name: String,
     pub up: bool,
     pub hardware: bool,
+    /// False only for Windows IfOperStatusNotPresent. Disconnected adapters
+    /// remain present and must receive DNS guards before they reconnect.
+    pub present: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -153,6 +156,7 @@ pub struct AdapterConfiguration {
     pub identity: InterfaceIdentity,
     pub name: String,
     pub hardware: bool,
+    pub present: bool,
     pub interfaces: Vec<IpInterfaceConfiguration>,
     pub addresses: Vec<IpAddressConfiguration>,
     pub dns: Vec<DnsConfiguration>,
@@ -590,6 +594,15 @@ try {
     if ($adapters[0].HardwareInterface) { throw 'Refusing to mutate a physical interface' }
     return $adapters[0]
   }
+  function Present-HardwareAliases {
+    Get-NetAdapter -IncludeHidden -Physical -ErrorAction Stop | ForEach-Object {
+      $status = $_.PSObject.Properties['InterfaceOperationalStatus']
+      if ($null -eq $status -or $null -eq $status.Value -or [uint32]$status.Value -notin 1..7) { throw 'Physical adapter operational status is unavailable' }
+      # NotPresent cannot transmit and Windows rejects a firewall rule for it.
+      # Keep Down/Disconnected, Dormant and every other present interface.
+      if ([uint32]$status.Value -ne 6) { [string]$_.Name }
+    }
+  }
   function Read-State {
     if ($p.resource.kind -ne 'dns_guard' -and $null -eq (Owned-Adapter)) { return $null }
     switch ($p.resource.kind) {
@@ -679,7 +692,7 @@ try {
     if ((Get-Service -Name mpssvc -ErrorAction Stop).Status -ne 'Running') { throw 'Windows Defender Firewall service stopped' }
     $profiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore -ErrorAction Stop)
     if ($profiles.Count -ne 3 -or @($profiles | Where-Object { [string]$_.Enabled -ne 'True' -or [string]$_.AllowLocalFirewallRules -eq 'False' }).Count -ne 0) { throw 'Active firewall profiles no longer enforce local DNS guard rules' }
-    $hardware = @(Get-NetAdapter -IncludeHidden -Physical -ErrorAction Stop | ForEach-Object { [string]$_.Name })
+    $hardware = @(Present-HardwareAliases)
     if ($hardware.Count -eq 0) { throw 'No physical adapters available for DNS guard audit' }
     foreach ($profile in $profiles) {
       foreach ($excluded in @($profile.DisabledInterfaceAliases)) {
@@ -753,11 +766,15 @@ try {
           if ((Get-Service -Name mpssvc -ErrorAction Stop).Status -ne 'Running') { throw 'Windows Defender Firewall service is not running' }
           $profiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore -ErrorAction Stop)
           if ($profiles.Count -ne 3 -or @($profiles | Where-Object { [string]$_.Enabled -ne 'True' -or [string]$_.AllowLocalFirewallRules -eq 'False' }).Count -ne 0) { throw 'Firewall profiles must enforce local DNS guard rules' }
-          $hardware = @(Get-NetAdapter -IncludeHidden -Physical -ErrorAction Stop | ForEach-Object { [string]$_.Name })
+          $hardware = @(Present-HardwareAliases)
           foreach ($alias in @($value.interfaces)) { if ($hardware -cnotcontains $alias) { throw 'DNS guard alias is not a physical adapter' } }
-          if (@($hardware | Where-Object { @($value.interfaces) -cnotcontains $_ }).Count -ne 0) { throw 'DNS guard must cover every known physical adapter, including disconnected adapters' }
+          if (@($hardware | Where-Object { @($value.interfaces) -cnotcontains $_ }).Count -ne 0) { throw 'DNS guard must cover every present physical adapter, including disconnected adapters' }
           $protocol = if ($value.protocol -eq 'tcp') { 'TCP' } else { 'UDP' }
-          New-NetFirewallRule -Name ([string]$p.resource.name) -DisplayName ([string]$p.resource.name) -Group 'Swirl Native TUN DNS Guard' -Description ('Swirl native TUN DNS guard owner ' + [string]$value.owner) -Direction Outbound -Action Block -Enabled True -Profile Any -Protocol $protocol -RemotePort 53 -LocalPort Any -LocalAddress Any -RemoteAddress Any -Program Any -Service Any -InterfaceAlias ([string[]]$value.interfaces) -EdgeTraversalPolicy Block -PolicyStore PersistentStore -ErrorAction Stop | Out-Null
+          # InterfaceAlias accepts WildcardPattern[]. Journal entries are exact
+          # observed names, including Windows-generated names with a literal '*'.
+          # Escape the backtick too: Windows PowerShell 5.1's Escape() omits it.
+          $literalAliases = @($value.interfaces | ForEach-Object { ([string]$_).Replace('`', '``').Replace('*', '`*').Replace('?', '`?').Replace('[', '`[').Replace(']', '`]') })
+          New-NetFirewallRule -Name ([string]$p.resource.name) -DisplayName ([string]$p.resource.name) -Group 'Swirl Native TUN DNS Guard' -Description ('Swirl native TUN DNS guard owner ' + [string]$value.owner) -Direction Outbound -Action Block -Enabled True -Profile Any -Protocol $protocol -RemotePort 53 -LocalPort Any -LocalAddress Any -RemoteAddress Any -Program Any -Service Any -InterfaceAlias ([string[]]$literalAliases) -EdgeTraversalPolicy Block -PolicyStore PersistentStore -ErrorAction Stop | Out-Null
         }
       }
     }
@@ -780,7 +797,9 @@ $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 try {
   $adapters = @(Get-NetAdapter -IncludeHidden -ErrorAction Stop | ForEach-Object {
-    @{identity=@{index=[uint32]$_.ifIndex;guid=([guid]$_.InterfaceGuid).ToString('D').ToLowerInvariant()};name=[string]$_.Name;up=($_.Status -eq 'Up');hardware=[bool]$_.HardwareInterface}
+    $status = $_.PSObject.Properties['InterfaceOperationalStatus']
+    if ($null -eq $status -or $null -eq $status.Value -or [uint32]$status.Value -notin 1..7) { throw 'Adapter operational status is unavailable' }
+    @{identity=@{index=[uint32]$_.ifIndex;guid=([guid]$_.InterfaceGuid).ToString('D').ToLowerInvariant()};name=[string]$_.Name;up=([uint32]$status.Value -eq 1);hardware=[bool]$_.HardwareInterface;present=([uint32]$status.Value -ne 6)}
   })
   $routes = @(Get-NetRoute -PolicyStore ActiveStore -ErrorAction Stop | Where-Object { $_.DestinationPrefix -in @('0.0.0.0/0','::/0','0.0.0.0/1','128.0.0.0/1','::/1','8000::/1') } | ForEach-Object {
     $ipif = Get-NetIPInterface -InterfaceIndex $_.InterfaceIndex -AddressFamily $_.AddressFamily -ErrorAction Stop
@@ -812,6 +831,8 @@ try {
   $configuration = @($adapters | ForEach-Object {
     $adapter = $_
     $index = $adapter.ifIndex
+    $status = $adapter.PSObject.Properties['InterfaceOperationalStatus']
+    if ($null -eq $status -or $null -eq $status.Value -or [uint32]$status.Value -notin 1..7) { throw 'Adapter operational status is unavailable' }
     $ip = @($interfaces | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
       $mtuProperty = $_.PSObject.Properties['NlMtu']
       if ($null -eq $mtuProperty -or $null -eq $mtuProperty.Value) { throw 'Windows configuration snapshot missing NlMtu property or value' }
@@ -829,7 +850,7 @@ try {
       if ($null -ne $_.ServerAddresses) { $serverAddresses = @($_.ServerAddresses) }
       @{address_family=$_.AddressFamily;servers=$serverAddresses}
     })
-    @{identity=@{index=$index;guid=([guid]$adapter.InterfaceGuid).ToString('D').ToLowerInvariant()};name=$adapter.Name;hardware=$adapter.HardwareInterface;interfaces=$ip;addresses=$address;dns=$servers}
+    @{identity=@{index=$index;guid=([guid]$adapter.InterfaceGuid).ToString('D').ToLowerInvariant()};name=$adapter.Name;hardware=$adapter.HardwareInterface;present=([uint32]$status.Value -ne 6);interfaces=$ip;addresses=$address;dns=$servers}
   })
   ConvertTo-Json -InputObject @{adapters=$configuration;routes=$routes} -Compress -Depth 12
 } catch {
@@ -913,6 +934,78 @@ try {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adapter_presence_keeps_disconnected_interfaces_and_detects_reappearance() {
+        const MOCK: &str = r#"
+function Get-NetAdapter {
+  foreach ($status in 1..7) {
+    [pscustomobject]@{ifIndex=$status;InterfaceGuid='00000000-0000-0000-0000-000000000001';Name=('Adapter '+$status);HardwareInterface=$true;InterfaceOperationalStatus=$status}
+  }
+}
+function Get-NetRoute {}
+function Get-NetIPInterface {}
+function Get-NetIPAddress {}
+function Get-DnsClientServerAddress {}
+"#;
+        let snapshot: NetworkSnapshot =
+            run_json(&format!("{MOCK}\n{SNAPSHOT_SCRIPT}"), &json!({})).unwrap();
+        assert_eq!(snapshot.adapters.len(), 7);
+        for adapter in &snapshot.adapters {
+            assert_eq!(adapter.present, adapter.identity.index != 6);
+            assert_eq!(adapter.up, adapter.identity.index == 1);
+        }
+        let snapshot: NetworkConfigurationSnapshot = run_json(
+            &format!("{MOCK}\n{CONFIGURATION_SNAPSHOT_SCRIPT}"),
+            &json!({}),
+        )
+        .unwrap();
+        assert_eq!(snapshot.adapters.len(), 7);
+        let mut reappeared = snapshot.clone();
+        assert!(!reappeared.adapters[5].present);
+        reappeared.adapters[5].present = true;
+        assert_ne!(
+            snapshot, reappeared,
+            "gateway comparison must see reappearance"
+        );
+        for adapter in snapshot.adapters {
+            assert_eq!(adapter.present, adapter.identity.index != 6);
+        }
+    }
+
+    #[test]
+    fn firewall_alias_patterns_match_only_the_observed_literal_names() {
+        let escape = RESOURCE_SCRIPT
+            .lines()
+            .find(|line| line.trim_start().starts_with("$literalAliases ="))
+            .expect("production firewall argument construction");
+        let script = format!(
+            r#"
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$p = [Console]::In.ReadToEnd() | ConvertFrom-Json
+$value = @{{interfaces=@($p.aliases)}}
+{escape}
+$result = @()
+for ($i=0; $i -lt $literalAliases.Count; $i++) {{
+  $pattern = [System.Management.Automation.WildcardPattern]::new($literalAliases[$i])
+  $result += @{{same=$pattern.IsMatch([string]$p.aliases[$i]);expanded=$pattern.IsMatch([string]$p.neighbours[$i])}}
+}}
+ConvertTo-Json -InputObject $result -Compress
+"#
+        );
+        let observed: Vec<serde_json::Value> = run_json(
+            &script,
+            &json!({
+                "aliases":["Local* 3","Adapter?","Adapter[1]","Adapter`x"],
+                "neighbours":["LocalXYZ 3","AdapterX","Adapter1","Adapterx"]
+            }),
+        )
+        .unwrap();
+        assert_eq!(observed.len(), 4);
+        for row in observed {
+            assert_eq!(row, json!({"same":true,"expanded":false}));
+        }
+    }
 
     #[test]
     fn different_interface_guid_or_index_is_rejected_before_network_commands() {
@@ -1095,8 +1188,12 @@ function Get-NetFirewallProfile {
 function Get-NetAdapter {
   param([switch]$IncludeHidden,[switch]$Physical)
   if (-not $Physical) { throw 'Audit must enumerate physical adapters' }
-  @{Name='Ethernet'}
-  if ($p.drift -eq 'adapter') { @{Name='Wi-Fi'} }
+  [pscustomobject]@{Name='Ethernet';InterfaceOperationalStatus=1}
+  if ($p.drift -eq 'adapter') { [pscustomobject]@{Name='Wi-Fi';InterfaceOperationalStatus=2} }
+  if ($p.drift -eq 'absent') { [pscustomobject]@{Name='Removed adapter';InterfaceOperationalStatus=6} }
+  if ($p.drift -eq 'missing_status') { [pscustomobject]@{Name='Unclassified adapter'} }
+  if ($p.drift -eq 'null_status') { [pscustomobject]@{Name='Unclassified adapter';InterfaceOperationalStatus=$null} }
+  if ($p.drift -eq 'invalid_status') { [pscustomobject]@{Name='Unclassified adapter';InterfaceOperationalStatus=8} }
 }
 function Get-NetFirewallRule {
   param($Name,$PolicyStore)
@@ -1135,6 +1232,7 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
     #[test]
     fn dns_guard_audit_checks_effective_dual_protocol_rules_without_network_writes() {
         assert!(mocked_dns_guard_audit("none").unwrap());
+        assert!(mocked_dns_guard_audit("absent").unwrap());
     }
 
     #[test]
@@ -1146,6 +1244,9 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
             "policy",
             "exempt",
             "adapter",
+            "missing_status",
+            "null_status",
+            "invalid_status",
             "degraded",
             "enforcement",
             "port",
@@ -1239,6 +1340,7 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
             identity: InterfaceIdentity::new(71, 1),
             name: "test adapter".into(),
             hardware: false,
+            present: true,
             interfaces: vec![IpInterfaceConfiguration {
                 compartment_id: 1,
                 address_family: 23,
@@ -1292,6 +1394,7 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
                 name: "test".into(),
                 up: true,
                 hardware: true,
+                present: true,
             }],
             routes: vec![SystemRoute {
                 interface_index: 7,
@@ -1324,12 +1427,14 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
                     name: "Ethernet".into(),
                     up: true,
                     hardware: true,
+                    present: true,
                 },
                 NetworkAdapter {
                     identity: disconnected,
                     name: "Wi-Fi".into(),
                     up: false,
                     hardware: true,
+                    present: true,
                 },
             ],
             routes: vec![

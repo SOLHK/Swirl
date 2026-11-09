@@ -93,6 +93,20 @@ pub fn physical_probe_active() -> bool {
     current_id() != 0
 }
 
+/// Capture the already verified request context before spawning a protocol
+/// driver that owns an existing socket. This performs no discovery or dial;
+/// unrelated spawned tasks keep their ordinary scope. The driver owner remains
+/// responsible for cancelling the task and retiring its socket.
+pub fn inherit_physical_probe_scope<F: Future>(future: F) -> impl Future<Output = F::Output> {
+    let scope = PHYSICAL_PROBE.try_with(|scope| *scope).ok();
+    async move {
+        match scope {
+            Some(scope) => PHYSICAL_PROBE.scope(scope, future).await,
+            None => future.await,
+        }
+    }
+}
+
 pub(super) fn binding(ipv6: bool) -> io::Result<Option<Binding>> {
     PHYSICAL_PROBE
         .try_with(|scope| scope.binding(ipv6).map(Some))
@@ -157,6 +171,43 @@ mod tests {
             source: "192.0.2.7".parse().unwrap(),
         }])
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn explicit_socket_driver_inheritance_keeps_full_scope_identity() {
+        let peer = "192.0.2.20:443".parse().unwrap();
+        let token = PHYSICAL_PROBE
+            .scope(fixture(), async {
+                let token = EgressToken::capture(&[peer]).unwrap();
+                tokio::spawn(inherit_physical_probe_scope(async move {
+                    assert!(physical_probe_active());
+                    assert!(token.with_current(|| ()).is_ok());
+                    assert_eq!(EgressToken::capture(&[peer]).unwrap(), token);
+                }))
+                .await
+                .unwrap();
+                assert!(
+                    !tokio::spawn(async { physical_probe_active() })
+                        .await
+                        .unwrap()
+                );
+                token
+            })
+            .await;
+        assert!(!physical_probe_active());
+        assert!(token.with_current(|| ()).is_err());
+        PHYSICAL_PROBE
+            .scope(fixture(), async {
+                assert!(token.with_current(|| ()).is_err());
+            })
+            .await;
+        assert!(
+            !tokio::spawn(inherit_physical_probe_scope(async {
+                physical_probe_active()
+            }))
+            .await
+            .unwrap()
+        );
     }
 
     #[tokio::test]

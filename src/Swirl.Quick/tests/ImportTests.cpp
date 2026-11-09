@@ -1091,7 +1091,7 @@ external-controller: 0.0.0.0:9090
         QVERIFY(service.saveSubscription({},"Header fixture",server.url(),360,false,"auto"));
         const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
-        QVERIFY(server.lastRequest.contains("User-Agent: Swirl/"));QVERIFY(!server.lastRequest.contains("Clash"));
+        QVERIFY(server.lastRequest.contains("User-Agent: Surge/6.0 Swirl/"));QVERIFY(!server.lastRequest.contains("Clash"));
         QVERIFY(!service.saveSubscription({},"Duplicate endpoint",server.url(),360,false));QCOMPARE(store.subscriptions().size(),1);
         QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
         server.code=400;service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
@@ -1144,6 +1144,20 @@ external-controller: 0.0.0.0:9090
         QVERIFY(!message.contains("PRIVATE-TOKEN"));QVERIFY(!message.contains("127.0.0.1"));
         QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);
     }
+    void automaticDownloadRequestsFullProfileButRetainsSeparateConfigurationReview() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+        server.content="[General]\ndns-server=192.0.2.53\n[Proxy]\nControlled=socks5,127.0.0.1,1080\n[Proxy Group]\nSelection=select,Controlled\n[Rule]\nFINAL,Selection\n[Script]\nfixture=http-response ^https://fixture.invalid/ script-path=https://fixture.invalid/script.js\n";
+        server.code=406;server.acceptedAgent="Surge/6.0 Swirl/"+QCoreApplication::applicationVersion().toUtf8();
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
+        const auto before=controller.policyDocument();auto *imports=controller.imports();
+        QVERIFY(imports->saveSubscription({},"Full profile",server.url(),360,false));
+        const auto source=imports->providers().first().toMap().value("id").toString();
+        imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),6000);
+        QCOMPARE(server.count,1);QCOMPARE(controller.nodeCatalog().size(),1);QVERIFY(!controller.processAlive());
+        QVERIFY(imports->providers().first().toMap().value("hasConfiguration").toBool());
+        QCOMPARE(controller.policyDocument(),before);
+        QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("脚本")));
+    }
     void automaticDownloadRetriesLegacyNegotiationWithoutChangingSignedUrl() {
         QFETCH(int,status);
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);server.code=status;
@@ -1159,7 +1173,7 @@ external-controller: 0.0.0.0:9090
         QCOMPARE(store.subscriptions().first().url.toEncoded(),url.toEncoded());
         const auto expected="GET "+url.toEncoded(QUrl::RemoveScheme|QUrl::RemoveAuthority)+" HTTP/1.1\r\n";
         for(const auto &request:server.requests)QVERIFY2(request.startsWith(expected),request.left(request.indexOf('\r')).constData());
-        QVERIFY(server.requests.first().contains("User-Agent: Swirl/"));
+        QVERIFY(server.requests.first().contains("User-Agent: Surge/6.0 Swirl/"));
         QVERIFY(server.requests.last().contains("User-Agent: Clash.Meta/1.19.32 Swirl/1.0\r\n"));
         QCOMPARE(diagnostics.size(),2);
         const auto initial=diagnostics.first().first().toString(),retry=diagnostics.last().first().toString();

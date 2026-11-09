@@ -13,7 +13,7 @@ mod probe;
 pub use budget::TcpConnection;
 #[cfg(not(feature = "private-acceptance"))]
 pub type TcpConnection = TcpStream;
-pub use probe::{physical_probe_active, with_physical_probe};
+pub use probe::{inherit_physical_probe_scope, physical_probe_active, with_physical_probe};
 use std::{io, net::SocketAddr, sync::Mutex};
 use tokio::net::{TcpSocket, TcpStream, UdpSocket};
 

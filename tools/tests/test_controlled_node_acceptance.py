@@ -487,7 +487,7 @@ class WindowsStateSnapshotTests(unittest.TestCase):
         self.path=self.root/"state.json"
         self.old=dict(nonce="a"*64,sourceSha="b"*40,phase="starting",requestsStarted=False)
         self.new=dict(self.old,phase="requests",requestsStarted=True)
-        self.path.write_text(json.dumps(self.old),encoding="utf-8")
+        self.write_private_json(self.path,self.old)
 
     def tearDown(self):
         self.storage.close()
@@ -495,8 +495,14 @@ class WindowsStateSnapshotTests(unittest.TestCase):
 
     def replacement(self):
         path=self.root/"replacement.json"
-        path.write_text(json.dumps(self.new),encoding="utf-8")
+        self.write_private_json(path,self.new)
         return path
+
+    def write_private_json(self,path,value):
+        # Match the native publisher's explicit TokenUser owner/DACL even when
+        # an elevated runner token would otherwise choose Administrators.
+        with os.fdopen(self.storage.open(path,create=True),"wb") as stream:
+            stream.write(json.dumps(value).encode("utf-8"))
 
     def replace_snapshot(self,replacement):
         # ReplaceFileW can replace an open snapshot with FILE_SHARE_DELETE;
@@ -610,9 +616,32 @@ class WindowsProcessTests(unittest.TestCase):
                     manifest=manifest_for(fixture)
                     proof=fixture.bind_session(manifest)
                     qa.write_json(root/"session.json",manifest)
+                    initial=dict(manifest,phase="starting",requestsStarted=False)
+                    with os.fdopen(storage.open(root/"state.json",create=True),"wb") as stream:
+                        stream.write(json.dumps(initial).encode("utf-8"))
+                    # Prove valid identity and ACL admission before an invalid
+                    # identity can cause the same fixed supervision error.
+                    self.assertEqual(qa.read_controlled_state(root/"state.json"),initial)
+                    publisher="""import ctypes,json,os,sys
+sys.path.insert(0,%r)
+from PrivateSubscriptionBudget import _WindowsStorage
+def publish_state(root,state):
+    storage=_WindowsStorage()
+    try:
+        temporary=root/'child-state.tmp'
+        with os.fdopen(storage.open(temporary,create=True),'wb') as stream:
+            stream.write(json.dumps(state).encode('utf-8'))
+        replace=storage.kernel.ReplaceFileW
+        replace.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_ulong,ctypes.c_void_p,ctypes.c_void_p]
+        replace.restype=ctypes.c_int
+        if not replace(str(root/'state.json'),str(temporary),None,0,None,None):
+            raise OSError('ControlledStatePublishFailed')
+    finally:
+        storage.close()
+"""%str(TOOLS)
                     actual=qa._WindowsProcess
                     def launch(arguments,**keywords):
-                        return actual([sys.executable,"-c",body,str(root)],**keywords)
+                        return actual([sys.executable,"-c",publisher+body,str(root)],**keywords)
                     with patch.object(qa,"_WindowsProcess",launch):
                         return qa.execute(Path(sys.executable),root,manifest,dict(os.environ),proof)
                 finally:
@@ -635,7 +664,7 @@ class WindowsProcessTests(unittest.TestCase):
     def test_request_state_cannot_substitute_for_native_deadline_proof(self):
         body="""import json,pathlib,sys
 root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text());state['phase']='requests'
-(root/'state.json').write_text(json.dumps(state));raise SystemExit(124)
+publish_state(root,state);raise SystemExit(124)
 """
         with self.assertRaisesRegex(ValueError,"NativeWatchdogExitUnproven"):
             self.run_real_child(body)
@@ -643,12 +672,11 @@ root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text(
     def test_state_identity_mismatch_retires_child_without_accepting_request_phase(self):
         for key,value in (("nonce","c"*64),("sourceSha","d"*40)):
             with self.subTest(key=key):
-                body="""import json,os,pathlib,sys,time
+                body="""import json,pathlib,sys,time
 root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text())
 state.update(phase='requests',requestsStarted=True)
 state[%r]=%r
-(root/'state.tmp').write_text(json.dumps(state),encoding='utf-8')
-os.replace(root/'state.tmp',root/'state.json');time.sleep(60)
+publish_state(root,state);time.sleep(60)
 """%(key,value)
                 result=self.run_real_child(body)
                 self.assertEqual(result["error"],"ChildSupervisionFailed")
@@ -659,7 +687,7 @@ os.replace(root/'state.tmp',root/'state.json');time.sleep(60)
     def test_stalled_request_is_killed_without_renewing_its_deadline(self):
         body="""import json,pathlib,sys,time
 root=pathlib.Path(sys.argv[1]);state=json.loads((root/'session.json').read_text());state['phase']='requests'
-(root/'state.json').write_text(json.dumps(state));time.sleep(60)
+publish_state(root,state);time.sleep(60)
 """
         started=time.monotonic()
         result=self.run_real_child(body)

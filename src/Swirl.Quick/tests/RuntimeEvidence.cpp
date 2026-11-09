@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QFile>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDateTime>
@@ -58,6 +59,7 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
+#include <sddl.h>
 #endif
 
 static void captureRenderedFrame(QQuickWindow *window,const QString &path){
@@ -217,9 +219,52 @@ bool controlledPath(const QString &path,bool directory=false) {
     return true;
 }
 bool controlledJson(const QString &path,const QJsonObject &value) {
-    QSaveFile file(path);
     const auto bytes=QJsonDocument(value).toJson(QJsonDocument::Compact);
+#ifdef Q_OS_WIN
+    // QSaveFile's FileRenameInfo replacement rejects an open destination even
+    // when the parent's read-only snapshot handle shares deletion.
+    HANDLE token=nullptr;
+    if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token))return false;
+    DWORD size=0;GetTokenInformation(token,TokenUser,nullptr,0,&size);
+    QByteArray user(int(size),Qt::Uninitialized);
+    const bool read=size&&GetTokenInformation(token,TokenUser,user.data(),size,&size);
+    CloseHandle(token);
+    LPWSTR sid=nullptr;
+    if(!read||!ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER *>(user.data())->User.Sid,&sid))return false;
+    // An elevated token's default owner can be Administrators. Set both owner
+    // and DACL at creation instead of changing process token defaults or ACLs.
+    const auto sddl=QStringLiteral("O:%1D:P(A;;FA;;;%1)").arg(QString::fromWCharArray(sid));
+    LocalFree(sid);
+    PSECURITY_DESCRIPTOR descriptor=nullptr;
+    if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(reinterpret_cast<LPCWSTR>(sddl.utf16()),
+        SDDL_REVISION_1,&descriptor,nullptr))return false;
+    const auto releaseDescriptor=qScopeGuard([&]{LocalFree(descriptor);});
+    SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES),descriptor,FALSE};
+    const auto target=QDir::toNativeSeparators(path);
+    const auto temporary=target+QStringLiteral(".pending-")+QUuid::createUuid().toString(QUuid::WithoutBraces);
+    HANDLE file=CreateFileW(reinterpret_cast<LPCWSTR>(temporary.utf16()),GENERIC_WRITE,0,&attributes,
+        CREATE_NEW,FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+    if(file==INVALID_HANDLE_VALUE)return false;
+    bool published=false;
+    const auto releaseTemporary=qScopeGuard([&]{
+        if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);
+        if(!published)DeleteFileW(reinterpret_cast<LPCWSTR>(temporary.utf16()));
+    });
+    DWORD written=0;
+    const bool complete=WriteFile(file,bytes.constData(),DWORD(bytes.size()),&written,nullptr)
+        &&written==bytes.size()&&FlushFileBuffers(file);
+    const bool closed=CloseHandle(file);file=INVALID_HANDLE_VALUE;
+    if(!complete||!closed)return false;
+    published=ReplaceFileW(reinterpret_cast<LPCWSTR>(target.utf16()),reinterpret_cast<LPCWSTR>(temporary.utf16()),
+        nullptr,0,nullptr,nullptr);
+    if(!published&&GetLastError()==ERROR_FILE_NOT_FOUND)
+        published=MoveFileExW(reinterpret_cast<LPCWSTR>(temporary.utf16()),reinterpret_cast<LPCWSTR>(target.utf16()),
+            MOVEFILE_WRITE_THROUGH);
+    return published;
+#else
+    QSaveFile file(path);
     return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
+#endif
 }
 bool controlledSeal(const QString &path,QByteArray bytes) {
 #ifdef Q_OS_WIN

@@ -2317,6 +2317,8 @@ async fn prepare_udp(
         }
         Outbound::Hysteria2(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
         Outbound::Tuic(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
+        Outbound::AnyTls(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
+        Outbound::Snell(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
         _ => return Err("UdpProxyUnsupportedOrRejected"),
     };
     Ok(UdpPrepared {

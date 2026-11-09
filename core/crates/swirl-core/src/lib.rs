@@ -932,7 +932,23 @@ async fn prepare_udp(
                 permit,
             });
         }
+        Outbound::Snell(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
         Outbound::Tuic(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::AnyTls(config) if config.udp => {
             return Ok(UdpDispatch {
                 transport: UdpTransport::ProxySession { target, payload },
                 payload_len,

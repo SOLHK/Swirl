@@ -110,6 +110,8 @@ private:
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);
+    bool automaticDownloadRoute(const QUrl &url) const;
+    bool tryPhysicalDownload(const QUrl &url,int redirects);
     void downloadPhysical(const QUrl &url,int redirects);
     void stopDownloadRoute();
     void startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies);
@@ -134,7 +136,7 @@ private:
     bool m_configurationReviewDismissed=false;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
-    QTimer m_timer,m_deadline;
+    QTimer m_timer,m_deadline,m_autoRouteDeadline;
     QQueue<QString> m_queue;
     QHash<QString,QString> m_errors;
     QSet<QString> m_cancelled;
@@ -156,6 +158,9 @@ private:
     bool m_busy=false,m_shuttingDown=false;
     bool m_downloadTimedOut=false;
     bool m_compatibilityRequest=false;
+    bool m_autoPhysicalAttempt=false;
+    QUrl m_routeUrl;
+    int m_routeRedirects=0;
     int m_downloadAttempts=0;
     QUrl m_downloadUrl;
     bool m_committing=false;

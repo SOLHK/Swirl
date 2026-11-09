@@ -543,20 +543,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("moreSubscription-"+id);click("editSubscription-"+id);QTest::qWait(250);
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-edit.png");
         check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
-        auto *downloadChoice=item("subscriptionDownloadRoute");auto *sourceDialog=window->findChild<QObject *>("subscriptionDialog");
-        check(downloadChoice&&downloadChoice->property("currentIndex").toInt()==0,"existing sources keep system networking as their default download route");
-        if(downloadChoice&&sourceDialog){
-            const auto autoUpdate=sourceDialog->property("autoUpdate").toBool();downloadChoice->setProperty("currentIndex",1);
-#ifdef Q_OS_WIN
-            constexpr bool physicalAvailable=true;
-#else
-            constexpr bool physicalAvailable=false;
-#endif
-            check(sourceDialog->property("downloadRoute").toString()=="physical"&&sourceDialog->property("downloadRouteSupported").toBool()==physicalAvailable&&downloadChoice->property("currentText").toString().contains(physicalAvailable?QStringLiteral("绕过系统代理"):QStringLiteral("仅 Windows")),"physical download choice describes its route and actual platform availability");
-            check(item("saveSubscription")&&item("saveSubscription")->isEnabled()==physicalAvailable,"unsupported physical download choices cannot be saved");
-            check(sourceDialog->property("autoUpdate").toBool()==autoUpdate&&sourceDialog->property("sourceUrl").toString().isEmpty(),"choosing a download route does not alter automatic updates or expose the saved URL");
-            downloadChoice->setProperty("currentIndex",0);
-        }
+        auto *sourceDialog=window->findChild<QObject *>("subscriptionDialog");
+        check(!item("subscriptionDownloadRoute")&&item("subscriptionAutomaticNetwork"),"subscription networking is automatic without a customer route selector");
+        check(sourceDialog&&sourceDialog->property("downloadRoute").toString()=="system","editing a source saves system-preferred automatic network selection");
+        check(item("saveSubscription")&&item("saveSubscription")->isEnabled(),"automatic subscription networking is available without a platform-specific choice");
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2;},8000),"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");

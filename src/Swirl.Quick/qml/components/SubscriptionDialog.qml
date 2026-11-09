@@ -18,8 +18,7 @@ SwirlDialog {
     readonly property int intervalMinutes: [360, 720, 1440, 10080][interval.currentIndex]
     readonly property bool autoUpdate: autoEnabled.checked
     readonly property string formatHint: ["auto", "clash", "loon", "shadowrocket", "surge", "quantumult-x", "sing-box"][formatPreference.currentIndex]
-    readonly property string downloadRoute: ["system", "physical"][downloadPreference.currentIndex]
-    readonly property bool downloadRouteSupported: downloadRoute !== "physical" || Qt.platform.os === "windows"
+    readonly property string downloadRoute: "system"
     signal saveRequested()
     signal recoveryRequested()
     objectName: "subscriptionDialog"
@@ -33,7 +32,6 @@ SwirlDialog {
         displayName.text = record ? record.name : ""
         urlField.text = ""
         formatPreference.currentIndex = record ? Math.max(0, ["auto", "clash", "loon", "shadowrocket", "surge", "quantumult-x", "sing-box"].indexOf(record.formatHint)) : 0
-        downloadPreference.currentIndex = record && record.downloadRoute === "physical" ? 1 : 0
         interval.currentIndex = record ? Math.max(0, [360, 720, 1440, 10080].indexOf(record.intervalMinutes)) : 2
         autoEnabled.checked = record ? record.enabled : true
         advanced = false
@@ -183,18 +181,10 @@ SwirlDialog {
                         text: qsTr("自动识别格式，只更新节点；完整配置需单独审阅。")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
                     }
-                    SwirlText { Layout.topMargin: Theme.dp(4); text: qsTr("下载路径"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-                    FormChoice {
-                        id: downloadPreference; objectName: "subscriptionDownloadRoute"
-                        Layout.fillWidth: true; enabled: !dialog.pending
-                        model: [qsTr("系统网络（默认）"), Qt.platform.os === "windows" ? qsTr("本机网络（绕过系统代理与 VPN/TUN）") : qsTr("本机网络（仅 Windows 可用）")]
-                        Accessible.name: qsTr("订阅下载路径")
-                    }
                     SwirlText {
+                        objectName: "subscriptionAutomaticNetwork"
                         Layout.fillWidth: true; wrapMode: Text.Wrap
-                        text: !dialog.downloadRouteSupported ? qsTr("本机网络下载仅支持 Windows。请选择系统网络。") : dialog.downloadRoute === "physical"
-                            ? qsTr("仅此来源使用本机网络，不改变系统代理、VPN/TUN 或路由设置。")
-                            : qsTr("使用当前系统代理与网络设置；下载失败时不会自动切换路径。")
+                        text: qsTr("自动选择可用网络更新订阅。")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
                     }
                 }
@@ -294,7 +284,7 @@ SwirlDialog {
                 DialogButton {
                     objectName: "saveSubscription"
                     text: dialog.pending ? qsTr("正在保存…") : qsTr("保存并更新"); primary: true
-                    enabled: !dialog.pending && dialog.canSave && dialog.downloadRouteSupported && displayName.text.trim().length > 0 && (dialog.sourceId.length > 0 || urlField.text.trim().length > 0)
+                    enabled: !dialog.pending && dialog.canSave && displayName.text.trim().length > 0 && (dialog.sourceId.length > 0 || urlField.text.trim().length > 0)
                     onClicked: dialog.saveRequested()
                 }
             }

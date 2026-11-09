@@ -28,6 +28,8 @@ jobs:
         working-directory: core
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install stable Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - run: cargo fmt --all -- --check
@@ -45,6 +47,7 @@ jobs:
         run: |
           cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          cargo test --locked -p swirl-protocol --features private-acceptance --test anytls_private_guard
           cargo check --locked -p swirl-api --features private-acceptance
           cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
       - name: Supervised private ledger and mandatory guarded worker
@@ -229,6 +232,97 @@ jobs:
         with:
           go-version: '1.27.2'
           cache: false
+      - name: Snell v4 native TCP and UDP against the pinned official peer
+        if: runner.os == 'Linux'
+        working-directory: .
+        shell: bash
+        timeout-minutes: 5
+        env:
+          SWIRL_SNELL_CLIENT: ${{ github.workspace }}/core/target/debug/examples/snell-client
+          SWIRL_SNELL_PEER_DIR: ${{ runner.temp }}/swirl-snell-peer
+          SWIRL_SNELL_SERVER: ${{ runner.temp }}/swirl-snell-peer/snell-server
+          SWIRL_SNELL_EVIDENCE: ${{ runner.temp }}/swirl-snell-official
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path core/Cargo.toml --locked -p swirl-protocol --example snell-client
+          test -x "$SWIRL_SNELL_CLIENT"
+          test ! -e "$SWIRL_SNELL_PEER_DIR"
+          test ! -e "$SWIRL_SNELL_EVIDENCE"
+          python tools/tests/fetch_snell_peer.py "$SWIRL_SNELL_PEER_DIR"
+          test -x "$SWIRL_SNELL_SERVER"
+          python tools/tests/test_snell_official.py
+          python - <<'PY'
+          import hashlib, json, os, pathlib
+          report = json.loads((pathlib.Path(os.environ['SWIRL_SNELL_EVIDENCE']) / 'summary.json').read_text())
+          peer = pathlib.Path(os.environ['SWIRL_SNELL_SERVER'])
+          provenance = json.loads(peer.with_name('snell-server-provenance.json').read_text())
+          observed = report['observations']
+          if report['success'] is not True or report['server_retired'] is not True or report['source_sha'] != os.environ['GITHUB_SHA']:
+              raise SystemExit('Official Snell fixture did not pass and retire at the current source.')
+          if not report['server_sha256'] == provenance['server_sha256'] == hashlib.sha256(peer.read_bytes()).hexdigest():
+              raise SystemExit('Official Snell peer identity changed.')
+          expected = {'success': True, 'native_tcp_entry': True, 'tcp_bytes_each_direction': 37000,
+                      'udp_datagrams': [0, 1200, 16000], 'oversized_udp_rejected': True,
+                      'wrong_psk_origin_connections': 0, 'public_network_tested': False, 'qt_product_acceptance': False}
+          if any(type(observed.get(key)) is not type(value) or observed.get(key) != value for key, value in expected.items()):
+              raise SystemExit('Official Snell evidence omitted a required TCP, UDP or rejection case.')
+          PY
+      - name: Preserve sanitized official Snell interoperability receipts
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Snell-Official-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-snell-official/summary.json
+            ${{ runner.temp }}/swirl-snell-peer/snell-server-provenance.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: AnyTLS native sessions against the pinned independent Go peer
+        if: runner.os == 'Linux'
+        working-directory: .
+        shell: bash
+        timeout-minutes: 8
+        env:
+          SWIRL_ANYTLS_EVIDENCE: ${{ runner.temp }}/swirl-anytls-interop
+        run: |
+          set -euo pipefail
+          test ! -e "$SWIRL_ANYTLS_EVIDENCE"
+          python3 scripts/Test-AnyTlsInterop.py --work-dir "$SWIRL_ANYTLS_EVIDENCE"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          directory = pathlib.Path(os.environ['SWIRL_ANYTLS_EVIDENCE'])
+          path = directory / 'anytls-interop.json'
+          report = json.loads(path.read_text())
+          expected = {'result': 'passed', 'upstream': 'https://github.com/anytls/anytls-go.git',
+                      'revision': 'fd6167acd6d73b9fa3e607659951847fbc9e6c50',
+                      'test': 'anytls::tests::official_peer_reuse_padding_tcp_udp_and_owner_retirement'}
+          if any(report.get(key) != value for key, value in expected.items()):
+              raise SystemExit('The required pinned independent AnyTLS test did not pass.')
+          peer_hash = hashlib.sha256((directory / 'anytls-fixture').read_bytes()).hexdigest()
+          module_hash = hashlib.sha256((directory / 'anytls-upstream/go.sum').read_bytes()).hexdigest()
+          if report.get('peer_retired') is not True or report.get('peer_sha256') != peer_hash or report.get('module_sum_sha256') != module_hash:
+              raise SystemExit('AnyTLS peer retirement or source dependency identity did not match.')
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != os.environ['GITHUB_SHA']:
+              raise SystemExit('AnyTLS fixture source differs from the current workflow checkout.')
+          receipt = {'schema': 1, 'source_sha': source, 'run_id': os.environ['GITHUB_RUN_ID'],
+                     'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'result': 'passed',
+                     'peer_receipt_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                     'peer_binary_sha256': peer_hash, 'module_sum_sha256': module_hash, 'go': report['go'],
+                     'fixture_script_sha256': hashlib.sha256(pathlib.Path('scripts/Test-AnyTlsInterop.py').read_bytes()).hexdigest(),
+                     'scope': 'owned loopback independent Go peer; no provider, Qt product or desktop acceptance'}
+          (directory / 'ci-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Preserve sanitized official AnyTLS interoperability receipts
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-AnyTLS-Official-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-anytls-interop/anytls-interop.json
+            ${{ runner.temp }}/swirl-anytls-interop/ci-receipt.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Build pinned Xray and verify REALITY interoperability
         working-directory: .
         shell: bash
@@ -507,6 +601,8 @@ jobs:
           cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p swirl-protocol --features private-acceptance --test anytls_private_guard
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo check --locked -p swirl-api --features private-acceptance
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "purpose": "Official Snell server for independent loopback tests only; never a Swirl runtime dependency or redistributed product binary.",
+  "version": "4.1.1",
+  "protocol": "Snell v4 TCP and UDP-over-TCP",
+  "vendor_documentation": "https://kb.nssurge.com/surge-knowledge-base/release-notes/snell",
+  "license": "Vendor binary; not incorporated into Swirl source or product packaging.",
+  "url": "https://dl.nssurge.com/snell/snell-server-v4.1.1-linux-amd64.zip",
+  "archive_sha256": "cc2271b79c7506888b34e651e8741b3aa7fc7d5f60aa65ef8bb096f3313a193b",
+  "server_sha256": "8e02974916645aafc0521c49faf0ab9916a0a8a7922ae7261cfd74b96899d25a"
+}

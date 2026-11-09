@@ -394,6 +394,8 @@ impl Ingress {
             | Outbound::Trojan { host, port, .. } => (host.as_str(), *port),
             Outbound::Hysteria2(config) => (config.host.as_str(), config.port),
             Outbound::Tuic(config) => (config.host.as_str(), config.port),
+            Outbound::Snell(config) => (config.host.as_str(), config.port),
+            Outbound::AnyTls(config) => (config.host.as_str(), config.port),
         };
         let host = host.to_owned();
         let known = if host.eq_ignore_ascii_case("localhost") {

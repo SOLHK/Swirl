@@ -297,6 +297,7 @@ async fn run(
 pub(super) enum ProxyAssociation {
     Hysteria2(swirl_protocol::hysteria2::UdpAssociation),
     Tuic(swirl_protocol::tuic::UdpAssociation),
+    Snell(Box<swirl_protocol::snell::UdpAssociation>),
     Shadowsocks2022(Box<swirl_protocol::ss2022::UdpAssociation>),
     Stream(swirl_protocol::stream_udp::UdpAssociation),
 }
@@ -310,6 +311,14 @@ impl ProxyAssociation {
         limit: Duration,
     ) -> Result<Self, &'static str> {
         match outbound {
+            Outbound::Snell(config) => {
+                if !matches!(transport, None | Some(Transport::Tcp {})) {
+                    return Err("SnellTransportUnsupported");
+                }
+                Ok(Self::Snell(Box::new(
+                    swirl_protocol::snell::UdpAssociation::connect(config, resolver, limit).await?,
+                )))
+            }
             Outbound::Hysteria2(config) => Ok(Self::Hysteria2(
                 swirl_protocol::hysteria2::UdpAssociation::connect(config, resolver, limit).await?,
             )),
@@ -329,6 +338,12 @@ impl ProxyAssociation {
                 )
                 .await?,
             ))),
+            outbound @ Outbound::AnyTls(config) if config.udp => Ok(Self::Stream(
+                swirl_protocol::stream_udp::UdpAssociation::connect(
+                    outbound, target, resolver, limit, transport,
+                )
+                .await?,
+            )),
             outbound @ (Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. }) => {
                 Ok(Self::Stream(
                     swirl_protocol::stream_udp::UdpAssociation::connect(
@@ -349,6 +364,7 @@ impl ProxyAssociation {
         match self {
             Self::Hysteria2(value) => value.send(target, payload).await,
             Self::Tuic(value) => value.send(target, payload).await,
+            Self::Snell(value) => value.send(target, payload).await,
             Self::Shadowsocks2022(value) => value.send(target, payload).await,
             Self::Stream(value) => value.send(target, payload).await,
         }
@@ -358,6 +374,7 @@ impl ProxyAssociation {
         match self {
             Self::Hysteria2(value) => value.recv().await,
             Self::Tuic(value) => value.recv().await,
+            Self::Snell(value) => value.recv().await,
             Self::Shadowsocks2022(value) => value.recv().await,
             Self::Stream(value) => value.recv().await,
         }
