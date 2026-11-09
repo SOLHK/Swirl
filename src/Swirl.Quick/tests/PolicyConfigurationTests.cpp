@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSettings>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTcpServer>
@@ -427,6 +428,64 @@ private slots:
         QCOMPARE(worker.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
         QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("策略")));
         QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("出口")));
+    }
+    void confirmedTunFaultReportsDisconnectedWithoutHidingTheFailure(){
+        RustCoreEngine worker;
+        // The first native authentication/recovery chain is exercised by the
+        // owned Windows fault acceptance. This seam checks its observable
+        // post-stop contract without a broker, registry write, driver or UAC.
+        worker.m_tunRecoveryRequired=false;worker.m_tunRecoveryState=NativeTunRecoveryState::Clear;
+        worker.m_status.state=ProxyEngine::State::Stopped;
+        worker.m_status.processAlive=false;worker.m_status.tunEnabled=false;worker.m_status.proxyPort=0;
+        QSignalSpy diagnostics(&worker,&ProxyEngine::diagnostic);
+        worker.finishUnexpectedTunStop(QStringLiteral("controlled worker failure"));
+        const auto status=worker.status();
+        QCOMPARE(status.state,ProxyEngine::State::Failed);
+        QCOMPARE(status.error,ProxyEngine::Error::ApiUnavailable);
+        QVERIFY(!status.processAlive);QVERIFY(!status.apiHealthy);QVERIFY(!status.tunEnabled);
+        QVERIFY(!status.tunCapturePossible);QVERIFY(!status.tunRecoveryRequired);QCOMPARE(status.proxyPort,0);
+        QVERIFY(status.message.contains(QStringLiteral("增强模式意外停止")));QVERIFY(status.message.contains(QStringLiteral("系统网络已恢复")));
+        QVERIFY(status.message.contains(QStringLiteral("可以重新连接")));QVERIFY(!status.message.contains("controlled worker failure"));
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(diagnostics.first().at(1).toString(),QString("TunFaultRecoveryConfirmed"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled worker failure"));
+        worker.refresh();worker.refresh();
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(worker.status().message,status.message);
+    }
+    void failedTunFaultConfirmationStaysBlockedWithoutRefreshRetries_data(){
+        QTest::addColumn<bool>("brokerRetained");
+        QTest::newRow("authentication-or-owner-unconfirmed")<<true;
+        QTest::newRow("marker-write-unconfirmed")<<false;
+    }
+    void failedTunFaultConfirmationStaysBlockedWithoutRefreshRetries(){
+        QFETCH(bool,brokerRetained);RustCoreEngine worker;
+        // Keep teardown independent of the simulated owner. No native broker
+        // is created: repeated public refresh must return before any I/O.
+        const auto cleanup=qScopeGuard([&]{worker.m_brokerSession=false;worker.m_handle=0;});
+        worker.m_brokerSession=brokerRetained;worker.m_handle=brokerRetained?7:0;
+        worker.m_tunRecoveryRequired=!brokerRetained;
+        worker.m_tunRecoveryState=brokerRetained?NativeTunRecoveryState::Pending:NativeTunRecoveryState::Unknown;
+        worker.m_status.state=ProxyEngine::State::Degraded;
+        worker.m_status.message=QStringLiteral("controlled recovery unconfirmed");
+        worker.m_status.processAlive=brokerRetained;worker.m_status.tunEnabled=brokerRetained;
+        QSignalSpy diagnostics(&worker,&ProxyEngine::diagnostic),changes(&worker,&ProxyEngine::statusChanged);
+        for(int attempt=0;attempt<8;++attempt)worker.refresh();
+        QCOMPARE(worker.status().state,ProxyEngine::State::Degraded);
+        QCOMPARE(worker.status().message,QString("controlled recovery unconfirmed"));QCOMPARE(changes.size(),0);
+        worker.finishUnexpectedTunStop(QStringLiteral("controlled worker failure"));
+        const auto status=worker.status();
+        QCOMPARE(status.state,ProxyEngine::State::Failed);QCOMPARE(status.error,ProxyEngine::Error::OwnershipFailed);
+        QVERIFY(status.tunRecoveryRequired);QVERIFY(status.tunCapturePossible);QVERIFY(!status.apiHealthy);
+        QCOMPARE(status.processAlive,brokerRetained);QCOMPARE(status.tunEnabled,brokerRetained);
+        QCOMPARE(worker.m_handle,quint64(brokerRetained?7:0));QCOMPARE(worker.m_brokerSession,brokerRetained);
+        QVERIFY(status.message.contains(QStringLiteral("恢复尚未确认")));QVERIFY(status.message.contains(QStringLiteral("连接已暂停")));
+        QVERIFY(status.message.contains(QStringLiteral("重试关闭代理")));QVERIFY(!status.message.contains("controlled recovery unconfirmed"));
+        QVERIFY(!worker.m_poll.isActive());
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(diagnostics.first().at(1).toString(),QString("TunFaultRecoveryUnconfirmed"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled worker failure"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled recovery unconfirmed"));
+        for(int attempt=0;attempt<8;++attempt)worker.refresh();
+        QCOMPARE(changes.size(),1);QCOMPARE(diagnostics.size(),1);QCOMPARE(worker.status().message,status.message);
+        QCOMPARE(worker.m_handle,quint64(brokerRetained?7:0));QVERIFY(worker.status().tunRecoveryRequired);
     }
     void repeatedRealCoreFinishKeepsTheAdoptedWorkerPolicy(){
         QTcpServer lease;QVERIFY(lease.listen(QHostAddress::LocalHost));const auto port=lease.serverPort();lease.close();

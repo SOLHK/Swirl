@@ -45,6 +45,7 @@ private:
  void ingestConfigurationReceipt(const QJsonObject &);
  void retainPublicNodeIdentities();
  void fail(Error,const QString &);
+ void finishUnexpectedTunStop(const QString &failure);
  void resetProbeState();
  void cancelProbe();
  void failProbe(const QString &stage,const QString &code,int httpStatus=0);

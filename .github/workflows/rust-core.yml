@@ -167,67 +167,8 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s ../tools/tests -p test_authenticated_hello_hold.py -v
-      - name: VMess official peer HTTP HTTPS and transport lifecycle
-        working-directory: .
-        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
-      - name: Preserve current VMess official peer evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/swirl-vmess-acceptance
-          if-no-files-found: error
-          retention-days: 14
-      - name: Independent portable protocol peers
-        run: |
-          python -m pip install cryptography==50.0.2
-          python ../tools/tests/generate_reality_vectors.py --check
-          python ../tools/tests/generate_vision_vectors.py --check
-          export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
-          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"
-          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"
-          export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"
-          test -x "$SWIRL_RUST_HARNESS"
-          test -x "$SWIRL_RUST_INSPECTOR"
-          test -x "$SWIRL_RUST_DIAGNOSTIC"
-          test -x "$SWIRL_REALITY_CLIENT"
-          python ../tools/tests/test_reality_peer.py
-          python ../tools/tests/test_reality_tls.py
-          python ../tools/tests/test_rust_core.py
-          python ../tools/tests/test_shadowsocks.py
-          python ../tools/tests/test_dns_tls.py
-          python ../tools/tests/test_dns_https.py
-          python ../tools/tests/test_socks4.py
-          python ../tools/tests/test_websocket_transport.py
-          python ../tools/tests/test_core_development.py
-          python ../tools/tests/test_policy_groups.py
-          python ../tools/tests/test_dns_negative.py
-          python ../tools/tests/test_native_probe.py
-          python ../tools/tests/test_connection_stages.py
-          python ../tools/tests/test_connectivity_diagnostics.py
-          python ../tools/tests/test_subscription_import.py
-          python ../tools/tests/test_socks5_udp.py
-      - name: Subscription to native proxy and target
-        working-directory: .
-        shell: bash
-        env:
-          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
-          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
-          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
-        run: |
-          set -euo pipefail
-          test -x "$SWIRL_RUST_HARNESS"
-          test -x "$SWIRL_RUST_INSPECTOR"
-          python tools/tests/test_product_subscription_chain.py -v
-      - name: Preserve subscription product rust evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Swirl-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/swirl-product-chain-rust
-          if-no-files-found: error
-          retention-days: 14
-      - name: Install pinned Go for the independent Xray peer
+      - name: Set up Go for native protocol interoperability
+        if: runner.os == 'Linux'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version: '1.27.2'
@@ -323,6 +264,71 @@ jobs:
             ${{ runner.temp }}/swirl-anytls-interop/ci-receipt.json
           if-no-files-found: error
           retention-days: 14
+      - name: VMess official peer HTTP HTTPS and transport lifecycle
+        working-directory: .
+        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
+      - name: Preserve current VMess official peer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-vmess-acceptance
+          if-no-files-found: error
+          retention-days: 14
+      - name: Independent portable protocol peers
+        run: |
+          python -m pip install cryptography==50.0.2
+          python ../tools/tests/generate_reality_vectors.py --check
+          python ../tools/tests/generate_vision_vectors.py --check
+          export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
+          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"
+          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"
+          export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          test -x "$SWIRL_RUST_DIAGNOSTIC"
+          test -x "$SWIRL_REALITY_CLIENT"
+          python ../tools/tests/test_reality_peer.py
+          python ../tools/tests/test_reality_tls.py
+          python ../tools/tests/test_rust_core.py
+          python ../tools/tests/test_shadowsocks.py
+          python ../tools/tests/test_dns_tls.py
+          python ../tools/tests/test_dns_https.py
+          python ../tools/tests/test_socks4.py
+          python ../tools/tests/test_websocket_transport.py
+          python ../tools/tests/test_core_development.py
+          python ../tools/tests/test_policy_groups.py
+          python ../tools/tests/test_dns_negative.py
+          python ../tools/tests/test_native_probe.py
+          python ../tools/tests/test_connection_stages.py
+          python ../tools/tests/test_connectivity_diagnostics.py
+          python ../tools/tests/test_subscription_import.py
+          python ../tools/tests/test_socks5_udp.py
+      - name: Subscription to native proxy and target
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
+        run: |
+          set -euo pipefail
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          python tools/tests/test_product_subscription_chain.py -v
+      - name: Preserve subscription product rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Install pinned Go for the independent Xray peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
       - name: Build pinned Xray and verify REALITY interoperability
         working-directory: .
         shell: bash

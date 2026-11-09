@@ -101,7 +101,23 @@ private slots:
             QCOMPARE(node.port, 443);
             QCOMPARE(node.serverName, QStringLiteral("edge.invalid"));
             QCOMPARE(node.originalConfiguration.value("uri").toString(), QString::fromUtf8(any));
-            QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+            QVERIFY(node.conversionIssues.isEmpty());
+            QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+            QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);
+            QVERIFY2(error.isEmpty(),qPrintable(error));
+            QCOMPARE(outbound.value("type").toString(),QString("any_tls"));
+            QCOMPARE(outbound.value("host").toString(),QString("example.invalid"));
+            QCOMPARE(outbound.value("port").toInt(),443);
+            QCOMPARE(outbound.value("password").toString(),QString("p@ss"));
+            const QJsonObject expectedTls{{"server_name","edge.invalid"},{"alpn",QJsonArray{}}};
+            QCOMPARE(outbound.value("tls").toObject(),expectedTls);
+            const QJsonObject forbiddenOptions{{"client-fingerprint","chrome"},{"pcs","fixture-pin"},
+                {"skip-cert-verify",true},{"tls-verification",false}};
+            for(auto it=forbiddenOptions.begin();it!=forbiddenOptions.end();++it){
+                auto forbidden=node;forbidden.parameters.insert(it.key(),it.value());
+                QJsonObject refused;QVERIFY(!NativeNodeBridge::executableOutbound(forbidden,&refused).isEmpty());
+                QVERIFY(refused.isEmpty());QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(forbidden).isEmpty());
+            }
         }
         const auto insecure = NodeImporter::parse(QByteArray(any).replace("insecure=0", "insecure=1"));
         QVERIFY(insecure);
@@ -116,7 +132,14 @@ private slots:
         QCOMPARE(mixedYaml.nodes.size(), 2);
         QVERIFY(mixedYaml.nodes.first().certificateVerificationEnforced);
         QVERIFY(!mixedYaml.nodes.first().parameters.value("skip-cert-verify").toBool());
-        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(mixedYaml.nodes.first()).isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(mixedYaml.nodes.first()).isEmpty());
+        QJsonObject normalized;const auto normalizedError=NativeNodeBridge::executableOutbound(mixedYaml.nodes.first(),&normalized);
+        QVERIFY2(normalizedError.isEmpty(),qPrintable(normalizedError));
+        QCOMPARE(normalized.value("type").toString(),QString("any_tls"));
+        const QJsonObject normalizedTls{{"server_name","example.invalid"},{"alpn",QJsonArray{}}};
+        QCOMPARE(normalized.value("tls").toObject(),normalizedTls);
+        auto tampered=mixedYaml.nodes.first();tampered.parameters["skip-cert-verify"]=true;
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(tampered).isEmpty());
         QVERIFY(mixedYaml.nodes.first().publicInfo().value("normalizationNotes").toString().contains("AnyTLS"));
     }
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }

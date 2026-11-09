@@ -521,6 +521,22 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
  failProbe("probe_status","ProbeStateInvalid");
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
+void RustCoreEngine::finishUnexpectedTunStop(const QString &failure){
+ const auto recoveryError=m_status.message;
+ const bool recovered=m_status.state==State::Stopped&&!m_handle&&!m_brokerSession
+  &&!m_tunRecoveryRequired&&m_tunRecoveryState==NativeTunRecoveryState::Clear;
+ // stop() alone owns the authenticated recovery and marker write. Preserve its
+ // handles, process state and ownership result; a failed attempt stays blocked.
+ if(!recovered)m_tunRecoveryRequired=true;
+ m_status.state=State::Failed;m_status.apiHealthy=false;
+ m_status.error=recovered?Error::ApiUnavailable:Error::OwnershipFailed;
+ m_status.message=recovered
+  ?QStringLiteral("增强模式意外停止。系统网络已恢复，可以重新连接。")
+  :QStringLiteral("增强模式意外停止。系统网络恢复尚未确认，连接已暂停；请重试关闭代理或恢复系统网络。");
+ const auto detail=failure+(!recovered&&!recoveryError.isEmpty()?QStringLiteral(" ")+recoveryError:QString());
+ emit diagnostic("SwirlRust",recovered?"TunFaultRecoveryConfirmed":"TunFaultRecoveryUnconfirmed",detail);
+ emit statusChanged();
+}
 void RustCoreEngine::start(const EngineStartOptions &options){
  if(!m_brokerSession&&!m_tunBroker.running()){
   if(!m_handle)m_tunRecoveryState=nativeTunRecoveryState();
@@ -757,8 +773,23 @@ void RustCoreEngine::stop(){
 }
 void RustCoreEngine::refresh(){
  if(!m_handle)return;
+ // A failed one-shot confirmation must not open another elevation request when
+ // an explicit refresh arrives after stop() retired the polling timer.
+ if(m_brokerSession&&!m_poll.isActive())return;
  const auto response=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
- if(!response["ok"].toBool()){fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;}
+ if(!response["ok"].toBool()){
+  if(m_brokerSession&&!m_tunBroker.running()){
+   // Commit the once-only decision before failure observers can re-enter. The
+   // existing stop path authenticates a fresh broker, requires owners==0, and
+   // closes it successfully before it may clear recoveryPending.
+   m_poll.stop();
+   const auto failure=QStringLiteral("增强模式意外停止，正在确认系统网络恢复。");
+   emit diagnostic("SwirlRust","TunBrokerExited",QStringLiteral("The native TUN broker exited before its runtime snapshot could be read."));
+   fail(Error::ApiUnavailable,failure);
+   stop();finishUnexpectedTunStop(failure);return;
+  }
+  fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;
+ }
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
  if(m_v2)ingestConfigurationReceipt(state.value("configuration").toObject());
  recordForwardingFailures(state);
