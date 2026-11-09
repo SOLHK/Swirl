@@ -52,6 +52,7 @@
 #include <QJSValue>
 #include <QPointer>
 #include <QScopedValueRollback>
+#include <QTemporaryDir>
 #include <QTest>
 #endif
 #ifdef Q_OS_WIN
@@ -718,7 +719,19 @@ private:
         return true;
     }
     bool readback(bool selected) {
-        NodeStore reopened(m_session.storePath);const auto providers=reopened.subscriptions();const auto nodes=reopened.nodes();
+        // A live V2 store owns its writer lock. Reopen the exact committed
+        // ciphertext at an independent path so validation cannot contend with
+        // the application's lock or recover/mutate its active store.
+        QFile ciphertext(m_session.storePath);if(!ciphertext.open(QIODevice::ReadOnly))return false;
+        const auto bytes=ciphertext.read(NodeStore::MaximumBytes+1);
+        if(ciphertext.error()!=QFile::NoError||bytes.isEmpty()||bytes.size()>NodeStore::MaximumBytes)return false;
+        ciphertext.close();
+        QTemporaryDir snapshotDirectory;if(!snapshotDirectory.isValid())return false;
+        const auto snapshotPath=snapshotDirectory.filePath(QStringLiteral("nodes.dpapi"));
+        QFile snapshot(snapshotPath);
+        if(!snapshot.open(QIODevice::WriteOnly|QIODevice::NewOnly)||snapshot.write(bytes)!=bytes.size()||!snapshot.flush())return false;
+        snapshot.close();
+        NodeStore reopened(snapshotPath);const auto providers=reopened.subscriptions();const auto nodes=reopened.nodes();
         const auto actualReceipt=QJsonObject::fromVariantMap(m_controller->policyReceipt());
         const auto durableReceipt=reopened.configurationReceipt();const auto savedRevision=m_controller->savedRevision();
         if(!reopened.error().isEmpty()||reopened.saving()||!reopened.configurationAvailable()||!reopened.configurationV2()
@@ -751,8 +764,8 @@ private:
         }
         const bool actualSelected=reopened.selectedId()==imported;
         if(imported.isEmpty()||(!m_importedId.isEmpty()&&m_importedId!=imported)||actualSelected!=selected)return false;
-        QFile ciphertext(m_session.storePath);if(!ciphertext.open(QIODevice::ReadOnly))return false;
-        const auto bytes=ciphertext.read(NodeStore::MaximumBytes+1);if(bytes.isEmpty()||bytes.size()>NodeStore::MaximumBytes)return false;
+        if(!ciphertext.open(QIODevice::ReadOnly)||ciphertext.read(NodeStore::MaximumBytes+1)!=bytes||ciphertext.error()!=QFile::NoError)return false;
+        if(!snapshot.open(QIODevice::ReadOnly)||snapshot.read(NodeStore::MaximumBytes+1)!=bytes||snapshot.error()!=QFile::NoError)return false;
         m_sourceId=source.id;m_importedId=imported;
         m_readbacks.append(QJsonObject{{"stage",selected?"selected-imported-node":"imported-catalog"},{"independentNodeStore",true},
             {"configurationV2",true},{"sourceCount",1},{"nodeCount",2},{"importedNodeId",imported},{"sourceId",source.id},

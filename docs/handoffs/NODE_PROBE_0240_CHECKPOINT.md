@@ -2,6 +2,14 @@
 
 Continue on `work/node-probe-render-20261105` in [PR #61](https://github.com/SOLHK/Swirl/pull/61), targeting `test`. Fetch the current head before editing. This is a development checkpoint. Release acceptance and promotion remain open.
 
+## Independently read the committed snapshot without taking the live writer lock (2026-11-09)
+
+Development `dd4c25cb317d2654ceebf48acce6ff5e10a67c1f` / tested merge `1168f9906b0f72ec311fc4de246e29d6b8bd0e70` completed seven of the eight main workflows successfully. Windows UI run [42416955909](https://github.com/SOLHK/Swirl/actions/runs/42416955909) failed the private import suite (11 pass, two failures, one cascading error). Its actual receipt now includes the online subscription transaction at revision 5, but independent readback still fails. The production `NodeStore` constructor always acquires the exclusive V2 writer lock; opening the live application's path a second time therefore correctly refuses ownership.
+
+The QA readback now captures the bounded committed ciphertext, writes those exact bytes into a temporary independent directory, and reopens that copy through production NodeStore parsing and DPAPI. All existing source/node/protocol, revision, request, digest and selected-policy assertions remain. Both the original path and the copy must still contain the captured bytes after verification. Production locking and recovery behavior are unchanged.
+
+On local Windows with Qt 6.12 MinGW, the parent source plus this patch compiled both ordinary and mandatory-quota QA applications. The actual import suite passed 14/14 and the actual DNS suite passed 11/11, with no skips. The import positive control observed probe 204, HTTP 200, verified HTTPS 200 and matching UI latency. Wrong-CA, 31-byte stop, body-limit, input/capability refusals, resolver-answer/question failures, cancellation and stalled DNS controls passed. These are owned synthetic endpoints; they are not provider-node or physical TUN evidence. This commit still requires its own complete GitHub CI and package verification before promotion.
+
 ## Correct the online import receipt contract after actual Windows acceptance (2026-11-07)
 
 The fully observed predecessor is development HEAD `2392ca0193600ab3456879e3da803548546a3f4b`, GitHub tested merge `30e18b6acea2d9cb5259494ab09e684a1d82f832`, and tree `a654558e964402acbb3db14f65667e437e0cd941`. Its base remains `test` / `acd7005c99a99c4f81b62d328fcc15883d51b62a`. All eight first attempts ended before the formal original-body reader ran:
