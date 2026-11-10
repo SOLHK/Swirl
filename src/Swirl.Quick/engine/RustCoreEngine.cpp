@@ -328,41 +328,49 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  else {
   // First map the default route. Policy groups add their referenced members.
   // Unreferenced unsupported imports remain in NodeStore without activation.
+  const auto appendNodeOutbound=[&](const ProxyNode &n)->QString{
+   if(n.isXray()){
+    // Persisted capability/cache fields are display data, never authority to
+    // start a proxy. Replay the exact bounded source through the Rust parser
+    // and converter each time this node enters a selected or rule route.
+    if(!ProxyNode::validate(n).isEmpty())return "JSON 节点来源或标识无效；请重新导入。";
+    QJsonObject outbound;const auto error=XrayJsonBridge::executableOutbound(n,&outbound);
+    if(!error.isEmpty())return error;
+    nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});return {};
+   }
+   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
+   const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
+   // Check the preserved sing-box requirement before accepting its normalized
+   // profile. A default inferred by the importer cannot authorize a browser
+   // handshake, and a source profile named rustls does not implement uTLS.
+   const auto sourceTls=n.originalConfiguration.value("tls").toObject();
+   if(sourceTls.contains("utls")){
+    if(!sourceTls.value("utls").isObject())return "源配置 uTLS 参数类型无效。";
+    const auto utls=sourceTls.value("utls").toObject();
+    for(auto p=utls.begin();p!=utls.end();++p)if(p.key()!="enabled"&&p.key()!="fingerprint")return "源配置 uTLS 含未映射参数；未丢弃原值。";
+    if(utls.value("enabled")==QJsonValue(true)){
+     const auto fingerprint=utls.value("fingerprint");
+     if(!reality||sourceTls.value("enabled")!=QJsonValue(true)||sourceTls.value("reality").toObject().value("enabled")!=QJsonValue(true)||!fingerprint.isString()||!QStringList{"chrome","chrome_133"}.contains(fingerprint.toString()))return "源配置 uTLS 仅支持 REALITY 的显式 chrome 或 chrome_133 指纹；未替换原值。";
+     if(fingerprint!=n.parameters.value("client-fingerprint"))return "源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。";
+    }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
+   }
+   if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
+   // The same Rust inspector owns non-JSON protocol, transport and UDP
+   // mapping. No stale C++ protocol allowlist can hide completed Rust work.
+   QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(n,&outbound);
+   if(!error.isEmpty())return error;
+   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});return {};
+  };
   const auto it=std::find_if(o.nodes.cbegin(),o.nodes.cend(),[&](const auto &n){return n.id==selected;});
   if(it==o.nodes.cend())return "未选择节点。";
-  const auto &n=*it;
-  if(n.isXray()){
-   // Persisted capability/cache fields are display data, never authority to
-   // start a proxy. Replay the exact bounded source through the Rust parser
-   // and converter each time this node enters a selected or rule route.
-   if(!ProxyNode::validate(n).isEmpty())return "JSON 节点来源或标识无效；请重新导入。";
-   QJsonObject outbound;const auto error=XrayJsonBridge::executableOutbound(n,&outbound);
-   if(!error.isEmpty())return error;
-   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
-  }else{
-  if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
-  // Check the preserved sing-box requirement before accepting its normalized
-  // profile. A default inferred by the importer cannot authorize a browser
-  // handshake, and a source profile named rustls does not implement uTLS.
-  const auto sourceTls=n.originalConfiguration.value("tls").toObject();
-  if(sourceTls.contains("utls")){
-   if(!sourceTls.value("utls").isObject())return "源配置 uTLS 参数类型无效。";
-   const auto utls=sourceTls.value("utls").toObject();
-   for(auto p=utls.begin();p!=utls.end();++p)if(p.key()!="enabled"&&p.key()!="fingerprint")return "源配置 uTLS 含未映射参数；未丢弃原值。";
-   if(utls.value("enabled")==QJsonValue(true)){
-    const auto fingerprint=utls.value("fingerprint");
-    if(!reality||sourceTls.value("enabled")!=QJsonValue(true)||sourceTls.value("reality").toObject().value("enabled")!=QJsonValue(true)||!fingerprint.isString()||!QStringList{"chrome","chrome_133"}.contains(fingerprint.toString()))return "源配置 uTLS 仅支持 REALITY 的显式 chrome 或 chrome_133 指纹；未替换原值。";
-    if(fingerprint!=n.parameters.value("client-fingerprint"))return "源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。";
-   }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
-  }
-  if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
-  // The same Rust inspector owns non-JSON protocol, transport and UDP
-  // mapping. No stale C++ protocol allowlist can hide completed Rust work.
-  QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(n,&outbound);
-  if(!error.isEmpty())return error;
-  nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
-  }
+  const auto selectedError=appendNodeOutbound(*it);
+  if(!selectedError.isEmpty())return selectedError;
+  // An isolated latency sweep dials several nodes inside one engine, so that
+  // engine maps every requested node. NodeTestService pre-validates each row
+  // and keeps its explicit per-node failure; a row that still fails here is
+  // simply not dialable and must not break the whole sweep.
+  if(o.probeAllNodes&&o.internalProbeListener)
+   for(const auto &extra:o.nodes)if(extra.id!=selected)appendNodeOutbound(extra);
  }
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
  QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},{"smart_routing",o.smartRouting&&o.routingMode=="rule"&&!o.directSession},

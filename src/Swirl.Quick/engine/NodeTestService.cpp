@@ -55,7 +55,7 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
 void NodeTestService::start(const EngineStartOptions &options,const QStringList &ids,const QUrl &url){
  if(busy())return;
  if(!url.isValid()||(url.scheme()!="https"&&url.scheme()!="http")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()||url.toString().size()>2048){m_message="测试地址必须为有效且不含凭据的 HTTP/HTTPS URL";emit changed();return;}
- m_options=isolatedOptions(options);m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
+ m_options=isolatedOptions(options);m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();m_batchDisabled=false;
  QSet<QString> available;for(const auto &node:options.nodes)available.insert(node.id);
  QSet<QString> queued;for(const auto &id:ids)if(available.contains(id)&&!queued.contains(id)){queued.insert(id);m_queue.enqueue(id);m_results.remove(id);}
  m_total=m_queue.size();m_message=m_total?"正在独立测试节点":"没有可测试的节点";emit changed();next();
@@ -106,7 +106,7 @@ void NodeTestService::next(){
  if(m_batchRunner||m_batchAwaitingStart)return;
  // Prefer one concurrent sweep inside a single engine. Engines without batch
  // support (test doubles) keep the isolated per-node path below.
- if(m_queue.size()>=2&&m_running.isEmpty()&&m_idle.isEmpty()&&tryBatch())return;
+ if(m_queue.size()>=2&&m_running.isEmpty()&&m_idle.isEmpty()&&!m_batchDisabled&&tryBatch())return;
  while(!m_queue.isEmpty()&&(!m_idle.isEmpty()||m_running.size()+m_retiring.size()<3)){
   const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;
   // Validate imported data before reserving a runtime. Unsupported nodes stay
@@ -183,45 +183,47 @@ bool NodeTestService::tryBatch(){
  m_batchSwept.clear();for(const auto &id:valid)m_batchSwept.insert(id);
  m_batchRecorded.clear();
  connect(m_batchRunner,&ProxyEngine::statusChanged,this,&NodeTestService::batchStatusChanged);
- auto opts=m_options;opts.selectedNodeId=valid.first();
+ auto opts=m_options;opts.selectedNodeId=valid.first();opts.probeAllNodes=true;
  m_batchAwaitingStart=true;
+ m_batchStartClock.start();
+ if(!m_batchPoll){
+  m_batchPoll=new QTimer(this);m_batchPoll->setInterval(50);
+  connect(m_batchPoll,&QTimer::timeout,this,&NodeTestService::pollBatch);
+ }
+ // Polling drives the startup handshake. ThreadedEngine publishes its pre-start
+ // snapshot after start(), so a single statusChanged(Stopped) is not a failure.
+ m_batchPoll->start();
  m_batchRunner->start(opts);
  return true;
 }
 
 void NodeTestService::batchStatusChanged(){
- if(!m_batchAwaitingStart||!m_batchRunner)return;
- const auto status=m_batchRunner->status();
- if(status.state==ProxyEngine::State::Failed||status.state==ProxyEngine::State::Stopped){
-  const auto pending=m_batchSwept;
-  m_batchAwaitingStart=false;
-  endBatch();
-  for(const auto &id:pending)if(!m_batchRecorded.contains(id))m_queue.enqueue(id);
-  next();
-  return;
- }
- if(!status.apiHealthy||status.state!=ProxyEngine::State::Running)return;
- QStringList ids;for(const auto &id:m_batchSwept)ids.append(id);
- QString error;
- if(!m_batchRunner->probeNodes(ids,m_url,&error)){
-  const auto pending=m_batchSwept;
-  m_batchAwaitingStart=false;
-  endBatch();
-  for(const auto &id:pending)if(!m_batchRecorded.contains(id))m_queue.enqueue(id);
-  next();
-  return;
- }
- m_batchAwaitingStart=false;
- if(!m_batchPoll){
-  m_batchPoll=new QTimer(this);m_batchPoll->setInterval(50);
-  connect(m_batchPoll,&QTimer::timeout,this,&NodeTestService::pollBatch);
- }
- m_batchPoll->start();
- m_message=QStringLiteral("并行测速中 · %1 个节点").arg(ids.size());emit changed();
+ // Accelerate the handshake; correctness comes from the poll state machine.
+ pollBatch();
 }
 
 void NodeTestService::pollBatch(){
  if(!m_batchRunner)return;
+ if(m_batchAwaitingStart){
+  const auto status=m_batchRunner->status();
+  if(status.state==ProxyEngine::State::Failed){
+   batchFallback(QStringLiteral("start-failed"),status.message);
+   return;
+  }
+  if(m_batchStartClock.elapsed()>20000){
+   batchFallback(QStringLiteral("start-timeout"),status.message);
+   return;
+  }
+  if(status.state!=ProxyEngine::State::Running||!status.apiHealthy)return;
+  QStringList ids;for(const auto &id:m_batchSwept)ids.append(id);
+  QString error;
+  if(!m_batchRunner->probeNodes(ids,m_url,&error)){
+   batchFallback(QStringLiteral("issue-failed"),error);
+   return;
+  }
+  m_batchAwaitingStart=false;
+  m_message=QStringLiteral("并行测速中 · %1 个节点").arg(ids.size());emit changed();
+ }
  const auto sweep=m_batchRunner->probeNodesStatus().value("sweep").toObject();
  if(sweep.isEmpty())return;
  const auto rows=sweep.value("rows").toArray();
@@ -238,7 +240,7 @@ void NodeTestService::pollBatch(){
   result["latency"]=ok?row.value("latency_ms").toInteger(-1):qint64(-1);
   result["http"]=row.value("http_status").toInteger(0);
   result["phase"]=ok?QStringLiteral("measured"):row.value("failure_stage").toString("probe");
-  result["failureCode"]=row.value("failure_code").toString();
+  result["failureCode"]=ok?QString():row.value("failure_code").toString();
   result["error"]=ok?QString():row.value("failure_code").toString();
   result["outboundConnectMs"]=row.value("outbound_connect_ms").toInteger(-1);
   result["originTlsMs"]=qint64(-1);
@@ -248,6 +250,18 @@ void NodeTestService::pollBatch(){
   endBatch();
   next();
  }
+}
+
+void NodeTestService::batchFallback(const QString &reason,const QString &detail){
+ // Fall back to the isolated per-node path for the rest of this sweep. Without
+ // the latch the same batch start failure would re-queue and repeat forever.
+ m_batchDisabled=true;
+ qWarning()<<"NODE_BATCH_FALLBACK"<<reason<<detail;
+ const auto pending=m_batchSwept;
+ m_batchAwaitingStart=false;
+ endBatch();
+ for(const auto &id:pending)if(!m_batchRecorded.contains(id))m_queue.enqueue(id);
+ next();
 }
 
 void NodeTestService::endBatch(){

@@ -1,5 +1,6 @@
 #pragma once
 #include "ProxyEngine.h"
+#include <QElapsedTimer>
 #include <QQueue>
 #include <QHash>
 #include <QSet>
@@ -50,6 +51,8 @@ private:
  void batchStatusChanged();
  void pollBatch();
  void endBatch();
+ // Latch the per-node fallback and return the unrecorded batch rows to the queue.
+ void batchFallback(const QString &reason,const QString &detail);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
@@ -62,6 +65,11 @@ private:
  QSet<QString> m_batchSwept;
  QSet<QString> m_batchRecorded;
  bool m_batchAwaitingStart=false;
+ // A batch that cannot start or cannot be issued falls back to the isolated
+ // per-node path for the rest of this sweep. Without this latch a failing
+ // batch start re-queues its nodes into the same batch forever.
+ bool m_batchDisabled=false;
+ QElapsedTimer m_batchStartClock;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;
  QString m_message;
 };

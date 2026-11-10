@@ -43,6 +43,10 @@ struct EngineStartOptions {
     // Internal request capability derived from the live TUN owner, never a
     // persisted/imported setting. It changes only isolated probe sockets.
     bool internalProbePhysicalEgress = false;
+    // Internal node-test capability: an isolated sweep engine maps every
+    // requested node so probe_nodes can dial each one. The live session still
+    // maps only its selected route and policy-group members.
+    bool probeAllNodes = false;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.

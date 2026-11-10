@@ -382,6 +382,9 @@ private slots:
         }
         opts.dnsConfig={{"mode",2},{"servers","127.0.0.1"},{"useHosts",false},{"queryFamily","ipv4_only"},{"hosts",hosts}};
         NodeTestService tests;tests.start(opts,ids,network.url());QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
+        // Keep the exact per-node outcome in CI logs: a batch failure must name
+        // its stage instead of only reporting an aggregate mismatch.
+        if(tests.succeeded()!=4)qInfo()<<"BATCH_DNS_RESULT"<<physical<<tests.results();
         QCOMPARE(tests.completed(),4);QCOMPARE(tests.succeeded(),4);QCOMPARE(tests.failed(),0);
         QCOMPARE(network.a.forwarded,4);QCOMPARE(network.httpRequestsByExit.value("exit-A"),4);QCOMPARE(network.httpRequestsByExit.value("DIRECT-BYPASS"),0);
         for(const auto &id:ids){
@@ -412,12 +415,12 @@ private slots:
         QCOMPARE(result.value("resolverPolicy").toString(),QString("isolated_configured_dns"));
         QCOMPARE(network.a.forwarded,0);QCOMPARE(network.httpRequests,0);
     }
-    void largeRealProbeBatchCancelsRestartsAndReusesThreeWorkers_data(){
+    void largeRealProbeBatchCancelsRestartsAndReusesOneSweepEngine_data(){
         QTest::addColumn<int>("count");
         QTest::newRow("104-nodes")<<104;
         QTest::newRow("88-nodes")<<88;
     }
-    void largeRealProbeBatchCancelsRestartsAndReusesThreeWorkers(){
+    void largeRealProbeBatchCancelsRestartsAndReusesOneSweepEngine(){
         QFETCH(int,count);
         ControlledNetwork network;QVERIFY(network.start());
         QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
@@ -435,15 +438,18 @@ private slots:
             }
         });
         tests.start(opts,ids,network.url());
-        QTRY_COMPARE_WITH_TIMEOUT(pending.size(),3,15000);
+        // One engine owns the sweep. The stalled listener therefore sees a
+        // bounded number of simultaneous dials (the sweep concurrency, default
+        // 16, capped at 32) instead of exactly three per-node engines.
+        QTRY_VERIFY_WITH_TIMEOUT(!pending.isEmpty()&&pending.size()<=32,15000);
         QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->bytesAvailable()>0;}),5000);
         QCOMPARE(tests.completed(),0);QCOMPARE(tests.total(),count);
-        QCOMPARE(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).size(),3);
+        QCOMPARE(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).size(),1);
         tests.cancel();tests.start(opts,ids,network.url()); // retiring workers still block a rapid restart
         QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),10000);
         QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->state()==QAbstractSocket::UnconnectedState;}),5000);
         QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
-        QCOMPARE(pending.size(),3);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
+        QVERIFY(pending.size()<=32);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
 
         for(auto &n:opts.nodes)n.port=network.a.serverPort();
         QSet<ProxyEngine *> workers;int peak=0;
@@ -459,7 +465,7 @@ private slots:
         QCOMPARE(tests.total(),count);
         QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),60000);
         QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
-        QCOMPARE(peak,3);QCOMPARE(workers.size(),3);
+        QCOMPARE(peak,1);QCOMPARE(workers.size(),1);
         QCOMPARE(tests.completed(),count);QCOMPARE(tests.succeeded(),count);QCOMPARE(tests.failed(),0);
         QCOMPARE(tests.results().size(),count);QCOMPARE(network.a.forwarded,count);
         QCOMPARE(network.httpRequests,count);QCOMPARE(network.httpRequestsByExit.value("exit-A"),count);

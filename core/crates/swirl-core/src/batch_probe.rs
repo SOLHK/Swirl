@@ -281,7 +281,10 @@ async fn probe_one(inputs: Arc<BatchInputs>, id: String, options: HealthProbe) -
     let Some((outbound, transport)) = inputs.targets.get(&id) else {
         return finish_failure(id, "ProbeNodeUnknown", "input");
     };
-    let expected = Some(options.expected_status);
+    // Match probe_start's unset-expected path: a latency sweep accepts any 2xx
+    // instead of pinning the policy editor's default 204. The HealthProbe value
+    // stays for display only.
+    let expected = None;
     let outcome: Result<UrlTestMetrics, UrlTestFailure> = match transport {
         Some(transport) => {
             swirl_protocol::url_test_head_with_transport(
