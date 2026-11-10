@@ -1,5 +1,18 @@
 # Windows Rust 内核身份与真实联网验收
 
+## 当前入口状态
+
+下文保留历史验收设计，**当前 0.2.40 不可执行这条旧真实联网路径**。
+`Invoke-WindowsRustAcceptance.ps1` 在解析私密路径或启动进程前返回退出码 64；
+QA 与 Release 的 `Swirl.exe` 也会在任何维护、自检、Qt 初始化或私密存储访问前
+拒绝 `--runtime-store`、`--runtime-commands`、`--runtime-state`，包括部分参数、
+空值和单独参数，返回固定的 `AuthenticatedBillingAndWireGuardRequired` 错误。
+这些入口尚未接入新鲜官方计费、唯一持久账本、完整传输计量和受控进程结算，
+不能用旧命令绕过 [0.2.40 真实联网门槛](PRIVATE_SUBSCRIPTION_ACCEPTANCE_20261105.md)。
+普通 UI 和现有合成回环测试保持原有行为。
+
+## 历史验收设计
+
 `Swirl.exe` 左侧常驻身份标签显示运行中的实际引擎。停机时标签明确写“构建类型”；系统代理标签仍只说明 Windows 系统代理的归属。诊断快照及本机导出 ZIP 的 `identity.json` 另包含完整源码 SHA、`Swirl.exe` 路径和 SHA-256、实际引擎类型及 PID，不包含节点或凭据。
 
 在 Windows 上构建 `SWIRL_USE_RUST_CORE=ON` 且 `SWIRL_BUILD_UI_TESTS=ON` 的程序并部署 Qt 运行库后，把**已有**加密 NodeStore 和选择 sidecar 复制到 Git 工作区外。不要把原始状态文件、订阅或运行时状态上传。调用：

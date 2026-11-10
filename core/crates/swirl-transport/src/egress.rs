@@ -6,6 +6,14 @@
 //! Existing sockets retain their interface. A lost interface must cancel old
 //! flows before the controller updates this lease. Dropping an unrecovered lease
 //! fails closed instead of letting new sockets follow the tunnel's own routes.
+#[cfg(feature = "private-acceptance")]
+pub mod budget;
+mod probe;
+#[cfg(feature = "private-acceptance")]
+pub use budget::TcpConnection;
+#[cfg(not(feature = "private-acceptance"))]
+pub type TcpConnection = TcpStream;
+pub use probe::{inherit_physical_probe_scope, physical_probe_active, with_physical_probe};
 use std::{io, net::SocketAddr, sync::Mutex};
 use tokio::net::{TcpSocket, TcpStream, UdpSocket};
 
@@ -15,7 +23,7 @@ const ORPHANED: u64 = u64::MAX - 1;
 static EGRESS: Mutex<EgressState> = Mutex::new(EgressState::new());
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EgressToken(u64);
+pub struct EgressToken(u64, u64);
 
 struct EgressState {
     interfaces: u64,
@@ -26,7 +34,7 @@ impl EgressState {
     const fn new() -> Self {
         Self {
             interfaces: 0,
-            token: EgressToken(0),
+            token: EgressToken(0, 0),
         }
     }
 
@@ -37,7 +45,7 @@ impl EgressState {
             .checked_add(1)
             .ok_or_else(|| io::Error::other("TunEgressGenerationLimit"))?;
         self.interfaces = interfaces;
-        self.token = EgressToken(generation);
+        self.token = EgressToken(generation, 0);
         Ok(())
     }
 
@@ -49,7 +57,7 @@ impl EgressState {
     }
 
     fn check(&self, token: EgressToken) -> io::Result<()> {
-        if self.token != token {
+        if self.token.0 != token.0 {
             return Err(io::Error::new(
                 io::ErrorKind::NetworkUnreachable,
                 "TunEgressChanged",
@@ -67,10 +75,12 @@ impl EgressToken {
     /// exemption. Mixed or empty endpoint sets never receive that exemption.
     pub fn capture(addresses: &[SocketAddr]) -> io::Result<Self> {
         let loopback_only = !addresses.is_empty() && addresses.iter().all(|a| a.ip().is_loopback());
-        EGRESS
+        let mut token = EGRESS
             .lock()
             .map_err(|_| io::Error::other("TunEgressState"))?
-            .token(loopback_only)
+            .token(loopback_only)?;
+        token.1 = probe::current_id();
+        Ok(token)
     }
 
     /// Admit a synchronous cache lookup/update only while this epoch is current.
@@ -81,6 +91,12 @@ impl EgressToken {
             .lock()
             .map_err(|_| io::Error::other("TunEgressState"))?;
         state.check(self)?;
+        if self.1 != probe::current_id() {
+            return Err(io::Error::new(
+                io::ErrorKind::NetworkUnreachable,
+                "ProbeEgressChanged",
+            ));
+        }
         let result = admit();
         drop(state);
         Ok(result)
@@ -226,9 +242,59 @@ pub fn release_orphan_after_routes_restored() -> io::Result<()> {
     }
 }
 
-pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpStream> {
+pub fn private_acceptance_active() -> bool {
+    #[cfg(feature = "private-acceptance")]
+    return budget::active();
+    #[cfg(not(feature = "private-acceptance"))]
+    false
+}
+
+/// Admit a legacy/special egress path that cannot carry the private quota.
+/// Normal product builds are unchanged. A guarded worker denies the path;
+/// starting it first also prevents subsequently installing a partial guard.
+pub fn check_unmetered_egress() -> io::Result<()> {
+    #[cfg(feature = "private-acceptance")]
+    budget::check_unmetered_egress()?;
+    Ok(())
+}
+
+/// A mandatory QA worker may open only an ephemeral loopback listener after
+/// its immutable grant. Ordinary product/optional-quota builds are unchanged.
+pub fn check_private_listener(address: SocketAddr) -> io::Result<()> {
+    #[cfg(feature = "private-acceptance-worker")]
+    budget::check_listener(address)?;
+    let _ = address;
+    Ok(())
+}
+
+pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpConnection> {
+    #[cfg(feature = "private-acceptance")]
+    {
+        let admission = budget::admit_connection()?;
+        let socket = admission
+            .as_ref()
+            .map(|guard| guard.socket(address))
+            .transpose()?;
+        let connect = connect_tcp_inner(address, socket);
+        let stream = match &admission {
+            Some(guard) => guard.while_running(connect).await?,
+            None => connect.await?,
+        };
+        TcpConnection::new(stream, admission)
+    }
+    #[cfg(not(feature = "private-acceptance"))]
+    connect_tcp_inner(address, None).await
+}
+
+async fn connect_tcp_inner(
+    address: SocketAddr,
+    prepared: Option<TcpSocket>,
+) -> io::Result<TcpStream> {
     if address.ip().is_loopback() {
-        return TcpStream::connect(address).await;
+        return match prepared {
+            Some(socket) => socket.connect(address).await,
+            None => TcpStream::connect(address).await,
+        };
     }
     let interface = select(
         EGRESS
@@ -237,19 +303,57 @@ pub async fn connect_tcp(address: SocketAddr) -> io::Result<TcpStream> {
             .interfaces,
         address.is_ipv6(),
     )?;
-    let Some(interface) = interface else {
-        return TcpStream::connect(address).await;
+    let physical = probe::binding(address.is_ipv6())?;
+    if physical.is_some() && interface.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "ProbeEgressOwned",
+        ));
+    }
+    let Some(interface) = physical.map(|binding| binding.interface).or(interface) else {
+        return match prepared {
+            Some(socket) => socket.connect(address).await,
+            None => TcpStream::connect(address).await,
+        };
     };
-    let socket = if address.is_ipv6() {
-        TcpSocket::new_v6()?
-    } else {
-        TcpSocket::new_v4()?
+    let socket = match prepared {
+        Some(socket) => socket,
+        None if address.is_ipv6() => TcpSocket::new_v6()?,
+        None => TcpSocket::new_v4()?,
     };
     #[cfg(windows)]
-    swirl_platform::pin_outbound_socket(&socket, address.is_ipv6(), interface)?;
+    {
+        if let Some(binding) = physical {
+            swirl_platform::physical_network::verify_physical_probe_interface(
+                interface,
+                binding.adapter_id,
+            )?;
+        }
+        swirl_platform::pin_outbound_socket(&socket, address.is_ipv6(), interface)?;
+    }
     #[cfg(not(windows))]
     let _ = interface;
-    socket.connect(address).await
+    if let Some(binding) = physical {
+        socket.bind(SocketAddr::new(binding.source, 0))?;
+    }
+    let stream = socket.connect(address).await?;
+    if let Some(binding) = physical
+        && stream.local_addr()?.ip() != binding.source
+    {
+        return Err(io::Error::other("ProbeEgressSourceChanged"));
+    }
+    Ok(stream)
+}
+
+pub(crate) fn outbound_udp_bind_address(address: SocketAddr) -> io::Result<SocketAddr> {
+    check_private_udp()?;
+    probe::udp_bind_address(address)
+}
+
+pub(crate) fn check_private_udp() -> io::Result<()> {
+    #[cfg(feature = "private-acceptance")]
+    budget::check_udp()?;
+    Ok(())
 }
 
 pub(crate) fn pin_udp(socket: &UdpSocket, local: SocketAddr) -> io::Result<()> {
@@ -257,15 +361,31 @@ pub(crate) fn pin_udp(socket: &UdpSocket, local: SocketAddr) -> io::Result<()> {
     if local.ip().is_loopback() {
         return Ok(());
     }
-    if let Some(interface) = select(
+    let interface = select(
         EGRESS
             .lock()
             .map_err(|_| io::Error::other("TunEgressState"))?
             .interfaces,
         local.is_ipv6(),
-    )? {
+    )?;
+    let physical = probe::binding(local.is_ipv6())?;
+    if physical.is_some() && interface.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "ProbeEgressOwned",
+        ));
+    }
+    if let Some(interface) = physical.map(|binding| binding.interface).or(interface) {
         #[cfg(windows)]
-        swirl_platform::pin_outbound_socket(socket, local.is_ipv6(), interface)?;
+        {
+            if let Some(binding) = physical {
+                swirl_platform::physical_network::verify_physical_probe_interface(
+                    interface,
+                    binding.adapter_id,
+                )?;
+            }
+            swirl_platform::pin_outbound_socket(socket, local.is_ipv6(), interface)?;
+        }
         #[cfg(not(windows))]
         let _ = (socket, interface);
     }

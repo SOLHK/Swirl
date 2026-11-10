@@ -960,7 +960,15 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     if family != "xray-v2ray-json"
         && matches!(
             kind,
-            "ss" | "vmess" | "vless" | "trojan" | "http" | "socks5" | "socks4" | "socks4a"
+            "ss" | "vmess"
+                | "vless"
+                | "trojan"
+                | "http"
+                | "socks5"
+                | "socks4"
+                | "socks4a"
+                | "snell"
+                | "anytls"
         )
         && let Some(enabled) = raw.get("tfo").and_then(Value::as_bool)
     {
@@ -974,7 +982,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         }
         return (capability, outbound);
     }
-    let implicit_tls = kind == "trojan"
+    let implicit_tls = matches!(kind, "trojan" | "anytls")
         || source_protocol.eq_ignore_ascii_case("socks5-tls")
         || source_protocol.eq_ignore_ascii_case("https");
     if matches!(kind, "socks4" | "socks4a")
@@ -1071,8 +1079,10 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             None => "not-declared",
             Some(Value::Number(n)) if n.as_u64() == Some(1) => "1",
             Some(Value::Number(n)) if n.as_u64() == Some(2) => "2",
+            Some(Value::Number(n)) if n.as_u64() == Some(4) => "4",
             Some(Value::String(s)) if s == "1" => "1",
             Some(Value::String(s)) if s == "2" => "2",
+            Some(Value::String(s)) if s == "4" => "4",
             _ => "declared-unrecognized",
         }
     };
@@ -1125,6 +1135,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         }
         "hysteria2" => Some(crate::hysteria2::from_raw(raw).map(Outbound::Hysteria2)),
         "tuic" => Some(crate::Tuic::from_raw(raw).map(Outbound::Tuic)),
+        "snell" => Some(crate::Snell::from_raw(raw).map(Outbound::Snell)),
+        "anytls" => Some(crate::AnyTls::from_raw(raw).map(Outbound::AnyTls)),
         _ => None,
     };
     if let Some(result) = native {
@@ -1383,6 +1395,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let (transport, udp, unrecognized) = match &candidate {
         Some(Outbound::Hysteria2(config)) => ("quic", config.udp, 0),
         Some(Outbound::Tuic(config)) => ("quic", config.udp, 0),
+        Some(Outbound::Snell(config)) => ("tcp", config.udp, 0),
+        Some(Outbound::AnyTls(config)) => ("tcp", config.udp, 0),
         _ => (transport, udp, unrecognized),
     };
     (
@@ -1401,7 +1415,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                 && udp
                 && candidate.is_some())
                 || matches!(&candidate, Some(Outbound::Hysteria2(config)) if config.udp)
-                || matches!(&candidate, Some(Outbound::Tuic(config)) if config.udp),
+                || matches!(&candidate, Some(Outbound::Tuic(config)) if config.udp)
+                || matches!(&candidate, Some(Outbound::AnyTls(config)) if config.udp)
+                || matches!(&candidate, Some(Outbound::Snell(config)) if config.udp),
             real_network_verified: false,
             diagnostic,
         },

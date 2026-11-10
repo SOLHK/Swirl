@@ -38,7 +38,8 @@ QByteArray crypt(const QByteArray &bytes, bool decrypt) {
 }
 QJsonObject read(const QString &path) {
     QFile f(path);if(!f.open(QIODevice::ReadOnly)||f.size()>65536)return {};
-    auto plain=crypt(f.readAll(),true);auto result=QJsonDocument::fromJson(plain).object();plain.fill(0);return result;
+    const auto encrypted=f.readAll();f.close();
+    auto plain=crypt(encrypted,true);auto result=QJsonDocument::fromJson(plain).object();plain.fill(0);return result;
 }
 bool write(const QString &path, const QJsonObject &object) {
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -128,6 +129,11 @@ QString guardReadyPath(const QString &journal,const QString &session) {
 bool guardReady(const QString &journal,const QString &session) {
     QFile ready(guardReadyPath(journal,session));
     return !session.isEmpty()&&ready.open(QIODevice::ReadOnly)&&ready.size()<=128&&QString::fromUtf8(ready.readAll())==session;
+}
+bool removeJournal(const QString &journal,const QString &session) {
+    if(!QFile::remove(journal))return false;
+    QFile::remove(guardReadyPath(journal,session));
+    return true;
 }
 }
 QString SystemProxySession::journalPath() { return SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
@@ -259,7 +265,9 @@ bool SystemProxySession::recover(const QString &journal, QString *error, bool re
     }
     if(matchesSettings(current,record.value("applied").toObject())&&!apply(record.value("original").toObject(),error))return false;
     // If any setting changed externally, relinquish ownership without writing.
-    return QFile::remove(journal);
+    if(removeJournal(journal,record.value("session").toString()))return true;
+    if(error)*error=QStringLiteral("无法移除代理恢复记录，可重试释放代理。");
+    return false;
 }
 quint64 SystemProxySession::requestEnable(int port,qint64 enginePid,std::function<bool()> stillValid) {
     if(busy()||m_owned)return 0;
@@ -280,7 +288,7 @@ void SystemProxySession::cancelEnable() {
     // another session is never cancelled by an old callback.
     if(!m_preparedRecord.isEmpty()&&m_enableLock&&m_enableLock->isLocked()) {
         if(read(m_journal).value("session")==m_preparedRecord.value("session")) {
-            QFile::remove(m_journal);QFile::remove(guardReadyPath(m_journal,m_preparedRecord.value("session").toString()));
+            removeJournal(m_journal,m_preparedRecord.value("session").toString());
         }
     }
     m_preparedRecord={};m_enableLock.reset();emit changed();emit enableFinished(request,false);
@@ -294,7 +302,7 @@ void SystemProxySession::finishEnable(bool success,const QString &error) {
         // commitPreparedEnable relinquishes the lock before recovery on a
         // partial write, preserving the journal and guard in that case.
         if(read(m_journal).value("session")==m_preparedRecord.value("session")) {
-            QFile::remove(m_journal);QFile::remove(guardReadyPath(m_journal,m_preparedRecord.value("session").toString()));
+            removeJournal(m_journal,m_preparedRecord.value("session").toString());
         }
     }
     m_preparedRecord={};m_enableLock.reset();emit changed();emit enableFinished(request,success);
@@ -416,9 +424,9 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
     const bool started=m_guard.startDetached();
     for(int i=0;started&&!guardReady(m_journal,record.value("session").toString())&&i<80;++i)QThread::msleep(25);
     if(!started||!guardReady(m_journal,record.value("session").toString())) {
-        m_error=QStringLiteral("安全恢复守护进程未就绪，未启用系统代理。");QFile::remove(m_journal);emit changed();return false;
+        m_error=QStringLiteral("安全恢复守护进程未就绪，未启用系统代理。");removeJournal(m_journal,record.value("session").toString());emit changed();return false;
     }
-    if(snapshot()!=original){m_error=QStringLiteral("其他软件刚刚修改了系统代理，请重试。");QFile::remove(m_journal);emit changed();return false;}
+    if(snapshot()!=original){m_error=QStringLiteral("其他软件刚刚修改了系统代理，请重试。");removeJournal(m_journal,record.value("session").toString());emit changed();return false;}
     if(!apply(applied,&m_error)){
         lock.unlock();const bool recovered=recover(m_journal,nullptr,false,record.value("session").toString());
         if(!recovered&&QFile::exists(m_journal)) {
@@ -431,7 +439,8 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
     }
     record.insert("applyUnconfirmed",false);
     if(!write(m_journal,record))m_error=QStringLiteral("代理已确认启用，但恢复记录确认标记未能更新；原始快照与守护仍保留。");
-    m_session=record.value("session").toString();m_owned=true;m_enabled=true;refresh();emit changed();return true;
+    m_session=record.value("session").toString();m_owned=true;m_enabled=true;
+    lock.unlock();refresh();emit changed();return true;
 }
 bool SystemProxySession::disable() {
     cancelEnable();
@@ -508,7 +517,19 @@ void SystemProxySession::refresh() {
     if(m_owned&&ownSession&&record.value("applyUnconfirmed").toBool()&&!same&&!matchesSettings(current,record.value("original").toObject())) {
         m_enabled=false;m_error=QStringLiteral("代理部分写入或外部修改的来源尚未确认；恢复快照已保留，请检查 Windows 代理。");emit changed();return;
     }
-    if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");observationChanged=true;}
+    if(m_owned&&!same){
+        if(ownSession){
+            QLockFile lock(m_journal+".lock");
+            if(!lock.tryLock(0))return; // Retry once recovery releases the journal.
+            const auto latest=read(m_journal);
+            const bool retained=latest.isEmpty()?QFile::exists(m_journal)
+                :latest.value("session").toString()==m_session&&!removeJournal(m_journal,m_session);
+            if(retained){
+                m_enabled=false;m_error=QStringLiteral("无法移除代理恢复记录，可重试释放代理。");emit changed();return;
+            }
+        }
+        m_owned=false;m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");observationChanged=true;
+    }
     const bool enabled=m_owned&&same;
     if(enabled!=m_enabled){m_enabled=enabled;observationChanged=true;}
     if(observationChanged)emit changed();
@@ -548,19 +569,27 @@ int SystemProxySession::guard(const QString &journal) {
     const auto removeReady=qScopeGuard([&]{QFile::remove(readyPath);});
     // Handle GUI death AND engine death. No fixed delay leaves a dead localhost
     // proxy behind while the GUI still appears alive.
+    const auto session=record.value("session").toString();
     for(;;) {
-        const auto snapshot=read(journal);
+        // Poll metadata only. A Windows reader can block replacement or
+        // removal of the journal. A retired marker can precede this poll even
+        // if a new owner has already created its journal.
         if(!QFile::exists(journal)){CloseHandle(owner);return 0;}
-        if(!snapshot.isEmpty()&&snapshot.value("session")!=record.value("session")){CloseHandle(owner);return 0;}
+        if(!QFile::exists(readyPath)) {
+            QLockFile lock(journal+".lock");
+            if(lock.tryLock(0)) {
+                const auto current=read(journal);
+                if(!QFile::exists(journal)||(!current.isEmpty()&&current.value("session").toString()!=session)){
+                    CloseHandle(owner);return 0;
+                }
+            }
+        }
         const auto waited=WaitForSingleObject(owner,250);
         if(waited==WAIT_FAILED){CloseHandle(owner);return 3;}
         if(waited==WAIT_OBJECT_0||!alive(record,"engine","engineTime"))break;
     }
     CloseHandle(owner);
-    if(read(journal).value("session")==record.value("session")) {
-        return recover(journal,nullptr,false,record.value("session").toString())?0:4;
-    }
-    return 0;
+    return recover(journal,nullptr,false,session)?0:4;
 #else
     Q_UNUSED(journal);return 2;
 #endif

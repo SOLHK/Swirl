@@ -1,13 +1,20 @@
-# Read-only network acceptance around an isolated, encrypted NodeStore copy.
+﻿# Historical network acceptance; currently blocked until the live guard is complete.
 # Never pass a production store or write the generated private runtime state to Git.
+# Optional parameters let the disabled launcher refuse without prompting for paths.
 param(
-    [Parameter(Mandatory=$true)][string]$SwirlExe,
-    [Parameter(Mandatory=$true)][string]$EncryptedStore,
-    [Parameter(Mandatory=$true)][string]$WorkDirectory,
+    [string]$SwirlExe = '',
+    [string]$EncryptedStore = '',
+    [string]$WorkDirectory = '',
     [string]$ExpectedSourceSha = '',
     [switch]$ObserveRustOutbound,
     [switch]$WriteProgress
 )
+# The historical QA entry has no authenticated billing/ledger admission or
+# complete wire fence. Refuse before resolving any caller path or starting a
+# process; flags cannot turn this into a guarded live run. Do not echo values.
+[Console]::Error.WriteLine('{"errorCode":"AuthenticatedBillingAndWireGuardRequired","networkStarted":false}')
+exit 64
+
 $ErrorActionPreference = 'Stop'
 $proxyPort = 17988
 $result = [ordered]@{ status='BLOCKED'; identity=$null; requests=@(); diagnostics=@(); independence='独立性未证实'; pre=$null; post=$null; reason='' }

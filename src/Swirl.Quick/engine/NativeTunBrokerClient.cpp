@@ -381,6 +381,13 @@ bool NativeTunBrokerClient::launch(QString *error) {
         return fail(error, QStringLiteral("TunBrokerHelloIdentityMismatch"));
     }
     m_impl->authenticated = true;
+    // The broker runs, its pipe owner and image identity were verified, and
+    // every later GUI operation uses open handles only. The broker retains its
+    // own ancestor locks until it has verified the package and launched the
+    // helper, so releasing the GUI-side directory locks here loses no
+    // anti-tamper coverage and stops an active TUN session from blocking
+    // unrelated renames/deletions across the install tree.
+    m_impl->directoryLocks.clear();
     return true;
 #else
     if (error) *error = QStringLiteral("TunBrokerWindowsRequired");

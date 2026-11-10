@@ -48,6 +48,9 @@ impl QueryTransport for DirectQueryTransport {
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
 type EndpointGuard = Arc<dyn Fn(SocketAddr) -> bool + Send + Sync>;
+#[cfg(all(test, windows))]
+#[path = "physical_probe_tests.rs"]
+mod physical_probe_tests;
 #[cfg(test)]
 #[path = "query_transport_tests.rs"]
 mod query_transport_tests;
@@ -288,6 +291,22 @@ impl Resolver {
         if let Some(ip) = self.system_hosts.get(&host.to_ascii_lowercase()) {
             return Ok(vec![SocketAddr::new(*ip, port)]);
         }
+        // Windows OS lookups run in a detached resolver task and cannot carry
+        // a per-probe socket binding. A TUN probe must keep its explicit DNS/
+        // hosts, not consult capture DNS or reuse an earlier OS-cache answer.
+        // Ordinary (TUN-off) probes retain the existing system lookup path.
+        if self.servers.is_empty()
+            && self.tls_servers.is_empty()
+            && swirl_transport::egress::private_acceptance_active()
+        {
+            return Err("DnsPrivateMeteredResolverRequired");
+        }
+        if self.servers.is_empty()
+            && self.tls_servers.is_empty()
+            && swirl_transport::egress::physical_probe_active()
+        {
+            return Err("DnsPhysicalResolverRequired");
+        }
         let key = host.to_ascii_lowercase();
         if let Some(result) = self.cached(&key, port)? {
             return result;
@@ -327,6 +346,10 @@ impl Resolver {
         }
         // Keep the permit until the underlying OS lookup actually finishes even
         // if the caller times out/cancels. This bounds detached blocking lookups.
+        // Mark this unmetered path before spawning: a later guard installation
+        // must not race a detached OS resolver that is already running.
+        swirl_transport::egress::check_unmetered_egress()
+            .map_err(|_| "DnsPrivateMeteredResolverRequired")?;
         let host = host.to_owned();
         let lookup = tokio::spawn(async move {
             let _permit = permit;

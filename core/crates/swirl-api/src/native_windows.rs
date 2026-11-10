@@ -300,7 +300,7 @@ impl Active {
             let aliases = snapshot
                 .adapters
                 .iter()
-                .filter(|adapter| adapter.hardware)
+                .filter(|adapter| adapter.hardware && adapter.present)
                 .map(|adapter| adapter.name.clone())
                 .collect::<Vec<_>>();
             let mut desired =

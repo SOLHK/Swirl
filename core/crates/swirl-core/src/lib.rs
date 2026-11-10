@@ -1,4 +1,5 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+mod batch_probe;
 pub mod lan;
 #[cfg(feature = "native-tun")]
 pub mod native_tun;
@@ -176,6 +177,7 @@ impl Plan {
 pub struct Core {
     runtime: Option<Runtime>,
     probe: ProbeRuntime,
+    batch_probe: batch_probe::BatchProbeRuntime,
     stop: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
     plan: Arc<RwLock<Arc<Plan>>>,
@@ -198,6 +200,8 @@ impl Core {
     ) -> Result<Self> {
         config.validate()?;
         validate_transports(&config, &transports)?;
+        swirl_transport::egress::check_private_listener(config.listen)
+            .map_err(|_| "PrivateQuotaListenerDenied")?;
         let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
@@ -267,6 +271,7 @@ impl Core {
         }});
         Ok(Self {
             probe: ProbeRuntime::new(runtime.handle().clone()),
+            batch_probe: batch_probe::BatchProbeRuntime::new(runtime.handle().clone()),
             runtime: Some(runtime),
             stop,
             task: Some(task),
@@ -394,6 +399,18 @@ impl Core {
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
     ) -> Result<ProbeStatus> {
+        self.probe_start_with_egress(url, timeout_ms, expected_status, false)
+    }
+
+    /// Internal isolated-worker probe. Physical egress is request-scoped and
+    /// never changes this Core's listener, another Core, or the TUN owner.
+    pub fn probe_start_with_egress(
+        &self,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        physical_egress: bool,
+    ) -> Result<ProbeStatus> {
         if self.runtime.is_none() {
             return Err("CoreStopped");
         }
@@ -410,6 +427,15 @@ impl Core {
         };
         options.target()?;
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        if physical_egress
+            && (!plan.config.listen.ip().is_loopback()
+                || plan.config.listen.port() != 0
+                || !plan.config.rules.is_empty()
+                || !plan.config.selectors.is_empty()
+                || plan.config.smart_routing)
+        {
+            return Err("ProbePhysicalWorkerRequired");
+        }
         let node = plan
             .config
             .nodes
@@ -422,7 +448,7 @@ impl Core {
         let outbound = node.outbound.clone();
         let transport = plan.transports.get(&node.id).cloned();
         let resolver = plan.resolver.clone();
-        self.probe.start_with(async move {
+        let request = async move {
             if let Some(transport) = transport {
                 swirl_protocol::url_test_head_with_transport(
                     &outbound,
@@ -435,6 +461,26 @@ impl Core {
             } else {
                 swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
             }
+        };
+        self.probe.start_with(async move {
+            if physical_egress {
+                swirl_transport::egress::with_physical_probe(request)
+                    .await
+                    .unwrap_or_else(|error| {
+                        Err(swirl_protocol::UrlTestFailure {
+                            stage: swirl_protocol::UrlTestStage::OutboundConnect,
+                            code: match error.kind() {
+                                std::io::ErrorKind::AlreadyExists => "ProbeEgressNetworkConflict",
+                                std::io::ErrorKind::Unsupported => "ProbeEgressUnsupported",
+                                _ => "ProbeEgressUnavailable",
+                            },
+                            http_status: None,
+                            outbound_timing: None,
+                        })
+                    })
+            } else {
+                request.await
+            }
         })
     }
     pub fn probe_status(&self) -> Result<ProbeStatus> {
@@ -442,6 +488,65 @@ impl Core {
     }
     pub fn probe_cancel(&self) -> Result<ProbeStatus> {
         self.probe.cancel()
+    }
+
+    /// Sweep the given nodes concurrently from one plan snapshot. Each probe
+    /// dials only its own node through the same strict protocol path as a
+    /// single probe: the current selection is untouched and a failure never
+    /// falls back to DIRECT.
+    pub fn probe_nodes(
+        &self,
+        nodes: Vec<String>,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        concurrency: Option<u32>,
+    ) -> Result<batch_probe::BatchSnapshot> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
+        if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
+            return Err("UrlTestExpectedStatus");
+        }
+        let options = HealthProbe {
+            url,
+            interval_ms: 300_000,
+            timeout_ms: timeout_ms.unwrap_or(5_000),
+            expected_status: expected_status.unwrap_or(204),
+            tolerance_ms: 0,
+            tls: None,
+        };
+        options.target()?;
+        let plan = self.plan.read().map_err(|_| "ConfigState")?.clone();
+        let mut targets = std::collections::BTreeMap::new();
+        for id in &nodes {
+            if let Some(node) = plan.config.nodes.iter().find(|node| &node.id == id)
+                && !matches!(node.outbound, Outbound::Reject {})
+            {
+                targets.insert(
+                    id.clone(),
+                    (node.outbound.clone(), plan.transports.get(id).cloned()),
+                );
+            }
+        }
+        let inputs = batch_probe::BatchInputs {
+            targets,
+            resolver: plan.resolver.clone(),
+        };
+        self.batch_probe.start(
+            inputs,
+            nodes,
+            options,
+            concurrency.map(|value| value as usize),
+        )
+    }
+
+    pub fn probe_nodes_status(&self) -> Result<batch_probe::BatchSnapshot> {
+        self.batch_probe.snapshot()
+    }
+
+    pub fn probe_nodes_cancel(&self) -> Result<batch_probe::BatchSnapshot> {
+        self.batch_probe.cancel()
     }
     pub fn snapshot(&self) -> Result<Snapshot> {
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
@@ -889,7 +994,23 @@ async fn prepare_udp(
                 permit,
             });
         }
+        Outbound::Snell(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
         Outbound::Tuic(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::AnyTls(config) if config.udp => {
             return Ok(UdpDispatch {
                 transport: UdpTransport::ProxySession { target, payload },
                 payload_len,

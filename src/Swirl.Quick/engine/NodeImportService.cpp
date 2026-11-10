@@ -16,6 +16,12 @@
 #include <QCoreApplication>
 #include <QMetaEnum>
 #include <QThreadPool>
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include <QCryptographicHash>
+#include <QSslCertificate>
+#include <QSslConfiguration>
+#include <QSslSocket>
+#endif
 
 namespace {
 bool loopbackHost(const QString &host) {
@@ -60,16 +66,44 @@ NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::funct
     // application's other sockets or the user's operating-system settings.
     if(!m_systemProxyResolver)m_systemProxyResolver=[](const QNetworkProxyQuery &query){return QNetworkProxyFactory::systemProxyForQuery(query);};
     m_deadline.setSingleShot(true);m_deadline.setInterval(30000);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    m_deadline.setInterval(8000);
+#endif
     connect(&m_deadline,&QTimer::timeout,this,[this]{
         if(!m_busy)return;
         m_downloadTimedOut=true;
         if(m_reply)m_reply->abort();
         else {++m_generation;finish(QStringLiteral("订阅下载超过 30 秒（含连接准备）；旧节点保持不变。"));}
     });
+    m_autoRouteDeadline.setSingleShot(true);m_autoRouteDeadline.setInterval(15000);
+    connect(&m_autoRouteDeadline,&QTimer::timeout,this,[this]{tryPhysicalDownload(m_routeUrl,m_routeRedirects);});
     connect(&m_timer,&QTimer::timeout,this,&NodeImportService::checkDue);
     connect(store,&NodeStore::changed,this,&NodeImportService::changed);
     m_timer.start(qMax(100,interval));QTimer::singleShot(1000,this,&NodeImportService::checkDue);
 }
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+bool NodeImportService::privateUiImportAllowed(const QUrl &url) {
+    return m_privateUiImport&&!m_privateUiImport->revoked&&!m_shuttingDown
+        &&m_privateUiImport->guardActive&&m_privateUiImport->guardActive()
+        &&url==m_privateUiImport->url&&url.scheme()==QStringLiteral("https")
+        &&url.host()==QStringLiteral("203.0.113.1")&&url.userInfo().isEmpty()
+        &&url.query().isEmpty()&&url.fragment().isEmpty();
+}
+void NodeImportService::privateUiImportReject(const char *code) {
+    if(m_privateUiImportFailure.isEmpty())m_privateUiImportFailure=QString::fromLatin1(code);
+    m_message=QStringLiteral("Private synthetic subscription admission rejected.");
+    emit changed();
+}
+QVariantMap NodeImportService::privateUiImportEvidence() const {
+    const auto *cap=m_privateUiImport.get();
+    return {{"capabilityInstalled",cap!=nullptr},{"requests",cap?cap->requests:0},
+        {"tlsVerified",cap&&cap->tlsVerified},{"responseVerified",cap&&cap->responseVerified},
+        {"responseBytes",cap?cap->responseBytes:0},{"httpStatus",cap?cap->httpStatus:0},
+        {"expectedBodySha256",cap?QString::fromLatin1(cap->bodyDigest.toHex()):QString()},
+        {"failureCode",m_privateUiImportFailure},{"route",QStringLiteral("granted-core-http-listener")},
+        {"bodyLimit",65536},{"revoked",!cap||cap->revoked}};
+}
+#endif
 NodeImportService::~NodeImportService(){
     // The QObject parent may already be tearing down its derived state.
     // Destruction revokes downloads without calling back into that owner.
@@ -98,6 +132,10 @@ void NodeImportService::importNodesOnlyText(const QString &text) {
     parseText(text,QStringLiteral("text"),true);
 }
 void NodeImportService::parseText(const QString &text,const QString &origin,bool nodesOnly) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    Q_UNUSED(text);Q_UNUSED(origin);Q_UNUSED(nodesOnly);
+    privateUiImportReject("PrivateUiTextImportRefused");return;
+#endif
     if(m_shuttingDown)return;
     if(m_busy || hasPreview()){m_message=QStringLiteral("请先确认或取消当前导入。");emit changed();return;}
     // Every UTF-16 code unit needs at least one UTF-8 byte. Reject this
@@ -115,9 +153,15 @@ void NodeImportService::parseText(const QString &text,const QString &origin,bool
     });
 }
 void NodeImportService::importClipboard() {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    privateUiImportReject("PrivateUiClipboardImportRefused");return;
+#endif
     if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"),false);
 }
 void NodeImportService::importNodesOnlyClipboard() {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    privateUiImportReject("PrivateUiClipboardImportRefused");return;
+#endif
     if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"),true);
 }
 void NodeImportService::importFile(const QUrl &file) {
@@ -127,6 +171,10 @@ void NodeImportService::importNodesOnlyFile(const QUrl &file) {
     startFile(file,true);
 }
 void NodeImportService::startFile(const QUrl &file,bool nodesOnly) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    Q_UNUSED(file);Q_UNUSED(nodesOnly);
+    privateUiImportReject("PrivateUiFileImportRefused");return;
+#endif
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!file.isLocalFile() || !file.host().isEmpty() || file.toLocalFile().startsWith("\\\\")) {m_message=QStringLiteral("请选择本机 YAML/JSON 文件。");emit changed();return;}
     m_busy=true;m_source.clear();m_importSource="file";m_previewRequested=true;m_nodesOnly=nodesOnly;
@@ -157,17 +205,29 @@ void NodeImportService::importNodesOnlyUrl(const QUrl &url) {
     startUrl(url,true);
 }
 void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    Q_UNUSED(url);Q_UNUSED(nodesOnly);
+    privateUiImportReject("PrivateUiSubscriptionFormRequired");return;
+#endif
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!m_store->configurationAvailable()){m_message=QStringLiteral("配置库需要恢复或重新打开；未发起下载。");emit changed();return;}
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
     m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;m_nodesOnly=nodesOnly;
-    m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
+    m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;m_autoPhysicalAttempt=false;
     m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");
     const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
     if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
     m_deadline.start();download(url);
 }
 bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope,const QString &downloadRoute) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!privateUiImportAllowed(url)||!id.isEmpty()||!m_store->subscriptions().isEmpty()
+        ||m_privateUiImport->started||name!=QStringLiteral("Synthetic owned subscription")||enabled
+        ||interval!=1440||formatHint!=QStringLiteral("auto")||!importScope.isEmpty()
+        ||downloadRoute!=QStringLiteral("system")){
+        privateUiImportReject("PrivateUiSubscriptionDefinitionRejected");return false;
+    }
+#endif
     if(m_busy || hasPreview())return false;
     if(m_store->configurationV2())return mutateCatalog("save_subscription",{{"id",id},{"name",name},{"url",url},{"interval",interval},{"enabled",enabled},{"formatHint",formatHint},{"importScope",importScope},{"downloadRoute",downloadRoute}},QStringLiteral("订阅已加密保存；自动更新设置已生效。"));
     const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint,importScope,downloadRoute);
@@ -225,14 +285,21 @@ bool NodeImportService::cancelRefresh(const QString &id) {
     return true;
 }
 void NodeImportService::shutdown() {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(m_privateUiImport)m_privateUiImport->revoked=true;
+#endif
     if(m_shuttingDown)return;
-    m_shuttingDown=true;++m_generation;m_timer.stop();m_deadline.stop();m_queue.clear();
+    m_shuttingDown=true;++m_generation;m_timer.stop();m_deadline.stop();m_autoRouteDeadline.stop();m_queue.clear();
     m_pending.reset();m_sourceDefinition.reset();m_configurationReview.clear();if(m_cancelConfigurationReview)m_cancelConfigurationReview();
     if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
     stopDownloadRoute();
     m_busy=false;
 }
 void NodeImportService::checkDue() {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    // A private session grants one explicit form refresh, never a background job.
+    return;
+#endif
     if(m_shuttingDown)return;
     if(!m_store->configurationAvailable())return;
     if(m_busy || hasPreview() || !m_queue.isEmpty())return;
@@ -255,7 +322,7 @@ void NodeImportService::next() {
             const QPointer<NodeImportService> guard(this);
             m_cancelled.remove(id);
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
-            m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
+            m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;m_autoPhysicalAttempt=false;
             // Legacy scope values never authorize a background policy change.
             // Only an explicit, separately reviewed operation may apply one.
             m_sourceDefinition=s;
@@ -275,10 +342,43 @@ void NodeImportService::rememberOwnedProxyPort(int port) {
     // a coincidentally configured but never-used Swirl port remains eligible.
     if(port>0&&port<=65535)m_ownedProxyPorts.insert(quint16(port));
 }
+bool NodeImportService::automaticDownloadRoute(const QUrl &url) const {
+#if defined(Q_OS_WIN) && !defined(SWIRL_PRIVATE_UI_QUOTA)
+    // Keep the existing persisted value: system policy is preferred, with one
+    // bounded physical-interface recovery for ordinary subscription refreshes.
+    return m_sourceDefinition&&m_sourceDefinition->downloadRoute=="system"
+        &&url.scheme()=="https"&&!loopbackHost(url.host());
+#else
+    Q_UNUSED(url);return false;
+#endif
+}
+bool NodeImportService::tryPhysicalDownload(const QUrl &url,int redirects) {
+    if(!m_busy||m_shuttingDown||m_downloadTimedOut||m_autoPhysicalAttempt||!automaticDownloadRoute(url))return false;
+    m_autoRouteDeadline.stop();m_autoPhysicalAttempt=true;++m_generation;
+    if(m_reply){auto *reply=m_reply.data();m_reply=nullptr;reply->abort();reply->deleteLater();}
+    m_network.clearAccessCache();
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+    emit downloadDiagnostic(QStringLiteral("route-policy=auto; retry=physical-interface"));
+    if(guard&&!m_shuttingDown&&m_busy&&m_generation==generation)downloadPhysical(url,redirects);
+    return true;
+}
 void NodeImportService::download(const QUrl &url,int redirects) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!privateUiImportAllowed(url)||redirects!=0||m_downloadAttempts!=0
+        ||m_privateUiImport->started||!m_sourceDefinition||m_sourceDefinition->url!=url
+        ||m_sourceDefinition->enabled||m_sourceDefinition->downloadRoute!=QStringLiteral("system")){
+        privateUiImportReject("PrivateUiSubscriptionRouteRejected");finish(m_message);return;
+    }
+    startDownload(url,0,{QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),m_privateUiImport->proxyPort)});
+    return;
+#endif
     if(!NodeStore::allowedSubscriptionUrl(url) || redirects>5){finish(QStringLiteral("订阅重定向不安全或次数过多；旧节点保持不变。"));return;}
-    if(m_sourceDefinition && m_sourceDefinition->downloadRoute=="physical"){downloadPhysical(url,redirects);return;}
+    if(m_autoPhysicalAttempt||(m_sourceDefinition&&m_sourceDefinition->downloadRoute=="physical")){downloadPhysical(url,redirects);return;}
     if(loopbackHost(url.host())){startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::NoProxy)});return;}
+    if(automaticDownloadRoute(url)){
+        m_routeUrl=url;m_routeRedirects=redirects;
+        if(!m_autoRouteDeadline.isActive())m_autoRouteDeadline.start();
+    }
     // Subscription recovery must not depend on the nodes it is downloading.
     // Use the platform's external proxy policy even while our core is running.
     // PAC discovery can block in platform APIs. Keep it off the UI thread and
@@ -305,10 +405,11 @@ void NodeImportService::download(const QUrl &url,int redirects) {
                 if(!guard || guard->m_shuttingDown || !guard->m_busy || guard->m_generation!=generation)return;
             }
             if(usable.isEmpty()){
+                if(guard->tryPhysicalDownload(url,redirects))return;
                 guard->finish(QStringLiteral("无法获得适用于订阅下载的系统代理；请检查系统代理设置后重试。旧节点保持不变。"));return;
             }
-            // Preserve the platform's ordered alternatives, including DIRECT
-            // without retrying a failed external proxy over a direct connection.
+            // The initial attempt preserves the platform's ordered alternatives.
+            // Automatic recovery uses a separately owned native interface lease.
             guard->startDownload(url,redirects,usable);
         },Qt::QueuedConnection);
     });
@@ -332,7 +433,9 @@ void NodeImportService::downloadPhysical(const QUrl &url,int redirects) {
         // native route startup is pending or this callback is discarded.
         QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,generation,url,redirects,lease,valid]{
             if(!guard || guard->m_shuttingDown || !guard->m_busy || guard->m_generation!=generation)return;
-            if(!valid){guard->finish(QStringLiteral("物理网卡下载通道不可用；未切换到其他路径，旧节点保持不变。"));return;}
+            if(!valid){guard->finish(guard->m_autoPhysicalAttempt
+                ?QStringLiteral("自动网络连接未成功；请检查网络后重试。旧节点保持不变。")
+                :QStringLiteral("物理网卡下载通道不可用；未切换到其他路径，旧节点保持不变。"));return;}
             guard->m_downloadRoute=lease;
             guard->startDownload(url,redirects,{lease->proxy});
         },Qt::QueuedConnection);
@@ -345,55 +448,114 @@ void NodeImportService::stopDownloadRoute() {
     m_downloadRoute.reset();
 }
 void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!privateUiImportAllowed(url)||redirects!=0||m_downloadAttempts!=0||m_privateUiImport->started
+        ||proxies.size()!=1||proxies.first().type()!=QNetworkProxy::HttpProxy
+        ||proxies.first().hostName()!=QStringLiteral("127.0.0.1")
+        ||proxies.first().port()!=m_privateUiImport->proxyPort){
+        privateUiImportReject("PrivateUiSubscriptionRouteRejected");finish(m_message);return;
+    }
+#endif
     if(!m_store->configurationAvailable()){finish(QStringLiteral("配置库需要恢复或重新打开；未使用旧来源发起下载。"));return;}
     if(m_automaticImport&&!sourceDefinitionCurrent()){finish(QStringLiteral("订阅定义已更改，已丢弃旧响应；请重新更新。"));return;}
     QNetworkRequest request(url);
     SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
-    const QHash<QString,QByteArray> agents{{"auto","Swirl/"+QCoreApplication::applicationVersion().toUtf8()},{"clash","Clash.Meta/1.19.32 Swirl"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
+    const QHash<QString,QByteArray> agents{{"auto","Surge/6.0 Swirl/"+QCoreApplication::applicationVersion().toUtf8()},{"clash","Clash.Meta/1.19.32 Swirl"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
     // Some subscription services negotiate solely through a known client UA.
-    // Keep Swirl's native request first, with one bounded retry using the exact
-    // previously shipped automatic identity. The response still determines its
-    // format and passes every existing parser/profile/security check.
+    // Ask for a full profile when the provider negotiates via Surge's identity.
+    // Swirl still identifies itself and parses the actual response format. One
+    // bounded legacy retry retains compatibility with Clash-only providers.
     request.setRawHeader("User-Agent",m_compatibilityRequest?QByteArray("Clash.Meta/1.19.32 Swirl/1.0"):agents.value(m_formatHint,agents.value("auto")));
     request.setRawHeader("Accept","application/json, application/yaml, text/yaml, text/plain, */*;q=0.5");
     request.setTransferTimeout(15000);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    auto tls=request.sslConfiguration();
+    request.setTransferTimeout(8000);
+    tls.setCaCertificates(QSslCertificate::fromData(m_privateUiImport->ca));
+    tls.setPeerVerifyMode(QSslSocket::VerifyPeer);request.setSslConfiguration(tls);
+    request.setRawHeader("Connection","close");
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);
+    m_network.clearAccessCache();
+    m_privateUiImport->started=true;++m_privateUiImport->requests;
+    constexpr qint64 maximumBytes=65536;
+#else
+    constexpr qint64 maximumBytes=NodeImporter::MaximumBytes;
+#endif
     m_network.setProxyFactory(new DownloadProxyFactory(proxies));
     auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(64*1024);
+    const auto tlsRejected=std::make_shared<bool>(false);
+    connect(reply,&QNetworkReply::sslErrors,this,[this,reply,tlsRejected](const QList<QSslError> &){
+        *tlsRejected=true;if(m_reply==reply)m_autoRouteDeadline.stop();
+    });
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    connect(reply,&QNetworkReply::encrypted,this,[this]{if(m_privateUiImport)m_privateUiImport->tlsVerified=true;});
+    connect(reply,&QNetworkReply::sslErrors,this,[this,reply](const QList<QSslError> &){
+        privateUiImportReject("PrivateUiSubscriptionTlsRejected");reply->abort();
+    });
+#endif
     const auto generation=m_generation;
     const auto attempt=++m_downloadAttempts;
     const auto negotiation=m_compatibilityRequest?QStringLiteral("legacy-auto"):QStringLiteral("native");
     const auto format=agents.contains(m_formatHint)?m_formatHint:QStringLiteral("auto");
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    const auto route=QStringLiteral("granted-core-http-listener");
+#else
     const auto route=m_downloadRoute?QStringLiteral("physical-interface"):loopbackHost(url.host())?QStringLiteral("loopback-direct"):
         proxies.size()==1 && proxies.first().type()==QNetworkProxy::NoProxy?QStringLiteral("direct-policy"):
         proxies.size()==1 && loopbackHost(proxies.first().hostName())?QStringLiteral("loopback-proxy"):QStringLiteral("proxy-policy");
+#endif
     auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
-    connect(reply,&QNetworkReply::metaDataChanged,this,[reply,tooLarge] {
+    connect(reply,&QNetworkReply::metaDataChanged,this,[this,reply,tooLarge,maximumBytes] {
+        if(m_reply==reply&&reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()>0)m_autoRouteDeadline.stop();
         bool ok=false;const auto length=reply->header(QNetworkRequest::ContentLengthHeader).toLongLong(&ok);
-        if(ok && length>NodeImporter::MaximumBytes){*tooLarge=true;reply->abort();}
+        if(ok && length>maximumBytes){*tooLarge=true;reply->abort();}
     });
-    const auto drain=[reply,bytes,tooLarge] {
+    const auto drain=[reply,bytes,tooLarge,maximumBytes] {
         while(!*tooLarge && reply->bytesAvailable()>0) {
-            const auto remaining=NodeImporter::MaximumBytes+1-bytes->size();
+            const auto remaining=maximumBytes+1-bytes->size();
             const auto chunk=reply->read(qMin<qint64>(64*1024,remaining));
             if(chunk.isEmpty())break;
             bytes->append(chunk);
-            if(bytes->size()>NodeImporter::MaximumBytes){*tooLarge=true;reply->abort();}
+            if(bytes->size()>maximumBytes){*tooLarge=true;reply->abort();}
         }
     };
     connect(reply,&QNetworkReply::readyRead,this,drain);
-    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,url,redirects,generation,drain,proxies,attempt,negotiation,format,route]{
+    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,tlsRejected,url,redirects,generation,drain,proxies,attempt,negotiation,format,route,maximumBytes]{
         if(m_shuttingDown || generation!=m_generation){reply->deleteLater();return;}
         if(m_reply==reply)m_reply=nullptr;
         drain();const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const auto redirect=reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
-        const auto error=reply->error();reply->deleteLater();
+        const auto error=reply->error();reply->deleteLater();m_autoRouteDeadline.stop();
         const QPointer<NodeImportService> guard(this);
         emit downloadDiagnostic(QStringLiteral("attempt=%1; negotiation=%2; format=%3; route=%4; http=%5; qt=%6")
             .arg(attempt).arg(negotiation,format,route).arg(code).arg(int(error)));
         if(!guard || guard->m_shuttingDown || guard->m_generation!=generation || !guard->m_busy)return;
-        if(*tooLarge || bytes->size()>NodeImporter::MaximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+        if(m_privateUiImport){m_privateUiImport->httpStatus=code;m_privateUiImport->responseBytes=bytes->size();}
+        if(*tooLarge||bytes->size()>maximumBytes){
+            privateUiImportReject("PrivateUiSubscriptionBodyLimit");finish(m_message);return;
+        }
+        if(!privateUiImportAllowed(url)||code!=200||error!=QNetworkReply::NoError
+            ||!m_privateUiImport->tlsVerified||!redirect.isEmpty()){
+            privateUiImportReject("PrivateUiSubscriptionTransferRejected");finish(m_message);return;
+        }
+        if(QCryptographicHash::hash(*bytes,QCryptographicHash::Sha256)!=m_privateUiImport->bodyDigest){
+            privateUiImportReject("PrivateUiSubscriptionBodyRejected");finish(m_message);return;
+        }
+        m_privateUiImport->responseVerified=true;
+#else
+        if(*tooLarge || bytes->size()>maximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
+#endif
         if(m_downloadTimedOut){finish(QStringLiteral("订阅下载超过 30 秒；旧节点保持不变。"));return;}
+        // Retry only a failed transport before any HTTP response/body. TLS,
+        // authentication, HTTP, redirect and parsing failures retain their result.
+        const bool transportFailure=error==QNetworkReply::ConnectionRefusedError||error==QNetworkReply::RemoteHostClosedError
+            ||error==QNetworkReply::HostNotFoundError||error==QNetworkReply::TimeoutError
+            ||error==QNetworkReply::TemporaryNetworkFailureError||error==QNetworkReply::NetworkSessionFailedError
+            ||error==QNetworkReply::ProxyConnectionRefusedError||error==QNetworkReply::ProxyConnectionClosedError
+            ||error==QNetworkReply::ProxyNotFoundError||error==QNetworkReply::ProxyTimeoutError;
+        if(code==0&&bytes->isEmpty()&&!*tlsRejected&&transportFailure&&tryPhysicalDownload(url,redirects))return;
         if(code==301||code==302||code==303||code==307||code==308) {
             if(redirect.isEmpty()){finish(QStringLiteral("订阅重定向失败：HTTP %1 未提供有效 Location；旧节点保持不变。").arg(code));return;}
             const auto nextUrl=url.resolved(redirect);
@@ -438,6 +600,11 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
     });
 }
 void NodeImportService::parse(QByteArray bytes) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!m_privateUiImport||!m_privateUiImport->responseVerified||!privateUiImportAllowed(m_downloadUrl)){
+        bytes.fill('\0');privateUiImportReject("PrivateUiSubscriptionCatalogRejected");finish(m_message);return;
+    }
+#endif
     QPointer<NodeImportService> guard(this);const auto generation=m_generation;
     QThreadPool::globalInstance()->start([guard,generation,bytes=std::move(bytes)]() mutable {
         auto result=NodeImporter::parse(bytes);bytes.fill('\0');
@@ -453,6 +620,12 @@ QVariantList NodeImportService::preview() const {
     return rows;
 }
 void NodeImportService::parsed(NodeImporter::Result result) {
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    if(!m_privateUiImport||!m_privateUiImport->responseVerified||!privateUiImportAllowed(m_downloadUrl)
+        ||result.nodes.size()!=1||m_importSource!=QStringLiteral("subscription")||!m_nodesOnly){
+        privateUiImportReject("PrivateUiSubscriptionCatalogRejected");finish(m_message);return;
+    }
+#endif
     if(!result){finish((result.errorKind=="unsupported-format"?QStringLiteral("订阅格式不支持：%1"):QStringLiteral("订阅内容解析失败：%1")).arg(result.error));return;}
     for(auto &node:result.nodes)node.importSource=m_importSource;
     if(m_previewRequested && result.format=="xray-v2ray-json") {
@@ -559,12 +732,12 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         if(missing && policy.value("mode")!=QJsonValue("direct"))
             m_message+=QStringLiteral(" 默认策略尚无有效出口；请到「策略 → 默认策略 → 更换出口」选择本次导入的节点。");
     }
-    if(certificatesEnforced)m_message+=QStringLiteral(" %1 条 Trojan 记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
+    if(certificatesEnforced)m_message+=QStringLiteral(" %1 条记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
 void NodeImportService::finish(const QString &error) {
     stopDownloadRoute();
-    m_deadline.stop();
+    m_deadline.stop();m_autoRouteDeadline.stop();m_routeUrl=QUrl();m_routeRedirects=0;
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
     m_source.clear();m_sourceDefinition.reset();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;

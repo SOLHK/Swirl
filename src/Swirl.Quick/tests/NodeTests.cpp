@@ -26,6 +26,7 @@
 #include <QSaveFile>
 #include <QFileInfo>
 #include <QUdpSocket>
+#include <algorithm>
 
 static quint16 freePort(){
     LoopbackPortLease ports;
@@ -33,6 +34,12 @@ static quint16 freePort(){
     return ports.proxyPort();
 }
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
+struct FixturePortOwner {
+    explicit FixturePortOwner(int &count):live(&count){++*live;}
+    ~FixturePortOwner(){--*live;}
+    int *live;
+};
+using FixtureOwner=std::unique_ptr<FixturePortOwner>;
 class NodeTests:public QObject {
     Q_OBJECT
     EngineStartOptions options() {
@@ -57,6 +64,61 @@ class NodeTests:public QObject {
 private slots:
     void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
     void init(){QSettings().clear();}
+    void fixturePortExclusionTablesFailClosed(){
+        QSet<quint16> ports;QString error;
+        const auto localized=QStringLiteral("协议 udp 端口排除范围\n起始端口 结束端口\n---------- ----------\n50000 50031\n51000 51001 *\n* - 管理的端口排除。\n").toUtf8();
+        QVERIFY2(SwirlFixturePorts::parseExclusions(localized,ports,error),qPrintable(error));
+        QCOMPARE(ports.size(),34);QVERIFY(ports.contains(50031));QVERIFY(ports.contains(51001));QVERIFY(!ports.contains(50032));
+        QVERIFY(SwirlFixturePorts::parseExclusions("--- ---\n51000 51001*\n",ports,error));QCOMPARE(ports.size(),2);
+        QVERIFY(SwirlFixturePorts::parseExclusions("heading\n--- ---\n",ports,error));QVERIFY(ports.isEmpty());
+        for(const auto &invalid:QList<QByteArray>{"","1 10","--- ---\n0 10","--- ---\n2 1","--- ---\n1 65536",
+                                                "--- ---\n1 2 extra","--- ---\n+1 2","--- ---\n1 +2",
+                                                "--- ---\n1 2**","--- ---\nunrecognized data","--- ---\n5 6\n7 bad"}){
+            QVERIFY2(!SwirlFixturePorts::parseExclusions(invalid,ports,error),invalid.constData());
+            QVERIFY(ports.isEmpty());QVERIFY(!error.isEmpty());
+        }
+    }
+    void fixtureExcludedBlockKeepsEveryCandidateOwned(){
+        QSet<quint16> excluded;for(int port=50000;port<50064;++port)excluded.insert(quint16(port));
+        int live=0,created=0,bindCalls=0;quint16 next=50000;bool allHeld=true;quint16 bound=0;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>(excluded,49999,[&]{
+            allHeld=allHeld&&live==created;
+            ++created;
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16 port){
+            ++bindCalls;bound=port;
+            return SwirlFixturePorts::BindResult{true,QAbstractSocket::UnknownSocketError,{}};
+        },result);
+        QVERIFY(owner);QVERIFY(allHeld);QCOMPARE(created,65);QCOMPARE(bindCalls,1);QCOMPARE(bound,quint16(50064));
+        QCOMPARE(result.filtered,64);QCOMPARE(result.collisions,0);QCOMPARE(result.heldOwners,64);
+        QCOMPARE(result.filteredSample.size(),32);QCOMPARE(live,1);owner.reset();QCOMPARE(live,0);
+    }
+    void fixtureUnknownAccessDenialStopsAfterCollision(){
+        int live=0,bindCalls=0;quint16 next=50000;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>({},49999,[&]{
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16){
+            ++bindCalls;
+            return SwirlFixturePorts::BindResult{false,bindCalls==1?QAbstractSocket::AddressInUseError:QAbstractSocket::SocketAccessError,
+                                                 QStringLiteral("Controlled denial")};
+        },result);
+        QVERIFY(!owner);QCOMPARE(bindCalls,2);QCOMPARE(result.candidates,2);QCOMPARE(result.collisions,1);
+        QCOMPARE(result.candidate,quint16(50001));QCOMPARE(result.stage,QStringLiteral("tcp-listen"));
+        QCOMPARE(result.error,QAbstractSocket::SocketAccessError);QCOMPARE(live,0);
+    }
+    void fixtureAddressCollisionLimitRemainsBounded(){
+        int live=0,bindCalls=0;quint16 next=50000;
+        SwirlFixturePorts::Selection result;
+        auto owner=SwirlFixturePorts::selectPair<FixtureOwner>({},49999,[&]{
+            return SwirlFixturePorts::Candidate<FixtureOwner>{std::make_unique<FixturePortOwner>(live),next++,QAbstractSocket::UnknownSocketError,{}};
+        },[&](quint16){
+            ++bindCalls;
+            return SwirlFixturePorts::BindResult{false,QAbstractSocket::AddressInUseError,QStringLiteral("Controlled collision")};
+        },result);
+        QVERIFY(!owner);QCOMPARE(bindCalls,32);QCOMPARE(result.candidates,32);QCOMPARE(result.collisions,32);QCOMPARE(live,0);
+    }
     void probesNeverInheritNetworkOwnership(){
         auto source=options();source.tunEnabled=true;source.gatewayForwarding=true;source.allowLan=true;source.meteredNetwork=true;
         source.meteredAllowlist={"Codex.exe"};source.lanUsername="private";source.lanPassword="private";
@@ -65,9 +127,40 @@ private slots:
         source.customGroups={QVariantMap{{"name","stale"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
         const auto isolated=NodeTestService::isolatedOptions(source);
         QVERIFY(!isolated.tunEnabled);QVERIFY(!isolated.gatewayForwarding);QVERIFY(!isolated.allowLan);QVERIFY(!isolated.meteredNetwork);
-        QVERIFY(!isolated.directSession);QVERIFY(isolated.dnsConfig.isEmpty());QVERIFY(isolated.customRules.isEmpty());QVERIFY(isolated.customGroups.isEmpty());
+        QVERIFY(!isolated.directSession);QCOMPARE(isolated.dnsConfig,source.dnsConfig);QVERIFY(isolated.customRules.isEmpty());QVERIFY(isolated.customGroups.isEmpty());
         QVERIFY(isolated.lanPassword.isEmpty());QVERIFY(isolated.inboundPassword.isEmpty());QCOMPARE(isolated.routingMode,QString("global"));
         QCOMPARE(isolated.nodes.size(),source.nodes.size());QVERIFY(!isolated.smartRouting);
+        // A saved TUN preference is not evidence of live capture ownership.
+        QVERIFY(!isolated.internalProbePhysicalEgress);
+        source.internalProbePhysicalEgress=true;
+        const auto physical=NodeTestService::isolatedOptions(source);
+        QVERIFY(physical.internalProbePhysicalEgress);QVERIFY(!physical.tunEnabled);
+        QVERIFY(physical.internalProbeListener);QCOMPARE(physical.proxyPort,quint16(0));
+    }
+    void probeFailureStatusText_data() {
+        QTest::addColumn<QString>("phase");QTest::addColumn<QString>("code");QTest::addColumn<QString>("expected");
+        QTest::newRow("dns")<<QString("dns")<<QString("DnsLookupFailed")<<QStringLiteral("DNS 失败");
+        QTest::newRow("dns-timeout")<<QString("dns")<<QString("UpstreamDnsTimeout")<<QStringLiteral("DNS 超时");
+        QTest::newRow("tcp")<<QString("tcp_connect")<<QString("UpstreamConnectionRefused")<<QStringLiteral("连接失败");
+        QTest::newRow("tcp-timeout")<<QString("tcp_connect")<<QString("UpstreamTcpTimeout")<<QStringLiteral("连接超时");
+        QTest::newRow("proxy-handshake")<<QString("outbound_handshake")<<QString("UpstreamRejected")<<QStringLiteral("握手失败");
+        QTest::newRow("proxy-certificate")<<QString("outbound_handshake")<<QString("TlsCertificateUnknownIssuer")<<QStringLiteral("TLS 验证失败");
+        QTest::newRow("proxy-tls-timeout")<<QString("outbound_handshake")<<QString("UpstreamTlsTimeout")<<QStringLiteral("握手超时");
+        QTest::newRow("quic-dns-timeout")<<QString("dns")<<QString("TuicDnsTimeout")<<QStringLiteral("DNS 超时");
+        QTest::newRow("quic-handshake-timeout")<<QString("outbound_handshake")<<QString("QuicHandshakeTimeout")<<QStringLiteral("握手超时");
+        QTest::newRow("origin-tls")<<QString("origin_tls")<<QString("TlsCertificateNameMismatch")<<QStringLiteral("目标 TLS 失败");
+        QTest::newRow("origin-tls-timeout")<<QString("origin_tls")<<QString("UrlTestTimeout")<<QStringLiteral("目标 TLS 超时");
+        QTest::newRow("response-timeout")<<QString("response_headers")<<QString("UrlTestTimeout")<<QStringLiteral("响应超时");
+        QTest::newRow("http-status")<<QString("http_status")<<QString("UrlTestStatus")<<QStringLiteral("HTTP 异常");
+        QTest::newRow("invalid-configuration")<<QString("configuration")<<QString("NodeConfigurationRejected")<<QStringLiteral("配置无效");
+        QTest::newRow("service-deadline")<<QString("timeout")<<QString("ProbeDeadlineExceeded")<<QStringLiteral("测试超时");
+        QTest::newRow("physical-conflict")<<QString("outbound_connect")<<QString("ProbeEgressNetworkConflict")<<QStringLiteral("网络路由冲突");
+        QTest::newRow("physical-unavailable")<<QString("outbound_connect")<<QString("ProbeEgressUnavailable")<<QStringLiteral("物理出口不可用");
+        QTest::newRow("unknown-phase")<<QString("future_stage")<<QString("FutureCode")<<QStringLiteral("测试失败");
+    }
+    void probeFailureStatusText() {
+        QFETCH(QString,phase);QFETCH(QString,code);QFETCH(QString,expected);
+        QCOMPARE(NodeTestService::failureStatusText({{"phase",phase},{"failureCode",code}}),expected);
     }
 
     void regionLabelsDoNotInventLocations() {
@@ -268,10 +361,127 @@ private slots:
         QVERIFY(network.a.forwarded>beforeMainRequest);QVERIFY(network.a.forwarded>=2);
         tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
     }
+    void isolatedBatchPreservesConfiguredDnsAcrossWorkerReuse_data() {
+        QTest::addColumn<bool>("physical");
+        QTest::newRow("ordinary-system-routes")<<false;
+#ifdef Q_OS_WIN
+        QTest::newRow("isolated-physical-route")<<true;
+#endif
+    }
+    void isolatedBatchPreservesConfiguredDnsAcrossWorkerReuse() {
+        QFETCH(bool,physical);
+        ControlledNetwork network;QVERIFY(network.start());auto opts=options();QStringList ids;QVariantList hosts;
+        opts.internalProbePhysicalEgress=physical;
+        // Four nodes require reusing at least one of the three probe workers.
+        // These reserved names resolve only through the supplied local map;
+        // even a missed map is confined to an explicit loopback DNS endpoint.
+        for(int i=0;i<4;++i){
+            auto n=node(QString("DNS fixture %1").arg(i),network.a.serverPort());
+            n.host=QString("probe-%1.invalid").arg(i);ids.append(n.id);opts.nodes.append(n);
+            hosts.append(QVariantMap{{"name",n.host},{"value","127.0.0.1"}});
+        }
+        opts.dnsConfig={{"mode",2},{"servers","127.0.0.1"},{"useHosts",false},{"queryFamily","ipv4_only"},{"hosts",hosts}};
+        NodeTestService tests;tests.start(opts,ids,network.url());QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
+        // Keep the exact per-node outcome in CI logs: a batch failure must name
+        // its stage instead of only reporting an aggregate mismatch.
+        if(tests.succeeded()!=4)qInfo()<<"BATCH_DNS_RESULT"<<physical<<tests.results();
+        QCOMPARE(tests.completed(),4);QCOMPARE(tests.succeeded(),4);QCOMPARE(tests.failed(),0);
+        QCOMPARE(network.a.forwarded,4);QCOMPARE(network.httpRequestsByExit.value("exit-A"),4);QCOMPARE(network.httpRequestsByExit.value("DIRECT-BYPASS"),0);
+        for(const auto &id:ids){
+            QVERIFY(tests.result(id).value("success").toBool());
+            QCOMPARE(tests.result(id).value("resolverPolicy").toString(),QString("isolated_configured_dns"));
+            QCOMPARE(tests.result(id).value("egressPolicy").toString(),physical?QString("isolated_physical_egress"):QString("system_routes"));
+        }
+        // A later batch must use its new resolver, not the preceding worker's
+        // cached endpoint. Only 127.0.0.1 has the controlled SOCKS listener.
+        opts.dnsConfig["hosts"]=QVariantList{QVariantMap{{"name",opts.nodes.first().host},{"value","127.0.0.2"}}};
+        tests.start(opts,{ids.first()},network.url());QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
+        QCOMPARE(tests.completed(),1);QCOMPARE(tests.failed(),1);QVERIFY(!tests.result(ids.first()).value("success").toBool());
+        QCOMPARE(tests.result(ids.first()).value("phase").toString(),QString("tcp_connect"));
+        QCOMPARE(network.a.forwarded,4);QCOMPARE(network.httpRequests,4);
+        opts.dnsConfig["hosts"]=hosts;tests.start(opts,{ids.first()},network.url());QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
+        QCOMPARE(tests.succeeded(),1);QVERIFY(tests.result(ids.first()).value("success").toBool());QCOMPARE(network.a.forwarded,5);
+    }
+    void invalidProbeDnsDoesNotFallBackToSystemResolution() {
+        ControlledNetwork network;QVERIFY(network.start());auto opts=options();opts.nodes={node("Fixture",network.a.serverPort())};
+        // An encrypted DNS hostname without its explicit bootstrap map is
+        // invalid. The old probe isolation discarded it and silently succeeded.
+        opts.dnsConfig={{"mode",0},{"encrypted","https://resolver.invalid/dns-query"}};
+        NodeTestService tests;tests.start(opts,{opts.nodes.first().id},network.url());
+        QVERIFY(!tests.busy());QCOMPARE(tests.completed(),1);QCOMPARE(tests.failed(),1);
+        const auto result=tests.result(opts.nodes.first().id);
+        QCOMPARE(result.value("phase").toString(),QString("configuration"));
+        QCOMPARE(result.value("failureCode").toString(),QString("NodeConfigurationRejected"));
+        QCOMPARE(result.value("resolverPolicy").toString(),QString("isolated_configured_dns"));
+        QCOMPARE(network.a.forwarded,0);QCOMPARE(network.httpRequests,0);
+    }
+    void largeRealProbeBatchCancelsRestartsAndReusesOneSweepEngine_data(){
+        QTest::addColumn<int>("count");
+        QTest::newRow("104-nodes")<<104;
+        QTest::newRow("88-nodes")<<88;
+    }
+    void largeRealProbeBatchCancelsRestartsAndReusesOneSweepEngine(){
+        QFETCH(int,count);
+        ControlledNetwork network;QVERIFY(network.start());
+        QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
+        auto opts=options();QStringList ids;QVariantList hosts;
+        for(int i=0;i<count;++i){
+            auto n=node(QString("Batch fixture %1").arg(i),stalled.serverPort());
+            n.host=QString("batch-%1.invalid").arg(i);opts.nodes.append(n);ids.append(n.id);
+            hosts.append(QVariantMap{{"name",n.host},{"value","127.0.0.1"}});
+        }
+        opts.dnsConfig={{"mode",2},{"servers","127.0.0.1"},{"useHosts",false},{"queryFamily","ipv4_only"},{"hosts",hosts}};
+        NodeTestService tests;QList<QPointer<QTcpSocket>> pending;
+        connect(&stalled,&QTcpServer::newConnection,&stalled,[&]{
+            while(stalled.hasPendingConnections()){
+                auto *socket=stalled.nextPendingConnection();socket->setParent(&stalled);pending.append(socket);
+            }
+        });
+        tests.start(opts,ids,network.url());
+        // One engine owns the sweep. The stalled listener therefore sees a
+        // bounded number of simultaneous dials (the sweep concurrency, default
+        // 16, capped at 32) instead of exactly three per-node engines.
+        QTRY_VERIFY_WITH_TIMEOUT(!pending.isEmpty()&&pending.size()<=32,15000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->bytesAvailable()>0;}),5000);
+        QCOMPARE(tests.completed(),0);QCOMPARE(tests.total(),count);
+        QCOMPARE(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).size(),1);
+        tests.cancel();tests.start(opts,ids,network.url()); // retiring workers still block a rapid restart
+        QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->state()==QAbstractSocket::UnconnectedState;}),5000);
+        QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
+        QVERIFY(pending.size()<=32);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
+
+        for(auto &n:opts.nodes)n.port=network.a.serverPort();
+        QSet<ProxyEngine *> workers;int peak=0;
+        // Disconnect before captured stack state or the service is destroyed,
+        // including when a failing assertion returns before workers retire.
+        QObject workerObserver;
+        connect(&tests,&NodeTestService::changed,&workerObserver,[&]{
+            const auto live=tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly);
+            peak=qMax(peak,int(live.size()));for(auto *worker:live)workers.insert(worker);
+        });
+        tests.start(opts,ids+ids,network.url()); // duplicate selection IDs still yield one request per node
+        for(int i=0;i<20;++i)tests.start(opts,ids,network.url());
+        QCOMPARE(tests.total(),count);
+        QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),60000);
+        QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
+        QCOMPARE(peak,1);QCOMPARE(workers.size(),1);
+        QCOMPARE(tests.completed(),count);QCOMPARE(tests.succeeded(),count);QCOMPARE(tests.failed(),0);
+        QCOMPARE(tests.results().size(),count);QCOMPARE(network.a.forwarded,count);
+        QCOMPARE(network.httpRequests,count);QCOMPARE(network.httpRequestsByExit.value("exit-A"),count);
+        QCOMPARE(network.httpRequestsByExit.value("DIRECT-BYPASS"),0);
+        for(const auto &id:ids){const auto result=tests.result(id);
+            QVERIFY(result.value("success").toBool());QCOMPARE(result.value("http").toInt(),200);
+            QVERIFY(result.value("latency").toLongLong()>=0);QVERIFY(!tests.testing(id));
+        }
+        QTest::qWait(50);QCOMPARE(tests.completed(),count);QCOMPARE(network.httpRequests,count);
+    }
     void independentMeasurementDoesNotClaimAConnectedSession() {
         ControlledNetwork network;QVERIFY(network.start());QTemporaryDir temp;
+        network.a.username="private-probe-user";network.a.password="private-probe-password";
         EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temp.filePath("nodes.dpapi"));
-        QVERIFY(controller.saveNode({{"name","private-fixture-name"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",network.a.serverPort()}}));
+        QVERIFY(controller.saveNode({{"name","private-fixture-name"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",network.a.serverPort()},
+            {"username",QString::fromLatin1(network.a.username)},{"password",QString::fromLatin1(network.a.password)}}));
         const auto id=controller.nodes().first().toMap().value("id").toString();
         controller.testSelectedNode(id,network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.tests()->busy(),45000);
         QVERIFY(controller.tests()->result(id).value("success").toBool());QVERIFY(network.a.forwarded>0);
@@ -285,6 +495,23 @@ private slots:
         QVERIFY(!diagnostic.value("requestVerified").toBool());QVERIFY(diagnostic.value("executable").toBool());
         const auto json=QJsonDocument(QJsonObject::fromVariantMap(diagnostic)).toJson();
         QVERIFY(!json.contains(id.toUtf8()));QVERIFY(!json.contains("private-fixture-name"));QVERIFY(!json.contains("127.0.0.1"));
+        // An actual failed request must reach the application's diagnostic log,
+        // with the same opaque reference/stage as the row and no node secrets.
+        network.a.reject=true;QSignalSpy events(&controller,&EngineController::diagnostic);
+        controller.testSelectedNode(id,network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.tests()->busy(),45000);
+        const auto failure=controller.tests()->result(id);QVERIFY(!failure.value("success").toBool());
+        QCOMPARE(failure.value("phase").toString(),QString("outbound_handshake"));
+        QCOMPARE(events.size(),1);QCOMPARE(events.first().at(0).toString(),QString("NodeTestService"));
+        QCOMPARE(events.first().at(1).toString(),QString("NodeTestFailed"));
+        const auto message=events.first().at(2).toString();
+        QVERIFY(message.contains(NodeTestService::nodeReference(id)));QVERIFY(message.contains("outbound_handshake"));
+        QVERIFY(!failure.value("failureCode").toString().isEmpty());QVERIFY(message.contains(failure.value("failureCode").toString()));
+        const auto report=controller.diagnostics()->report();QVERIFY(report.contains(message));
+        for(const auto &secret:QStringList{id,"private-fixture-name","127.0.0.1","private-probe-user","private-probe-password"})QVERIFY(!report.contains(secret));
+        const auto failedRow=controller.nodes().first().toMap();
+        QCOMPARE(failedRow.value("status").toString(),QStringLiteral("测试失败"));
+        QCOMPARE(failedRow.value("statusDetail").toString(),QStringLiteral("握手失败"));
+        QCOMPARE(failedRow.value("connectionState").toString(),QStringLiteral("未连接"));QVERIFY(!controller.processAlive());
     }
     void authenticTrafficStreamAndConnectionHistory() {
         ControlledNetwork network;QVERIFY(network.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));network.a.targetPorts.append(origin.serverPort());

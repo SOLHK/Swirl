@@ -41,6 +41,7 @@ struct Route {
 }
 
 async fn connect(endpoint: &Endpoint) -> io::Result<TcpStream> {
+    swirl_transport::egress::check_unmetered_egress()?;
     let socket = if endpoint.address.is_ipv6() {
         TcpSocket::new_v6()?
     } else {
@@ -260,6 +261,7 @@ async fn resolve(host: &str, port: u16) -> io::Result<Vec<Endpoint>> {
 
 #[cfg(any(windows, test))]
 async fn query_dns(host: &str, kind: u16, endpoint: &Endpoint) -> io::Result<Vec<IpAddr>> {
+    swirl_transport::egress::check_unmetered_egress()?;
     let mut random = [0; 2];
     SystemRandom::new()
         .fill(&mut random)
@@ -359,6 +361,7 @@ fn execute(command: Command) -> io::Result<serde_json::Value> {
             Ok(json!({"ok":true}))
         }
         Command::Start { host, port } | Command::StartOnce { host, port } => {
+            swirl_transport::egress::check_unmetered_egress()?;
             if port == 0
                 || host.len() > 253
                 || !host.is_ascii()
@@ -448,6 +451,7 @@ fn response(input: &[u8], capacity: usize) -> Result<(usize, Option<Vec<u8>>), i
                 "PhysicalDownloadWindowsOnly",
                 "PhysicalRouteBusy",
                 "PhysicalRouteCommandInvalid",
+                "PrivateQuotaUnmeteredDenied",
             ];
             let text = error.to_string();
             json!({"ok":false,"error":if KNOWN.contains(&text.as_str()){text.as_str()}else{"PhysicalDownloadUnavailable"}})
@@ -472,3 +476,7 @@ pub unsafe extern "C" fn swirl_download_route_v1(
 #[cfg(test)]
 #[path = "download_route_tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "private-acceptance"))]
+#[path = "download_route_quota_tests.rs"]
+mod quota_tests;

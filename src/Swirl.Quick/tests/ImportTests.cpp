@@ -76,6 +76,72 @@ public:
 class ImportTests:public QObject {
     Q_OBJECT
 private slots:
+    void emptyUriCertificatePinDoesNotBlockVerifiedTls() {
+        const QByteArray uri = "trojan://secret@example.invalid:443?type=tcp&pcs=&sni=example.invalid#Fixture";
+        const auto parsed = NodeImporter::parse(uri);
+        QVERIFY2(parsed, qPrintable(parsed.error));
+        QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+        QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri").toString(), QString::fromUtf8(uri));
+        const auto pinned = NodeImporter::parse(QByteArray(uri).replace("pcs=", "pcs=nonempty"));
+        QVERIFY(pinned);
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(pinned.nodes.first()).isEmpty());
+        QVERIFY(!NodeImporter::parse(QByteArray(uri).replace("pcs=", "pcs=&pcs=")));
+    }
+    void mixedAnyTlsShareLinksStayInCatalog() {
+        const QByteArray any = "anytls://p%40ss@example.invalid/?sni=edge.invalid&insecure=0#Any";
+        const QByteArray trojan = "trojan://p@other.invalid:443#Trojan";
+        for (const auto &mixed : {any + "\r\n" + trojan, trojan + "\n" + any}) {
+            const auto parsed = NodeImporter::parse(mixed.toBase64());
+            QVERIFY2(parsed, qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.size(), 2);
+            const auto &node = parsed.nodes[mixed.startsWith(any) ? 0 : 1];
+            QCOMPARE(node.protocol, QStringLiteral("anytls"));
+            QCOMPARE(node.password, QStringLiteral("p@ss"));
+            QCOMPARE(node.port, 443);
+            QCOMPARE(node.serverName, QStringLiteral("edge.invalid"));
+            QCOMPARE(node.originalConfiguration.value("uri").toString(), QString::fromUtf8(any));
+            QVERIFY(node.conversionIssues.isEmpty());
+            QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+            QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);
+            QVERIFY2(error.isEmpty(),qPrintable(error));
+            QCOMPARE(outbound.value("type").toString(),QString("any_tls"));
+            QCOMPARE(outbound.value("host").toString(),QString("example.invalid"));
+            QCOMPARE(outbound.value("port").toInt(),443);
+            QCOMPARE(outbound.value("password").toString(),QString("p@ss"));
+            const QJsonObject expectedTls{{"server_name","edge.invalid"},{"alpn",QJsonArray{}}};
+            QCOMPARE(outbound.value("tls").toObject(),expectedTls);
+            const QJsonObject forbiddenOptions{{"client-fingerprint","chrome"},{"pcs","fixture-pin"},
+                {"skip-cert-verify",true},{"tls-verification",false}};
+            for(auto it=forbiddenOptions.begin();it!=forbiddenOptions.end();++it){
+                auto forbidden=node;forbidden.parameters.insert(it.key(),it.value());
+                QJsonObject refused;QVERIFY(!NativeNodeBridge::executableOutbound(forbidden,&refused).isEmpty());
+                QVERIFY(refused.isEmpty());QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(forbidden).isEmpty());
+            }
+        }
+        const auto insecure = NodeImporter::parse(QByteArray(any).replace("insecure=0", "insecure=1"));
+        QVERIFY(insecure);
+        QVERIFY(!insecure.nodes.first().conversionIssues.isEmpty());
+        QVERIFY(!insecure.nodes.first().parameters.value("skip-cert-verify").toBool());
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(insecure.nodes.first()).isEmpty());
+        QVERIFY(!NodeImporter::parse(QByteArray(any).replace("insecure=0", "insecure=bogus")));
+        QVERIFY(!NodeImporter::parse(QByteArray(any).replace("insecure=0", "sni=other.invalid")));
+        const QByteArray yaml = "proxies:\n - {name: Any, type: anytls, server: example.invalid, port: 443, password: secret, skip-cert-verify: true}\n - {name: Trojan, type: trojan, server: other.invalid, port: 443, password: secret}";
+        const auto mixedYaml = NodeImporter::parse(yaml);
+        QVERIFY2(mixedYaml, qPrintable(mixedYaml.error));
+        QCOMPARE(mixedYaml.nodes.size(), 2);
+        QVERIFY(mixedYaml.nodes.first().certificateVerificationEnforced);
+        QVERIFY(!mixedYaml.nodes.first().parameters.value("skip-cert-verify").toBool());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(mixedYaml.nodes.first()).isEmpty());
+        QJsonObject normalized;const auto normalizedError=NativeNodeBridge::executableOutbound(mixedYaml.nodes.first(),&normalized);
+        QVERIFY2(normalizedError.isEmpty(),qPrintable(normalizedError));
+        QCOMPARE(normalized.value("type").toString(),QString("any_tls"));
+        const QJsonObject normalizedTls{{"server_name","example.invalid"},{"alpn",QJsonArray{}}};
+        QCOMPARE(normalized.value("tls").toObject(),normalizedTls);
+        auto tampered=mixedYaml.nodes.first();tampered.parameters["skip-cert-verify"]=true;
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(tampered).isEmpty());
+        QVERIFY(mixedYaml.nodes.first().publicInfo().value("normalizationNotes").toString().contains("AnyTLS"));
+    }
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
     void tcpUriTransportRequirementsRemainBlockedAfterPersistence() {
         const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
@@ -1048,7 +1114,7 @@ external-controller: 0.0.0.0:9090
         QVERIFY(service.saveSubscription({},"Header fixture",server.url(),360,false,"auto"));
         const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
-        QVERIFY(server.lastRequest.contains("User-Agent: Swirl/"));QVERIFY(!server.lastRequest.contains("Clash"));
+        QVERIFY(server.lastRequest.contains("User-Agent: Surge/6.0 Swirl/"));QVERIFY(!server.lastRequest.contains("Clash"));
         QVERIFY(!service.saveSubscription({},"Duplicate endpoint",server.url(),360,false));QCOMPARE(store.subscriptions().size(),1);
         QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
         server.code=400;service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
@@ -1101,6 +1167,20 @@ external-controller: 0.0.0.0:9090
         QVERIFY(!message.contains("PRIVATE-TOKEN"));QVERIFY(!message.contains("127.0.0.1"));
         QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);
     }
+    void automaticDownloadRequestsFullProfileButRetainsSeparateConfigurationReview() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+        server.content="[General]\ndns-server=192.0.2.53\n[Proxy]\nControlled=socks5,127.0.0.1,1080\n[Proxy Group]\nSelection=select,Controlled\n[Rule]\nFINAL,Selection\n[Script]\nfixture=http-response ^https://fixture.invalid/ script-path=https://fixture.invalid/script.js\n";
+        server.code=406;server.acceptedAgent="Surge/6.0 Swirl/"+QCoreApplication::applicationVersion().toUtf8();
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
+        const auto before=controller.policyDocument();auto *imports=controller.imports();
+        QVERIFY(imports->saveSubscription({},"Full profile",server.url(),360,false));
+        const auto source=imports->providers().first().toMap().value("id").toString();
+        imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),6000);
+        QCOMPARE(server.count,1);QCOMPARE(controller.nodeCatalog().size(),1);QVERIFY(!controller.processAlive());
+        QVERIFY(imports->providers().first().toMap().value("hasConfiguration").toBool());
+        QCOMPARE(controller.policyDocument(),before);
+        QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("脚本")));
+    }
     void automaticDownloadRetriesLegacyNegotiationWithoutChangingSignedUrl() {
         QFETCH(int,status);
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);server.code=status;
@@ -1116,7 +1196,7 @@ external-controller: 0.0.0.0:9090
         QCOMPARE(store.subscriptions().first().url.toEncoded(),url.toEncoded());
         const auto expected="GET "+url.toEncoded(QUrl::RemoveScheme|QUrl::RemoveAuthority)+" HTTP/1.1\r\n";
         for(const auto &request:server.requests)QVERIFY2(request.startsWith(expected),request.left(request.indexOf('\r')).constData());
-        QVERIFY(server.requests.first().contains("User-Agent: Swirl/"));
+        QVERIFY(server.requests.first().contains("User-Agent: Surge/6.0 Swirl/"));
         QVERIFY(server.requests.last().contains("User-Agent: Clash.Meta/1.19.32 Swirl/1.0\r\n"));
         QCOMPARE(diagnostics.size(),2);
         const auto initial=diagnostics.first().first().toString(),retry=diagnostics.last().first().toString();

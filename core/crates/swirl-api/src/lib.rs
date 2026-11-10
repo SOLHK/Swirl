@@ -31,6 +31,10 @@ mod node_import;
 pub use node_import::swirl_import_node_v1;
 mod profile_import;
 pub use profile_import::swirl_import_profile_v1;
+#[cfg(feature = "private-acceptance-ui")]
+pub mod private_ui_quota;
+#[cfg(feature = "private-acceptance-worker")]
+pub mod private_worker;
 mod xray_import;
 pub use xray_import::swirl_import_xray_v1;
 
@@ -63,11 +67,29 @@ enum Command {
         url: String,
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
+        #[serde(default)]
+        physical_egress: bool,
     },
     ProbeStatus {
         handle: u64,
     },
     ProbeCancel {
+        handle: u64,
+    },
+    /// Start one concurrent sweep of per-node latency probes. Each row probes
+    /// only its own node; the current selection and policy are not touched.
+    ProbeNodes {
+        handle: u64,
+        nodes: Vec<String>,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        concurrency: Option<u32>,
+    },
+    ProbeNodesStatus {
+        handle: u64,
+    },
+    ProbeNodesCancel {
         handle: u64,
     },
     Stop {
@@ -206,8 +228,12 @@ impl Controller {
                 url,
                 timeout_ms,
                 expected_status,
+                physical_egress,
             } => {
                 if let Some(core) = self.cores_v2.get(&handle) {
+                    if physical_egress {
+                        return Err("ProbePhysicalWorkerRequired");
+                    }
                     return Ok(
                         json!({"ok":true,"probe":core.probe_start(url,timeout_ms,expected_status)?}),
                     );
@@ -215,7 +241,7 @@ impl Controller {
                 Ok(json!({
                     "ok": true,
                     "probe": self.cores.get(&handle).ok_or("UnknownHandle")?
-                        .probe_start(url, timeout_ms, expected_status)?
+                        .probe_start_with_egress(url, timeout_ms, expected_status, physical_egress)?
                 }))
             }
             Command::ProbeStatus { handle } => {
@@ -235,6 +261,46 @@ impl Controller {
                     "ok": true,
                     "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_cancel()?
                 }))
+            }
+            Command::ProbeNodes {
+                handle,
+                nodes,
+                url,
+                timeout_ms,
+                expected_status,
+                concurrency,
+            } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
+            }
+            Command::ProbeNodesStatus { handle } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes_status()?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes_status()?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
+            }
+            Command::ProbeNodesCancel { handle } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes_cancel()?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes_cancel()?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
             }
             Command::SelectGroup { handle, id, member } => {
                 if self.cores_v2.contains_key(&handle) {

@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QRegularExpression>
 #include <QTextStream>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -17,6 +18,9 @@ namespace {
 // Only fixed classifications are public. Source-derived text is never echoed.
 QString reasonCode(const QString &reason) {
     static const QHash<QString,QString> known{
+        {QStringLiteral("skip-cert-verify=true 请求关闭 TLS 证书验证，已拒绝。请使用证书验证开启的订阅配置。"), "InsecureCertificateVerification"},
+        {QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。"), "AmbiguousProfileNodeName"},
+        {QStringLiteral("无法解析 Clash YAML/JSON：请检查格式、重复键、锚点循环和嵌套层数。"), "InvalidClashDocument"},
         {QStringLiteral("节点 URI 含重复参数，无法安全确定配置。"), "DuplicateUriParameter"},
         {QStringLiteral("节点 URI 别名参数冲突；未应用配置。"), "ConflictingUriParameter"},
         {QStringLiteral("节点 URI 布尔参数无效；未应用配置。"), "InvalidUriBoolean"},
@@ -75,8 +79,9 @@ QString reasonCode(const QString &reason) {
         {QStringLiteral("源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。"), "UtlsFingerprintConflict"},
         {QStringLiteral("源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。"), "UtlsSecurityRequired"},
     };
+    static const QRegularExpression nodePrefix(QStringLiteral("^第 [0-9]+ 个节点："));
     return reason.isEmpty()?QStringLiteral("TcpCandidateNotYetVerified"):
-        known.value(reason,QStringLiteral("UnclassifiedNativeOrImportDiagnostic"));
+        known.value(QString(reason).remove(nodePrefix),QStringLiteral("UnclassifiedNativeOrImportDiagnostic"));
 }
 
 QString choice(const QJsonValue &value,const QStringList &allowed,const QString &missing="not-declared") {

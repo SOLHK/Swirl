@@ -198,9 +198,7 @@ pub(crate) fn validate_value(resource: &Resource, value: &Option<Value>) -> io::
             && !interfaces.is_empty()
             && interfaces.len() <= 128
             && interfaces.iter().all(|alias| {
-                !alias.is_empty()
-                    && alias.encode_utf16().count() <= 256
-                    && !alias.contains(['\0', '*', '?', '[', ']'])
+                !alias.is_empty() && alias.encode_utf16().count() <= 256 && !alias.contains('\0')
             }) =>
         {
             Ok(())
@@ -912,7 +910,8 @@ pub(crate) fn dns_guard_name(
 }
 
 /// Block both plaintext DNS transports on every known physical adapter,
-/// including disconnected Wi-Fi/Ethernet. Place these changes before capture
+/// including disconnected Wi-Fi/Ethernet (exclude only explicitly NotPresent
+/// interfaces at the OS snapshot boundary). Place these changes before capture
 /// routes so recovery removes the firewall rules last. New adapters require
 /// a new guarded session; the caller must monitor adapter changes.
 pub fn dns_guard_resources(
@@ -1441,6 +1440,24 @@ mod tests {
             backend.values.is_empty(),
             "disk-full recovery must still remove installed routes/addresses"
         );
+    }
+
+    #[test]
+    fn dns_guards_preserve_literal_windows_interface_names() {
+        let interface = InterfaceIdentity::new(7, 1);
+        let aliases = vec!["WLAN".into(), "本地连接* 3".into(), "Adapter[1]?`".into()];
+        let desired = dns_guard_resources(&interface, &"b".repeat(32), &aliases).unwrap();
+        let mut expected = aliases;
+        expected.sort();
+        for (_, value) in desired {
+            let Some(Value::DnsGuard { interfaces, .. }) = value else {
+                panic!("DNS guard required")
+            };
+            assert_eq!(interfaces, expected);
+        }
+        for invalid in ["bad\0name".to_string(), "x".repeat(257)] {
+            assert!(dns_guard_resources(&interface, &"b".repeat(32), &[invalid]).is_err());
+        }
     }
 
     #[test]

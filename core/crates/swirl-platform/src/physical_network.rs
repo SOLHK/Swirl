@@ -1,4 +1,5 @@
-//! Read-only physical adapter snapshot for an explicitly requested download.
+//! Read-only physical adapter snapshot for an explicitly requested download
+//! or an isolated probe while Swirl's own full tunnel is active.
 //! No routes, DNS configuration, proxy policy or global egress lease is changed.
 use std::{
     io,
@@ -6,14 +7,21 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 use windows_sys::Win32::{
-    NetworkManagement::IpHelper::{
-        FreeMibTable, GAA_FLAG_INCLUDE_GATEWAYS, GetAdaptersAddresses, GetIfEntry2,
-        GetIpForwardTable2, IP_ADAPTER_ADDRESSES_LH, MIB_IF_ROW2,
+    NetworkManagement::{
+        IpHelper::{
+            ConvertInterfaceIndexToLuid, FreeMibTable, GAA_FLAG_INCLUDE_GATEWAYS,
+            GetAdaptersAddresses, GetIfEntry2, GetIpForwardTable2, IP_ADAPTER_ADDRESSES_LH,
+            MIB_IF_ROW2,
+        },
+        Ndis::NET_LUID_LH,
     },
     Networking::WinSock::{
         AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6, SOCKET_ADDRESS,
     },
 };
+use windows_sys::core::GUID;
+
+const PRODUCT_TUN_GUID: GUID = GUID::from_u128(0x4f9ba9f8_81ea_4c7c_bcf5_b9e47e4ba3cc);
 
 #[derive(Clone)]
 pub struct PhysicalInterface {
@@ -27,8 +35,52 @@ pub struct PhysicalInterface {
 /// Active hardware interfaces with a gateway and a preferred source address.
 /// Virtual/VPN adapters never enter the candidate set. Family indices are kept
 /// separately because Windows does not require IPv4 and IPv6 indices to match.
-#[allow(unsafe_code)]
 pub fn physical_interfaces() -> io::Result<Vec<PhysicalInterface>> {
+    physical_interfaces_inner(false)
+}
+
+/// A probe may bypass only this product's fixed TUN capture. Other default or
+/// /1 VPN routes remain a conflict, never permission to bypass the user's VPN.
+/// This is a read-only route check; per-application WFP policies are unchanged.
+pub fn physical_probe_interfaces() -> io::Result<Vec<PhysicalInterface>> {
+    physical_interfaces_inner(true)
+}
+
+/// Reject an adapter that disappeared or whose numeric index was recycled
+/// after the snapshot. Socket binding must still verify its own readback.
+#[allow(unsafe_code)]
+pub fn verify_physical_probe_interface(index: u32, adapter_id: u64) -> io::Result<()> {
+    let mut luid = NET_LUID_LH { Value: 0 };
+    // SAFETY: Windows writes this valid output for a nonzero interface index.
+    let status = unsafe { ConvertInterfaceIndexToLuid(index, &mut luid) };
+    if status != 0 {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    // SAFETY: successful conversion initialized the union's LUID value.
+    if unsafe { luid.Value } != adapter_id {
+        return Err(io::Error::other("ProbeEgressInterfaceChanged"));
+    }
+    let mut row = MIB_IF_ROW2 {
+        InterfaceLuid: luid,
+        ..Default::default()
+    };
+    // SAFETY: initialized writable row identifies the same adapter by LUID.
+    let status = unsafe { GetIfEntry2(&mut row) };
+    if status != 0 {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    if row.OperStatus != 1 || row.InterfaceAndOperStatusFlags._bitfield & 1 == 0 {
+        return Err(io::Error::other("ProbeEgressInterfaceChanged"));
+    }
+    Ok(())
+}
+
+fn probe_route_allowed(prefix: u8, hardware: bool, product_tun: bool) -> bool {
+    (prefix == 0 && hardware) || (prefix == 1 && !hardware && product_tun)
+}
+
+#[allow(unsafe_code)]
+fn physical_interfaces_inner(probe: bool) -> io::Result<Vec<PhysicalInterface>> {
     let mut table = std::ptr::null_mut();
     // SAFETY: Windows initializes its owned route-table pointer on success.
     let status = unsafe { GetIpForwardTable2(AF_UNSPEC, &mut table) };
@@ -41,6 +93,43 @@ pub fn physical_interfaces() -> io::Result<Vec<PhysicalInterface>> {
     };
     // SAFETY: release exactly the table returned by GetIpForwardTable2.
     unsafe { FreeMibTable(table.cast()) };
+    if probe {
+        for route in &routes {
+            if route.DestinationPrefix.PrefixLength > 1
+                || route.Loopback
+                || route.ValidLifetime == 0
+            {
+                continue;
+            }
+            let mut row = MIB_IF_ROW2 {
+                InterfaceLuid: route.InterfaceLuid,
+                ..Default::default()
+            };
+            // SAFETY: initialized writable row identifies the route's adapter.
+            let status = unsafe { GetIfEntry2(&mut row) };
+            if status != 0 {
+                return Err(io::Error::from_raw_os_error(status as i32));
+            }
+            if row.OperStatus != 1 {
+                continue;
+            }
+            let guid = row.InterfaceGuid;
+            let product_tun = guid.data1 == PRODUCT_TUN_GUID.data1
+                && guid.data2 == PRODUCT_TUN_GUID.data2
+                && guid.data3 == PRODUCT_TUN_GUID.data3
+                && guid.data4 == PRODUCT_TUN_GUID.data4;
+            if !probe_route_allowed(
+                route.DestinationPrefix.PrefixLength,
+                row.InterfaceAndOperStatusFlags._bitfield & 1 != 0,
+                product_tun,
+            ) {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "ProbeEgressNetworkConflict",
+                ));
+            }
+        }
+    }
     let mut size = 16 * 1024u32;
     for _ in 0..3 {
         if size > 1024 * 1024 {
@@ -177,5 +266,21 @@ unsafe fn address(value: SOCKET_ADDRESS) -> Option<IpAddr> {
             Some(Ipv6Addr::from(unsafe { addr.sin6_addr.u.Byte }).into())
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn probe_exclusion_never_accepts_a_foreign_or_reidentified_capture() {
+        assert!(probe_route_allowed(0, true, false));
+        assert!(probe_route_allowed(1, false, true));
+        assert!(!probe_route_allowed(0, false, false));
+        assert!(!probe_route_allowed(1, false, false));
+        assert!(!probe_route_allowed(1, true, false));
+        assert!(!probe_route_allowed(0, false, true));
+        assert!(!probe_route_allowed(1, true, true));
     }
 }

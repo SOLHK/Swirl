@@ -19,13 +19,56 @@
 #include <functional>
 #include <limits>
 
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+QString PrivateUiDnsTrust::bindingDigest() const {
+ return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(m_binding).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
+}
+bool PrivateUiDnsTrust::snapshot(QJsonObject *snapshot) const {
+ auto &library=RustCoreLibrary::instance();
+ if(!snapshot||!library.load()||library.expectedSourceSha()!=m_source)return false;
+ const auto command=library.privateUiQuota();if(!command)return false;
+ auto request=m_binding;request["op"]="snapshot";
+ const auto input=QJsonDocument(request).toJson(QJsonDocument::Compact);QByteArray output(16*1024,Qt::Uninitialized);
+ const auto size=command(reinterpret_cast<const unsigned char *>(input.constData()),size_t(input.size()),
+     reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));
+ if(size<=0||size>output.size())return false;output.resize(size);
+ const auto value=QJsonDocument::fromJson(output).object();
+ if(value.value("ok")!=QJsonValue(true)||value.value("op")!=QJsonValue("snapshot")
+     ||value.value("source_sha")!=QJsonValue(m_source))return false;
+ for(auto it=m_binding.begin();it!=m_binding.end();++it)if(value.value(it.key())!=it.value())return false;
+ const auto guard=value.value("guard").toObject();
+ if(guard.value("connection_limit")!=QJsonValue(6)||guard.value("timeout_ms")!=QJsonValue(8000))return false;
+ *snapshot=guard;return true;
+}
+QString PrivateUiDnsTrust::apply(QJsonObject *dns) const {
+ const QJsonObject tlsConfig{{"server_name","127.0.0.1"},{"alpn",QJsonArray{"dot"}}};
+ const QJsonObject serverConfig{{"address",m_endpoint},{"tls",tlsConfig}};
+ const QJsonObject expected{{"hosts",QJsonArray{}},{"force_proxy_hosts",false},{"servers",QJsonArray{}},
+     {"use_system_hosts",false},{"query_family","ipv4_only"},{"tls_servers",QJsonArray{serverConfig}}};
+ QJsonObject guard;
+ if(!dns||*dns!=expected||m_ca.isEmpty()||m_ca.size()>16384||!snapshot(&guard)
+     ||guard.value("stopped")!=QJsonValue(false)||guard.value("timed_out")!=QJsonValue(false))
+     return QStringLiteral("PrivateUiDnsTrustRejected");
+ auto servers=dns->value("tls_servers").toArray();auto server=servers.first().toObject();auto tls=server.value("tls").toObject();
+ tls["ca_der_base64"]=QString::fromLatin1(m_ca.toBase64());server["tls"]=tls;servers[0]=server;(*dns)["tls_servers"]=servers;
+ return {};
+}
+#endif
+
 namespace {
+QString recoveryRequiredMessage(){
+ return QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+}
 const QStringList &privateSubnets(){
  static const QStringList values{"127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","100.64.0.0/10","::1/128","fc00::/7","fe80::/10"};
  return values;
 }
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
- return SwirlRustDns::configuration(o.dnsConfig,output);
+ const auto error=SwirlRustDns::configuration(o.dnsConfig,output);if(!error.isEmpty())return error;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+ if(o.privateUiDnsTrust)return o.privateUiDnsTrust->apply(output);
+#endif
+ return {};
 }
 
 QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules,QJsonArray *selectors){
@@ -192,6 +235,8 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
 RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
  m_poll.setInterval(250);connect(&m_poll,&QTimer::timeout,this,&RustCoreEngine::refresh);
  m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
+ m_tunRecoveryState=nativeTunRecoveryState();m_tunRecoveryRequired=m_tunRecoveryState!=NativeTunRecoveryState::Clear;
+ if(m_tunRecoveryRequired){m_status.state=State::Failed;m_status.error=Error::OwnershipFailed;m_status.message=recoveryRequiredMessage();}
 }
 // Owners can destroy their telemetry members before their engine member.
 // Shutdown during destruction must not signal those partially destroyed owners.
@@ -269,6 +314,7 @@ QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &op
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
+ if(o.internalProbePhysicalEgress&&(!o.internalProbeListener||!o.policyDocument.isEmpty()))return QStringLiteral("物理测速出口仅供独立节点检测使用，未改变活动会话的网络路径。");
  if(!o.policyDocument.isEmpty())return configurationV2(o,o.policyDocument,output);
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
@@ -282,41 +328,49 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  else {
   // First map the default route. Policy groups add their referenced members.
   // Unreferenced unsupported imports remain in NodeStore without activation.
+  const auto appendNodeOutbound=[&](const ProxyNode &n)->QString{
+   if(n.isXray()){
+    // Persisted capability/cache fields are display data, never authority to
+    // start a proxy. Replay the exact bounded source through the Rust parser
+    // and converter each time this node enters a selected or rule route.
+    if(!ProxyNode::validate(n).isEmpty())return "JSON 节点来源或标识无效；请重新导入。";
+    QJsonObject outbound;const auto error=XrayJsonBridge::executableOutbound(n,&outbound);
+    if(!error.isEmpty())return error;
+    nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});return {};
+   }
+   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
+   const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
+   // Check the preserved sing-box requirement before accepting its normalized
+   // profile. A default inferred by the importer cannot authorize a browser
+   // handshake, and a source profile named rustls does not implement uTLS.
+   const auto sourceTls=n.originalConfiguration.value("tls").toObject();
+   if(sourceTls.contains("utls")){
+    if(!sourceTls.value("utls").isObject())return "源配置 uTLS 参数类型无效。";
+    const auto utls=sourceTls.value("utls").toObject();
+    for(auto p=utls.begin();p!=utls.end();++p)if(p.key()!="enabled"&&p.key()!="fingerprint")return "源配置 uTLS 含未映射参数；未丢弃原值。";
+    if(utls.value("enabled")==QJsonValue(true)){
+     const auto fingerprint=utls.value("fingerprint");
+     if(!reality||sourceTls.value("enabled")!=QJsonValue(true)||sourceTls.value("reality").toObject().value("enabled")!=QJsonValue(true)||!fingerprint.isString()||!QStringList{"chrome","chrome_133"}.contains(fingerprint.toString()))return "源配置 uTLS 仅支持 REALITY 的显式 chrome 或 chrome_133 指纹；未替换原值。";
+     if(fingerprint!=n.parameters.value("client-fingerprint"))return "源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。";
+    }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
+   }
+   if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
+   // The same Rust inspector owns non-JSON protocol, transport and UDP
+   // mapping. No stale C++ protocol allowlist can hide completed Rust work.
+   QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(n,&outbound);
+   if(!error.isEmpty())return error;
+   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});return {};
+  };
   const auto it=std::find_if(o.nodes.cbegin(),o.nodes.cend(),[&](const auto &n){return n.id==selected;});
   if(it==o.nodes.cend())return "未选择节点。";
-  const auto &n=*it;
-  if(n.isXray()){
-   // Persisted capability/cache fields are display data, never authority to
-   // start a proxy. Replay the exact bounded source through the Rust parser
-   // and converter each time this node enters a selected or rule route.
-   if(!ProxyNode::validate(n).isEmpty())return "JSON 节点来源或标识无效；请重新导入。";
-   QJsonObject outbound;const auto error=XrayJsonBridge::executableOutbound(n,&outbound);
-   if(!error.isEmpty())return error;
-   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
-  }else{
-  if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
-  // Check the preserved sing-box requirement before accepting its normalized
-  // profile. A default inferred by the importer cannot authorize a browser
-  // handshake, and a source profile named rustls does not implement uTLS.
-  const auto sourceTls=n.originalConfiguration.value("tls").toObject();
-  if(sourceTls.contains("utls")){
-   if(!sourceTls.value("utls").isObject())return "源配置 uTLS 参数类型无效。";
-   const auto utls=sourceTls.value("utls").toObject();
-   for(auto p=utls.begin();p!=utls.end();++p)if(p.key()!="enabled"&&p.key()!="fingerprint")return "源配置 uTLS 含未映射参数；未丢弃原值。";
-   if(utls.value("enabled")==QJsonValue(true)){
-    const auto fingerprint=utls.value("fingerprint");
-    if(!reality||sourceTls.value("enabled")!=QJsonValue(true)||sourceTls.value("reality").toObject().value("enabled")!=QJsonValue(true)||!fingerprint.isString()||!QStringList{"chrome","chrome_133"}.contains(fingerprint.toString()))return "源配置 uTLS 仅支持 REALITY 的显式 chrome 或 chrome_133 指纹；未替换原值。";
-    if(fingerprint!=n.parameters.value("client-fingerprint"))return "源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。";
-   }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
-  }
-  if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
-  // The same Rust inspector owns non-JSON protocol, transport and UDP
-  // mapping. No stale C++ protocol allowlist can hide completed Rust work.
-  QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(n,&outbound);
-  if(!error.isEmpty())return error;
-  nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
-  }
+  const auto selectedError=appendNodeOutbound(*it);
+  if(!selectedError.isEmpty())return selectedError;
+  // An isolated latency sweep dials several nodes inside one engine, so that
+  // engine maps every requested node. NodeTestService pre-validates each row
+  // and keeps its explicit per-node failure; a row that still fails here is
+  // simply not dialable and must not break the whole sweep.
+  if(o.probeAllNodes&&o.internalProbeListener)
+   for(const auto &extra:o.nodes)if(extra.id!=selected)appendNodeOutbound(extra);
  }
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
  QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},{"smart_routing",o.smartRouting&&o.routingMode=="rule"&&!o.directSession},
@@ -475,7 +529,33 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
  failProbe("probe_status","ProbeStateInvalid");
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
+void RustCoreEngine::finishUnexpectedTunStop(const QString &failure){
+ const auto recoveryError=m_status.message;
+ const bool recovered=m_status.state==State::Stopped&&!m_handle&&!m_brokerSession
+  &&!m_tunRecoveryRequired&&m_tunRecoveryState==NativeTunRecoveryState::Clear;
+ // stop() alone owns the authenticated recovery and marker write. Preserve its
+ // handles, process state and ownership result; a failed attempt stays blocked.
+ if(!recovered)m_tunRecoveryRequired=true;
+ m_status.state=State::Failed;m_status.apiHealthy=false;
+ m_status.error=recovered?Error::ApiUnavailable:Error::OwnershipFailed;
+ m_status.message=recovered
+  ?QStringLiteral("增强模式意外停止。系统网络已恢复，可以重新连接。")
+  :QStringLiteral("增强模式意外停止。系统网络恢复尚未确认，连接已暂停；请重试关闭代理或恢复系统网络。");
+ const auto detail=failure+(!recovered&&!recoveryError.isEmpty()?QStringLiteral(" ")+recoveryError:QString());
+ emit diagnostic("SwirlRust",recovered?"TunFaultRecoveryConfirmed":"TunFaultRecoveryUnconfirmed",detail);
+ emit statusChanged();
+}
 void RustCoreEngine::start(const EngineStartOptions &options){
+ if(!m_brokerSession&&!m_tunBroker.running()){
+  if(!m_handle)m_tunRecoveryState=nativeTunRecoveryState();
+  // Only the current main owner's internal physical-probe grant can admit a
+  // fresh worker while its marker is pending. This worker owns no TUN routes
+  // and must never clear that marker when it stops. Unknown state stays closed.
+  const bool trustedProbe=options.internalProbeListener&&options.internalProbePhysicalEgress&&options.policyDocument.isEmpty();
+  m_tunRecoveryRequired=m_tunRecoveryState==NativeTunRecoveryState::Unknown
+   ||(m_tunRecoveryState==NativeTunRecoveryState::Pending&&!trustedProbe);
+  if(m_tunRecoveryRequired){fail(Error::OwnershipFailed,recoveryRequiredMessage());return;}
+ }
  if(!m_handle&&(m_brokerSession||m_tunBroker.running())){
   fail(Error::OwnershipFailed,QStringLiteral("原 TUN 会话的停止或恢复尚未确认，请先重试关闭代理。"));return;
  }
@@ -582,6 +662,7 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   if(!setNativeTunRecoveryPending(true,&markerError)){
    stop();fail(Error::ConfigurationFailed,markerError);return;
   }
+  m_tunRecoveryState=NativeTunRecoveryState::Pending;
   auto request=QJsonObject{{"native_tun_schema",1},{"op","native_tun_start"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
    {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch},
    {"config",QJsonObject{{"driver_path",QDir(QCoreApplication::applicationDirPath()).filePath("wintun.dll")},
@@ -689,16 +770,34 @@ void RustCoreEngine::stop(){
  m_brokerSession=false;
  if(stoppedBroker){
   QString markerError;
-  m_status.message=setNativeTunRecoveryPending(false,&markerError)?QString():markerError;
+  const bool cleared=setNativeTunRecoveryPending(false,&markerError);
+  m_tunRecoveryRequired=!cleared;m_tunRecoveryState=cleared?NativeTunRecoveryState::Clear:NativeTunRecoveryState::Unknown;
+  if(!cleared)m_status.error=Error::OwnershipFailed;
+  m_status.message=cleared?QString():recoveryRequiredMessage()+markerError;
   if(!markerError.isEmpty())emit diagnostic("SwirlRust","TunRecoveryMarkerUnconfirmed",markerError);
  }
  m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
- m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
+ m_status.state=m_tunRecoveryRequired?State::Failed:State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
  if(!m_handle)return;
+ // A failed one-shot confirmation must not open another elevation request when
+ // an explicit refresh arrives after stop() retired the polling timer.
+ if(m_brokerSession&&!m_poll.isActive())return;
  const auto response=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
- if(!response["ok"].toBool()){fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;}
+ if(!response["ok"].toBool()){
+  if(m_brokerSession&&!m_tunBroker.running()){
+   // Commit the once-only decision before failure observers can re-enter. The
+   // existing stop path authenticates a fresh broker, requires owners==0, and
+   // closes it successfully before it may clear recoveryPending.
+   m_poll.stop();
+   const auto failure=QStringLiteral("增强模式意外停止，正在确认系统网络恢复。");
+   emit diagnostic("SwirlRust","TunBrokerExited",QStringLiteral("The native TUN broker exited before its runtime snapshot could be read."));
+   fail(Error::ApiUnavailable,failure);
+   stop();finishUnexpectedTunStop(failure);return;
+  }
+  fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;
+ }
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
  if(m_v2)ingestConfigurationReceipt(state.value("configuration").toObject());
  recordForwardingFailures(state);
@@ -799,7 +898,9 @@ void RustCoreEngine::probeNode(const QUrl &url){
   failProbe("input","ProbeUrlInvalid");emit statusChanged();return;
  }
  resetProbeState();
- const auto response=call({{"op","probe_start"},{"handle",qint64(m_handle)},{"url",text},{"timeout_ms",8000}});
+ QJsonObject request{{"op","probe_start"},{"handle",qint64(m_handle)},{"url",text},{"timeout_ms",8000}};
+ if(m_options.internalProbePhysicalEgress)request.insert("physical_egress",true);
+ const auto response=call(request);
  if(!response.value("ok").toBool()){
   failProbe("probe_start",response.value("error").toString("ProbeStartFailed"));emit statusChanged();return;
  }
@@ -809,4 +910,31 @@ void RustCoreEngine::probeNode(const QUrl &url){
  }
  m_probeRequestId=requestId;m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;
  m_status.nodeHealth=NodeHealth::Checking;emit statusChanged();
+}
+
+bool RustCoreEngine::probeNodes(const QStringList &ids,const QUrl &url,QString *error){
+ if(!m_handle){if(error)*error=QStringLiteral("CoreStopped");return false;}
+ const auto text=url.toString(QUrl::FullyEncoded);
+ if(text.size()>2048||!url.isValid()||!QStringList{"http","https"}.contains(url.scheme())||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()){
+  if(error)*error=QStringLiteral("ProbeUrlInvalid");return false;
+ }
+ QJsonArray nodes;for(const auto &id:ids){const auto trimmed=id.trimmed();if(!trimmed.isEmpty())nodes.append(trimmed);}
+ if(nodes.isEmpty()){if(error)*error=QStringLiteral("ProbeNodesEmpty");return false;}
+ // One bounded concurrent sweep inside the already-running core. Nothing is
+ // selected and no per-node engine is created.
+ const auto response=call({{"op","probe_nodes"},{"handle",qint64(m_handle)},{"nodes",nodes},
+   {"url",text},{"timeout_ms",5000},{"concurrency",16}});
+ if(!response.value("ok").toBool()){
+  if(error)*error=response.value("error").toString("ProbeNodesFailed");return false;
+ }
+ return true;
+}
+
+QJsonObject RustCoreEngine::probeNodesStatus(){
+ if(!m_handle)return {};
+ return call({{"op","probe_nodes_status"},{"handle",qint64(m_handle)}});
+}
+
+void RustCoreEngine::cancelProbeNodes(){
+ if(m_handle)call({{"op","probe_nodes_cancel"},{"handle",qint64(m_handle)}});
 }

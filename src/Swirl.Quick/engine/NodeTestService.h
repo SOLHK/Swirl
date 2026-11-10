@@ -1,8 +1,10 @@
 #pragma once
 #include "ProxyEngine.h"
+#include <QElapsedTimer>
 #include <QQueue>
 #include <QHash>
 #include <QSet>
+#include <QTimer>
 
 // At most three isolated Rust workers are reused within a batch. FFI and
 // lifecycle work run off the UI thread; no probe changes the live session.
@@ -20,11 +22,12 @@ public:
  ~NodeTestService() override;
  static EngineStartOptions isolatedOptions(const EngineStartOptions &);
  static QString nodeReference(const QString &id);
+ static QString failureStatusText(const QVariantMap &result);
  void start(const EngineStartOptions &,const QStringList &ids,const QUrl &url);
  Q_INVOKABLE void cancel();
  // A catalog change invalidates results for the old connection parameters.
  void invalidateResults();
- bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_idle.isEmpty()||!m_retiring.isEmpty(); }
+ bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_idle.isEmpty()||!m_retiring.isEmpty()||m_batchRunner!=nullptr||m_batchAwaitingStart; }
  int completed() const { return m_completed; }
  int total() const { return m_total; }
  int succeeded() const { return m_succeeded; }
@@ -42,6 +45,14 @@ private:
  void retire(ProxyEngine *runner);
  void finish(const QString &,ProxyEngine *,const QVariantMap &);
  void record(const QString &,QVariantMap);
+ // One concurrent sweep inside a single engine replaces the former engine per
+ // node when the engine supports it. The isolated path remains the fallback.
+ bool tryBatch();
+ void batchStatusChanged();
+ void pollBatch();
+ void endBatch();
+ // Latch the per-node fallback and return the unrecorded batch rows to the queue.
+ void batchFallback(const QString &reason,const QString &detail);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
@@ -49,6 +60,16 @@ private:
  QQueue<ProxyEngine *> m_idle;
  QSet<ProxyEngine *> m_retiring;
  QVariantMap m_results;
+ ProxyEngine *m_batchRunner=nullptr;
+ QTimer *m_batchPoll=nullptr;
+ QSet<QString> m_batchSwept;
+ QSet<QString> m_batchRecorded;
+ bool m_batchAwaitingStart=false;
+ // A batch that cannot start or cannot be issued falls back to the isolated
+ // per-node path for the rest of this sweep. Without this latch a failing
+ // batch start re-queues its nodes into the same batch forever.
+ bool m_batchDisabled=false;
+ QElapsedTimer m_batchStartClock;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;
  QString m_message;
 };

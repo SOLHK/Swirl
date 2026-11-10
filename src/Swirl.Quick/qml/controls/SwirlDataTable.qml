@@ -23,6 +23,57 @@ Item {
     property bool wasAtEnd:true
     property var visiblePositions:({})
     property int projectionGeneration:0
+    property bool stagedProjection:false
+    property bool projectionViewReady:false
+    property string projectionPhase:"idle"
+    property real projectionOpacity:1
+    property real projectionOffsetY:0
+    readonly property bool presentationOutgoing:stagedProjection&&projectionPhase==="out"
+    readonly property bool projectionBlocked:stagedProjection&&(projectionPhase==="out"||projectionPhase==="commit")
+    // The binding follows temporary diagnostic models as well as the page's
+    // normal model. Detaching restores the model's synchronous default.
+    Binding {
+        target:table.stagedProjection?table.externalModel:null
+        property:"projectionDelayMs"
+        when:target!==null
+        value:table.animateRowChanges&&!SwirlMotion.reduced&&table.visible?SwirlMotion.exitDuration:0
+    }
+    NumberAnimation {id:projectionExit;target:table;property:"projectionOpacity";to:0;duration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
+    ParallelAnimation {
+        id:projectionEnter
+        NumberAnimation {target:table;property:"projectionOpacity";to:1;duration:SwirlMotion.duration;easing.type:Easing.OutCubic}
+        NumberAnimation {target:table;property:"projectionOffsetY";to:0;duration:SwirlMotion.duration;easing.type:Easing.OutCubic}
+        onFinished:if(table.projectionPhase==="in")table.projectionPhase="idle"
+    }
+    function resetProjectionPresentation() {
+        ++projectionGeneration
+        if(projectionExit)projectionExit.stop()
+        if(projectionEnter)projectionEnter.stop()
+        projectionOpacity=1;projectionOffsetY=0;projectionPhase="idle";visiblePositions={}
+    }
+    function prepareProjectionCommit() {
+        if(!stagedProjection)return
+        if(projectionExit)projectionExit.stop()
+        if(projectionEnter)projectionEnter.stop()
+        // This signal is synchronous with the model commit. Timer ordering
+        // cannot expose a partially faded old layout at new row coordinates.
+        projectionOpacity=0;projectionOffsetY=0;projectionPhase="commit"
+    }
+    function enterProjection() {
+        if(!stagedProjection||externalModel===null||externalModel.projectionPending)return
+        if(projectionExit)projectionExit.stop()
+        if(projectionEnter)projectionEnter.stop()
+        if(!animateRowChanges||SwirlMotion.reduced||!visible) {
+            projectionOpacity=1;projectionOffsetY=0;projectionPhase="idle"
+            return
+        }
+        projectionPhase="in";projectionOpacity=0;projectionOffsetY=Theme.dp(4)
+        projectionEnter.start()
+    }
+    onExternalModelChanged:resetProjectionPresentation()
+    onStagedProjectionChanged:resetProjectionPresentation()
+    onAnimateRowChangesChanged:if(!animateRowChanges&&projectionPhase==="in")resetProjectionPresentation()
+    Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced&&table.projectionPhase==="in")table.resetProjectionPresentation()}}
     function recordAt(index) {
         if(index<0||index>=list.count)return null
         if(externalModel!==null)return typeof externalModel.get==="function"?externalModel.get(index):null
@@ -33,74 +84,126 @@ Item {
         if(sectioned)return String(record.displayKey||record.id||"")
         return incrementalRows&&index>=0&&index<stableRows.count?String(stableRows.get(index).motionKey):String(record.id||record.name||"")
     }
+    function cellText(record,key) {
+        if(!record)return ""
+        const value=key==="status"&&record.statusDetail?record.statusDetail:record[key]
+        return String(value===undefined?"":value)
+    }
     function rowForKey(key) {
         if(externalModel!==null&&typeof externalModel.rowForDisplayKey==="function")return externalModel.rowForDisplayKey(key)
         for(let i=0;i<list.count;++i)if(displayKey(recordAt(i),i)===key)return i
         return -1
     }
+    function currentPresentation(item) {
+        if(projectionBlocked||!item||!item.currentModelRow||!item.presentationKey)return false
+        const index=item.delegateIndex
+        // Qt parents asynchronous cache delegates to contentItem before they
+        // have finished creation or joined the view's laid-out item list.
+        // A reused context can also retain its previous record briefly.
+        return list.itemAtIndex(index)===item
+            &&displayKey(recordAt(index),index)===item.presentationKey
+    }
     function saveViewport() {
         wasAtEnd=list.atYEnd
         const index=list.indexAt(1,list.contentY+1)
         const item=index>=0?list.itemAtIndex(index):null
-        anchorKey=item?displayKey(item.record,index):""
-        anchorOffset=item?item.y-list.contentY:0
+        const current=currentPresentation(item)
+        anchorKey=current?displayKey(item.record,index):""
+        anchorOffset=current?item.y-list.contentY:0
     }
     function animateVisibleRows() {
+        if(stagedProjection){enterProjection();return}
         if(!sectioned||!animateRowChanges||SwirlMotion.reduced||list.moving)return
         for(const item of list.contentItem.children) {
-            if(!item.presentationKey||item.pooled||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
+            if(!item.presentationKey||!currentPresentation(item)||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
             const before=visiblePositions[item.presentationKey]
             if(before!==undefined)item.presentFrom(before-(item.y-list.contentY))
         }
         visiblePositions={}
+    }
+    function projectionCurrent(generation,model) {
+        return list!==null&&generation===projectionGeneration&&model===externalModel
+            &&(!stagedProjection||(projectionViewReady&&model!==null&&!model.projectionPending))
     }
     function restoreViewport() {
         const observer=performanceObserver
         if(observer)observer.mark(9,true)
         try {
             const generation=projectionGeneration
-            if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
+            const model=externalModel
+            if(!projectionCurrent(generation,model))return
+            if(followTail&&wasAtEnd){
+                list.positionViewAtEnd()
+                if(!projectionCurrent(generation,model))return
+                if(stagedProjection)list.forceLayout()
+                if(projectionCurrent(generation,model))animateVisibleRows()
+                return
+            }
             const index=anchorKey.length?rowForKey(anchorKey):-1
             if(index<0){animateVisibleRows();return}
             list.positionViewAtIndex(index,ListView.Beginning)
-            Qt.callLater(function(){
+            const restore=function(){
                 const deferredObserver=table.performanceObserver
                 if(deferredObserver)deferredObserver.mark(10,true)
                 try {
-                    if(generation!==table.projectionGeneration)return
+                    if(!table.projectionCurrent(generation,model))return
+                    if(table.stagedProjection){
+                        list.forceLayout()
+                        if(!table.projectionCurrent(generation,model))return
+                    }
                     const item=list.itemAtIndex(index)
                     if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
-                    table.animateVisibleRows()
+                    if(table.projectionCurrent(generation,model))table.animateVisibleRows()
                 } finally {if(deferredObserver)deferredObserver.mark(10,false)}
-            })
+            }
+            if(stagedProjection)restore()
+            else Qt.callLater(restore)
         } finally {if(observer)observer.mark(9,false)}
     }
     function beginProjection() {
+        // The next model deadline is already running. Finish the previous
+        // incoming pose before fading it out again, so continuous structural
+        // updates cannot recursively restart the exit from a near-zero alpha.
+        if(stagedProjection&&projectionPhase==="in"&&projectionEnter)projectionEnter.complete()
         ++projectionGeneration
-        saveViewport()
+        if(!projectionBlocked)saveViewport()
+        if(stagedProjection) {
+            if(projectionExit)projectionExit.stop()
+            if(projectionEnter)projectionEnter.stop()
+            projectionPhase="out"
+            if(animateRowChanges&&!SwirlMotion.reduced&&visible)projectionExit.start()
+            else projectionOpacity=0
+            return
+        }
         const positions={}
         if(sectioned&&animateRowChanges&&!SwirlMotion.reduced&&!list.moving)
             for(const item of list.contentItem.children)
-                if(item.presentationKey&&!item.pooled&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
+                if(item.presentationKey&&currentPresentation(item)&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
                     positions[item.presentationKey]=item.y+item.visualOffsetY-list.contentY
         visiblePositions=positions
     }
     function endProjection() {
         const generation=projectionGeneration
-        Qt.callLater(function(){
+        const model=externalModel
+        const finish=function(){
             const observer=table.performanceObserver
             if(observer)observer.mark(11,true)
             try {
-                if(generation!==table.projectionGeneration)return
+                if(!table.projectionCurrent(generation,model))return
                 if(observer)observer.mark(8,true)
                 try {list.forceLayout()}
                 finally {if(observer)observer.mark(8,false)}
-                table.restoreViewport()
+                if(table.projectionCurrent(generation,model))table.restoreViewport()
             } finally {if(observer)observer.mark(11,false)}
-        })
+        }
+        // synced follows the complete row transaction. Finish this committed
+        // layout and start its incoming pose before the next producer update
+        // can cancel deferred work and restart an exit at zero opacity.
+        if(stagedProjection)finish()
+        else Qt.callLater(finish)
     }
     Connections {target:stableRows;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
-    Connections {target:table.sectioned||table.externalProjectionEvents?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
+    Connections {target:table.sectioned||table.externalProjectionEvents?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onProjectionCommitting(){table.prepareProjectionCommit()}function onSynced(){table.endProjection()}}
     property bool managedSelection:false
     property bool animateRowChanges:false
     property bool animateLatency:false
@@ -114,7 +217,7 @@ Item {
             if (index >= 0) list.positionViewAtIndex(index, ListView.Contain)
         })
     }
-    function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
+    function focusRowAt(index){if(projectionBlocked)return;const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
     SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
@@ -142,7 +245,7 @@ Item {
         return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
     }
     function chooseRow(row,activate) {
-        if(!row||!row.enabled)return
+        if(!row||!row.enabled||!currentPresentation(row))return
         if(row.sectionRow){if(activate)sectionActivated(String(row.record.sectionKey));return}
         selectedItem=row
         if(!incrementalRows&&!managedSelection)selectedId=String(row.record.id||row.record.name)
@@ -195,11 +298,16 @@ Item {
                 }
             }
             ListView {
-                    add: Transition { enabled:table.animateRowChanges && !SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} NumberAnimation {property:"scale";from:table.sectioned?0.985:1;to:1;duration:SwirlMotion.duration;easing.type:Easing.OutCubic} } }
-                    remove: Transition { enabled:table.animateRowChanges && !SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:table.sectioned?SwirlMotion.exitDuration:SwirlMotion.duration} NumberAnimation {property:"scale";to:table.sectioned?0.985:1;duration:table.sectioned?SwirlMotion.exitDuration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
+                    add: Transition { enabled:table.animateRowChanges && !table.stagedProjection && !SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} NumberAnimation {property:"scale";from:table.sectioned?0.985:1;to:1;duration:SwirlMotion.duration;easing.type:Easing.OutCubic} } }
+                    remove: Transition { enabled:table.animateRowChanges && !table.stagedProjection && !SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:table.sectioned?SwirlMotion.exitDuration:SwirlMotion.duration} NumberAnimation {property:"scale";to:table.sectioned?0.985:1;duration:table.sectioned?SwirlMotion.exitDuration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
                     move: Transition {enabled:table.animateRowChanges && !table.sectioned && !SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
                     displaced: Transition { enabled:table.animateRowChanges && !table.sectioned && !SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                 id:list
+                Component.onCompleted:{
+                    table.projectionViewReady=true
+                    if(table.stagedProjection&&table.projectionPhase==="commit")table.endProjection()
+                }
+                opacity:table.stagedProjection?table.projectionOpacity:1
                 objectName:"tableRowsViewport"
                 Repeater {model:table.fillEmptyRows?Math.max(0,Math.ceil((list.height-table.rows.length*table.itemHeight)/table.emptyStripeHeight)):0
                     Rectangle{required property int index;x:table.stripeInset;y:table.rows.length*table.itemHeight+index*table.emptyStripeHeight;width:list.width-2*table.stripeInset;height:table.emptyStripeHeight;radius:table.stripeRadius;color:(index+table.rows.length)%2?Theme.field:Theme.surface;z:-1}
@@ -213,13 +321,13 @@ Item {
                 boundsBehavior:Flickable.StopAtBounds
                 pixelAligned:false
                 activeFocusOnTab:true
-                keyNavigationEnabled:true
+                keyNavigationEnabled:!table.projectionBlocked
                 highlightMoveDuration:0
                 Keys.onReturnPressed:table.chooseRow(currentItem,true)
                 Keys.onEnterPressed:table.chooseRow(currentItem,true)
                 Keys.onSpacePressed:table.chooseRow(currentItem,true)
                 Keys.onPressed:function(event){
-                    if(table.sectioned&&[Qt.Key_Up,Qt.Key_Down,Qt.Key_Home,Qt.Key_End,Qt.Key_PageUp,Qt.Key_PageDown].indexOf(event.key)>=0)
+                    if(!table.projectionBlocked&&table.sectioned&&[Qt.Key_Up,Qt.Key_Down,Qt.Key_Home,Qt.Key_End,Qt.Key_PageUp,Qt.Key_PageDown].indexOf(event.key)>=0)
                         Qt.callLater(function(){if(list.currentItem)table.chooseRow(list.currentItem,false)})
                     event.accepted=false
                 }
@@ -228,10 +336,36 @@ Item {
                     id:recordRow
                     // Removed delegates can remain visible until the next model
                     // polish. Their retired contexts must not receive input.
-                    enabled:index>=0&&!pooled
+                    property bool componentReady:false
+                    property var recordModel:null
+                    Component.onCompleted:{recordModel=table.externalModel;refreshRecord();componentReady=true}
+                    readonly property int delegateIndex:index
+                    readonly property bool currentModelRow:componentReady&&delegateIndex>=0&&!pooled
+                        &&sourceRecordAvailable&&recordModel===table.externalModel
+                    enabled:currentModelRow&&!table.projectionBlocked
+                    readonly property bool presentationOutgoing:table.presentationOutgoing
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
-                    property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData
+                    // A revoked role can outlive its model while Qt retires the
+                    // delegate. Preserve only its last display value for exit
+                    // motion; never bind children to that transient undefined.
+                    property var recordSnapshot:({})
+                    readonly property var record:recordSnapshot
+                    readonly property var sourceRecord:{
+                        if(delegateIndex<0)return null
+                        return table.externalModel!==null||table.incrementalRows
+                            ? (typeof model!=="undefined"&&model?model.entry:null)
+                            : (typeof modelData!=="undefined"?modelData:null)
+                    }
+                    readonly property bool sourceRecordAvailable:sourceRecord!==undefined&&sourceRecord!==null
+                    function refreshRecord(){
+                        const source=sourceRecord
+                        if(source===undefined||source===null||(componentReady&&recordModel!==table.externalModel))return
+                        const snapshot={}
+                        for(const key of Object.keys(source))snapshot[key]=source[key]
+                        recordSnapshot=snapshot
+                    }
+                    onSourceRecordChanged:refreshRecord()
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
@@ -242,27 +376,44 @@ Item {
                         focused:!recordRow.pooled && list.activeFocus && list.currentIndex===index
                         controlEnabled:recordRow.enabled && !recordRow.pooled
                     }
-                    property real visualOffsetY:0
-                    function clearPresentation(){if(positionShift)positionShift.stop();if(rowFeedback)rowFeedback.finish();visualOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close();if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()}
-                    function presentFrom(offset){positionShift.stop();visualOffsetY=offset;if(Math.abs(offset)>0.25){positionShift.to=0;positionShift.start()}else visualOffsetY=0}
-                    SmoothedAnimation {id:positionShift;target:recordRow;property:"visualOffsetY";to:0;duration:SwirlMotion.duration;velocity:-1}
+                    property real rowOffsetY:0
+                    readonly property real visualOffsetY:table.stagedProjection?table.projectionOffsetY:rowOffsetY
+                    function clearPresentation(){if(positionShift)positionShift.stop();if(rowFeedback)rowFeedback.finish();rowOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close();if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()}
+                    function presentFrom(offset){positionShift.stop();rowOffsetY=offset;if(Math.abs(offset)>0.25){positionShift.to=0;positionShift.start()}else rowOffsetY=0}
+                    SmoothedAnimation {id:positionShift;target:recordRow;property:"rowOffsetY";to:0;duration:SwirlMotion.duration;velocity:-1}
                     onPresentationKeyChanged:{clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
+                    onCurrentModelRowChanged:if(componentReady&&!currentModelRow){
+                        // Closing detached popups must not reset opacity/scale
+                        // and interrupt the outgoing row's removal transition.
+                        if(contextMenu)contextMenu.close()
+                        if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()
+                        if(table.selectedItem===recordRow)table.selectedItem=null
+                    }
+                    Connections {target:table;function onProjectionBlockedChanged(){if(table.projectionBlocked){
+                        if(contextMenu)contextMenu.close()
+                        if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()
+                        if(table.selectedItem===recordRow)table.selectedItem=null
+                    }}}
                     onVisibleChanged:if(!visible)clearPresentation()
                     ListView.onPooled:{pooled=true;clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
-                    ListView.onReused:{pooled=false;clearPresentation()}
+                    ListView.onReused:{recordModel=table.externalModel;refreshRecord();pooled=false;clearPresentation()}
                     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)recordRow.clearPresentation()}}
                     property Item titleElement:null
+                    Accessible.ignored:!currentModelRow||table.projectionBlocked
                     Accessible.role:sectionRow?Accessible.Button:Accessible.ListItem
-                    Accessible.selected:!sectionRow&&table.selectedId===String(record.id||record.name)
-                    Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+String(recordRow.record[c.key]===undefined?"":recordRow.record[c.key])).join("，")
+                    Accessible.selected:!sectionRow&&!!presentationKey&&!!(record.id||record.name)&&table.selectedId===String(record.id||record.name)
+                    Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+table.cellText(recordRow.record,c.key)).join("，")
                     Accessible.onPressAction:table.chooseRow(recordRow,true)
                     Rectangle {
                     anchors.fill:parent
+                    // A retired context may survive Qt's polish. It must never
+                    // join the next layout's shared fade-in.
+                    opacity:table.stagedProjection&&!recordRow.currentModelRow?0:1
                     transform:[Translate {y:recordRow.visualOffsetY},Scale {origin.x:recordRow.width/2;origin.y:recordRow.height/2;xScale:1-0.008*rowFeedback.contact;yScale:1-(1-SwirlMotion.pressScale)*rowFeedback.contact}]
                     radius:table.minimal?Theme.dp(10):0
                     border.width:Theme.increaseContrast && table.sectioned?Theme.dp(1):0
                     border.color:Theme.text
-                    color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
+                    color:!recordRow.sectionRow&&!!recordRow.presentationKey&&!!(recordRow.record.id||recordRow.record.name)&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
                           mouse.containsMouse ? (table.minimal?(table.rowActions!==null?Theme.hover:Theme.withAlpha(Theme.accent,0.055)):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
                     Behavior on color { enabled:!SwirlMotion.reduced;ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
@@ -279,7 +430,7 @@ Item {
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
                                     id:cell
                                     Component.onCompleted:if(modelData.key==="name")recordRow.titleElement=cell
-                                    readonly property string raw:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
+                                    readonly property string raw:table.cellText(recordRow.record,modelData.key)
                                     readonly property real measured:table.animateLatency && modelData.key==="latency" && raw.length && isFinite(Number(raw))?Number(raw):-1
                                     property real displayed:-1
                                     property real previous:-1
@@ -320,25 +471,28 @@ Item {
                         cursorShape:Qt.PointingHandCursor
                         acceptedButtons:Qt.LeftButton|Qt.RightButton
                         onClicked:function(event){
+                            if(!table.currentPresentation(recordRow))return
                             list.forceActiveFocus();list.currentIndex=index
                             table.chooseRow(recordRow,event.button===Qt.LeftButton&&(recordRow.sectionRow||table.activateOnSingleClick))
                             if(event.button===Qt.RightButton&&!recordRow.sectionRow){if(actionsLoader.item&&actionsLoader.item.openMenu)actionsLoader.item.openMenu();else contextMenu.showAt(mouse,event.x,event.y)}
                         }
-                        onDoubleClicked:if(!recordRow.sectionRow){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
+                        onDoubleClicked:if(!recordRow.sectionRow&&table.currentPresentation(recordRow)){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
                         SwirlContextMenu {
                             id:contextMenu
                             parent:mouse
                             payload:table.columns.map(function(c){
-                                return c.label + ": " + String(recordRow.record[c.key] === undefined?"":recordRow.record[c.key])
+                                return c.label + ": " + table.cellText(recordRow.record,c.key)
                             }).join("\n")
                         }
                     }
                     Loader {
                         id:actionsLoader
+                        objectName:"tableRowActions"
                         z:2; anchors.right:parent.right; width:table.actionWidth; height:parent.height
                         active:!recordRow.sectionRow&&!recordRow.pooled&&table.rowActions!==null
                         sourceComponent:table.rowActions
                         readonly property var record:recordRow.record
+                        function acceptsInteraction(){return table.currentPresentation(recordRow)}
                     }
                     }
                 }

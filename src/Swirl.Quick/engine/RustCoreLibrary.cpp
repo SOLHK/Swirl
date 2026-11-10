@@ -160,6 +160,9 @@ bool RustCoreLibrary::fail(const char *stage, const char *code, const QString &m
     m_importNode = nullptr;
     m_importProfile = nullptr;
     m_downloadRoute = nullptr;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    m_privateUiQuota = nullptr;
+#endif
     m_message = message;
     m_diagnostics["stage"] = QString::fromLatin1(stage);
     m_diagnostics["code"] = QString::fromLatin1(code);
@@ -356,6 +359,11 @@ bool RustCoreLibrary::load(const QString &absolutePath)
     m_importNode = reinterpret_cast<Command>(m_library.resolve("swirl_import_node_v1"));
     m_importProfile = reinterpret_cast<Command>(m_library.resolve("swirl_import_profile_v1"));
     m_downloadRoute = reinterpret_cast<Command>(m_library.resolve("swirl_download_route_v1"));
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    m_privateUiQuota = reinterpret_cast<Command>(m_library.resolve("swirl_private_ui_quota_v1"));
+    if (!m_privateUiQuota)
+        return fail("private_ui", "PrivateUiQuotaAbiRequired", QStringLiteral("QA 配额内核接口缺失。"));
+#endif
     m_diagnostics["import_xray_available"] = m_importXray != nullptr;
     m_diagnostics["import_node_available"] = m_importNode != nullptr;
     m_diagnostics["import_profile_available"] = m_importProfile != nullptr;

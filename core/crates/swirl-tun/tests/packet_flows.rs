@@ -762,6 +762,76 @@ async fn syn_retransmission_does_not_allocate_another_flow_and_limit_rejects() {
 }
 
 #[tokio::test]
+async fn saturated_table_reclaims_timewait_flows_before_rejecting_a_syn() {
+    let source: SocketAddr = "192.0.2.10:40000".parse().unwrap();
+    let destination: SocketAddr = "203.0.113.20:443".parse().unwrap();
+    let mut stack = spawn(TunConfig {
+        max_tcp_flows: 1,
+        ..TunConfig::default()
+    })
+    .unwrap();
+    let (mut stream, _next) = handshake(&mut stack, source, destination).await;
+    // Actively close the stack side, then complete the peer's FIN so the
+    // socket enters TIME-WAIT while still occupying the only flow slot.
+    stream.shutdown().await.unwrap();
+    let fin = next_tcp(&mut stack).await;
+    assert_eq!(fin.control, TcpControl::Fin);
+    stack
+        .ingress
+        .send(tcp_packet(
+            source,
+            destination,
+            101,
+            Some(fin.sequence.wrapping_add(1)),
+            TcpControl::None,
+            &[],
+        ))
+        .await
+        .unwrap();
+    stack
+        .ingress
+        .send(tcp_packet(
+            source,
+            destination,
+            101,
+            Some(fin.sequence.wrapping_add(1)),
+            TcpControl::Fin,
+            &[],
+        ))
+        .await
+        .unwrap();
+    // Consume the stack's final ACK; the socket is now in TIME-WAIT.
+    let _last_ack = next_tcp(&mut stack).await;
+    // A fresh connection must be admitted by reclaiming the TIME-WAIT slot
+    // instead of being silently rejected at the saturated flow table.
+    let second_source: SocketAddr = "192.0.2.11:40001".parse().unwrap();
+    stack
+        .ingress
+        .send(tcp_packet(
+            second_source,
+            destination,
+            100,
+            None,
+            TcpControl::Syn,
+            &[],
+        ))
+        .await
+        .unwrap();
+    let flow = timeout(WAIT, stack.tcp.recv()).await.unwrap().unwrap();
+    assert_eq!(
+        (flow.source, flow.destination),
+        (second_source, destination)
+    );
+    let snapshot = stack.stats.snapshot();
+    assert_eq!(snapshot.rejected_tcp_flows, 0);
+    assert_eq!(snapshot.timewait_reclaimed, 1);
+    assert_eq!(snapshot.active_tcp_flows, 1);
+    drop(stream);
+    drop(flow);
+    stack.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn equal_ports_at_different_destination_ips_cannot_cross_streams() {
     let mut stack = spawn(TunConfig::default()).unwrap();
     let source: SocketAddr = "192.0.2.10:40000".parse().unwrap();

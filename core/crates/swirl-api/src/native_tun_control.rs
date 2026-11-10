@@ -179,6 +179,10 @@ fn execute(controller: &mut Controller, command: Command) -> Result<Value> {
             engine_epoch,
             config,
         } => {
+            // A private TCP quota cannot account for OS capture or the
+            // additional traffic created by changing system networking.
+            swirl_transport::egress::check_unmetered_egress()
+                .map_err(|_| "PrivateQuotaUnmeteredDenied")?;
             if !controller.native_helper {
                 return Err("TunHelperRequired");
             }

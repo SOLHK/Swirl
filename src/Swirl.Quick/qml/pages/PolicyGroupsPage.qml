@@ -78,9 +78,15 @@ Item {
     }
     function nextPriority() {return services.reduce((value,record)=>Math.max(value,Number(record.priority)+10),0)}
     function editService(record,source) {
-        serviceEditor.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
+        serviceEditorLoader.active=true
+        if(serviceEditorLoader.status===Loader.Ready)
+            serviceEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
     }
-    function editGroup(record,source,strategyPreset) {groupEditor.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)}
+    function editGroup(record,source,strategyPreset) {
+        groupEditorLoader.active=true
+        if(groupEditorLoader.status===Loader.Ready)
+            groupEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)
+    }
     function moveService(id,direction) {
         const rows=services.slice().sort((a,b)=>a.priority-b.priority);const index=rows.findIndex(record=>record.id===id);const destination=index+direction
         if(index<0||destination<0||destination>=rows.length)return
@@ -189,8 +195,29 @@ Item {
         }
     }
     PolicyTargetPicker {id:targetPicker;ownerItem:page;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onTargetChosen:target=>page.chooseTarget(target)}
-    ServicePolicyDialog {id:serviceEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)}
-    PolicyGroupDialog {id:groupEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)}
+    // Build the editor trees on first use, then retain their instances for command receipts and popup transitions.
+    Loader {
+        id:serviceEditorLoader
+        active:false
+        sourceComponent:ServicePolicyDialog {
+            id:serviceEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)
+        }
+    }
+    Loader {
+        id:groupEditorLoader
+        active:false
+        sourceComponent:PolicyGroupDialog {
+            id:groupEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)
+        }
+    }
     SwirlDialog {
         id:deleteDialog;objectName:"deletePolicyDialog";ownerItem:page;title:kind==="service"?qsTr("删除策略"):qsTr("删除策略组");guardChanges:false
         property string kind:"service";property string recordId:"";property string recordName:"";property bool pending:false;property string pendingRequestId:"";property string message:""

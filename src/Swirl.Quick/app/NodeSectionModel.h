@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QPointer>
 #include <QSet>
+#include <QTimer>
 #include <QtQml/qqmlregistration.h>
 #include "NodeViewModel.h"
 
@@ -18,6 +19,9 @@ class NodeSectionModel : public QAbstractListModel {
     Q_PROPERTY(int total READ total NOTIFY changed)
     Q_PROPERTY(int displayCount READ displayCount NOTIFY changed)
     Q_PROPERTY(int revision READ revision NOTIFY changed)
+    // Views opt in while animated. Other consumers keep synchronous updates.
+    Q_PROPERTY(int projectionDelayMs READ projectionDelayMs WRITE setProjectionDelayMs NOTIFY projectionDelayMsChanged)
+    Q_PROPERTY(bool projectionPending READ projectionPending NOTIFY projectionPendingChanged)
 public:
     explicit NodeSectionModel(QObject *parent=nullptr);
     NodeViewModel *source() const { return m_source; }
@@ -28,6 +32,9 @@ public:
     int total() const { return m_total; }
     int displayCount() const { return m_rows.size(); }
     int revision() const { return m_revision; }
+    int projectionDelayMs() const { return m_projectionDelayMs; }
+    void setProjectionDelayMs(int value);
+    bool projectionPending() const { return m_projectionPending; }
     int rowCount(const QModelIndex &parent={}) const override;
     QVariant data(const QModelIndex &index,int role) const override;
     Qt::ItemFlags flags(const QModelIndex &index) const override;
@@ -41,7 +48,11 @@ signals:
     void sourceChanged();
     void providersChanged();
     void aboutToSync();
+    // A view must be fully transparent before the displayed rows are mutated.
+    void projectionCommitting();
     void synced();
+    void projectionDelayMsChanged();
+    void projectionPendingChanged();
     void changed();
 private:
     struct CachedNode {
@@ -52,12 +63,16 @@ private:
     };
     void refreshCatalog();
     void rebuild();
+    void commitPendingProjection();
     void syncRows(const QList<QVariantMap> &next);
     void rebuildIndex();
     static QString sectionKey(const QVariantMap &row);
     QPointer<NodeViewModel> m_source;
     QVariantList m_providers;
     QList<QVariantMap> m_rows;
+    QList<QVariantMap> m_pendingRows;
+    QTimer m_projectionTimer;
+    QTimer m_valueRefreshTimer;
     QHash<QString,int> m_rowByKey;
     QStringList m_nodeIds;
     QSet<QString> m_collapsed;
@@ -68,4 +83,12 @@ private:
     int m_cachedCatalogRevision=-1;
     int m_total=0;
     int m_revision=0;
+    int m_projectionDelayMs=0;
+    bool m_projectionPending=false;
+    bool m_committingProjection=false;
+    bool m_notifyingProjection=false;
+    bool m_flushRequested=false;
+    bool m_syncingRows=false;
+    bool m_valueRefreshPending=false;
+    quint64 m_pendingVersion=0;
 };

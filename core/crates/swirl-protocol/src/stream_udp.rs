@@ -26,6 +26,7 @@ const FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 
 enum Encoding {
     Vless(Target),
+    AnyTls(Target),
     Trojan,
 }
 
@@ -80,6 +81,10 @@ impl UdpAssociation {
                     return Err("TrojanParameters");
                 }
                 Encoding::Trojan
+            }
+            Outbound::AnyTls(config) if config.udp => {
+                config.validate()?;
+                Encoding::AnyTls(target.clone())
             }
             _ => return Err("StreamUdpDisabledOrUnsupported"),
         };
@@ -231,6 +236,11 @@ fn encode_packet(encoding: &Encoding, target: &Target, payload: &[u8]) -> Result
                 return Err("VlessUdpTargetMismatch");
             }
         }
+        Encoding::AnyTls(bound) => {
+            if !same_target(bound, target) {
+                return Err("AnyTlsUdpTargetMismatch");
+            }
+        }
         Encoding::Trojan => target.encode(&mut frame)?,
     }
     frame.extend_from_slice(&(payload.len() as u16).to_be_bytes());
@@ -244,7 +254,7 @@ fn encode_packet(encoding: &Encoding, target: &Target, payload: &[u8]) -> Result
 type Decoded = Option<(usize, Target, Vec<u8>)>;
 fn decode_packet(encoding: &Encoding, bytes: &[u8]) -> Result<Decoded> {
     let (target, length_at) = match encoding {
-        Encoding::Vless(target) => (target.clone(), 0),
+        Encoding::Vless(target) | Encoding::AnyTls(target) => (target.clone(), 0),
         Encoding::Trojan => {
             let Some((target, used)) = decode_address(bytes)? else {
                 return Ok(None);

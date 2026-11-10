@@ -8,6 +8,15 @@
 class ThreadedEngine final : public ProxyEngine {
 public:
     explicit ThreadedEngine(QObject *parent=nullptr):ProxyEngine(parent) {
+        // This strict registry-only snapshot is synchronous so a connection
+        // requested before the first event-loop turn is not silently lost.
+        // The worker independently rechecks before starting any listener.
+        m_status.tunRecoveryRequired=nativeTunRecoveryState()!=NativeTunRecoveryState::Clear;
+        m_status.tunCapturePossible=m_status.tunRecoveryRequired;
+        if(m_status.tunRecoveryRequired){
+            m_status.state=State::Failed;m_status.error=Error::OwnershipFailed;
+            m_status.message=QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+        }
         m_context=new QObject;
         m_context->moveToThread(&m_thread);
         connect(&m_thread,&QThread::finished,m_context,&QObject::deleteLater);
@@ -37,6 +46,8 @@ public:
                 const auto epoch=m_workerEpoch;
                 QMetaObject::invokeMethod(this,[this,requestId,response,epoch]{if(epoch==m_epoch)emit configurationCommandFinished(requestId,response);},Qt::QueuedConnection);
             });
+            const auto initial=m_engine->status();const auto epoch=m_workerEpoch;
+            QMetaObject::invokeMethod(this,[this,initial,epoch]{if(epoch==m_epoch){m_status=initial;emit statusChanged();}},Qt::QueuedConnection);
         });
         m_thread.setObjectName("Swirl network");m_thread.start();
     }
@@ -47,7 +58,10 @@ public:
         m_thread.wait();
     }
     void start(const EngineStartOptions &options) override {
-        const auto epoch=++m_epoch;m_status.state=State::Starting;emit statusChanged();
+        const auto epoch=++m_epoch;m_status.state=State::Starting;
+        // Cover the queued startup interval before the worker can publish its
+        // actual broker ownership. Later snapshots are authoritative.
+        m_status.tunCapturePossible=m_status.tunCapturePossible||options.tunEnabled;emit statusChanged();
         QMetaObject::invokeMethod(m_context,[this,options,epoch]{if(epoch!=m_epoch)return;m_workerEpoch=epoch;m_workerProbeTag=0;m_engine->start(options);},Qt::QueuedConnection);
     }
     void stop() override {
@@ -74,6 +88,28 @@ public:
         });
     }
     void setRoutingMode(const QString &mode) override {post([this,mode](auto *engine){m_workerProbeTag=0;engine->setRoutingMode(mode);});}
+    // The sweep start and its incremental snapshot must be synchronous for the
+    // caller's poll loop, so they use a blocking hop into the worker. Both calls
+    // are short (spawn or mutex read) and never run while the worker is blocked
+    // on the GUI thread.
+    bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override {
+        std::atomic<bool> started{false};
+        std::atomic<bool> accepted{false};
+        QMetaObject::invokeMethod(m_context,[this,ids,url,&accepted]{
+            accepted.store(m_engine&&m_engine->probeNodes(ids,url,nullptr));
+        },Qt::BlockingQueuedConnection);
+        started.store(accepted.load());
+        if(!started.load()&&error)*error=QStringLiteral("probe-batch-unavailable");
+        return started.load();
+    }
+    QJsonObject probeNodesStatus() override {
+        QJsonObject snapshot;
+        QMetaObject::invokeMethod(m_context,[this,&snapshot]{
+            if(m_engine)snapshot=m_engine->probeNodesStatus();
+        },Qt::BlockingQueuedConnection);
+        return snapshot;
+    }
+    void cancelProbeNodes() override {post([](auto *engine){engine->cancelProbeNodes();});}
     void configurationCommand(const QJsonObject &command) override {post([command](auto *engine){engine->configurationCommand(command);});}
     void lanCommand(const QJsonObject &command) override {post([command](auto *engine){engine->lanCommand(command);});}
     Status status() const override{return m_status;}

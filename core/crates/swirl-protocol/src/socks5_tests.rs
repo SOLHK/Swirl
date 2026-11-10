@@ -1,6 +1,9 @@
 use super::*;
 use swirl_subscription::{HostMapping, Tls};
-use tokio::{net::TcpListener, time::timeout};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    time::timeout,
+};
 
 fn outbound(port: u16) -> Outbound {
     Outbound::Socks5 {

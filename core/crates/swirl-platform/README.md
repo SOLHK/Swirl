@@ -24,7 +24,7 @@ The helper uses `windows_network::secure_state_directory` to obtain the fixed Wi
 
 Compose start changes in this order:
 
-1. `dns_guard_resources` for **all** known physical adapter aliases, including disconnected adapters.
+1. `dns_guard_resources` for **all present** physical adapter aliases, including disconnected and hidden adapters. Only Windows `IfOperStatusNotPresent` (6) is excluded: it cannot transmit and Windows rejects a firewall interface rule for it. Missing/invalid status fails admission. Interface/address/route notifications suspend and rebuild the owned transaction; effective firewall audits reject a newly present, unguarded adapter. This is not a kernel-wide kill switch or a claim of zero-gap protection during topology changes.
 2. `Resource::Mtu { ipv6: false/true }`, using the packet stack's configured MTU.
 3. `capture_resources` for virtual addresses, virtual DNS and IPv4/IPv6 split default routes.
 

@@ -180,13 +180,28 @@ fn random_token() -> Result<String> {
     Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-struct Plan {
+pub(crate) struct Plan {
     prepared: PreparedConfig,
     policies: Arc<PolicyRuntime>,
     revision: u64,
     request_id: String,
 }
 impl Plan {
+    /// One node by id from this immutable snapshot, never the current selection.
+    pub(crate) fn prepared_node(&self, id: &str) -> Option<Node> {
+        self.prepared
+            .base
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .cloned()
+    }
+    pub(crate) fn prepared_transport(&self, id: &str) -> Option<Transport> {
+        self.prepared.runtime.transports.get(id).cloned()
+    }
+    pub(crate) fn prepared_resolver(&self) -> Arc<Resolver> {
+        self.prepared.resolver.clone()
+    }
     fn new(
         prepared: PreparedConfig,
         runtime: &Runtime,
@@ -219,7 +234,7 @@ struct SessionControl {
     nodes: BTreeSet<String>,
     preparing: usize,
 }
-struct Shared {
+pub(crate) struct Shared {
     live: Mutex<Live>,
     notify: Notify,
     waiting: AtomicUsize,
@@ -311,7 +326,7 @@ impl Shared {
         }
     }
 
-    async fn admit(&self) -> Result<(Arc<Plan>, u64)> {
+    pub(crate) async fn admit(&self) -> Result<(Arc<Plan>, u64)> {
         let start = Instant::now();
         let mut waiting = None;
         loop {
@@ -516,6 +531,7 @@ pub struct Core {
     stop: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
     probe: ProbeRuntime,
+    batch_probe: super::batch_probe::BatchProbeRuntime,
     transactions: Arc<Mutex<Transactions>>,
     expiry_notify: Arc<Notify>,
     expiry_task: Option<JoinHandle<()>>,
@@ -536,6 +552,8 @@ impl Core {
         let epoch = random_number()?;
         let prepared = candidate.prepare()?;
         prepared.runtime.policy.validate_start()?;
+        swirl_transport::egress::check_private_listener(prepared.runtime.listen)
+            .map_err(|_| "PrivateQuotaListenerDenied")?;
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .max_blocking_threads(4)
@@ -627,6 +645,7 @@ impl Core {
         ));
         Ok(Self {
             probe: ProbeRuntime::new(runtime.handle().clone()),
+            batch_probe: super::batch_probe::BatchProbeRuntime::new(runtime.handle().clone()),
             runtime: Some(runtime),
             shared,
             stop,
@@ -922,6 +941,13 @@ impl Core {
             .as_ref()
             .ok_or("CoreStopped")?
             .block_on(self.probe.invalidate_and_wait())?;
+        // A configuration swap invalidates the snapshot a latency sweep holds.
+        // Cancel it and bound the wait for the aborted tasks to drop sockets.
+        let _ = self.batch_probe.cancel();
+        let deadline = Instant::now() + Duration::from_millis(500);
+        while !self.batch_probe.quiescent() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         self.fields(request_id, "committing")
     }
     pub fn rollback(
@@ -1205,6 +1231,63 @@ impl Core {
                 .await
             }
         })
+    }
+
+    /// Sweep the given nodes concurrently from one plan snapshot. Nothing is
+    /// selected and no policy is consulted: each probe dials only its own node
+    /// through the same strict protocol path as a single probe, and a failure
+    /// never falls back to DIRECT.
+    pub fn probe_nodes(
+        &self,
+        nodes: Vec<String>,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        concurrency: Option<u32>,
+    ) -> Result<super::batch_probe::BatchSnapshot> {
+        if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
+            return Err("UrlTestExpectedStatus");
+        }
+        let options = swirl_subscription::HealthProbe {
+            url,
+            interval_ms: 300_000,
+            timeout_ms: timeout_ms.unwrap_or(5_000),
+            expected_status: expected_status.unwrap_or(204),
+            tolerance_ms: 0,
+            tls: None,
+        };
+        options.target()?;
+        let plan = {
+            let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
+            if live.closed {
+                return Err("Reconfiguring");
+            }
+            live.plan.clone()
+        };
+        let mut targets = std::collections::BTreeMap::new();
+        for id in &nodes {
+            if let Some(node) = plan.prepared_node(id) {
+                targets.insert(id.clone(), (node.outbound, plan.prepared_transport(id)));
+            }
+        }
+        let inputs = super::batch_probe::BatchInputs {
+            targets,
+            resolver: plan.prepared_resolver(),
+        };
+        self.batch_probe.start(
+            inputs,
+            nodes,
+            options,
+            concurrency.map(|value| value as usize),
+        )
+    }
+
+    pub fn probe_nodes_status(&self) -> Result<super::batch_probe::BatchSnapshot> {
+        self.batch_probe.snapshot()
+    }
+
+    pub fn probe_nodes_cancel(&self) -> Result<super::batch_probe::BatchSnapshot> {
+        self.batch_probe.cancel()
     }
 }
 impl Drop for Core {
@@ -2315,6 +2398,8 @@ async fn prepare_udp(
         }
         Outbound::Hysteria2(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
         Outbound::Tuic(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
+        Outbound::AnyTls(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
+        Outbound::Snell(c) if c.udp => UdpPacket::Proxy(flow.routed.target.clone(), payload),
         _ => return Err("UdpProxyUnsupportedOrRejected"),
     };
     Ok(UdpPrepared {

@@ -549,6 +549,8 @@ mod windows {
         Ok(())
     }
     pub fn run(arguments: Vec<String>) -> io::Result<()> {
+        // A helper is a new process and cannot inherit an installed TCP quota.
+        swirl_transport::egress::check_unmetered_egress()?;
         if arguments.len() != 4 || arguments[0] != "--pipe" || arguments[2] != "--gui-pid" {
             return Err(invalid("BrokerArguments"));
         }
@@ -573,6 +575,13 @@ mod windows {
                 return Err(error);
             }
         };
+        // The helper is running and its image identity was verified. No further
+        // path-based resolution happens in this session (commands travel over
+        // stdio, payload files stay locked, and the helper re-verifies the
+        // official driver digest before loading). Release the ancestor
+        // directory locks so an active TUN session no longer blocks unrelated
+        // renames/deletions across the install tree.
+        connection.get_mut().release_directory_locks();
         loop {
             let Some(bytes) = frame(&mut connection)? else {
                 return helper.close();

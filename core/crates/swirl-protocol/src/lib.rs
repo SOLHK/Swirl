@@ -1,5 +1,6 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+pub mod anytls;
 mod diagnostics;
 mod dial;
 pub mod http_single;
@@ -10,6 +11,7 @@ mod inbound_http_tests;
 mod outbound_http_tests;
 mod probe;
 mod shadowsocks;
+pub mod snell;
 mod socks4;
 mod socks5;
 pub mod ss2022;
@@ -558,6 +560,18 @@ pub(crate) async fn connect_udp_stream(
     handshake_limit: std::time::Duration,
     transport: Option<&Transport>,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::AnyTls(config) = outbound {
+        if !config.udp || transport.is_some() {
+            return Err("AnyTlsUdpDisabledOrUnsupported");
+        }
+        return Box::pin(anytls::connect_udp(
+            config,
+            target,
+            resolver,
+            handshake_limit,
+        ))
+        .await;
+    }
     match outbound {
         Outbound::Vless {
             udp: true, flow, ..
@@ -603,6 +617,9 @@ async fn connect_selected(
         }
         Outbound::Tuic(config) => {
             Box::pin(tuic::connect(config, target, resolver, handshake_limit)).await
+        }
+        Outbound::AnyTls(config) => {
+            Box::pin(anytls::connect(config, target, resolver, handshake_limit)).await
         }
         _ => {
             Box::pin(connect_stream_selected(
@@ -780,6 +797,10 @@ async fn connect_stream_selected(
             .await;
         }
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
+        Outbound::Snell(config) => {
+            config.validate()?;
+            (&config.host, config.port, None, None)
+        }
         Outbound::Socks5 {
             host,
             port,
@@ -802,7 +823,9 @@ async fn connect_stream_selected(
         | Outbound::Vmess {
             host, port, tls, ..
         } => (host, *port, None, tls.as_ref()),
-        Outbound::Hysteria2(_) | Outbound::Tuic(_) => return Err("QuicDispatchInvariant"),
+        Outbound::Hysteria2(_) | Outbound::Tuic(_) | Outbound::AnyTls(_) => {
+            return Err("ProtocolDispatchInvariant");
+        }
     };
     let tcp = connect_tcp(
         resolver,
@@ -881,6 +904,7 @@ pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Resul
     match outbound {
         Outbound::Hysteria2(config) => return hysteria2::validate(config),
         Outbound::Tuic(config) => return tuic::validate(config),
+        Outbound::AnyTls(config) => return anytls::validate(config),
         _ => {}
     }
     let tls = match outbound {
@@ -913,6 +937,7 @@ async fn handshake(
             | Outbound::Vless { .. }
             | Outbound::Trojan { .. }
             | Outbound::Shadowsocks { .. }
+            | Outbound::Snell(_)
     ) {
         // These protocols may defer a response until application data, or
         // have no acknowledgement. Measure encoding/writing, never auth OK.
@@ -931,6 +956,12 @@ async fn handshake_inner(
     handshake_limit: std::time::Duration,
     udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::Snell(config) = outbound {
+        if udp {
+            return Err("SnellUdpRequiresAssociation");
+        }
+        return snell::connect(stream, &config.psk, target).await;
+    }
     if let Outbound::Vmess {
         uuid,
         alter_id,

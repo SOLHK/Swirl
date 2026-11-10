@@ -132,7 +132,7 @@ Item {
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:true;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
-                    sectioned:true;activateOnSingleClick:false
+                    sectioned:true;stagedProjection:true;activateOnSingleClick:false
                     sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
                     rowActionsWidth:Theme.dp(88)
                     rowActions:Component {
@@ -140,11 +140,11 @@ Item {
                             record:parent.record
                             editable:!record.sourceId&&engineController.canStart&&!page.nodeSavePending&&!page.nodeDeletePending
                             testable:!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
-                            onFavoriteRequested:nodes.toggleFavorite(record.id)
-                            onDetailsRequested:page.inspectRow(record)
-                            onEditRequested:page.edit(record)
-                            onTestRequested:engineController.testSelectedNode(record.id,testUrl.text.trim())
-                            onCopyRequested:nodes.copySafeInfo(record.id)
+                            onFavoriteRequested:if(parent.acceptsInteraction())nodes.toggleFavorite(record.id)
+                            onDetailsRequested:if(parent.acceptsInteraction())page.inspectRow(record)
+                            onEditRequested:if(parent.acceptsInteraction())page.edit(record)
+                            onTestRequested:if(parent.acceptsInteraction())engineController.testSelectedNode(record.id,testUrl.text.trim())
+                            onCopyRequested:if(parent.acceptsInteraction())nodes.copySafeInfo(record.id)
                         }
                     }
                     anchors.fill:parent;anchors.margins:Theme.dp(6);externalModel:sections;selectedId:page.focusedId
@@ -154,7 +154,7 @@ Item {
                     onRowActivated:function(row,titleItem){page.inspectRow(row)}
                     onSectionActivated:function(key){sections.toggleSection(key)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0&&!nodeTable.projectionBlocked;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
         }
     }

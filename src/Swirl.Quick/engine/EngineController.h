@@ -112,7 +112,7 @@ public:
     bool processAlive() const { return m_engine->status().processAlive; }
     bool apiHealthy() const { return m_engine->status().apiHealthy; }
     bool busy() const;
-    bool canStart() const { return !m_shuttingDown && !m_policyBusy && !busy() && !processAlive() && !m_imports.busy(); }
+    bool canStart() const { return !m_shuttingDown && !m_policyBusy && !busy() && !processAlive() && !m_imports.busy() && !m_engine->status().tunRecoveryRequired; }
     QString version() const { return m_engine->status().version; }
     QString engineName() const { return m_engine->status().engineName; }
     QString engineKind() const { return m_engine->status().engineKind; }
@@ -267,6 +267,9 @@ signals:
     void nodesChanged();
 private:
     friend class PolicyConfigurationTests;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    friend class PrivateUiQuotaSession;
+#endif
     QString nodeConnectionState(const QString &id) const;
     QList<ProxyNode> availableNodes() const;
     void refreshLanAddresses();
@@ -317,7 +320,12 @@ private:
     bool m_tunBeforeMetered=false;
     QString m_modeBeforeMetered="rule";
     bool m_restartPending=false;
+    bool m_startAfterProbes=false;
+    bool m_probeStartPosted=false;
+    quint64 m_probeStartGeneration=0;
     bool m_connectionRequested=false;
+    EngineStartOptions nodeProbeOptions() const;
+    bool nodeProbeReady();
     bool m_moduleOverlayActive=false;
     bool m_nativeDocumentRouting=false;
     bool m_smartRoutingEligible=false;

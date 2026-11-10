@@ -14,6 +14,10 @@ option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 option(SWIRL_BUILD_CORE_TESTS "Build standalone Core/network tests without exposing application UI test entry points" OFF)
 option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
 option(SWIRL_XRAY_UI_TESTS "Build the isolated JSON import acceptance profile in the real Rust application" OFF)
+option(SWIRL_PRIVATE_UI_QUOTA "Build only the mandatory-quota synthetic Qt acceptance profile" OFF)
+if(SWIRL_PRIVATE_UI_QUOTA AND NOT SWIRL_BUILD_UI_TESTS)
+ message(FATAL_ERROR "SWIRL_PRIVATE_UI_QUOTA requires the explicit UI test profile")
+endif()
 
 # Keep the standalone CI and the existing UI suite on the same font targets.
 # This path deliberately precedes third_party and all application/core targets.
@@ -130,6 +134,11 @@ include(cmake/SwirlRustCore.cmake)
 swirl_pair_rust_core(SwirlEngine)
 swirl_stage_rust_core(Swirl)
 target_sources(SwirlEngine PRIVATE engine/RustCoreLibrary.h engine/RustCoreLibrary.cpp)
+if(SWIRL_PRIVATE_UI_QUOTA)
+ target_compile_definitions(SwirlEngine PUBLIC SWIRL_PRIVATE_UI_QUOTA)
+ target_sources(Swirl PRIVATE tests/PrivateUiQuotaSession.h tests/PrivateUiQuotaSession.cpp)
+ set_target_properties(Swirl PROPERTIES OUTPUT_NAME SwirlPrivateUiQuota)
+endif()
 target_sources(Swirl PRIVATE engine/RustCoreSelfTest.h engine/RustCoreSelfTest.cpp)
 target_sources(Swirl PRIVATE network/TlsRuntimeSelfTest.h network/TlsRuntimeSelfTest.cpp)
 set(SWIRL_OPENSSL_LOCK "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/openssl-runtime.lock.json")
@@ -281,7 +290,7 @@ if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
 target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp app/PopupMotionBridge.cpp)
-target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private)
+target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private Qt6::QmlPrivate)
 # The SDK-specific popup adapter alone sees the Qt Quick transition internals.
 set_property(SOURCE app/PopupMotionBridge.cpp APPEND PROPERTY INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:Qt6::QuickPrivate,INTERFACE_INCLUDE_DIRECTORIES>")
 
@@ -395,7 +404,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
  set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QSG_INFO=1" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
- target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QmlPrivate Qt6::QuickPrivate)
+ target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QuickPrivate)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  if(WIN32)
   target_sources(Swirl PRIVATE tests/NativeTunBrokerChecks.cpp tests/NativeTunBrokerChecks.h)
@@ -468,6 +477,16 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-state.xml,xml" -o -,txt)
  set_tests_properties(swirl-system-proxy-state PROPERTIES LABELS security TIMEOUT 30)
  if(WIN32)
+  # The process-local HKCU override isolates marker cases from the user's
+  # actual TUN recovery state; no driver, route change or UAC is involved.
+  add_executable(SwirlNativeTunRecoveryTests tests/NativeTunRecoveryTests.cpp)
+  target_link_libraries(SwirlNativeTunRecoveryTests PRIVATE SwirlEngine Qt6::Test advapi32)
+  if(MSVC)
+   target_compile_options(SwirlNativeTunRecoveryTests PRIVATE /utf-8)
+  endif()
+  add_test(NAME swirl-native-tun-recovery COMMAND SwirlNativeTunRecoveryTests
+   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-native-tun-recovery.xml,xml" -o -,txt)
+  set_tests_properties(swirl-native-tun-recovery PROPERTIES RUN_SERIAL TRUE LABELS security TIMEOUT 30)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
   target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test winhttp)
   add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
@@ -592,7 +611,17 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_compile_definitions(Swirl PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
- set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
+ set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY};SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-evidence")
+ if(WIN32)
+  # The reported overlap occurs in the native Windows text/rendering path.
+  # Keep the software regression and also exercise D3D11 with enlarged text.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store")
+  add_test(NAME swirl-node-ui-native-scaled COMMAND Swirl --node-self-test)
+  set_tests_properties(swirl-node-ui-native-scaled PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QT_SCALE_FACTOR=1.5;SWIRL_NODE_UI_REQUIRE_NATIVE=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store;SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-evidence"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:;QT_SCREEN_SCALE_FACTORS=unset:")
+ endif()
  add_test(NAME swirl-engine-ui COMMAND Swirl --engine-self-test)
  set_tests_properties(swirl-engine-ui PROPERTIES TIMEOUT 60
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
@@ -710,7 +739,7 @@ if(WIN32)
 endif()
 
 foreach(runtime_target IN ITEMS SwirlLanProxyTests SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
- SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
+ SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlNativeTunRecoveryTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
  SwirlPrivateSubscriptionInspect SwirlPrivateSubscriptionAcceptance SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})

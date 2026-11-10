@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSettings>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTcpServer>
@@ -291,6 +292,71 @@ private slots:
         QVERIFY(!controller.setTunEnabled(false));QVERIFY(controller.tunRequested());QVERIFY(controller.processAlive());
         QCOMPARE(bytes(path),before);QVERIFY(!controller.routingError().isEmpty());
     }
+    void probeEgressUsesActualCaptureOwnershipInsteadOfTheSavedPreference(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("probe-egress-state.dpapi"));
+        controller.m_options.tunEnabled=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.state=ProxyEngine::State::Running;engine->current.processAlive=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        controller.m_options.tunEnabled=false;engine->current.tunCapturePossible=true;
+        QVERIFY(controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.state=ProxyEngine::State::Degraded;engine->current.tunEnabled=false;
+        QVERIFY(controller.nodeProbeOptions().internalProbePhysicalEgress);
+        engine->current.tunRecoveryRequired=true;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+        QVERIFY(!controller.canStart());QVERIFY(!controller.nodeProbeReady());
+        QVERIFY(controller.nodeError().contains(QStringLiteral("TUN")));
+        controller.testAllNodes(QUrl("http://127.0.0.1:9/probe"));QVERIFY(!controller.m_tests.busy());
+        engine->current.tunRecoveryRequired=false;
+        engine->current.tunCapturePossible=false;engine->current.processAlive=false;engine->current.state=ProxyEngine::State::Stopped;
+        QVERIFY(!controller.nodeProbeOptions().internalProbePhysicalEgress);
+    }
+#ifdef Q_OS_WIN
+    void tunStartWaitsForOldProbeSockets_data(){
+        QTest::addColumn<int>("action");
+        QTest::newRow("continue-original-connection-intent")<<0;
+        QTest::newRow("stop-withdraws-intent")<<1;
+        QTest::newRow("queued-stop-and-new-start")<<2;
+    }
+    void tunStartWaitsForOldProbeSockets(){
+        QFETCH(int,action);
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("probe-start-barrier.dpapi"));
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        auto candidate=controller.m_options;candidate.tunEnabled=true;candidate.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
+        QVERIFY(controller.applyPolicyConfiguration(document(),candidate));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
+        ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Controlled pending probe";
+        node.protocol="socks5";node.host="127.0.0.1";node.port=stalled.serverPort();
+        EngineStartOptions options;options.nodes={node};
+        controller.m_tests.start(options,{node.id},QUrl("http://127.0.0.1:9/probe"));
+        QTRY_VERIFY_WITH_TIMEOUT(stalled.hasPendingConnections(),10000);
+        auto *socket=stalled.nextPendingConnection();QVERIFY(socket);socket->setParent(&stalled);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable()>0,2000);
+        QVERIFY(controller.m_tests.busy());
+        bool replacedIntent=false;
+        // The observer must disconnect before controller/member destruction
+        // can emit changed(), including on an assertion's early return.
+        QObject probeObserver;
+        connect(&controller.m_tests,&NodeTestService::changed,&probeObserver,[&]{
+            if(action!=2||replacedIntent||controller.m_tests.busy()||!controller.m_startAfterProbes)return;
+            replacedIntent=true;controller.stop();controller.connectConfiguredPolicy();
+        });
+        controller.connectConfiguredPolicy();
+        QVERIFY(controller.m_startAfterProbes);QCOMPARE(engine->starts,0);
+        if(action==1)controller.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.m_tests.busy(),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->state()==QAbstractSocket::UnconnectedState,3000);
+        if(action==1){QTest::qWait(50);QCOMPARE(engine->starts,0);QVERIFY(!controller.processAlive());}
+        else {QTRY_COMPARE_WITH_TIMEOUT(engine->starts,1,5000);QTest::qWait(50);QCOMPARE(engine->starts,1);QVERIFY(controller.processAlive());}
+        QCOMPARE(replacedIntent,action==2);
+        QVERIFY(!controller.m_startAfterProbes);QVERIFY(!controller.m_tests.busy());
+        QVERIFY(controller.m_tests.message().contains(QStringLiteral("已取消")));
+    }
+#endif
 #endif
     void acceptedMutationRejectsAConcurrentWriterWithoutReplacingItsRequest(){
         QTemporaryDir dir;EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("nodes.dpapi"));
@@ -362,6 +428,64 @@ private slots:
         QCOMPARE(worker.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
         QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("策略")));
         QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("出口")));
+    }
+    void confirmedTunFaultReportsDisconnectedWithoutHidingTheFailure(){
+        RustCoreEngine worker;
+        // The first native authentication/recovery chain is exercised by the
+        // owned Windows fault acceptance. This seam checks its observable
+        // post-stop contract without a broker, registry write, driver or UAC.
+        worker.m_tunRecoveryRequired=false;worker.m_tunRecoveryState=NativeTunRecoveryState::Clear;
+        worker.m_status.state=ProxyEngine::State::Stopped;
+        worker.m_status.processAlive=false;worker.m_status.tunEnabled=false;worker.m_status.proxyPort=0;
+        QSignalSpy diagnostics(&worker,&ProxyEngine::diagnostic);
+        worker.finishUnexpectedTunStop(QStringLiteral("controlled worker failure"));
+        const auto status=worker.status();
+        QCOMPARE(status.state,ProxyEngine::State::Failed);
+        QCOMPARE(status.error,ProxyEngine::Error::ApiUnavailable);
+        QVERIFY(!status.processAlive);QVERIFY(!status.apiHealthy);QVERIFY(!status.tunEnabled);
+        QVERIFY(!status.tunCapturePossible);QVERIFY(!status.tunRecoveryRequired);QCOMPARE(status.proxyPort,0);
+        QVERIFY(status.message.contains(QStringLiteral("增强模式意外停止")));QVERIFY(status.message.contains(QStringLiteral("系统网络已恢复")));
+        QVERIFY(status.message.contains(QStringLiteral("可以重新连接")));QVERIFY(!status.message.contains("controlled worker failure"));
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(diagnostics.first().at(1).toString(),QString("TunFaultRecoveryConfirmed"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled worker failure"));
+        worker.refresh();worker.refresh();
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(worker.status().message,status.message);
+    }
+    void failedTunFaultConfirmationStaysBlockedWithoutRefreshRetries_data(){
+        QTest::addColumn<bool>("brokerRetained");
+        QTest::newRow("authentication-or-owner-unconfirmed")<<true;
+        QTest::newRow("marker-write-unconfirmed")<<false;
+    }
+    void failedTunFaultConfirmationStaysBlockedWithoutRefreshRetries(){
+        QFETCH(bool,brokerRetained);RustCoreEngine worker;
+        // Keep teardown independent of the simulated owner. No native broker
+        // is created: repeated public refresh must return before any I/O.
+        const auto cleanup=qScopeGuard([&]{worker.m_brokerSession=false;worker.m_handle=0;});
+        worker.m_brokerSession=brokerRetained;worker.m_handle=brokerRetained?7:0;
+        worker.m_tunRecoveryRequired=!brokerRetained;
+        worker.m_tunRecoveryState=brokerRetained?NativeTunRecoveryState::Pending:NativeTunRecoveryState::Unknown;
+        worker.m_status.state=ProxyEngine::State::Degraded;
+        worker.m_status.message=QStringLiteral("controlled recovery unconfirmed");
+        worker.m_status.processAlive=brokerRetained;worker.m_status.tunEnabled=brokerRetained;
+        QSignalSpy diagnostics(&worker,&ProxyEngine::diagnostic),changes(&worker,&ProxyEngine::statusChanged);
+        for(int attempt=0;attempt<8;++attempt)worker.refresh();
+        QCOMPARE(worker.status().state,ProxyEngine::State::Degraded);
+        QCOMPARE(worker.status().message,QString("controlled recovery unconfirmed"));QCOMPARE(changes.size(),0);
+        worker.finishUnexpectedTunStop(QStringLiteral("controlled worker failure"));
+        const auto status=worker.status();
+        QCOMPARE(status.state,ProxyEngine::State::Failed);QCOMPARE(status.error,ProxyEngine::Error::OwnershipFailed);
+        QVERIFY(status.tunRecoveryRequired);QVERIFY(status.tunCapturePossible);QVERIFY(!status.apiHealthy);
+        QCOMPARE(status.processAlive,brokerRetained);QCOMPARE(status.tunEnabled,brokerRetained);
+        QCOMPARE(worker.m_handle,quint64(brokerRetained?7:0));QCOMPARE(worker.m_brokerSession,brokerRetained);
+        QVERIFY(status.message.contains(QStringLiteral("恢复尚未确认")));QVERIFY(status.message.contains(QStringLiteral("连接已暂停")));
+        QVERIFY(status.message.contains(QStringLiteral("重试关闭代理")));QVERIFY(!status.message.contains("controlled recovery unconfirmed"));
+        QVERIFY(!worker.m_poll.isActive());
+        QCOMPARE(diagnostics.size(),1);QCOMPARE(diagnostics.first().at(1).toString(),QString("TunFaultRecoveryUnconfirmed"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled worker failure"));
+        QVERIFY(diagnostics.first().at(2).toString().contains("controlled recovery unconfirmed"));
+        for(int attempt=0;attempt<8;++attempt)worker.refresh();
+        QCOMPARE(changes.size(),1);QCOMPARE(diagnostics.size(),1);QCOMPARE(worker.status().message,status.message);
+        QCOMPARE(worker.m_handle,quint64(brokerRetained?7:0));QVERIFY(worker.status().tunRecoveryRequired);
     }
     void repeatedRealCoreFinishKeepsTheAdoptedWorkerPolicy(){
         QTcpServer lease;QVERIFY(lease.listen(QHostAddress::LocalHost));const auto port=lease.serverPort();lease.close();

@@ -34,6 +34,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QtMath>
+#include <array>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -390,13 +391,77 @@ Item {
                             bool hasSceneGraphNodes=false,geometryValid=false;
                             bool hasContent=false;
                             QJsonArray frames;
+                            // Keep the natural frame pipeline across timed arms.
+                            // Recording uses fixed storage and the existing lock;
+                            // conversion and output happen only after the gate.
+                            struct PhaseSample {
+                                const char *phase=nullptr;
+                                std::chrono::steady_clock::time_point at;
+                                quint64 serial=0,frame=0;
+                                bool frameBoundaryKnown=false,inFrame=false,armed=false,timedFramePending=false,geometryValid=false;
+                                qreal surfaceScale=-1,contentScale=-1,surfaceScaleY=-1,contentScaleY=-1;
+                            };
+                            std::array<PhaseSample,128> phaseHistory;
+                            std::array<PhaseSample,48> preArmHistory;
+                            size_t phaseCount=0,phaseNext=0,preArmCount=0;
+                            quint64 phaseSerial=0,phaseFrame=0,armPhaseSerial=0;
+                            bool tracing=true,phaseFrameBoundaryKnown=false,phaseInFrame=false;
+                            bool preArmFrameBoundaryKnown=false,preArmInFrame=false,preArmTimedFramePending=false;
+                            void recordPhase(const char *phase,bool valid=false,qreal sx=-1,qreal cx=-1,qreal sy=-1,qreal cy=-1) {
+                                if(!tracing)return;
+                                phaseHistory[phaseNext]={phase,std::chrono::steady_clock::now(),++phaseSerial,phaseFrame,
+                                    phaseFrameBoundaryKnown,phaseInFrame,armed,pending,valid,sx,cx,sy,cy};
+                                phaseNext=(phaseNext+1)%phaseHistory.size();
+                                phaseCount=std::min(phaseCount+1,phaseHistory.size());
+                            }
+                            void retainPreArmPhases() {
+                                armPhaseSerial=phaseSerial;
+                                preArmFrameBoundaryKnown=phaseFrameBoundaryKnown;
+                                preArmInFrame=phaseInFrame;preArmTimedFramePending=pending;
+                                preArmCount=std::min(phaseCount,preArmHistory.size());
+                                const size_t begin=(phaseNext+phaseHistory.size()-preArmCount)%phaseHistory.size();
+                                for(size_t i=0;i<preArmCount;++i)preArmHistory[i]=phaseHistory[(begin+i)%phaseHistory.size()];
+                            }
+                            QJsonObject phaseSnapshot() const {
+                                const auto encode=[this](const PhaseSample &sample){
+                                    QJsonObject result{{"phase",QString::fromLatin1(sample.phase)},
+                                        {"elapsedMs",std::chrono::duration<qreal,std::milli>(sample.at-start).count()},
+                                        {"serial",qint64(sample.serial)},{"frame",qint64(sample.frame)},
+                                        {"frameBoundaryKnown",sample.frameBoundaryKnown},{"inFrame",sample.inFrame},{"armed",sample.armed},
+                                        {"timedFramePending",sample.timedFramePending}};
+                                    if(qstrcmp(sample.phase,"afterSynchronizing")==0){
+                                        result.insert("geometryValid",sample.geometryValid);
+                                        result.insert("surfaceScale",sample.surfaceScale);result.insert("contentScale",sample.contentScale);
+                                        result.insert("surfaceScaleY",sample.surfaceScaleY);result.insert("contentScaleY",sample.contentScaleY);
+                                    }
+                                    return result;
+                                };
+                                QJsonArray before,after;
+                                for(size_t i=0;i<preArmCount;++i)before.append(encode(preArmHistory[i]));
+                                const size_t begin=(phaseNext+phaseHistory.size()-phaseCount)%phaseHistory.size();
+                                for(size_t i=0;i<phaseCount;++i){
+                                    const auto &sample=phaseHistory[(begin+i)%phaseHistory.size()];
+                                    if(sample.serial>armPhaseSerial)after.append(encode(sample));
+                                }
+                                return {{"scope","bounded passive phase observations; original input origin and frameSwapped deadline unchanged"},
+                                    {"preArmFrameBoundaryKnown",preArmFrameBoundaryKnown},
+                                    {"preArmInFrame",preArmInFrame},{"preArmTimedFramePending",preArmTimedFramePending},
+                                    {"preArm",before},{"afterArm",after},
+                                    {"afterArmHistoryTruncated",phaseSerial-armPhaseSerial>phaseHistory.size()}};
+                            }
                         };
                         auto presented=std::make_shared<SubmittedPressFrames>();
                         QObject pressContext;
                         const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});
                         const auto pressDelivery=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[&]{samplePress("frameSwappedQueued");},Qt::QueuedConnection);
+                        const auto pressTraceAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);presented->recordPhase("afterAnimating");
+                        });
                         const auto pressFrameBegin=QObject::connect(window,&QQuickWindow::beforeFrameBegin,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
+                            if(!presented->tracing)return;
+                            ++presented->phaseFrame;presented->phaseFrameBoundaryKnown=true;
+                            presented->phaseInFrame=true;presented->recordPhase("beforeFrameBegin");
                             // A frame may have begun before input armed this probe.
                             // Keep that boundary unknown instead of inventing a time.
                             presented->latestFrameBeginMs=presented->armed
@@ -411,6 +476,7 @@ Item {
                         // This is not a physical display scan-out timestamp.
                         const auto pressSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&pressContext,[presented,paint,content]{
                             QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("beforeSynchronizing");
                             if(!presented->armed)return;
                             presented->frameBeginMs=presented->latestFrameBeginMs;
                             presented->latestFrameBeginMs=-1;
@@ -427,15 +493,31 @@ Item {
                         },Qt::DirectConnection);
                         const auto pressGeometry=QObject::connect(window,&QQuickWindow::afterSynchronizing,&pressContext,[presented,paint,content]{
                             QMutexLocker lock(&presented->mutex);
-                            if(!presented->armed||!presented->pending)return;
+                            if(!presented->tracing)return;
                             // Qt6.12's itemNodeInstance is the already-created node.
                             // Calling itemNode() here would create a missing node and
                             // turn this observation into a scene-graph mutation.
                             const auto *surfaceNode=QQuickItemPrivate::get(paint)->itemNodeInstance;
                             const auto *contentNode=content?QQuickItemPrivate::get(content)->itemNodeInstance:nullptr;
+                            if(!presented->armed||!presented->pending){
+                                bool valid=surfaceNode&&contentNode;
+                                qreal sx=-1,cx=-1,sy=-1,cy=-1;
+                                if(valid){
+                                    const auto sm=surfaceNode->matrix(),cm=contentNode->matrix();
+                                    for(int row=0;row<4;++row)for(int column=0;column<4;++column)
+                                        valid=valid&&qIsFinite(sm(row,column))&&qIsFinite(cm(row,column));
+                                    sx=qSqrt(qreal(sm(0,0))*sm(0,0)+qreal(sm(1,0))*sm(1,0));
+                                    cx=qSqrt(qreal(cm(0,0))*cm(0,0)+qreal(cm(1,0))*cm(1,0));
+                                    sy=qSqrt(qreal(sm(0,1))*sm(0,1)+qreal(sm(1,1))*sm(1,1));
+                                    cy=qSqrt(qreal(cm(0,1))*cm(0,1)+qreal(cm(1,1))*cm(1,1));
+                                    valid=valid&&sx>0&&cx>0&&sy>0&&cy>0;
+                                }
+                                presented->recordPhase("afterSynchronizing",valid,sx,cx,sy,cy);
+                                return;
+                            }
                             presented->geometryCapturedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->hasSceneGraphNodes=surfaceNode&&contentNode;
-                            if(!presented->hasSceneGraphNodes)return;
+                            if(!presented->hasSceneGraphNodes){presented->recordPhase("afterSynchronizing");return;}
                             presented->surfaceMatrix=surfaceNode->matrix();presented->contentMatrix=contentNode->matrix();
                             bool finite=true;
                             for(int row=0;row<4;++row)for(int column=0;column<4;++column)
@@ -446,19 +528,24 @@ Item {
                             presented->contentScale=scaleX(presented->contentMatrix);presented->contentScaleY=scaleY(presented->contentMatrix);
                             presented->geometryValid=finite&&presented->surfaceScale>0&&presented->surfaceScaleY>0
                                 &&presented->contentScale>0&&presented->contentScaleY>0;
+                            presented->recordPhase("afterSynchronizing",presented->geometryValid,presented->surfaceScale,
+                                presented->contentScale,presented->surfaceScaleY,presented->contentScaleY);
                         },Qt::DirectConnection);
                         const auto pressRenderStart=QObject::connect(window,&QQuickWindow::beforeRendering,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("beforeRendering");
                             if(presented->armed&&presented->pending)
                                 presented->renderStartMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                         },Qt::DirectConnection);
                         const auto pressRenderEnd=QObject::connect(window,&QQuickWindow::afterRendering,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("afterRendering");
                             if(presented->armed&&presented->pending)
                                 presented->renderEndMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                         },Qt::DirectConnection);
                         const auto pressSwap=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("frameSwapped");
                             if(!presented->armed||!presented->pending)return;
                             const qreal elapsed=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->frames.append(QJsonObject{{"frame",qint64(presented->frame)},
@@ -475,6 +562,13 @@ Item {
                                 {"contentMatrix",appearanceMatrixValues(presented->contentMatrix)}});
                             presented->pending=false;
                         },Qt::DirectConnection);
+                        const auto pressFrameEnd=QObject::connect(window,&QQuickWindow::afterFrameEnd,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->phaseFrameBoundaryKnown=true;presented->phaseInFrame=false;presented->recordPhase("afterFrameEnd");
+                        },Qt::DirectConnection);
+                        const auto traceInput=[presented](const char *phase){
+                            QMutexLocker lock(&presented->mutex);presented->recordPhase(phase);
+                        };
                         // QTest::qWait polls with sleeps of up to10ms, which can
                         // starve a fast render loop during this strict deadline.
                         QEventLoop pressObservation;
@@ -486,13 +580,16 @@ Item {
                         {
                             QMutexLocker lock(&presented->mutex);
                             presented->start=std::chrono::steady_clock::now();
+                            presented->retainPreArmPhases();
                             presented->armed=true;
                         }
                         pressClock.start();pressDeadline.start(40);
                         // Qt 6.12's QTest mouse helper drains processEvents after
                         // delivery. Send the same-stack press before entering the
                         // observation loop so its first frame cannot escape arming.
+                        traceInput("mousePressDispatchBegin");
                         const bool pressDelivered=QCoreApplication::sendEvent(window,&pressEvent);
+                        traceInput("mousePressDispatchEnd");
                         samplePress("inputDelivered");
                         const bool pressDown=control->property("down").toBool();
                         {
@@ -503,11 +600,10 @@ Item {
                         samplePress("deadlineObservation");
                         QJsonArray presentedFrames;
                         {
-                            // Acquiring this lock also retires an in-flight direct
-                            // callback before any fixture item can be destroyed.
-                            // Callbacks entering afterwards see armed=false and never
-                            // dereference the captured item pointers. Shared ownership
-                            // keeps their synchronization state alive through disconnect.
+                            // Freeze the timed arm under the same lock as the
+                            // render callbacks. Passive phase/SG observations remain
+                            // active for the later reversal; tracing is disabled
+                            // under this lock before disconnect and item teardown.
                             QMutexLocker lock(&presented->mutex);
                             presented->armed=false;
                             presentedFrames=presented->frames;
@@ -530,6 +626,9 @@ Item {
                         qInfo().noquote()<<"CONTROL_PRESS_FRAMES"<<theme<<name<<QJsonDocument(pressFrames).toJson(QJsonDocument::Compact);
                         qInfo().noquote()<<"CONTROL_PRESS_SUBMITTED_FRAMES"<<theme<<name
                             <<"legacyObservedWithin40ms"<<legacyObservedWithin40ms<<QJsonDocument(presentedFrames).toJson(QJsonDocument::Compact);
+                        QJsonObject ordinaryPhaseTrace;
+                        {QMutexLocker lock(&presented->mutex);ordinaryPhaseTrace=presented->phaseSnapshot();}
+                        qInfo().noquote()<<"CONTROL_PRESS_PHASE_TRACE"<<theme<<name<<QJsonDocument(ordinaryPhaseTrace).toJson(QJsonDocument::Compact);
                         check(submittedGeometryPresent,"submitted press frames contain finite scene-graph transforms for surface and label");
                         check(contractedWithin40ms,"a short press contracts both the surface and its label within the first40ms");
                         QObject::disconnect(pressAnimation);QObject::disconnect(pressDelivery);
@@ -538,7 +637,9 @@ Item {
                         check(QQmlProperty(paint,"border.width").read().toReal()==0,"press feedback does not introduce an outline stroke");
                         QMouseEvent releaseEvent(QEvent::MouseButtonRelease,QPointF(at),globalAt,
                             Qt::LeftButton,Qt::NoButton,Qt::NoModifier);
+                        traceInput("mouseReleaseDispatchBegin");
                         const bool releaseDelivered=QCoreApplication::sendEvent(window,&releaseEvent);
+                        traceInput("mouseReleaseDispatchEnd");
                         const bool released=!control->property("down").toBool();
                         QTest::qWait(30);
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
@@ -553,6 +654,7 @@ Item {
                                 const auto armNative=[&]{
                                     QMutexLocker lock(&presented->mutex);
                                     presented->start=std::chrono::steady_clock::now();
+                                    presented->retainPreArmPhases();
                                     presented->frames=QJsonArray();presented->pending=false;
                                     presented->latestFrameBeginMs=-1;presented->inputDown=true;presented->armed=true;
                                 };
@@ -575,7 +677,10 @@ Item {
                                 const auto sendMouse=[&](QEvent::Type type){
                                     QMouseEvent event(type,QPointF(at),globalAt,Qt::LeftButton,
                                         type==QEvent::MouseButtonPress?Qt::LeftButton:Qt::NoButton,Qt::NoModifier);
-                                    return QCoreApplication::sendEvent(window,&event);
+                                    traceInput(type==QEvent::MouseButtonPress?"mousePressDispatchBegin":"mouseReleaseDispatchBegin");
+                                    const bool delivered=QCoreApplication::sendEvent(window,&event);
+                                    traceInput(type==QEvent::MouseButtonPress?"mousePressDispatchEnd":"mouseReleaseDispatchEnd");
+                                    return delivered;
                                 };
                                 armNative();pressDeadline.start(40);
                                 const bool initialInputDelivered=sendMouse(QEvent::MouseButtonPress);
@@ -583,10 +688,11 @@ Item {
                                 pressObservation.exec();
                                 const bool initialContractedWithin40ms=submittedContraction();
                                 QJsonArray initialFrames;
-                                QJsonObject initialObservation;
+                                QJsonObject initialObservation,initialPhaseTrace;
                                 {
                                     QMutexLocker lock(&presented->mutex);
                                     initialFrames=presented->frames;
+                                    initialPhaseTrace=presented->phaseSnapshot();
                                     initialObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
                                         {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
                                     // A frame waiting for Present is not in frames yet. Only
@@ -609,7 +715,7 @@ Item {
                                     {"inputDelivered",initialInputDelivered},{"inputDown",initialInputDown},
                                     {"observedDown",initialObservedDown},{"nativeClockRunningAtObservation",initialClockRunning},
                                     {"contractedWithin40ms",initialContractedWithin40ms},{"frames",initialFrames},
-                                    {"observation",initialObservation}
+                                    {"observation",initialObservation},{"phaseTrace",initialPhaseTrace}
                                 }).toJson(QJsonDocument::Compact);
                                 check(initialContractedWithin40ms,"native reversal fixture observes a submitted paired contraction within the first40ms");
                                 // These values came from existing SG nodes after sync. The
@@ -654,10 +760,12 @@ Item {
                                         && qAbs(first.value("surfaceScaleY").toDouble()-first.value("contentScaleY").toDouble())<.001
                                         && qAbs(first.value("surfaceScale").toDouble()-first.value("contentScale").toDouble())<.001;
                             }
+                            QJsonObject reversePhaseTrace;
+                            {QMutexLocker lock(&presented->mutex);reversePhaseTrace=presented->phaseSnapshot();}
                             qInfo().noquote()<<"NATIVE_PRESS_SPRING_REVERSAL"<<QJsonDocument(QJsonObject{
                                 {"exercised",reversedSpring},{"sameStackContinuous",repressContinuous},
                                 {"adoptedSurfaceBefore",springOrigin.x()},{"adoptedContentBefore",springOrigin.y()},
-                                {"submittedFrames",reverseFrames}}).toJson(QJsonDocument::Compact);
+                                {"submittedFrames",reverseFrames},{"phaseTrace",reversePhaseTrace}}).toJson(QJsonDocument::Compact);
                             check(reversedSpring && repressContinuous,"re-press reverses from the actual adopted spring pose in the input stack");
                             check(reversedSpring && firstRepressContinuous,"the first submitted re-press preserves adopted geometry within40ms");
                             sendMouse(QEvent::MouseButtonRelease);
@@ -665,17 +773,20 @@ Item {
                                 "native release retires its clock and settles normally");
                             control->forceActiveFocus(Qt::TabFocusReason);armNative();pressDeadline.start(40);
                             QKeyEvent keyDown(QEvent::KeyPress,Qt::Key_Space,Qt::NoModifier);
+                            traceInput("spaceDispatchBegin");
                             const bool keyboardDelivered=QCoreApplication::sendEvent(window,&keyDown);
+                            traceInput("spaceDispatchEnd");
                             const bool keyboardDown=control->property("down").toBool();
                             pressObservation.exec();
                             const bool keyboardContractedWithin40ms=submittedContraction();
                             const bool keyboardPassed=keyboardDelivered && keyboardDown && keyboardContractedWithin40ms;
                             if(!keyboardPassed){
                                 QJsonArray keyboardFrames;
-                                QJsonObject keyboardObservation;
+                                QJsonObject keyboardObservation,keyboardPhaseTrace;
                                 {
                                     QMutexLocker lock(&presented->mutex);
                                     keyboardFrames=presented->frames;
+                                    keyboardPhaseTrace=presented->phaseSnapshot();
                                     keyboardObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
                                         {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
                                     if(presented->pending)keyboardObservation.insert("pendingFrame",QJsonObject{
@@ -691,7 +802,8 @@ Item {
                                 qInfo().noquote()<<"NATIVE_PRESS_SPACE"<<QJsonDocument(QJsonObject{
                                     {"theme",theme},{"control",name},{"inputDelivered",keyboardDelivered},{"inputDown",keyboardDown},
                                     {"observedDown",control->property("down").toBool()},{"nativeClockRunningAtObservation",nativeClock->running()},
-                                    {"contractedWithin40ms",keyboardContractedWithin40ms},{"frames",keyboardFrames},{"observation",keyboardObservation}
+                                    {"contractedWithin40ms",keyboardContractedWithin40ms},{"frames",keyboardFrames},{"observation",keyboardObservation},
+                                    {"phaseTrace",keyboardPhaseTrace}
                                 }).toJson(QJsonDocument::Compact);
                             }
                             check(keyboardPassed,
@@ -718,8 +830,9 @@ Item {
                             {QMutexLocker lock(&presented->mutex);presented->armed=false;}
                             }
                         }
-                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
-                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
+                        {QMutexLocker lock(&presented->mutex);presented->armed=false;presented->tracing=false;}
+                        QObject::disconnect(pressTraceAnimation);QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);QObject::disconnect(pressFrameEnd);
                     }
                     control->setEnabled(false);
                     // Compare exact premultiplied channels: RGB hidden by alpha=0
