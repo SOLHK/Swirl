@@ -1717,6 +1717,159 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  diagnose-pr61-production-motion:
+    if: >-
+      ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' &&
+      github.repository == 'SOLHK/Swirl' && github.event.pull_request.number == 61 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'work/node-probe-render-20261105' && github.base_ref == 'test' &&
+      github.event.pull_request.base.sha == 'acd7005c99a99c4f81b62d328fcc15883d51b62a' &&
+      github.event.before == '3d0b2b4593bc83a6372f0a0628cb06e6aa55b327' }}
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SWIRL_REPLAY_SOURCE: 7015f1744117a8e144b7bce03c413c5c7bf990b6
+      SWIRL_REPLAY_HEAD: 3d0b2b4593bc83a6372f0a0628cb06e6aa55b327
+      CARGO_NET_OFFLINE: 'true'
+    steps:
+      - name: Checkout the executing diagnostic source for authenticated SDK selection
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Restore official Qt SDK archives
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0
+          key: qt-sdk-${{ runner.os }}-6.12.0-msvc2022-${{ hashFiles('tools/Install-QtSdk.py', 'tools/requirements-qt-sdk.txt') }}
+      - name: Verify the existing SDK recipe in the actual workflow context
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install -r tools/requirements-qt-sdk.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Qt downloader setup failed.' }
+          $sdk = Join-Path $env:RUNNER_TEMP 'swirl-qt-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK installation failed.' }
+          ./scripts/Select-Qt612ProductSdk.ps1 -OfficialReceipt (Join-Path $sdk 'sdk-install-result.json') -EvidenceDirectory build-evidence/qt-product-sdk
+      - name: Restore the original OpenSSL runtime
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-openssl-3.5.9
+          key: openssl-Windows-b8395f33e5c14da689932269a7d598feddf919b33870a1594e7bb5ec3eeaf3d4-33f897139e0d070a871355c848c59698447d3db9c1fbe586bdfda2bb5390b631
+          fail-on-cache-miss: true
+      - name: Restore fixed Qt source archives for matching runtime notices
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0-source-cache
+          key: qt-corresponding-source-6.12.0-${{ hashFiles('tools/qt612-product-source.lock.json') }}
+      - name: Checkout the failed source at its original absolute build root
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: 7015f1744117a8e144b7bce03c413c5c7bf990b6
+          clean: false
+          persist-credentials: false
+      - name: Checkout diagnostic helpers separately
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic-helper
+          persist-credentials: false
+      - name: Restore only the original PR merge cache
+        id: original_release_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: apec-qt612-product-msvc-Windows-6f642192c09fb64420985085888cfae6d91d888412c8ca4881e9a19a30e4a391-7c430aa273ff084e04c6e4e22c3526e4239d1c39552b85be0c8ed889ed71ae2d-7015f1744117a8e144b7bce03c413c5c7bf990b6
+          fail-on-cache-miss: true
+      - name: Recover the original Release runtime without compiling it
+        shell: pwsh
+        env:
+          SWIRL_ORIGINAL_RELEASE_CACHE_HIT: ${{ steps.original_release_cache.outputs.cache-hit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SWIRL_ORIGINAL_RELEASE_CACHE_HIT -cne 'true') { throw 'Exact original Release cache was not restored.' }
+          . ./scripts/Assert-BuildSource.ps1
+          Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:SWIRL_REPLAY_SOURCE
+          $originalBinaries = @{
+            'Swirl.exe' = '0a888fbd933ecb86c4c1acf24e6b526f9e729120ae8ecd7205e1cddea68c08cf'
+            'swirl_api.dll' = 'a7924d6d64e12a94344693281c669a2bfbec75368fa813e8d0aa571dea04cae6'
+            'swirl-tun-broker.exe' = '60912d42e8401251a7a24356572e9b512add54a457cbaacb9b459e80765f5ffd'
+            'swirl-tun-helper.exe' = '7fd1818503f8e5162a5b95ef466ccba85ecb7ec198603478aee931e54b5d0688'
+          }
+          foreach ($name in $originalBinaries.Keys) {
+            $actual = (Get-FileHash -LiteralPath (Join-Path 'build/swirl-product/Release' $name) -Algorithm SHA256).Hash
+            if ($actual -ne $originalBinaries[$name]) { throw "Original cached Release binary differs: $name" }
+          }
+          $openssl = Join-Path $env:RUNNER_TEMP 'swirl-openssl-3.5.9'
+          python tools/Build-OpenSslRuntime.py --output $openssl --target VC-WIN64A --verify-only
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned cached OpenSSL verification failed.' }
+          $selected = Get-Content -LiteralPath $env:SWIRL_QT_SELECTED_RECEIPT -Raw | ConvertFrom-Json
+          $tlsReport = Join-Path 'build/swirl-product' ('tls-runtime-' + $env:SWIRL_REPLAY_SOURCE + '.json')
+          if (Test-Path -LiteralPath $tlsReport) { Remove-Item -LiteralPath $tlsReport }
+          # The selected SDK was composed for this diagnostic run. Its receipt is
+          # not a production receipt for the old source. Stage and admit separately.
+          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $openssl -QtSdkReceipt ''
+          python tools/Prepare-Qt612ProductSource.py prepare --runtime-dir installer-bin --source-sha $env:SWIRL_REPLAY_SOURCE `
+            --sdk-evidence $selected.sdk_evidence_dir --cache-dir (Join-Path $env:RUNNER_TEMP 'swirl-qt-6.12.0-source-cache') `
+            --output-dir out/replay-qt-source
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Qt source notice recovery failed.' }
+          $runtime = (Resolve-Path -LiteralPath installer-bin).Path
+          $manifestPath = Join-Path $runtime 'package-manifest.json'
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+          $manifest.files = @(Get-ChildItem -LiteralPath $runtime -File -Recurse | Sort-Object FullName | Where-Object FullName -cne $manifestPath | ForEach-Object {
+            [ordered]@{
+              path = [IO.Path]::GetRelativePath($runtime, $_.FullName).Replace('\', '/')
+              sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          })
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+      - name: Admit recovered runtime against the original failed run
+        shell: pwsh
+        env:
+          SWIRL_ARTIFACT_READ_TOKEN: ${{ github.token }}
+        run: |
+          ./diagnostic-helper/scripts/tests/Admit-PR61RecoveredRelease.ps1 `
+            -RuntimeDirectory installer-bin -ReferenceExecutable build/swirl-product/Release/Swirl.exe `
+            -EvidenceDirectory build-evidence/pr61-replay-admission -RestoreOriginalGeneratedQtMetadata
+      - name: Compare original Release QML modes and policies incubation
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          ./scripts/Set-CiDisplayResolution.ps1
+          ./diagnostic-helper/scripts/tests/Invoke-Pr61ProductionMotionComparison.ps1 `
+            -RepositoryRoot $env:GITHUB_WORKSPACE -RuntimeDirectory installer-bin `
+            -ReferenceExecutable build/swirl-product/Release/Swirl.exe `
+            -OutputDirectory build-evidence/pr61-replay-motion -ScratchRoot $env:RUNNER_TEMP `
+            -SourceSha $env:SWIRL_REPLAY_SOURCE -PullRequestHeadSha $env:SWIRL_REPLAY_HEAD
+      - name: Preserve original Release admission and motion comparison
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-PR61-Original-Release-Motion-Comparison
+          path: |
+            build-evidence/pr61-replay-admission/
+            build-evidence/pr61-replay-motion/
+          if-no-files-found: warn
+          retention-days: 14
+
   observe-fresh-windows-proxy:
     runs-on: windows-2022
     timeout-minutes: 10
