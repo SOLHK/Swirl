@@ -575,6 +575,13 @@ mod windows {
                 return Err(error);
             }
         };
+        // The helper is running and its image identity was verified. No further
+        // path-based resolution happens in this session (commands travel over
+        // stdio, payload files stay locked, and the helper re-verifies the
+        // official driver digest before loading). Release the ancestor
+        // directory locks so an active TUN session no longer blocks unrelated
+        // renames/deletions across the install tree.
+        connection.get_mut().release_directory_locks();
         loop {
             let Some(bytes) = frame(&mut connection)? else {
                 return helper.close();

@@ -322,6 +322,17 @@ impl AuthenticatedPipe {
         result.check_alive()?;
         Ok(result)
     }
+    /// All path-based lookups for this session are complete once the broker has
+    /// verified the package and launched the helper. Retaining the ancestor
+    /// directory locks beyond that point has no anti-tamper value: every later
+    /// operation uses open handles, the payload files stay locked, and the
+    /// helper re-verifies the pinned official driver digest before loading it.
+    /// Holding them for the whole session would instead block unrelated renames
+    /// and deletions across the install tree (including Windows servicing of
+    /// ancestor directories), because the locks exclude FILE_SHARE_DELETE.
+    pub fn release_directory_locks(&mut self) {
+        self._directory_locks.clear();
+    }
     pub fn check_alive(&self) -> io::Result<()> {
         if self.poisoned.load(Ordering::Relaxed) {
             return Err(failure("BrokerPipePoisoned"));
