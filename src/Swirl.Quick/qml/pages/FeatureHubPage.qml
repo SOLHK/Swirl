@@ -8,6 +8,19 @@ import "../controls"
 
 Item {
     id: page
+    // The page participates in the card-to-page morph and its scroll viewport
+    // can report intermediate widths while that transition runs. Switching the
+    // grid between one and two columns mid-transition re-lays out every entry,
+    // which is the visible jump when a detail page closes back here. Settle the
+    // column count on a stable width instead of the animated one.
+    property int stableColumns: (width < Theme.dp(560)) ? 1 : 2
+    onWidthChanged: columnSettle.restart()
+    Timer {
+        id: columnSettle
+        interval: 140
+        repeat: false
+        onTriggered: page.stableColumns = page.width < Theme.dp(560) ? 1 : 2
+    }
     component Entry: SwirlMotionButton {
         id: entry
         required property string entryTitle
@@ -71,7 +84,7 @@ Item {
                 Entry { featured: true; entryTitle: qsTr("通用设置"); entryDescription: qsTr("主题、字体、动画与本机偏好"); entryIcon: "settings"; route: "settings" }
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: width < Theme.dp(560) ? 1 : 2
+                    columns: page.stableColumns
                     columnSpacing: Theme.dp(28)
                     rowSpacing: Theme.dp(24)
                     ColumnLayout {
