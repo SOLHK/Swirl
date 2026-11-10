@@ -2734,7 +2734,11 @@ private slots:
   for(const auto &id:ids)if(id!=unsupported.id){const auto result=probes.result(id);QVERIFY(result.value("success").toBool());QCOMPARE(result.value("http").toInt(),200);QVERIFY(result.value("outboundConnectMs").toLongLong()>=0);}
   for(const auto port:listeners){QTcpServer listener;QVERIFY2(listener.listen(QHostAddress::LocalHost,port),qPrintable(listener.errorString()));}
   // Cancelling while start messages are queued must drain worker-owned handles.
-  probes.start(o,ids,net.url());probes.cancel();QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.completed(),0);
+  // Use only dialable rows here: the unsupported row is recorded synchronously
+  // while the batch validates its inputs, which would make a cancellation
+  // completion count ambiguous and is already covered above.
+  QStringList dialable;for(const auto &id:ids)if(id!=unsupported.id)dialable.append(id);
+  probes.start(o,dialable,net.url());probes.cancel();QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.completed(),0);
   probes.start(o,{ids.first()},net.url());QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.succeeded(),1);
  }
  void nativeHeadProbeFinishesAtHeadersAndReportsHttpFailureStage(){
