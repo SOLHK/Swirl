@@ -34,6 +34,10 @@ const FIELDS: &[&str] = &[
     "tfo",
     "skip-cert-verify",
     "tls-verification",
+    // Provider-emitted certificate-pin list. Sharing URIs in the wild routinely
+    // carry an empty `pcs=` (no pins requested). Accepted only when empty; a
+    // non-empty value stays refused below because pinning cannot be honored.
+    "pcs",
 ];
 
 pub(super) fn declared(raw: &Value) -> bool {
@@ -82,6 +86,11 @@ fn outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
         return outbound(&xray::normalized(raw)?, "normalized-reality");
     }
     object_keys(raw, FIELDS)?;
+    // An empty pin list requests nothing and is a common artifact of sharing
+    // URIs. Any actual pin remains unsupported rather than silently dropped.
+    if raw.get("pcs").is_some_and(|v| v.as_str() != Some("")) {
+        return Err("RealityCertificatePinsUnsupported");
+    }
     if raw
         .get("network")
         .is_some_and(|value| value.as_str() != Some("tcp"))
@@ -397,6 +406,39 @@ mod tests {
         source.as_object_mut().unwrap().remove("client-fingerprint");
         let without_reality = inspect(json!({"proxies":[source]}).to_string().as_bytes());
         assert!(without_reality.tcp_candidates[0].is_none());
+    }
+
+    #[test]
+    fn empty_certificate_pin_list_does_not_block_and_actual_pins_stay_refused() {
+        let base = node();
+        let key = base["reality-opts"]["public-key"].as_str().unwrap();
+        let shared = format!(
+            "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=rustls&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision&pcs="
+        );
+        let parsed = inspect(shared.as_bytes());
+        assert!(
+            parsed.report.nodes[0].native_tcp_candidate,
+            "{}",
+            parsed.report.nodes[0].diagnostic
+        );
+        let pinned = shared.replace("&pcs=", "&pcs=sha256//AAAA");
+        let rejected = inspect(pinned.as_bytes());
+        assert!(!rejected.report.nodes[0].native_tcp_candidate);
+        assert_eq!(
+            rejected.report.nodes[0].diagnostic,
+            "RealityCertificatePinsUnsupported"
+        );
+        assert!(rejected.tcp_candidates[0].is_none());
+        let mut source = base;
+        source["pcs"] = json!("");
+        let document = json!({"proxies":[source.clone()]}).to_string();
+        assert!(inspect(document.as_bytes()).report.nodes[0].native_tcp_candidate);
+        source["pcs"] = json!("pin-set");
+        let document = json!({"proxies":[source]}).to_string();
+        assert_eq!(
+            inspect(document.as_bytes()).report.nodes[0].diagnostic,
+            "RealityCertificatePinsUnsupported"
+        );
     }
 
     #[test]
