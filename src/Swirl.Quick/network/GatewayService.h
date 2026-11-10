@@ -45,7 +45,7 @@ private:
     bool saveConfiguration();
     void loadConfiguration();
     EngineController *m_engine=nullptr;
-    QString m_path,m_journal,m_error;
+    QString m_path,m_journal,m_error,m_interfaceGuid;
     DhcpServer m_dhcp;
     DhcpServer::Config m_config;
     QProcess m_process;

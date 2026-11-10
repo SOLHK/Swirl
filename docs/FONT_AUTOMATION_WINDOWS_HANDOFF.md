@@ -1,12 +1,11 @@
 # 智能字体系统：Windows 实机交接
 
-GitHub 已交付开发分支 `work/core-completion-20261017`。
-`dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb` 相比
-`8d045ab888e6ed0af6dea87adfb752793c455b5b` 没有修改字体、QML 或应用入口源码。
-[8d045ab 字体 CI](https://github.com/SOLHK/Swirl/actions/runs/39180142727)
-已实际通过 50 个用例，另有 8 个跳过；完整应用和导航检查也通过。
-精确结果、历史失败及 Core 的独立状态见
-[验证记录](FONT_AUTOMATION_VALIDATION.md)。
+当前 W1-B 智能宽度交接使用 **`work/vf-smart-width-w1`**，没有合并到
+`work/core-completion-20261017`。准确的验收提交、Windows CI 通过/失败/跳过
+数量、量化问题修正和未完成清单见
+[W1-B 验证记录](FONT_SMART_WIDTH_W1B_VALIDATION.md)。以前集成分支的测试
+与 Core 独立状态仍保留在 [历史验证记录](FONT_AUTOMATION_VALIDATION.md)，
+不能用旧提交的成功替代本次 W1-B 实机检查。
 
 云端没有访问或更新你的 `D:\Codex`，字体 CI 的证据包也不包含安装包。
 以下命令须在 Windows 本机执行；本文件本身不是已经执行过的实机报告。
@@ -14,7 +13,7 @@ GitHub 已交付开发分支 `work/core-completion-20261017`。
 
 ## 1. 确认现有源码、工具链和 EXE
 
-在 `D:\Codex` 内的现有 Swirl 仓库根目录打开 PowerShell，检查：
+在 `D:\Codex` 内的 W1 专用 Swirl 仓库根目录打开 PowerShell，检查：
 
 ```powershell
 git branch --show-current
@@ -22,10 +21,19 @@ git status --short
 git rev-parse HEAD
 ```
 
-分支必须是上面的开发分支；有未提交修改时先保留它们，不使用强制重置。
+分支必须是上面的 W1 专用分支；有未提交修改时先保留它们，不使用强制重置。
 若源码尚未更新，在该分支的干净工作区执行
-`git pull --ff-only origin work/core-completion-20261017`，并重新记录完整 SHA。
+`git pull --ff-only origin work/vf-smart-width-w1`，并重新记录完整 SHA。
 后续新提交的 CI 结论须与其实际 SHA 对应。
+若另一个窗口正在使用集成分支，不切换或覆盖那个工作区；可在尚不存在的
+独立目录执行 `git clone --branch work/vf-smart-width-w1 https://github.com/SOLHK/Swirl.git D:\Codex\Swirl-W1B`。
+目录已存在时先检查其中的分支、HEAD 和未提交修改，不重复克隆到已有目录。
+
+W1 本机检查优先覆盖受约束单行按钮/导航、下拉框、列表/卡片名称、表头、
+对话框及窗口标题；同时观察正文、输入和数值显示仍保持原排版。宽度不足
+但已到安全压缩限度时，应继续使用该组件原有的省略规则。专门打开 Gateway
+菜单并连续 resize；该 popup 的具体开关状态不在 W1-B 针对性 QML 测试内。
+保留自动/手动切换、换字体、同窗实际 DPI 变化和弹窗反复开关的原始观察。
 
 已有同一源码的可运行测试构建时可直接进入第 2 步。需要重建时，使用现有
 Qt **6.10.3 的 MSVC 2022 x64 SDK**、VS 2022 C++ 工具链和 CMake；

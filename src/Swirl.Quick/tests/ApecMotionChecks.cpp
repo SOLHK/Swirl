@@ -6,6 +6,9 @@
 #include <QQmlContext>
 #include <QQmlComponent>
 #include <QQmlExpression>
+#include <QQmlError>
+#include <QQmlIncubationController>
+#include <QQmlListReference>
 #include <QQmlProperty>
 #include <QTest>
 #include <QJsonDocument>
@@ -20,12 +23,14 @@
 #include <QTimer>
 #include <QSGRendererInterface>
 #include <QColor>
+#include <QMatrix4x4>
+#include <QTransform>
 #include <QtMath>
 #include <memory>
 #include <functional>
 
 int runApecMotionChecks(QQuickWindow *window,const QString &output) {
-    QJsonArray checks;int failures=0;
+    QJsonArray checks,wingSettledSamples;int failures=0;
     const auto check=[&](const char *name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"APEC_MOTION_CHECK"<<name<<passed;};
     const auto wait=[](int ms){QEventLoop loop;QTimer timer;timer.setTimerType(Qt::PreciseTimer);timer.setSingleShot(true);QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);timer.start(ms);loop.exec();};
     const auto keyboardWindow=[&](){
@@ -68,17 +73,34 @@ Item {
  SwirlDialog {id:guarded;ownerItem:fixture;title:"Guarded fixture";contentItem:SwirlTextField {objectName:"apecGuardedField";text:"Original";implicitHeight:40}}
  Component {id:miniA;Item{objectName:"miniPageA"}}
  Component {id:miniB;Item{objectName:"miniPageB"}}
- Component {id:miniC;Item{Repeater{model:240;Item{}}}}
+ Component {id:miniC;Item{readonly property Item motionTitle:loadedTitle;SwirlText{id:loadedTitle;x:Theme.pagePadding;y:Theme.pagePadding;text:"Cold route";font.pixelSize:Theme.pageTitleSize}Repeater{model:240;Item{}}}}
+ Item {id:coldCard;x:0;y:165;width:170;height:45;readonly property string motionDescription:"Cold body"
+  Rectangle {id:coldSurface;anchors.fill:parent;color:Theme.independentCard}
+  SwirlText {id:coldTitle;anchors.centerIn:parent;text:"Cold route";font.pixelSize:Theme.fontSize(15)}
+ }
  SwirlPageHost {
-  id:miniHost;x:0;y:220;width:180;height:120;routeKey:"a"
+  id:miniHost;x:0;y:220;width:180;height:120;routeKey:"a";insetRoutes:["settingsCold"]
   sourceComponent:routeKey==="a"?miniA:routeKey==="b"?miniB:miniC
   property bool interruptPreparation:false
   property bool interrupted:false
   property bool coldWasPending:false
-  onPreparingChanged:if(interruptPreparation && preparing && routeKey==="b"){
-   interruptPreparation=false;interrupted=true
-   routeKey="c";requestRoute();coldWasPending=pendingLoader!==null
-   routeKey="b";requestRoute()
+  property bool recordColdExpansion:false
+  property bool coldExpansionStarted:false
+  function openColdSettings(){
+   recordColdExpansion=true
+   SwirlMotion.shared={source:coldTitle,surface:coldSurface,card:coldCard,targetKey:"settings"}
+   routeKey="settingsCold"
+  }
+  onPreparingChanged:{
+   if(recordColdExpansion && preparing && routeKey==="settingsCold"){
+    recordColdExpansion=false
+    coldExpansionStarted=pendingLoader===activeLoader && activeLoader.status===Loader.Loading
+   }
+   if(interruptPreparation && preparing && routeKey==="b"){
+    interruptPreparation=false;interrupted=true
+    routeKey="c";requestRoute();coldWasPending=pendingLoader!==null
+    routeKey="b";requestRoute()
+   }
   }
  }
 })QML",QUrl("qrc:/qt/qml/SwirlQuick/ApecMotionFixture.qml"));
@@ -93,7 +115,66 @@ Item {
         eval("apecFixture.miniHost.interruptPreparation=true;apecFixture.miniHost.routeKey='b'");wait(550);
         check("prepare-retarget-fixture-exercises-cold-request",eval("apecFixture.miniHost.interrupted && apecFixture.miniHost.coldWasPending").toBool());
         check("prepare-retarget-returns-visible-enabled-final-route",eval("apecFixture.miniHost.activeLoader.routeId==='b' && !apecFixture.miniHost.pendingGrab && !apecFixture.miniHost.moving && apecFixture.miniHost.activeLoader.visible && apecFixture.miniHost.activeLoader.enabled && apecFixture.miniHost.activeLoader.opacity===1").toBool());
+        eval("apecFixture.miniHost.openColdSettings()");
+        check("cold-settings-expansion-admits-shell-before-body-ready",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.coldExpansionStarted").toBool();},1500));
+        check("cold-settings-body-finishes-in-same-animated-shell",QTest::qWaitFor([&]{return eval("apecFixture.miniHost.item && apecFixture.miniHost.activeLoader.routeId==='settingsCold' && !apecFixture.miniHost.pendingGrab && !apecFixture.miniHost.moving && apecFixture.miniHost.activeLoader.opacity===1").toBool();},2500));
         eval("apecFixture.miniHost.visible=false");
+        {
+            // Keep the deliberately invalid component in its own engine. The
+            // production engine's zero-warning acceptance remains unchanged.
+            QList<QQmlError> loaderErrors;
+            QQmlIncubationController incubation;
+            QQmlEngine failureEngine;
+            failureEngine.setImportPathList(qmlEngine(window)->importPathList());
+            failureEngine.setIncubationController(&incubation);
+            failureEngine.setOutputWarningsToStandardError(false);
+            for(const auto &name:QStringList{"fontManager","motionPolicy","engineController","gpuEffectsSupported"})
+                failureEngine.rootContext()->setContextProperty(name,qmlContext(window)->contextProperty(name));
+            QObject::connect(&failureEngine,&QQmlEngine::warnings,&failureEngine,[&](const QList<QQmlError> &errors){loaderErrors.append(errors);});
+            const QUrl failureUrl("qrc:/qt/qml/SwirlQuick/ApecMotionFailureFixture.qml");
+            QQmlComponent failureComponent(&failureEngine);
+            failureComponent.setData(R"QML(
+import QtQuick
+import SwirlQuick
+SwirlPageHost {
+ id:host;width:180;height:120;routeKey:"healthy"
+ sourceComponent:routeKey==="broken"?broken:healthy
+ property int failureCount:0
+ property string failedRoute:""
+ property string fallbackRoute:""
+ property bool observedPending:false
+ Component {id:healthy;Item{objectName:"healthyFallbackPage"}}
+ Component {id:broken;Item{required property string deliberatelyMissing}}
+ onPendingLoaderChanged:if(pendingLoader!==null && pendingLoader.status===Loader.Loading)observedPending=true
+ onRouteFailed:(failed,fallback)=>{++failureCount;failedRoute=failed;fallbackRoute=fallback}
+ function requestFailure(){observedPending=false;routeKey="broken"}
+})QML",failureUrl);
+            std::unique_ptr<QObject> failedObject(failureComponent.create());
+            auto *failureHost=qobject_cast<QQuickItem *>(failedObject.get());
+            check("cold-route-error-fixture-loads",failureHost!=nullptr);
+            if(failureHost){
+                failureHost->setParentItem(window->contentItem());
+                const auto failureEval=[&](const QString &source){
+                    QQmlExpression expression(qmlContext(failureHost),failureHost,source);
+                    const auto result=expression.evaluate();
+                    check("cold-route-error-fixture-expression",!expression.hasError());return result;
+                };
+                check("cold-route-error-keeps-existing-page",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("item && activeLoader.routeId==='healthy'").toBool();},1500));
+                failureEval("requestFailure()");
+                check("cold-route-error-exercises-pending-incubation",QTest::qWaitFor([&]{return failureEval("observedPending").toBool();},1500));
+                check("cold-route-error-emits-one-failure",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("failureCount===1 && pendingLoader===null").toBool();},1500));
+                check("cold-route-error-restores-visible-enabled-page",failureEval("failedRoute==='broken' && fallbackRoute==='healthy' && item && activeLoader.routeId==='healthy' && activeLoader.visible && activeLoader.enabled && activeLoader.opacity===1 && !moving && !pendingGrab && pages.broken===undefined").toBool());
+                const int generation=failureEval("generation").toInt();
+                for(int frame=0;frame<5;++frame){incubation.incubateFor(5);wait(20);}
+                check("cold-route-error-does-not-retry-itself",failureEval("failureCount===1 && pendingLoader===null && pages.broken===undefined").toBool()&&failureEval("generation").toInt()==generation);
+                check("cold-route-error-has-only-expected-required-property-warning",loaderErrors.size()==1 && loaderErrors[0].url()==failureUrl && loaderErrors[0].description()=="Required property deliberatelyMissing was not initialized");
+                failureEval("routeKey='healthy'");wait(20);
+                failureEval("requestFailure()");
+                check("cold-route-error-explicit-retry-incubates",QTest::qWaitFor([&]{return failureEval("observedPending").toBool();},1500));
+                check("cold-route-error-retries-only-after-new-request",QTest::qWaitFor([&]{incubation.incubateFor(5);return failureEval("failureCount===2 && pendingLoader===null && activeLoader.routeId==='healthy' && pages.broken===undefined").toBool();},1500));
+                check("cold-route-error-explicit-retry-has-one-new-expected-warning",loaderErrors.size()==2 && loaderErrors[1].url()==failureUrl && loaderErrors[1].description()=="Required property deliberatelyMissing was not initialized");
+            }
+        }
         eval("apecFixture.arc.targetY=180;apecFixture.arc.retarget();apecFixture.arc.targetY=0;apecFixture.arc.retarget()");wait(340);
         check("same-turn-reversal-retires-old-destination",eval("!apecFixture.arc.moving && apecFixture.arc.position.y===0 && apecFixture.arc.destination.y===0").toBool());
         eval("apecFixture.arc.targetY=180;apecFixture.arc.retarget()");wait(100);
@@ -313,15 +394,114 @@ Item {
         qmlEngine(window)->rootContext()->setContextProperty("apecFixture",static_cast<QObject *>(nullptr));
     }
     eval("Theme.reduceMotion=false;Theme.transparency=true;AppState.navigate('activity')");wait(80);
-    auto *wing=window->findChild<QQuickItem *>("apecWingVisual");
+    // The hidden dashboard is a child Window with its own identically named
+    // wing. Resolve the main scene's published item instead of searching the
+    // broader QObject tree, then verify its real visual/window ownership.
+    auto *wing=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop.mainWingItem"));
+    auto *wingScene=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop"));
+    check("production-wing-belongs-to-main-scene",wing && wingScene
+        && wing->window()==window && wingScene->window()==window
+        && wingScene->isAncestorOf(wing));
+    // The accepted whole-feather master puts transparency in each painted
+    // gradient. Its container stays opaque; multiplying the retired global
+    // wingOpacity here would incorrectly dim the current artwork a second time.
+    const auto wingState=[&](QQuickItem *visual){
+        QVariantList state;
+        if(!visual)return state;
+        bool visualTransformValid=false;
+        const auto visualTransform=visual->itemTransform(window->contentItem(),&visualTransformValid);
+        if(!visualTransformValid)return state;
+        state.append(visual->opacity());state.append(visual->scale());state.append(visual->rotation());
+        state.append(visual->property("progress"));
+        state.append(QVariant::fromValue(visualTransform));
+        for(int i=0;i<visual->property("featherCount").toInt();++i){
+            auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
+            if(!feather)return QVariantList();
+            bool featherTransformValid=false;
+            const auto featherTransform=feather->itemTransform(visual,&featherTransformValid);
+            if(!featherTransformValid)return QVariantList();
+            state.append(feather->opacity());state.append(feather->property("reveal"));
+            state.append(QVariant::fromValue(featherTransform));
+        }
+        return state;
+    };
+    const auto settledFeathers=[&](QQuickItem *visual,const char *phase){
+        const int count=visual?visual->property("featherCount").toInt():0;
+        bool settled=visual&&visual->property("progress").toDouble()==1&&visual->opacity()==1&&count>0;
+        QJsonArray samples;
+        for(int i=0;i<count;++i){
+            auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
+            if(!feather){settled=false;if(samples.size()<64)samples.append(QJsonObject{{"index",i},{"present",false}});continue;}
+            bool pieceSettled=feather->property("reveal").toDouble()==1&&feather->opacity()==1
+                &&feather->x()==0&&feather->y()==0&&feather->scale()==1&&feather->rotation()==0;
+            bool localTransformValid=false;
+            const auto localTransform=feather->itemTransform(feather->parentItem(),&localTransformValid);
+            pieceSettled=pieceSettled&&localTransformValid;
+            // itemTransform composes an ancestor QTransform through float
+            // QMatrix4x4 storage before multiplying the parent's double inverse.
+            // Even an exact local identity can therefore map back as 1+epsilon.
+            // Check the actual local inputs exactly, without loosening epsilon.
+            const QQmlListReference transforms(feather,"transform");
+            pieceSettled=pieceSettled&&transforms.isReadable()&&transforms.count()==2;
+            QJsonArray transformSamples;
+            for(qsizetype index=0;index<transforms.count();++index){
+                auto *transform=transforms.at(index);
+                QJsonObject sample{{"type",transform?QString::fromLatin1(transform->metaObject()->className()):QStringLiteral("null")}};
+                bool identity=false;
+                if(transform&&transform->inherits("QQuickMatrix4x4")){
+                    const auto value=transform->property("matrix");
+                    const auto matrix=value.value<QMatrix4x4>();
+                    identity=value.canConvert<QMatrix4x4>()&&matrix.isIdentity();
+                    QJsonArray elements;for(int row=0;row<4;++row)for(int column=0;column<4;++column)elements.append(matrix(row,column));
+                    sample.insert("matrix",elements);
+                }else if(transform&&transform->inherits("QQuickRotation")){
+                    const auto angle=transform->property("angle");
+                    identity=angle.isValid()&&angle.toDouble()==0;
+                    sample.insert("angle",angle.toDouble());
+                }
+                sample.insert("identity",identity);pieceSettled=pieceSettled&&identity;
+                if(transformSamples.size()<16)transformSamples.append(sample);
+            }
+            int gradients=0;QJsonArray gradientSamples;
+            for(auto *object:feather->findChildren<QObject *>()){
+                auto *gradient=object->property("fillGradient").value<QObject *>();
+                if(!gradient)continue;
+                ++gradients;
+                const QQmlListReference stops(gradient,"stops");
+                pieceSettled=pieceSettled&&stops.isReadable()&&stops.count()>=2;
+                QJsonArray alphaSamples;
+                for(qsizetype stop=0;stop<stops.count();++stop){
+                    auto *entry=stops.at(stop);
+                    const auto color=entry?entry->property("color").value<QColor>():QColor();
+                    pieceSettled=pieceSettled&&color.isValid()&&color.alphaF()>0&&color.alphaF()<1;
+                    if(alphaSamples.size()<16)alphaSamples.append(color.isValid()?QJsonValue(color.alphaF()):QJsonValue(QJsonValue::Null));
+                }
+                if(gradientSamples.size()<16)gradientSamples.append(QJsonObject{{"readable",stops.isReadable()},{"stops",int(stops.count())},{"alphas",alphaSamples}});
+            }
+            pieceSettled=pieceSettled&&gradients==1;settled=settled&&pieceSettled;
+            if(samples.size()<64)samples.append(QJsonObject{{"index",i},{"reveal",feather->property("reveal").toDouble()},
+                {"opacity",feather->opacity()},{"x",feather->x()},{"y",feather->y()},{"scale",feather->scale()},{"rotation",feather->rotation()},
+                {"relativeMappingValid",localTransformValid},{"relativeMappingIdentity",localTransform.isIdentity()},
+                {"relativeMapping",QJsonArray{localTransform.m11(),localTransform.m12(),localTransform.m21(),localTransform.m22(),localTransform.dx(),localTransform.dy()}},
+                {"transforms",transformSamples},{"gradients",gradientSamples},{"passed",pieceSettled}});
+        }
+        const QJsonObject evidence{{"phase",QString::fromLatin1(phase)},{"count",count},
+            {"progress",visual?visual->property("progress").toDouble():-1},{"opacity",visual?visual->opacity():-1},
+            {"feathers",samples},{"passed",settled}};
+        wingSettledSamples.append(evidence);
+        if(!settled)qInfo().noquote()<<"APEC_WING_SETTLED_FAILURE"<<QJsonDocument(evidence).toJson(QJsonDocument::Compact);
+        return settled;
+    };
     check("production-wing-entry-already-consumed",wing && eval("appSceneBackdrop.entranceConsumed").toBool());
+    check("production-wing-settles-every-feather-with-painted-transparency",settledFeathers(wing,"production"));
+    const auto restingWing=wingState(wing);
     eval("AppState.navigate('overview')");wait(35);
     check("wing-persists-off-home",wing && !eval("appSceneBackdrop.entering").toBool()
         && eval("appSceneBackdrop.progress===1").toBool()
-        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+        && !restingWing.isEmpty() && wingState(wing)==restingWing);
     eval("AppState.navigate('activity')");wait(80);
     check("wing-does-not-replay-on-navigation",wing && !eval("appSceneBackdrop.entering").toBool()
-        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+        && !restingWing.isEmpty() && wingState(wing)==restingWing);
     window->showMinimized();wait(40);
     check("wing-minimize-stops-render-motion",!eval("appSceneBackdrop.presenting").toBool() && !eval("appSceneBackdrop.entering").toBool());
     window->showNormal();wait(80);
@@ -344,7 +524,7 @@ Item {
         eval("Theme.reduceMotion=true");wait(40);
         check("reduced-motion-settles-unfolding",visual && !entry->property("entering").toBool()
             && visual->scale()==1 && visual->rotation()==0 && visual->y()==0
-            && qAbs(visual->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+            && settledFeathers(visual,"reduced-motion"));
         eval("Theme.reduceMotion=false;apecEntry.visible=false");wait(40);
         eval("apecEntry.visible=true");wait(100);
         check("consumed-opening-stays-static-on-return",!entry->property("entering").toBool() && visual && visual->rotation()==0 && visual->scale()==1);
@@ -353,6 +533,6 @@ Item {
     eval("Theme.reduceMotion=true");
     const auto api=window->rendererInterface()->graphicsApi();
     QDir().mkpath(QFileInfo(output).absolutePath());QFile report(output);if(!report.open(QIODevice::WriteOnly))return 2;
-    report.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"graphicsApi",int(api)},{"scope","Actual application QML, controlled motion/input; not physical refresh or private-network acceptance"}}).toJson());
+    report.write(QJsonDocument(QJsonObject{{"checks",checks},{"wingSettledSamples",wingSettledSamples},{"failures",failures},{"qtVersion",qVersion()},{"graphicsApi",int(api)},{"scope","Actual application QML, controlled motion/input; not physical refresh or private-network acceptance"}}).toJson());
     return failures?1:0;
 }

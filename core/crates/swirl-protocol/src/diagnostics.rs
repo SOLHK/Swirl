@@ -102,6 +102,7 @@ pub fn failure_stage(code: &str) -> &'static str {
         | "UpstreamConnectionReset"
         | "UpstreamConnectionAborted"
         | "UpstreamNetworkUnreachable"
+        | "UpstreamHostUnreachable"
         | "UpstreamPermissionDenied" => "tcp_connect",
         "UpstreamTlsTimeout" => "tls_handshake",
         "QuicHandshakeTimeout" | "QuicHandshake" | "QuicConnect" | "QuicHandshakeData" => {
@@ -117,6 +118,9 @@ pub fn failure_stage(code: &str) -> &'static str {
         | "UpstreamHeaderTooLarge"
         | "ShadowsocksSetup"
         | "ShadowsocksHandshakeWrite"
+        | "SnellSetup"
+        | "SnellHandshakeWrite"
+        | "SnellHandshakeTimeout"
         | "TrojanHandshakeWrite"
         | "VlessHandshakeWrite"
         | "VmessHandshakeWrite"

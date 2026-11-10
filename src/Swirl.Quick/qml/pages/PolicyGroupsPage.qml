@@ -78,9 +78,15 @@ Item {
     }
     function nextPriority() {return services.reduce((value,record)=>Math.max(value,Number(record.priority)+10),0)}
     function editService(record,source) {
-        serviceEditor.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
+        serviceEditorLoader.active=true
+        if(serviceEditorLoader.status===Loader.Ready)
+            serviceEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
     }
-    function editGroup(record,source,strategyPreset) {groupEditor.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)}
+    function editGroup(record,source,strategyPreset) {
+        groupEditorLoader.active=true
+        if(groupEditorLoader.status===Loader.Ready)
+            groupEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)
+    }
     function moveService(id,direction) {
         const rows=services.slice().sort((a,b)=>a.priority-b.priority);const index=rows.findIndex(record=>record.id===id);const destination=index+direction
         if(index<0||destination<0||destination>=rows.length)return
@@ -111,7 +117,7 @@ Item {
         SwirlPageHeader {
             id:policyHeading;Layout.fillWidth:true;title:qsTr("策略与出口")
             description:qsTr("先选择默认出口，再为需要单独处理的服务分配策略。")
-            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)
+            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)+(page.engineController.subscriptionScopeEnabled?qsTr(" · 当前来源：%1").arg(page.engineController.activeSubscriptionId.length?(page.engineController.imports.providers.find(source=>source.id===page.engineController.activeSubscriptionId)||{}).name||qsTr("来源已删除"):qsTr("独立导入")):"")
             SubscriptionAction {id:addButton;objectName:page.tabIndex===0?"addServicePolicy":"addPolicyGroup";text:page.tabIndex===0?qsTr("添加服务"):qsTr("添加策略组");solid:true;iconName:"plus";enabled:page.editable;onClicked:{if(page.tabIndex===0)page.editService(null,addButton);else page.editGroup(null,addButton)}}
             SubscriptionAction {id:advancedButton;objectName:"policyAdvancedButton";iconName:"sliders";Accessible.name:qsTr("策略高级设置");tooltip:Accessible.name;onClicked:{advancedDialog.heroSource=advancedButton;advancedDialog.open()}}
         }
@@ -189,8 +195,29 @@ Item {
         }
     }
     PolicyTargetPicker {id:targetPicker;ownerItem:page;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onTargetChosen:target=>page.chooseTarget(target)}
-    ServicePolicyDialog {id:serviceEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)}
-    PolicyGroupDialog {id:groupEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)}
+    // Build the editor trees on first use, then retain their instances for command receipts and popup transitions.
+    Loader {
+        id:serviceEditorLoader
+        active:false
+        sourceComponent:ServicePolicyDialog {
+            id:serviceEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)
+        }
+    }
+    Loader {
+        id:groupEditorLoader
+        active:false
+        sourceComponent:PolicyGroupDialog {
+            id:groupEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)
+        }
+    }
     SwirlDialog {
         id:deleteDialog;objectName:"deletePolicyDialog";ownerItem:page;title:kind==="service"?qsTr("删除策略"):qsTr("删除策略组");guardChanges:false
         property string kind:"service";property string recordId:"";property string recordName:"";property bool pending:false;property string pendingRequestId:"";property string message:""

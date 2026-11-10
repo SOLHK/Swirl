@@ -1,0 +1,50 @@
+{
+  "verified_at_utc": "2026-11-02T16:15:16.379750+00:00",
+  "status": "PASS",
+  "source_head": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "core_tree": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "core_files_rehashed": 302,
+  "harness_files_rehashed": 7,
+  "evidence_entries_rehashed": 50,
+  "original_run_source_commit_sha": null,
+  "original_run_base_commit_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "original_run_exit_code": 0,
+  "started_at_utc": "2026-11-02T15:12:05.616086+00:00",
+  "finished_at_utc": "2026-11-02T15:42:06.039493+00:00",
+  "seconds": 1800.004075,
+  "connections": 8,
+  "events_per_connection": [
+    1801,
+    1801,
+    1801,
+    1801,
+    1801,
+    1801,
+    1801,
+    1801
+  ],
+  "all_client_origin_expected_hashes_match": true,
+  "all_tls_close_notify_tcp_eof": true,
+  "reconnections": 0,
+  "samples": 1800,
+  "rss_kib_minmax": [
+    6888,
+    6912
+  ],
+  "fd_minmax": [
+    23,
+    23
+  ],
+  "final_core": {
+    "active": 0,
+    "accepted": 8,
+    "failed": 0,
+    "upload": 13800,
+    "download": 1198958,
+    "ended_records": 8
+  },
+  "listener_closed": true,
+  "binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+  "raw_sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875",
+  "scope": "Linux controlled local production V2 HTTP CONNECT -> authenticated independent SOCKS5 upstream -> verified TLS SSE; no Windows desktop/provider acceptance. RSS/FD snapshots cannot prove absence of all leaks; original source was uncommitted and linked by core tree/file hashes later."
+}

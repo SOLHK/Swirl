@@ -14,11 +14,17 @@ option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 option(SWIRL_BUILD_CORE_TESTS "Build standalone Core/network tests without exposing application UI test entry points" OFF)
 option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
 option(SWIRL_XRAY_UI_TESTS "Build the isolated JSON import acceptance profile in the real Rust application" OFF)
+option(SWIRL_PRIVATE_UI_QUOTA "Build only the mandatory-quota synthetic Qt acceptance profile" OFF)
+if(SWIRL_PRIVATE_UI_QUOTA AND NOT SWIRL_BUILD_UI_TESTS)
+ message(FATAL_ERROR "SWIRL_PRIVATE_UI_QUOTA requires the explicit UI test profile")
+endif()
 
 # Keep the standalone CI and the existing UI suite on the same font targets.
 # This path deliberately precedes third_party and all application/core targets.
 function(swirl_add_font_tests)
  add_executable(SwirlFontTests tests/FontTests.cpp app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp)
+ # Source-loaded shared controls use the same native press clock as the app.
+ target_sources(SwirlFontTests PRIVATE app/SwirlPressClock.h app/SwirlPressClock.cpp)
  target_include_directories(SwirlFontTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  target_compile_definitions(SwirlFontTests PRIVATE SWIRL_UI_TESTS SWIRL_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml")
  # QRhi is Qt's documented texture-upload API, supplied by GuiPrivate.
@@ -38,8 +44,27 @@ function(swirl_add_font_tests)
  add_test(NAME swirl-font-axis-policy COMMAND SwirlFontAxisPolicyTests -o "${CMAKE_CURRENT_BINARY_DIR}/font-axis-policy.xml,xml" -o "-,txt")
  set_tests_properties(swirl-font-axis-policy PROPERTIES LABELS fonts TIMEOUT 30)
  if(WIN32)
-  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
-  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  set(swirl_width_tests automaticWidthUsesRealAdvances automaticWidthNonmonotonicFonts
+      automaticWidthShaping automaticWidthCacheAndResize qmlWidthControls)
+  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources ${swirl_width_tests} localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
+  # This aggregate includes native rasterization and an independently bounded
+  # identity subprocess; a cold raster pass alone used 20.8 seconds in CI.
+  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 60 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Qt documents QT_SCALE_FACTOR as a hardware-independent application-scale
+  # simulation. Its multiplier is not a physical Windows system DPI setting.
+  # Run separate processes so each QGuiApplication sees its scale at startup.
+  foreach(swirl_width_scale IN ITEMS 125 200)
+   if(swirl_width_scale EQUAL 125)
+    set(swirl_width_factor 1.25)
+   else()
+    set(swirl_width_factor 2)
+   endif()
+   add_test(NAME swirl-font-width-simulated-${swirl_width_scale} COMMAND SwirlFontTests ${swirl_width_tests}
+       -o "${CMAKE_CURRENT_BINARY_DIR}/font-width-simulated-${swirl_width_scale}.xml,xml" -o "-,txt")
+   set_tests_properties(swirl-font-width-simulated-${swirl_width_scale} PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE
+       ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QT_SCALE_FACTOR=${swirl_width_factor}"
+       ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  endforeach()
  endif()
  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/font-toolchain.txt"
   "Qt=${Qt6_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nGenerator=${CMAKE_GENERATOR}\nGeneratorPlatform=${CMAKE_GENERATOR_PLATFORM}\nPointerSize=${CMAKE_SIZEOF_VOID_P}\nCxxStandard=${CMAKE_CXX_STANDARD}\n")
@@ -101,11 +126,19 @@ target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlPr
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE network/HttpRequestPolicy.h)
+target_sources(SwirlEngine PRIVATE network/LanFirewall.h network/LanFirewall.cpp network/LanProxySession.h network/LanProxySession.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
+target_sources(SwirlEngine PRIVATE engine/NativeTunBrokerClient.h engine/NativeTunBrokerClient.cpp)
+target_sources(SwirlEngine PRIVATE app/NativeTunRecovery.h app/NativeTunRecovery.cpp)
 include(cmake/SwirlRustCore.cmake)
 swirl_pair_rust_core(SwirlEngine)
 swirl_stage_rust_core(Swirl)
 target_sources(SwirlEngine PRIVATE engine/RustCoreLibrary.h engine/RustCoreLibrary.cpp)
+if(SWIRL_PRIVATE_UI_QUOTA)
+ target_compile_definitions(SwirlEngine PUBLIC SWIRL_PRIVATE_UI_QUOTA)
+ target_sources(Swirl PRIVATE tests/PrivateUiQuotaSession.h tests/PrivateUiQuotaSession.cpp)
+ set_target_properties(Swirl PROPERTIES OUTPUT_NAME SwirlPrivateUiQuota)
+endif()
 target_sources(Swirl PRIVATE engine/RustCoreSelfTest.h engine/RustCoreSelfTest.cpp)
 target_sources(Swirl PRIVATE network/TlsRuntimeSelfTest.h network/TlsRuntimeSelfTest.cpp)
 set(SWIRL_OPENSSL_LOCK "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/openssl-runtime.lock.json")
@@ -139,7 +172,7 @@ if(WIN32)
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/SubscriptionCapture.py" "$<TARGET_FILE_DIR:Swirl>/SubscriptionCapture.py")
  add_dependencies(Swirl SwirlCodexManagementTools)
  target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
- target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
+ target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet ole32 oleaut32 uuid shell32)
  add_executable(SwirlGatewayGuard WIN32 tools/GatewayGuard.cpp network/GatewayRouting.cpp)
  target_include_directories(SwirlGatewayGuard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  target_link_libraries(SwirlGatewayGuard PRIVATE Qt6::Core Qt6::Network)
@@ -160,7 +193,7 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
- qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml qml/controls/SwirlWingAnimation.qml qml/SwirlProxyWingMotion.qml
+ qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml qml/controls/SwirlWingAnimation.qml qml/controls/SwirlWingMaster.js qml/SwirlProxyWingMotion.qml
  qml/controls/SwirlArcMotion.qml qml/controls/SwirlInteractionMotion.qml qml/controls/SwirlFlow.qml qml/controls/SwirlPopupMotion.qml
  qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
  qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
@@ -180,14 +213,16 @@ set(SWIRL_QML_FILES
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
  qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
- qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlSystemProxyCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
+ qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlToolbarButton.qml qml/controls/SwirlSystemProxyCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml
  qml/controls/SwirlTransitionCoordinator.qml qml/controls/SwirlHeroCard.qml qml/controls/SwirlHeroTitle.qml
  qml/components/SwirlContinuousSurface.qml qml/components/SwirlShellOutline.qml qml/components/SwirlBlurLayer.qml qml/components/SwirlGlassMaterial.qml qml/components/SwirlWindowControls.qml qml/components/SwirlDailyTrafficChart.qml
  qml/controls/SwirlClickLight.qml qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
- qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js qml/components/SwirlSilkRope.qml qml/components/SwirlSilkRopeGeometry.js
+ qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js
+ qml/components/SwirlActivityCard.qml qml/components/SwirlCardSurface.qml qml/controls/ActivityDetailTransition.qml
+ qml/pages/ActivitySourcesDetail.qml qml/pages/ActivityDiagnosticsDetail.qml qml/pages/ActivityConnectionDetail.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
  qml/controls/SwirlComboBox.qml qml/controls/SwirlDialog.qml
@@ -232,7 +267,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/SwirlPressClock.h app/SwirlPressClock.cpp app/SwirlConnectionRows.h app/SwirlConnectionRows.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -255,7 +290,7 @@ if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
 target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp app/PopupMotionBridge.cpp)
-target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private)
+target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private Qt6::QmlPrivate)
 # The SDK-specific popup adapter alone sees the Qt Quick transition internals.
 set_property(SOURCE app/PopupMotionBridge.cpp APPEND PROPERTY INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:Qt6::QuickPrivate,INTERFACE_INCLUDE_DIRECTORIES>")
 
@@ -280,6 +315,29 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
+ qt_add_executable(SwirlLanProxyTests tests/LanProxyTests.cpp)
+ target_link_libraries(SwirlLanProxyTests PRIVATE SwirlEngine Qt6::Test)
+ target_include_directories(SwirlLanProxyTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ if(MSVC)
+  target_compile_options(SwirlLanProxyTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-lan-proxy-control COMMAND SwirlLanProxyTests -o "${CMAKE_CURRENT_BINARY_DIR}/lan-proxy-control.xml,xml" -o "-,txt")
+ set_tests_properties(swirl-lan-proxy-control PROPERTIES TIMEOUT 60)
+ if(WIN32)
+  # Compile the internal COM fixture seam only into this dedicated executable,
+  # never into SwirlEngine/Swirl. It is deliberately absent from normal CTest;
+  # CI must opt in explicitly before creating its disabled loopback-only rules.
+  qt_add_executable(SwirlLanFirewallTests tests/LanFirewallTests.cpp network/LanFirewall.cpp network/LanFirewall.h)
+  target_include_directories(SwirlLanFirewallTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(SwirlLanFirewallTests PRIVATE SWIRL_LAN_FIREWALL_TESTS)
+  target_link_libraries(SwirlLanFirewallTests PRIVATE Qt6::Core Qt6::Network Qt6::Test advapi32 ws2_32 iphlpapi crypt32 ole32 oleaut32 uuid)
+  if(MSVC)
+   target_compile_options(SwirlLanFirewallTests PRIVATE /utf-8)
+  endif()
+  add_custom_command(TARGET SwirlLanFirewallTests POST_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:SwirlLanFirewallTests> $<TARGET_FILE_DIR:SwirlLanFirewallTests>
+   COMMAND_EXPAND_LISTS)
+ endif()
  qt_add_executable(SwirlWindowShadowTests tests/WindowShadowRendererTests.cpp app/WindowShadowRenderer.cpp app/WindowShadowRenderer.h)
  target_link_libraries(SwirlWindowShadowTests PRIVATE Qt6::Gui Qt6::Test)
  target_include_directories(SwirlWindowShadowTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -298,10 +356,30 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_include_directories(SwirlNodeSectionModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-node-section-model COMMAND SwirlNodeSectionModelTests)
  set_tests_properties(swirl-node-section-model PROPERTIES TIMEOUT 60)
+ qt_add_executable(SwirlConnectionRowsTests tests/ConnectionRowsTests.cpp app/SwirlConnectionRows.h app/SwirlConnectionRows.cpp)
+ target_link_libraries(SwirlConnectionRowsTests PRIVATE Qt6::Qml Qt6::Gui Qt6::Test)
+ target_include_directories(SwirlConnectionRowsTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ if(MSVC)
+  target_compile_options(SwirlConnectionRowsTests PRIVATE /utf-8)
+ endif()
+ if(WIN32)
+  add_custom_command(TARGET SwirlConnectionRowsTests POST_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:SwirlConnectionRowsTests> $<TARGET_FILE_DIR:SwirlConnectionRowsTests>
+   COMMAND_EXPAND_LISTS)
+ endif()
+ add_test(NAME swirl-connection-rows COMMAND SwirlConnectionRowsTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/connection-rows.xml,xml" -o -,txt)
+ set_tests_properties(swirl-connection-rows PROPERTIES TIMEOUT 60)
  qt_add_executable(SwirlPolicyConfigurationTests tests/PolicyConfigurationTests.cpp)
+ option(SWIRL_PROXY_STOP_NEGATIVE_CONTROL "Compile the pinned historical controller's proxy-stop test control" OFF)
+ if(SWIRL_PROXY_STOP_NEGATIVE_CONTROL)
+  target_compile_definitions(SwirlPolicyConfigurationTests PRIVATE SWIRL_PROXY_STOP_NEGATIVE_CONTROL)
+ endif()
  target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
  target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
- add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests)
+ add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.xml,xml"
+  -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.txt,txt" -o -,txt)
  set_tests_properties(swirl-policy-configuration PROPERTIES TIMEOUT 60)
  qt_add_executable(SwirlCatalogTransactionTests tests/CatalogTransactionTests.cpp)
  target_link_libraries(SwirlCatalogTransactionTests PRIVATE SwirlEngine Qt6::Test)
@@ -314,6 +392,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  swirl_add_font_tests()
  if(SWIRL_BUILD_UI_TESTS)
+ target_sources(Swirl PRIVATE tests/ActivityLayoutChecks.cpp tests/ActivityLayoutChecks.h)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
@@ -323,10 +402,19 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_test(NAME swirl-appearance-ui COMMAND Swirl --appearance-test)
  # Includes ten shared-control/theme samples, repeated native popups, a bounded
  # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
- set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+ set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QSG_INFO=1" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
- target_link_libraries(Swirl PRIVATE Qt6::Test)
+ target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QuickPrivate)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
+ if(WIN32)
+  target_sources(Swirl PRIVATE tests/NativeTunBrokerChecks.cpp tests/NativeTunBrokerChecks.h)
+  if("$ENV{SWIRL_NATIVE_TUN_ACCEPTANCE}" STREQUAL "1")
+   add_test(NAME swirl-native-tun-broker-control
+    COMMAND "${CMAKE_CURRENT_BINARY_DIR}/native-tun-broker-control/app/Swirl.exe"
+     --native-tun-broker-self-test "${CMAKE_CURRENT_BINARY_DIR}/native-tun-broker-control/report.json")
+   set_tests_properties(swirl-native-tun-broker-control PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "SWIRL_NATIVE_TUN_ACCEPTANCE=1")
+  endif()
+ endif()
  endif()
  enable_testing()
  # Rust integration tests are unconditional within the selected QA profile.
@@ -370,7 +458,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  if(MSVC)
   target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
  endif()
- add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests)
+ add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-telemetry-accounting.xml,xml" -o -,txt)
  add_executable(SwirlDiagnosticTests tests/DiagnosticTests.cpp)
  target_link_libraries(SwirlDiagnosticTests PRIVATE SwirlEngine Qt6::Test)
  if(MSVC)
@@ -384,16 +473,56 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  # Read-only live observations and a unique temporary registry key only;
  # this does not opt in to changing the user's Internet Settings.
- add_test(NAME swirl-system-proxy-state COMMAND SwirlSystemProxyStateTests)
+ add_test(NAME swirl-system-proxy-state COMMAND SwirlSystemProxyStateTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-state.xml,xml" -o -,txt)
  set_tests_properties(swirl-system-proxy-state PROPERTIES LABELS security TIMEOUT 30)
  if(WIN32)
+  # The process-local HKCU override isolates marker cases from the user's
+  # actual TUN recovery state; no driver, route change or UAC is involved.
+  add_executable(SwirlNativeTunRecoveryTests tests/NativeTunRecoveryTests.cpp)
+  target_link_libraries(SwirlNativeTunRecoveryTests PRIVATE SwirlEngine Qt6::Test advapi32)
+  if(MSVC)
+   target_compile_options(SwirlNativeTunRecoveryTests PRIVATE /utf-8)
+  endif()
+  add_test(NAME swirl-native-tun-recovery COMMAND SwirlNativeTunRecoveryTests
+   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-native-tun-recovery.xml,xml" -o -,txt)
+  set_tests_properties(swirl-native-tun-recovery PROPERTIES RUN_SERIAL TRUE LABELS security TIMEOUT 30)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
-  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
+  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test winhttp)
   add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
   # Explicit opt-in: normal CI and CTest never modify the runner's proxy.
   if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
-   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests)
+   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests
+    -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-recovery.xml,xml" -o -,txt)
    set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45 ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1")
+  endif()
+  if(SWIRL_BUILD_UI_TESTS)
+   # Exercise normal close in the complete application with a live Rust core
+   # and native proxy ownership. Keep this separate from the low-level suite,
+   # which is also built before Swirl by the standalone core workflow.
+   add_executable(SwirlSystemProxyExitTests tests/SystemProxyExitTests.cpp)
+   target_link_libraries(SwirlSystemProxyExitTests PRIVATE SwirlEngine Qt6::Test winhttp ws2_32 iphlpapi)
+   add_dependencies(SwirlSystemProxyExitTests Swirl SwirlProxyGuard)
+   if(MSVC)
+    target_compile_options(SwirlSystemProxyExitTests PRIVATE /utf-8)
+   endif()
+   if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
+    add_test(NAME swirl-system-proxy-app-exit COMMAND SwirlSystemProxyExitTests
+     ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry
+     listenerProbeDistinguishesClosedAndLivePorts
+     exclusiveListenerProbeRequiresReleasedPortAfterTraffic
+     normalApplicationExitRestoresOwnedProxy
+     -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-app-exit.xml,xml" -o -,txt)
+    set_tests_properties(swirl-system-proxy-app-exit PROPERTIES RUN_SERIAL TRUE TIMEOUT 120
+     ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1;SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE=${CMAKE_CURRENT_BINARY_DIR}/system-proxy-exit;QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11"
+     ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+    add_test(NAME swirl-system-proxy-normal-stop COMMAND SwirlSystemProxyExitTests
+     normalStopRestoresOwnedProxyWhileApplicationRemainsAlive
+     -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-normal-stop.xml,xml" -o -,txt)
+    set_tests_properties(swirl-system-proxy-normal-stop PROPERTIES RUN_SERIAL TRUE TIMEOUT 120 LABELS security
+     ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1;SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE=${CMAKE_CURRENT_BINARY_DIR}/system-proxy-normal-stop;QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11"
+     ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+   endif()
   endif()
   add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)
   target_link_libraries(SwirlAcceptance PRIVATE SwirlEngine)
@@ -438,6 +567,17 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_executable(SwirlSubscriptionFormatTests tests/SubscriptionFormatTests.cpp tests/ControlledNetwork.h)
  add_executable(SwirlPrivateSubscriptionInspect tools/InspectPrivateSubscription.cpp)
  target_link_libraries(SwirlPrivateSubscriptionInspect PRIVATE SwirlEngine)
+ if(SWIRL_BUILD_CORE_TESTS AND WIN32)
+  add_executable(SwirlPrivateSubscriptionAcceptance tools/PrivateSubscriptionAcceptance.cpp)
+  target_link_libraries(SwirlPrivateSubscriptionAcceptance PRIVATE SwirlEngine)
+  target_compile_definitions(SwirlPrivateSubscriptionAcceptance PRIVATE SWIRL_QA_APP_VERSION="${PROJECT_VERSION}")
+  target_compile_definitions(SwirlPrivateSubscriptionAcceptance PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+  if(MSVC)
+   target_compile_options(SwirlPrivateSubscriptionAcceptance PRIVATE /utf-8)
+  endif()
+  add_test(NAME swirl-private-acceptance-local COMMAND SwirlPrivateSubscriptionAcceptance --self-test)
+  set_tests_properties(swirl-private-acceptance-local PROPERTIES TIMEOUT 30 LABELS security)
+ endif()
  if(MSVC)
   target_compile_options(SwirlPrivateSubscriptionInspect PRIVATE /utf-8)
  endif()
@@ -461,19 +601,70 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/ApecGlassChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ if(WIN32)
+  target_sources(Swirl PRIVATE tests/SystemProxyExitFixture.cpp tests/SystemProxyExitFixture.h)
+ endif()
+ target_sources(Swirl PRIVATE tests/ActivityPerfTrace.h)
+ # Opt-in timing is compiled only for this QA profile; production has no
+ # telemetry timing properties or test observer class.
+ target_compile_definitions(SwirlEngine PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
+ target_compile_definitions(Swirl PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
- set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
+ set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY};SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-evidence")
+ if(WIN32)
+  # The reported overlap occurs in the native Windows text/rendering path.
+  # Keep the software regression and also exercise D3D11 with enlarged text.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store")
+  add_test(NAME swirl-node-ui-native-scaled COMMAND Swirl --node-self-test)
+  set_tests_properties(swirl-node-ui-native-scaled PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QT_SCALE_FACTOR=1.5;SWIRL_NODE_UI_REQUIRE_NATIVE=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store;SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-evidence"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:;QT_SCREEN_SCALE_FACTORS=unset:")
+ endif()
  add_test(NAME swirl-engine-ui COMMAND Swirl --engine-self-test)
  set_tests_properties(swirl-engine-ui PROPERTIES TIMEOUT 60
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
+ add_test(NAME swirl-activity-layout COMMAND Swirl --activity-layout-test --preview-page=activity --preview-size=1013x672 --activity-layout-output=activity-layout)
+ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/activity-layout-store")
+ set_tests_properties(swirl-activity-layout PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-layout-store" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  add_test(NAME swirl-apec-motion COMMAND Swirl --motion-test --motion-output=apec-motion-report.json)
  set_tests_properties(swirl-apec-motion PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;SWIRL_APEC_MOTION_CHECKS=1;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)
+  # These focused drivers are selected before the generic motion suite. Register
+  # them explicitly so a green motion check cannot leave detail/data regressions
+  # or the bounded live-update workloads unexecuted.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/activity-details-store")
+  add_test(NAME swirl-activity-details COMMAND Swirl --motion-test --motion-output=activity-details-report.json)
+  set_tests_properties(swirl-activity-details PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_ACTIVITY_DETAIL_CHECKS=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-details-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  foreach(activity_rows 600 2000)
+   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/activity-perf-${activity_rows}-store")
+   add_test(NAME swirl-activity-perf-${activity_rows} COMMAND Swirl --motion-test --motion-output=activity-perf-${activity_rows}-report.json)
+   set_tests_properties(swirl-activity-perf-${activity_rows} PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_ACTIVITY_PERF_CHECKS=1;SWIRL_ACTIVITY_PERF_ROWS=${activity_rows};SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-perf-${activity_rows}-store"
+    ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  endforeach()
+  # This existing driver exercises the toolbar state machine with a per-process
+  # in-memory system-proxy backend and real Rust loopback peers. Keep it isolated
+  # from the user's settings and register it instead of leaving it CLI-only.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/policy-ui-store")
+  add_test(NAME swirl-policy-ui COMMAND Swirl --policy-self-test --policy-output=policy-evidence)
+  set_tests_properties(swirl-policy-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/policy-ui-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Cover the existing cross-theme five-card and native window-state driver,
+  # which otherwise remains reachable only through an environment flag.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/liquid-glass-store")
+  add_test(NAME swirl-liquid-glass COMMAND Swirl --motion-test --motion-output=liquid-glass-evidence)
+  set_tests_properties(swirl-liquid-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_LIQUID_GLASS_CHECKS=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/liquid-glass-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-apec-glass COMMAND Swirl --motion-test --motion-output=apec-glass-report.json)
   set_tests_properties(swirl-apec-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"
@@ -482,9 +673,13 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   add_test(NAME swirl-settings-material COMMAND Swirl --hero-test --hero-material-only --hero-output=settings-material-evidence)
   set_tests_properties(swirl-settings-material PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
-  # Includes canceled native input, focus and pixel evidence for 17 page controls.
-  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
-  set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Includes canceled native input, focus and pixels for ordinary page controls,
+  # the flat toolbar and each of the five activity cards.
+  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE FIXTURES_SETUP swirl_native_navigation ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # CTest always schedules the complete navigation audit before Hero, including
+  # when selecting only Hero with -R. Reuse its verified same-executable report
+  # instead of executing the same 600+ assertions twice inside Hero's deadline.
+  set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE FIXTURES_REQUIRED swirl_native_navigation ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:;SWIRL_HERO_NAVIGATION_REPORT=set:${CMAKE_CURRENT_BINARY_DIR}/navigation-evidence/navigation-report.json")
  endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
@@ -503,16 +698,29 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
 endif()
 if(WIN32)
  # Generate the Windows-only ICO from its optical SVG before RC compilation.
+ if(NOT TARGET Qt6::QOffscreenIntegrationPlugin)
+  message(FATAL_ERROR "The selected Qt SDK must provide its offscreen platform plugin for the icon build tool")
+ endif()
  add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
  target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
+ # Test targets stage Qt DLLs in the application directory during parallel
+ # builds. Keep this build-time executable away from those mutable copies.
+ set_target_properties(SwirlIconBuilder PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/icon-tools/$<CONFIG>")
  set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
  add_custom_command(
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
-  COMMAND $<TARGET_FILE:SwirlIconBuilder>
+  COMMAND "${CMAKE_COMMAND}"
+          "-DSWIRL_ICON_BUILDER=$<TARGET_FILE:SwirlIconBuilder>"
+          "-DSWIRL_QT_BINARY_DIR=$<TARGET_FILE_DIR:Qt6::Core>"
+          "-DSWIRL_ICON_PLATFORM_PLUGIN=$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+          "-DSWIRL_ICON_SOURCE=${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "-DSWIRL_ICON_OUTPUT=${SWIRL_GENERATED_ICON}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/BuildWindowsIcon.cmake"
+  DEPENDS SwirlIconBuilder app/BrandRaster.h tools/BuildWindowsIcon.cmake
           "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
-          "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+  WORKING_DIRECTORY "$<TARGET_FILE_DIR:SwirlIconBuilder>"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )
@@ -530,10 +738,10 @@ if(WIN32)
  target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32 propsys shlwapi)
 endif()
 
-foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
- SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
+foreach(runtime_target IN ITEMS SwirlLanProxyTests SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
+ SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlNativeTunRecoveryTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
- SwirlPrivateSubscriptionInspect SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
+ SwirlPrivateSubscriptionInspect SwirlPrivateSubscriptionAcceptance SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})
   swirl_stage_rust_core(${runtime_target})
  endif()

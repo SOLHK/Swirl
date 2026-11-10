@@ -406,6 +406,13 @@ func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (
 }
 
 func sourceProvesEmpty(_ face: RawFace, _ glyph: Int, _ bytes: Bytes) throws -> Bool {
+    guard glyph >= 0, glyph < Int(face.glyphCount) else { throw OracleError.invalid("empty_check_gid_invalid") }
+    if let cff2 = face.tables["CFF2"] {
+        guard face.tables["glyf"] == nil, face.tables["CFF "] == nil else {
+            throw OracleError.invalid("cff2_empty_check_ambiguous_outline_tables")
+        }
+        return try cff2ProvesEmpty(cff2, glyph, Int(face.glyphCount), bytes)
+    }
     if let loca = face.tables["loca"], let head = face.tables["head"], let glyf = face.tables["glyf"] {
         let format = try bytes.u16(head.offset + 50)
         let start: Int
@@ -468,6 +475,85 @@ func sourceProvesEmpty(_ face: RawFace, _ glyph: Int, _ bytes: Bytes) throws -> 
         return true
     }
     return try visit(glyph, depth: 0)
+}
+
+func cff2ProvesEmpty(_ table: TableSlice, _ glyph: Int, _ glyphCount: Int, _ bytes: Bytes) throws -> Bool {
+    // Only a zero-byte CharString proves emptiness here. Interpreting arbitrary
+    // programs (including subroutines and variation operators) is not a proof.
+    let cff = Bytes(data: try bytes.slice(table.offset, table.length))
+    _ = try cff.checked(0, 5)
+    guard cff.data[0] == 2, cff.data[1] == 0, cff.data[2] >= 5,
+          glyph >= 0, glyph < glyphCount else {
+        throw OracleError.invalid("cff2_empty_check_header_or_gid_invalid")
+    }
+    var position = Int(cff.data[2])
+    let dictEnd = position + Int(try cff.u16(3))
+    _ = try cff.checked(position, dictEnd - position)
+    var operands: [Int?] = []
+    var charStrings: Int?
+    while position < dictEnd {
+        let token = Int(cff.data[position]); position += 1
+        if token >= 32 && token <= 246 {
+            operands.append(token - 139)
+        } else if token >= 247 && token <= 254 {
+            guard position < dictEnd else { throw OracleError.invalid("cff2_dict_number_truncated") }
+            let next = Int(cff.data[position]); position += 1
+            operands.append(token <= 250 ? (token - 247) * 256 + next + 108 : -(token - 251) * 256 - next - 108)
+        } else if token == 28 || token == 29 {
+            let size = token == 28 ? 2 : 4
+            guard position + size <= dictEnd else { throw OracleError.invalid("cff2_dict_number_truncated") }
+            operands.append(token == 28 ? Int(Int16(bitPattern: try cff.u16(position))) : Int(Int32(bitPattern: try cff.u32(position))))
+            position += size
+        } else if token == 30 {
+            // Real operands (e.g. FontMatrix) cannot be CharStrings offsets.
+            var terminated = false
+            while position < dictEnd && !terminated {
+                let value = cff.data[position]; position += 1
+                for nibble in [value >> 4, value & 15] {
+                    if nibble == 15 { terminated = true; break }
+                    guard nibble != 13 else { throw OracleError.invalid("cff2_dict_real_reserved_nibble") }
+                }
+            }
+            guard terminated else { throw OracleError.invalid("cff2_dict_real_truncated") }
+            operands.append(nil)
+        } else if token <= 27 {
+            if token == 12 {
+                guard position < dictEnd else { throw OracleError.invalid("cff2_dict_escape_truncated") }
+                position += 1
+            } else if token == 17 {
+                guard charStrings == nil, operands.count == 1, let value = operands[0], value >= dictEnd + 4 else {
+                    throw OracleError.invalid("cff2_charstrings_offset_invalid")
+                }
+                charStrings = value
+            }
+            operands.removeAll(keepingCapacity: true)
+        } else { throw OracleError.invalid("cff2_dict_token_invalid") }
+        guard operands.count <= 513 else { throw OracleError.invalid("cff2_dict_operand_overflow") }
+    }
+    guard operands.isEmpty, let index = charStrings else {
+        throw OracleError.invalid("cff2_charstrings_reference_missing")
+    }
+    guard Int(try cff.u32(index)) == glyphCount else {
+        throw OracleError.invalid("cff2_charstrings_glyph_count_mismatch")
+    }
+    _ = try cff.checked(index + 4, 1)
+    let offSize = Int(cff.data[index + 4])
+    guard (1...4).contains(offSize) else { throw OracleError.invalid("cff2_index_offsize_invalid") }
+    let offsetsStart = index + 5
+    let dataStart = offsetsStart + (glyphCount + 1) * offSize
+    _ = try cff.checked(offsetsStart, (glyphCount + 1) * offSize)
+    var previous = 0, start = 0, end = 0
+    for i in 0...glyphCount {
+        var offset = 0
+        for j in 0..<offSize { offset = offset * 256 + Int(cff.data[offsetsStart + i * offSize + j]) }
+        guard (i == 0 ? offset == 1 : offset >= previous), offset <= cff.data.count - dataStart + 1 else {
+            throw OracleError.invalid("cff2_index_offset_invalid")
+        }
+        if i == glyph { start = offset }
+        if i == glyph + 1 { end = offset }
+        previous = offset
+    }
+    return start == end
 }
 
 func pathCommands(_ path: CGPath) throws -> [[Any]] {

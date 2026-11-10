@@ -18,13 +18,14 @@ SwirlDialog {
     readonly property int intervalMinutes: [360, 720, 1440, 10080][interval.currentIndex]
     readonly property bool autoUpdate: autoEnabled.checked
     readonly property string formatHint: ["auto", "clash", "loon", "shadowrocket", "surge", "quantumult-x", "sing-box"][formatPreference.currentIndex]
+    readonly property string downloadRoute: "system"
     signal saveRequested()
     signal recoveryRequested()
     objectName: "subscriptionDialog"
     title: sourceId.length ? qsTr("编辑订阅") : qsTr("添加订阅")
     dismissBlocked: pending
     height: Math.min(implicitHeight, parent ? parent.height - Theme.dp(30) : implicitHeight)
-    stateFingerprint: String(autoUpdate) + ":" + intervalMinutes + ":" + formatHint
+    stateFingerprint: String(autoUpdate) + ":" + intervalMinutes + ":" + formatHint + ":" + downloadRoute
 
     function edit(record, source) {
         sourceId = record ? record.id : ""
@@ -178,6 +179,12 @@ SwirlDialog {
                         objectName: "subscriptionAutomaticImport"
                         Layout.fillWidth: true; wrapMode: Text.Wrap
                         text: qsTr("自动识别格式，只更新节点；完整配置需单独审阅。")
+                        color: Theme.muted; font.pixelSize: Theme.fontSize(12)
+                    }
+                    SwirlText {
+                        objectName: "subscriptionAutomaticNetwork"
+                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                        text: qsTr("自动选择可用网络更新订阅。")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
                     }
                 }

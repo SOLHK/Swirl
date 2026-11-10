@@ -1,0 +1,808 @@
+{
+  "status": "PARTIAL_NOT_DELIVERED",
+  "code_head": "e78b962f8d05e2ace7bd97952fee407ffd7bac9f",
+  "code_tree": "bebf7f6563554dad4f0965fa70464d61fa92e58f",
+  "PR_merge_checkout": "455c77b6e0ed3c5ad968d307210a2a1c18310776",
+  "run_id": 41462925682,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41462925682",
+  "workflow_conclusion": "failure",
+  "source_tests": {
+    "passed": 965,
+    "failed": 0,
+    "skipped": 0,
+    "runner": "ubuntu-24.04",
+    "python": "3.12.15"
+  },
+  "audit_tests": {
+    "passed": 6,
+    "failed": 0
+  },
+  "windows": [
+    {
+      "runner": "windows-2022",
+      "artifact_id": 13150557924,
+      "artifact_sha256": "0435cfe06b2b09c0c9a85a54a6a401137620cd8453fefa81044bc499d768500d",
+      "windows_product": "Microsoft Windows Server 2022 Datacenter",
+      "windows_build": "20348",
+      "native_architecture": {
+        "native_machine": 34404,
+        "process_emulated": false,
+        "query_succeeded": true,
+        "compiled_machine": 34404,
+        "process_machine": 0
+      },
+      "binary_sha256": "32d73c3d9957a603f67e05bd844015af9b3b635d11a81a0f9e3ad55e99c71f9d",
+      "build": "COMPILED",
+      "native_runtime": "RAN",
+      "system_installation": "NOT_TESTED",
+      "real_swirl_ui": "NOT_TESTED",
+      "ordinary_geometry_passed": true,
+      "cases": [
+        {
+          "variant": "flat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_standalone",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 186,
+          "controls": 620,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_stat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_fdselect",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_post3",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "compact",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007066269668287043,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_default",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "flat_regions_64",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_192",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_506",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_long",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 634880,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_subr_blend",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "nested_subr_blend",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "adaptive",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        }
+      ]
+    },
+    {
+      "runner": "windows-2025",
+      "artifact_id": 13150507264,
+      "artifact_sha256": "77c034c7b7eb70db457dc9a2e718397622e3e143d9f3ed094615a03ef322b6c8",
+      "windows_product": "Microsoft Windows Server 2025 Datacenter",
+      "windows_build": "26100",
+      "native_architecture": {
+        "process_machine": 0,
+        "compiled_machine": 34404,
+        "native_machine": 34404,
+        "process_emulated": false,
+        "query_succeeded": true
+      },
+      "binary_sha256": "e8690e36426c4534f603143bedf75001aa973859f92c14bb6f456fbde883c63d",
+      "build": "COMPILED",
+      "native_runtime": "RAN",
+      "system_installation": "NOT_TESTED",
+      "real_swirl_ui": "NOT_TESTED",
+      "ordinary_geometry_passed": true,
+      "cases": [
+        {
+          "variant": "flat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_standalone",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 186,
+          "controls": 620,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_stat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_fdselect",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_post3",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "compact",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007066269668287043,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_default",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "flat_regions_64",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_192",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_506",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_long",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 634880,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_subr_blend",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "nested_subr_blend",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "adaptive",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        }
+      ]
+    },
+    {
+      "runner": "windows-11-arm",
+      "artifact_id": 13149748096,
+      "artifact_sha256": "3c699bd392f825e4565e2f5c1794dccafd5ebf0130f6d30e6c9c7c8346243ba8",
+      "windows_product": "Microsoft Windows 11 Enterprise",
+      "windows_build": "26200",
+      "native_architecture": {
+        "process_machine": 0,
+        "native_machine": 43620,
+        "process_emulated": true,
+        "compiled_machine": 34404,
+        "query_succeeded": true
+      },
+      "binary_sha256": "1e889dfe4c255578a66d6a535476e95f8c3647206a11cb862eebb1dde162709e",
+      "build": "COMPILED",
+      "native_runtime": "RAN",
+      "system_installation": "NOT_TESTED",
+      "real_swirl_ui": "NOT_TESTED",
+      "ordinary_geometry_passed": true,
+      "cases": [
+        {
+          "variant": "flat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_standalone",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 186,
+          "controls": 620,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_stat",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_fdselect",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_post3",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "compact",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007066269668287043,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "factored_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_default",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "flat_regions_64",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_192",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_regions_506",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_long",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 634880,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "flat_subr_blend",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        },
+        {
+          "variant": "nested_subr_blend",
+          "status": "FAIL_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 496,
+          "max_control_error": 0.0,
+          "geometry_failures": 124
+        },
+        {
+          "variant": "adaptive",
+          "status": "PASS_AUTHORED_GEOMETRY",
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "geometry_failures": 0
+        }
+      ]
+    }
+  ],
+  "final_font_accepted": false,
+  "apple": {
+    "artifact_id": 13150117892,
+    "artifact_sha256": "0a286c5a59b279a348069245541605b1d912f4e3a8bed609799aea98a049a936",
+    "status": "FAIL_STRICT_METRICS_OR_GEOMETRY",
+    "os": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.10",
+    "fonttools": "4.61.1",
+    "harfbuzz": "14.6.0",
+    "variants": {
+      "flat": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "factored": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "compact": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.001815558652092049,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "flat_long": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "adaptive": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018214870846191714,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      }
+    }
+  },
+  "dense_boundary_diagnosis": [
+    {
+      "gid": 19177,
+      "holdout_count": 128,
+      "failing_holdouts": 62,
+      "max_holdout_control_error": 0.5906989363320106,
+      "worst_control_index": 271,
+      "cell_corner_regime_switches": 18,
+      "switch_kinds": {
+        "axis": 18
+      },
+      "cell_axis_slices": [
+        {
+          "axis": "WDTH",
+          "branch_boundaries_inside_cell": 0,
+          "max_source_chord_defect": 0.0028045547641259586,
+          "worst_control_chord_defect": 2.5421149729252077e-13
+        },
+        {
+          "axis": "wght",
+          "branch_boundaries_inside_cell": 10,
+          "max_source_chord_defect": 0.17300400186043868,
+          "worst_control_chord_defect": 2.5421149729252077e-13
+        },
+        {
+          "axis": "HGHT",
+          "branch_boundaries_inside_cell": 2,
+          "max_source_chord_defect": 0.59106836679691,
+          "worst_control_chord_defect": 0.5910683667844482
+        }
+      ]
+    },
+    {
+      "gid": 1166,
+      "holdout_count": 128,
+      "failing_holdouts": 99,
+      "max_holdout_control_error": 0.8564331994133305,
+      "worst_control_index": 115,
+      "cell_corner_regime_switches": 15,
+      "switch_kinds": {
+        "axis": 15
+      },
+      "cell_axis_slices": [
+        {
+          "axis": "WDTH",
+          "branch_boundaries_inside_cell": 11,
+          "max_source_chord_defect": 0.8886613225532073,
+          "worst_control_chord_defect": 0.8886613225532073
+        },
+        {
+          "axis": "wght",
+          "branch_boundaries_inside_cell": 0,
+          "max_source_chord_defect": 0.0007105386889593942,
+          "worst_control_chord_defect": 0.00015499295941040223
+        },
+        {
+          "axis": "HGHT",
+          "branch_boundaries_inside_cell": 0,
+          "max_source_chord_defect": 0.005701208051990919,
+          "worst_control_chord_defect": 0.005701208051990919
+        }
+      ]
+    }
+  ],
+  "private_diagnostic_sha256": {
+    "diagnose_dense_boundary.py": "d430b44ed5d82b0c656a11c5fdb306a6e6a49c3ee6f46ff5f14cc3763d2b323c",
+    "dense-boundary-report.json": "fb1d7b94810811e05553471982a3eb0123c936310886d64b19e39eb953c23bd2",
+    "probe_branch_tensor.py": "afe77c1144dae740e76aaad0ed6c17bbfacdf3debec3020c93d02b9df4b346be",
+    "branch-tensor-report.json": "b46e4d2e3e8e5b2e3ef96cb3124f18cb8418ec0b2e218cdc9ea5a6745a560d32"
+  },
+  "structural_branch_tensor_followup": [
+    {
+      "gid": 19177,
+      "max_nodes": 507,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "structural_candidates": [
+        53,
+        661,
+        158
+      ],
+      "seconds": 18.772391666992917,
+      "sampled_geometry_passed": false,
+      "training_count": 507,
+      "holdout_count": 128,
+      "max_holdout_error": 1.6719272099422033,
+      "max_refinement_error": 1.6647970189860561,
+      "max_training_error": 0.0005022796309851935,
+      "nonzero_regions": 506,
+      "flat_blend_stack_encodable": true
+    },
+    {
+      "gid": 19177,
+      "max_nodes": 4096,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "structural_candidates": [
+        53,
+        661,
+        158
+      ],
+      "seconds": 239.13713620799535,
+      "sampled_geometry_passed": false,
+      "training_count": 4056,
+      "holdout_count": 128,
+      "max_holdout_error": 0.5696673769631369,
+      "max_refinement_error": 0.7448557900559278,
+      "max_training_error": 0.0011592903617426485,
+      "nonzero_regions": 4050,
+      "flat_blend_stack_encodable": false
+    },
+    {
+      "gid": 1166,
+      "max_nodes": 507,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "structural_candidates": [
+        170,
+        445,
+        80
+      ],
+      "seconds": 7.843074916992919,
+      "sampled_geometry_passed": false,
+      "training_count": 486,
+      "holdout_count": 128,
+      "max_holdout_error": 2.812400445377394,
+      "max_refinement_error": 2.9135640647907266,
+      "max_training_error": 0.00044667767009358493,
+      "nonzero_regions": 485,
+      "flat_blend_stack_encodable": true
+    },
+    {
+      "gid": 1166,
+      "max_nodes": 4096,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "structural_candidates": [
+        170,
+        445,
+        80
+      ],
+      "seconds": 142.20921375000034,
+      "sampled_geometry_passed": false,
+      "training_count": 4048,
+      "holdout_count": 128,
+      "max_holdout_error": 0.926360251384868,
+      "max_refinement_error": 1.2674106069051356,
+      "max_training_error": 0.0012323578187088955,
+      "nonzero_regions": 4040,
+      "flat_blend_stack_encodable": false
+    }
+  ]
+}

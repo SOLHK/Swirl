@@ -37,7 +37,7 @@ class SourceRequestBuildGateTests(unittest.TestCase):
         self.before = self.source.read_bytes()
         self.executable = self.root / 'analytic-oracle-double'
         self.executable.write_text('authored analytic protocol identity\n')
-        self.output = self.root / 'Swirl-VF.ttc'
+        self.output = self.root / 'SwirlVF.ttc'
         self.checkpoints = self.root / 'private-checkpoints'
 
     def test_first_source_only_session_cannot_sample_checkpoint_or_publish(self):

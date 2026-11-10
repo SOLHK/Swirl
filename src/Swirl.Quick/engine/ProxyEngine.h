@@ -5,6 +5,26 @@
 #include <QVariantList>
 #include <QJsonObject>
 #include "ProxyNode.h"
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+#include <memory>
+class PrivateUiQuotaSession;
+// An immutable trust attachment issued only after the paired private grant and
+// owned fixture proof. It is not an imported/persisted DNS configuration field.
+class PrivateUiDnsTrust final {
+public:
+    QString apply(QJsonObject *) const;
+    bool snapshot(QJsonObject *) const;
+    QString bindingDigest() const;
+private:
+    friend class PrivateUiQuotaSession;
+    PrivateUiDnsTrust(QString endpoint,QByteArray ca,QJsonObject binding,QString source)
+        :m_endpoint(std::move(endpoint)),m_ca(std::move(ca)),m_binding(std::move(binding)),m_source(std::move(source)){}
+    const QString m_endpoint;
+    const QByteArray m_ca;
+    const QJsonObject m_binding;
+    const QString m_source;
+};
+#endif
 
 // Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
 struct EngineStartOptions {
@@ -20,6 +40,13 @@ struct EngineStartOptions {
     // Internal node-test capability only, never loaded from user settings or
     // subscriptions. Rust atomically binds loopback port zero for these workers.
     bool internalProbeListener = false;
+    // Internal request capability derived from the live TUN owner, never a
+    // persisted/imported setting. It changes only isolated probe sockets.
+    bool internalProbePhysicalEgress = false;
+    // Internal node-test capability: an isolated sweep engine maps every
+    // requested node so probe_nodes can dial each one. The live session still
+    // maps only its selected route and policy-group members.
+    bool probeAllNodes = false;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.
@@ -31,9 +58,13 @@ struct EngineStartOptions {
     bool gatewayForwarding=false;
     bool allowLan=false;
     QString lanUsername,lanPassword;
-    QString lanBindAddress = QStringLiteral("*");
+    QString lanBindAddress = QStringLiteral("127.0.0.1");
+    QVariantMap lanConfiguration;
     bool lanSkipLocalAuthentication = true;
     QVariantMap dnsConfig;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    std::shared_ptr<const PrivateUiDnsTrust> privateUiDnsTrust;
+#endif
     QStringList customRules;
     QVariantList customGroups;
     QString inboundUsername,inboundPassword;
@@ -93,6 +124,11 @@ public:
         bool gatewayForwarding=false;
         bool directSession=false;
         bool tunEnabled=false,allowLan=false;
+        // Includes starting, degraded and restoring broker ownership. A false
+        // healthy-TUN flag alone cannot prove that capture routes are absent.
+        bool tunCapturePossible=false;
+        bool tunRecoveryRequired=false;
+        QJsonObject lan;
         QJsonObject configurationReceipt;
     };
     using QObject::QObject;
@@ -109,8 +145,20 @@ public:
         emit probeRequestRejected(tag,QStringLiteral("probe-unavailable"));
     }
     virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
+    // Concurrent per-node latency sweep. Engines that cannot batch return
+    // false and the caller keeps its isolated-engine path.
+    virtual bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) {
+        Q_UNUSED(ids);Q_UNUSED(url);
+        if(error)*error=QStringLiteral("probe-batch-unavailable");
+        return false;
+    }
+    virtual QJsonObject probeNodesStatus() { return {}; }
+    virtual void cancelProbeNodes() {}
     virtual void configurationCommand(const QJsonObject &command) {
         emit configurationCommandFinished(command.value("request_id").toString(),QJsonObject{{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"}});
+    }
+    virtual void lanCommand(const QJsonObject &command) {
+        emit lanCommandFinished(command.value("request_id").toString(), QJsonObject{{"ok",false},{"code","UnsupportedCapability"}});
     }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
@@ -122,5 +170,6 @@ signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
     void probeRequestRejected(quint64 tag,const QString &code);
+    void lanCommandFinished(const QString &requestId,const QJsonObject &response);
     void configurationCommandFinished(const QString &requestId,const QJsonObject &response);
 };

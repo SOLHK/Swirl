@@ -13,7 +13,6 @@ SwirlMotionButton {
     property bool danger: false
     property bool spinning: false
     property string tooltip: ""
-    property bool tooltipEnabled: true
     readonly property bool iconOnly: text.length === 0
     implicitWidth: iconOnly ? Theme.dp(44) : contents.implicitWidth + leftPadding + rightPadding
     implicitHeight:Math.max(Theme.controlHeight,contents.implicitHeight+topPadding+bottomPadding)
@@ -21,6 +20,7 @@ SwirlMotionButton {
     leftPadding:Theme.dp(iconOnly?8:16);rightPadding:leftPadding
     topPadding:Theme.dp(4);bottomPadding:Theme.dp(4)
     Accessible.name: text
+    Accessible.description: tooltip
     background: SwirlControlSurface {
         anchors.centerIn: parent
         width: control.iconOnly ? Theme.controlHeight : parent.width
@@ -61,9 +61,5 @@ SwirlMotionButton {
             }
         }
     }
-    SwirlToolTip {
-        parent: control
-        visible: control.tooltipEnabled && control.enabled && (control.hovered || control.visualFocus) && (control.tooltip.length > 0 || caption.truncated)
-        text:control.tooltip.length ? control.tooltip : control.text
-    }
+
 }

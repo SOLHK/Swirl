@@ -1,4 +1,5 @@
 #include "WindowShadowRenderer.h"
+#include "SwirlContour.h"
 #include <QtMath>
 #include <algorithm>
 #include <cmath>
@@ -6,13 +7,6 @@
 #include <limits>
 
 namespace {
-qreal distanceToContour(qreal x, qreal y, qreal width, qreal height, qreal radius) {
-    const qreal dx = std::abs(x - width / 2) - (width / 2 - radius);
-    const qreal dy = std::abs(y - height / 2) - (height / 2 - radius);
-    return std::pow(std::pow(qMax<qreal>(dx, 0), 2.5) + std::pow(qMax<qreal>(dy, 0), 2.5), 0.4)
-        + qMin(qMax(dx, dy), qreal(0)) - radius;
-}
-
 QImage analyticImage(QSize body, qreal radius, qreal dpr, bool active) {
     const int padding = qCeil(20 * dpr);
     const qreal sigma = 6 * dpr, offset = 2.5 * dpr;
@@ -26,8 +20,7 @@ QImage analyticImage(QSize body, qreal radius, qreal dpr, bool active) {
         int clearLeft = image.width(), clearRight = image.width();
         if (localY >= 0 && localY < body.height()) {
             const qreal dy = qMax<qreal>(0, qMax(radius - localY, localY - (body.height() - radius)));
-            const qreal inset = radius - std::pow(qMax<qreal>(0,
-                std::pow(radius, 2.5) - std::pow(dy, 2.5)), 0.4);
+            const qreal inset = SwirlContour::insetAtY(radius, dy);
             clearLeft = padding + qMax(0, qCeil(inset + 0.5));
             clearRight = padding + body.width() - qMax(0, qCeil(inset + 0.5));
         }
@@ -36,11 +29,11 @@ QImage analyticImage(QSize body, qreal radius, qreal dpr, bool active) {
             const qreal localX = x + 0.5 - padding;
             if (localX >= radius && localX < body.width() - radius && localY >= 0 && localY < body.height()) continue;
             if (localY >= radius && localY < body.height() - radius && localX >= 0 && localX < body.width()) continue;
-            const qreal edge = distanceToContour(localX, localY, body.width(), body.height(), radius);
+            const qreal edge = SwirlContour::distance(localX, localY, body.width(), body.height(), radius);
             if (edge <= -0.5) continue;
             const qreal t = qBound<qreal>(0, edge + 0.5, 1);
             const qreal coverage = t * t * (3 - 2 * t);
-            const qreal distance = qMax<qreal>(0, distanceToContour(localX, localY - offset, body.width(), body.height(), radius));
+            const qreal distance = qMax<qreal>(0, SwirlContour::distance(localX, localY - offset, body.width(), body.height(), radius));
             row[x] = qRgba(0, 0, 0, qRound(255 * strength * coverage * std::exp(-distance * distance / (2 * sigma * sigma))));
         }
     }

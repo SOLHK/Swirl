@@ -42,7 +42,9 @@ Item {
     property int groupIndex:0
     onGroupIndexChanged:if(groupIndex!==0)recentOnly=false
     readonly property var sources:engineController.imports.providers
-    readonly property var sourceOptions:[{id:"",kind:"",name:qsTr("全部来源")},{id:"",kind:"manual",name:qsTr("手动添加")}].concat(page.sources.map(s=>({id:s.id,kind:"subscription",name:s.name}))).concat(engineController.imports.legacyNodeCount>0?[{id:"",kind:"legacy",name:qsTr("历史未归属")}]:[])
+    readonly property var sourceOptions:engineController.subscriptionScopeEnabled
+        ? [{id:engineController.activeSubscriptionId,kind:engineController.activeSubscriptionId.length?"subscription":"",name:engineController.activeSubscriptionId.length?(page.sources.find(s=>s.id===engineController.activeSubscriptionId)||{}).name||qsTr("来源已删除"):qsTr("独立导入")}]
+        : [{id:"",kind:"",name:qsTr("全部来源")},{id:"",kind:"manual",name:qsTr("独立导入")}].concat(page.sources.map(s=>({id:s.id,kind:"subscription",name:s.name}))).concat(engineController.imports.legacyNodeCount>0?[{id:"",kind:"legacy",name:qsTr("历史未归属")}]:[])
     readonly property int sourceIndex:Math.max(0,sourceOptions.findIndex(s=>s.id===page.sourceId&&s.kind===page.sourceKind))
     function selectSource(index){const entry=sourceOptions[index]||sourceOptions[0];sourceKind=entry.kind;sourceId=entry.id}
     readonly property var countries:{const names={};for(const n of engineController.nodeCatalog)if((!sourceId||n.sourceId===sourceId)&&(!sourceKind||n.sourceKind===sourceKind))names[n.regionCode]=n.regionName;return Object.keys(names).sort().map(code=>({code:code,name:names[code]}))}
@@ -52,7 +54,7 @@ Item {
     readonly property var filterState:({protocol:protocol,regionCode:countryCode,sourceId:sourceId,sourceKind:sourceKind,status:statusFilter,maxLatency:maxLatency,available:availableOnly||groupIndex===1,group:groupIndex===2?"favorites":recentOnly?"recent":"all",sort:["name","latency","regionName","protocol"][sortOrder.currentIndex]})
     onFilterStateChanged:nodes.filters=filterState
     onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId)){sourceId="";sourceKind=""}
-    onSourceOptionsChanged:if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""
+    onSourceOptionsChanged:{if(engineController.subscriptionScopeEnabled){sourceKind=sourceOptions[0].kind;sourceId=sourceOptions[0].id}else if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""}
     Timer {id:searchDelay;interval:100;onTriggered:{nodes.query=search.text;nodeTable.scrollToBeginning()}}
     function dismissDetail(){if(!nodeHero.opened)return false;if(nodeDeletePending)return true;nodeHero.returnTo(nodeTable.selectedItem);if(nodeDeleteRecovery){nodeDeleteRecovery=false;inspectedId=""}return true}
     function selectRow(row) {if(row&&row.id)focusedId=row.id}
@@ -99,7 +101,7 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         SwirlPageHeader {
             id:nodeHeading;Layout.fillWidth:true;title:qsTr("节点资源库")
-            description:qsTr("浏览、收藏与独立测试节点，在策略页分配出口。")
+            description:engineController.subscriptionScopeEnabled?qsTr("仅显示当前来源的节点；在订阅管理中切换使用的来源。"):qsTr("浏览、收藏与独立测试节点，在策略页分配出口。")
             metadata:qsTr("%1 个节点，%2 个订阅来源").arg(nodes.total).arg(page.sources.length)
             SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测试"):qsTr("测试连接");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.showAt()}}}
             SwirlButton {objectName:"nodeImportButton";text:qsTr("导入");quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
@@ -130,7 +132,7 @@ Item {
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:true;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
-                    sectioned:true;activateOnSingleClick:false
+                    sectioned:true;stagedProjection:true;activateOnSingleClick:false
                     sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
                     rowActionsWidth:Theme.dp(88)
                     rowActions:Component {
@@ -138,11 +140,11 @@ Item {
                             record:parent.record
                             editable:!record.sourceId&&engineController.canStart&&!page.nodeSavePending&&!page.nodeDeletePending
                             testable:!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
-                            onFavoriteRequested:nodes.toggleFavorite(record.id)
-                            onDetailsRequested:page.inspectRow(record)
-                            onEditRequested:page.edit(record)
-                            onTestRequested:engineController.testSelectedNode(record.id,testUrl.text.trim())
-                            onCopyRequested:nodes.copySafeInfo(record.id)
+                            onFavoriteRequested:if(parent.acceptsInteraction())nodes.toggleFavorite(record.id)
+                            onDetailsRequested:if(parent.acceptsInteraction())page.inspectRow(record)
+                            onEditRequested:if(parent.acceptsInteraction())page.edit(record)
+                            onTestRequested:if(parent.acceptsInteraction())engineController.testSelectedNode(record.id,testUrl.text.trim())
+                            onCopyRequested:if(parent.acceptsInteraction())nodes.copySafeInfo(record.id)
                         }
                     }
                     anchors.fill:parent;anchors.margins:Theme.dp(6);externalModel:sections;selectedId:page.focusedId
@@ -152,7 +154,7 @@ Item {
                     onRowActivated:function(row,titleItem){page.inspectRow(row)}
                     onSectionActivated:function(key){sections.toggleSection(key)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0&&!nodeTable.projectionBlocked;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
         }
     }

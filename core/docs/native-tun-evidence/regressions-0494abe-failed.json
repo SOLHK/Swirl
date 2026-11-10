@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "development_sha": "0494abe936e61ea05eff199d646e85f2dd9b19e3",
+  "status": "failed",
+  "files": [
+    {
+      "path": "windows-wintun-0494abe-failed.log",
+      "bytes": 18973,
+      "sha256": "796a2f0fde47483f4d47c36cb36ef2c02db071c870f24d6974bad93ec1ef4cbc",
+      "normalization": "none; original ZIP-entry bytes",
+      "artifact_id": 13074398936,
+      "original_zip_entry": "swirl-wintun-smoke.log"
+    },
+    {
+      "path": "macos-trojan-udp-0494abe-receipt.json",
+      "bytes": 6835,
+      "sha256": "b8afaeddc3fba0e8d3498e9e35bbe28dbf5eb583cecd2a6363c9b05d422f95f6",
+      "normalization": "none; original ZIP-entry bytes",
+      "artifact_id": 13074641556,
+      "original_zip_entry": "stream-udp.json"
+    }
+  ],
+  "windows_native": {
+    "actual_checkout_sha": "0684916a8cf35a9ed9b7b654e2d9c9341559bd73",
+    "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41283451790",
+    "job_id": 124779894236,
+    "runner_label": "windows-2025",
+    "error_code": 10060,
+    "stage": "IPv4 UDP proxy_unavailable after-DIRECT receive, inferred from the exact source path and original error",
+    "prior_dot_reset_code": 10054,
+    "dot_reset_phase": "not recorded; do not infer handshake/query/shutdown",
+    "cleanup": {
+      "restored": 6,
+      "conflicts": 0,
+      "adapter_removed": true,
+      "original_adapters": 8,
+      "original_routes": 26,
+      "original_schema_equal": true
+    },
+    "wfp_diagnostic_executed": false,
+    "physical_windows_11_acceptance": false
+  },
+  "macos_protocols": {
+    "actual_checkout_sha": "0494abe936e61ea05eff199d646e85f2dd9b19e3",
+    "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41283448635",
+    "job_id": 124779876994,
+    "test": "test_vless_targets_have_separate_carriers_and_trojan_frames_keep_each_address",
+    "subtest_protocol": "trojan",
+    "observed_failure": "first UDP receive timed out after original four-second socket deadline",
+    "uploaded": 5,
+    "downloaded": 0,
+    "active_after_close": 0,
+    "origin_receive_or_reply_observations": "not collected in this source; failure location beyond Xray frame decoding is unknown",
+    "qt_product_acceptance": false
+  },
+  "root_cause": "Unresolved. New measurement-only diagnostics retain all original timeouts/assertions and require fresh real runs."
+}

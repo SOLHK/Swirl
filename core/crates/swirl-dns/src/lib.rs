@@ -1,6 +1,12 @@
-//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver. Fake-IP is not implemented.
+//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver.
+//! Fake-IP and real-IP association live in `association` and are not applied
+//! by `Resolver::resolve`.
+mod association;
 mod dot;
+mod stub;
+pub mod tun;
 mod wire;
+pub use association::{Association, DNS_IPV4, DNS_IPV6, Mapping, RecordKind, TUN_IPV4, TUN_IPV6};
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -8,6 +14,10 @@ use std::{
     time::{Duration, Instant},
 };
 use std::{future::Future, pin::Pin};
+pub use stub::{
+    AAAA, DNS_A, DnsQuestion, decode_answers, decode_query, encode_query, encode_response,
+    unwrap_tcp, wrap_tcp,
+};
 use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::BoxStream;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
@@ -27,7 +37,7 @@ impl QueryTransport for DirectQueryTransport {
         address: SocketAddr,
     ) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>> {
         Box::pin(async move {
-            let stream = tokio::net::TcpStream::connect(address)
+            let stream = swirl_transport::connect_tcp(address)
                 .await
                 .map_err(|_| "DnsTlsConnect")?;
             Ok(Box::new(stream) as BoxStream)
@@ -37,13 +47,22 @@ impl QueryTransport for DirectQueryTransport {
 
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
+type EndpointGuard = Arc<dyn Fn(SocketAddr) -> bool + Send + Sync>;
+#[cfg(all(test, windows))]
+#[path = "physical_probe_tests.rs"]
+mod physical_probe_tests;
 #[cfg(test)]
 #[path = "query_transport_tests.rs"]
 mod query_transport_tests;
 const FAILURE_TTL: Duration = Duration::from_secs(1);
+// Immutable views share the same cache and in-flight lookup budget. Ingress
+// endpoint policies can therefore be scoped without creating another resolver.
+#[derive(Clone)]
 pub struct Resolver {
     query_family: DnsQueryFamily,
-    cache: Mutex<Cache>,
+    cache: Arc<Mutex<Cache>>,
+    pinned: Option<(String, Vec<IpAddr>)>,
+    endpoint_guard: Option<EndpointGuard>,
     permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
@@ -54,7 +73,9 @@ impl Default for Resolver {
     fn default() -> Self {
         Self {
             query_family: DnsQueryFamily::Dual,
-            cache: Mutex::new(HashMap::new()),
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            pinned: None,
+            endpoint_guard: None,
             permits: Arc::new(Semaphore::new(8)),
             hosts: HashMap::new(),
             servers: Vec::new(),
@@ -81,6 +102,9 @@ impl Resolver {
         if let Ok(ip) = host.parse() {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
+        if let Some(addresses) = self.pinned_addresses(host, port) {
+            return Ok(addresses);
+        }
         if let Some(ip) = self.mapped_host(host) {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
@@ -95,6 +119,7 @@ impl Resolver {
         if let Some(answer) = self.cached(&key, port)? {
             return answer;
         }
+        self.check_configured_endpoints()?;
         let started = Instant::now();
         let resolution = timeout(
             Duration::from_secs(3),
@@ -166,7 +191,9 @@ impl Resolver {
     pub fn with_hosts(&self, hosts: &[swirl_subscription::HostMapping]) -> Self {
         Self {
             query_family: DnsQueryFamily::Dual,
-            cache: Mutex::new(HashMap::new()),
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            pinned: None,
+            endpoint_guard: None,
             permits: self.permits.clone(),
             hosts: hosts
                 .iter()
@@ -189,6 +216,62 @@ impl Resolver {
         }
         Ok(result)
     }
+    /// Preserve the configured DNS policy, cache and shared lookup budget while
+    /// freezing an already validated endpoint answer for one outbound flow.
+    /// Protocols keep the original hostname for SNI and certificate checks.
+    pub fn with_pinned_addresses(&self, host: &str, addresses: Vec<IpAddr>) -> Self {
+        Self {
+            query_family: self.query_family,
+            cache: self.cache.clone(),
+            pinned: Some((host.to_ascii_lowercase(), addresses)),
+            endpoint_guard: self.endpoint_guard.clone(),
+            permits: self.permits.clone(),
+            hosts: self.hosts.clone(),
+            servers: self.servers.clone(),
+            tls_servers: self.tls_servers.clone(),
+            system_hosts: self.system_hosts.clone(),
+        }
+    }
+    /// Attach an ingress-owned endpoint policy to this immutable resolver view.
+    /// Protocols that learn a second physical endpoint (SOCKS5 UDP BND.ADDR)
+    /// must consult it after resolution and before sending any packet.
+    pub fn with_endpoint_guard(
+        mut self,
+        guard: impl Fn(SocketAddr) -> bool + Send + Sync + 'static,
+    ) -> Self {
+        self.endpoint_guard = Some(Arc::new(guard));
+        self
+    }
+    pub fn endpoint_allowed(&self, address: SocketAddr) -> bool {
+        self.endpoint_guard
+            .as_ref()
+            .is_none_or(|guard| guard(address))
+    }
+    fn check_configured_endpoints(&self) -> Result<(), &'static str> {
+        // Run after cache/hosts lookup and before any configured DNS I/O.
+        // Checking every configured fallback prevents retrying a denied server.
+        // The OS resolver path is unchanged; no fallback is introduced here.
+        if self
+            .servers
+            .iter()
+            .chain(self.tls_servers.iter().map(|server| &server.address))
+            .any(|address| !self.endpoint_allowed(*address))
+        {
+            return Err("DnsEndpointForbidden");
+        }
+        Ok(())
+    }
+    fn pinned_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
+        self.pinned
+            .as_ref()
+            .filter(|(name, _)| name.eq_ignore_ascii_case(host))
+            .map(|(_, addresses)| {
+                addresses
+                    .iter()
+                    .map(|ip| SocketAddr::new(*ip, port))
+                    .collect()
+            })
+    }
     pub fn mapped_host(&self, host: &str) -> Option<IpAddr> {
         self.hosts.get(&host.to_ascii_lowercase()).copied()
     }
@@ -199,11 +282,30 @@ impl Resolver {
         if let Ok(ip) = host.parse() {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
+        if let Some(addresses) = self.pinned_addresses(host, port) {
+            return Ok(addresses);
+        }
         if let Some(ip) = self.mapped_host(host) {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
         if let Some(ip) = self.system_hosts.get(&host.to_ascii_lowercase()) {
             return Ok(vec![SocketAddr::new(*ip, port)]);
+        }
+        // Windows OS lookups run in a detached resolver task and cannot carry
+        // a per-probe socket binding. A TUN probe must keep its explicit DNS/
+        // hosts, not consult capture DNS or reuse an earlier OS-cache answer.
+        // Ordinary (TUN-off) probes retain the existing system lookup path.
+        if self.servers.is_empty()
+            && self.tls_servers.is_empty()
+            && swirl_transport::egress::private_acceptance_active()
+        {
+            return Err("DnsPrivateMeteredResolverRequired");
+        }
+        if self.servers.is_empty()
+            && self.tls_servers.is_empty()
+            && swirl_transport::egress::physical_probe_active()
+        {
+            return Err("DnsPhysicalResolverRequired");
         }
         let key = host.to_ascii_lowercase();
         if let Some(result) = self.cached(&key, port)? {
@@ -219,6 +321,7 @@ impl Resolver {
         }
         if !self.servers.is_empty() || !self.tls_servers.is_empty() {
             let _permit = permit;
+            self.check_configured_endpoints()?;
             let started = Instant::now();
             let resolution = async {
                 if self.tls_servers.is_empty() {
@@ -243,6 +346,10 @@ impl Resolver {
         }
         // Keep the permit until the underlying OS lookup actually finishes even
         // if the caller times out/cancels. This bounds detached blocking lookups.
+        // Mark this unmetered path before spawning: a later guard installation
+        // must not race a detached OS resolver that is already running.
+        swirl_transport::egress::check_unmetered_egress()
+            .map_err(|_| "DnsPrivateMeteredResolverRequired")?;
         let host = host.to_owned();
         let lookup = tokio::spawn(async move {
             let _permit = permit;
@@ -321,6 +428,185 @@ fn parse_hosts(data: &[u8]) -> Result<HashMap<String, IpAddr>, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn pinned_endpoint_preserves_policy_budget_and_cannot_rebind() {
+        let root = Resolver::default();
+        let dns = swirl_subscription::Dns {
+            hosts: vec![swirl_subscription::HostMapping {
+                name: "endpoint.fixture.invalid".into(),
+                address: "127.0.0.1".parse().unwrap(),
+            }],
+            servers: vec!["127.0.0.1:5353".parse().unwrap()],
+            use_system_hosts: false,
+            ..Default::default()
+        };
+        let resolver = root.with_config(&dns).unwrap();
+        let approved = vec![
+            "203.0.113.1".parse().unwrap(),
+            "2001:db8::1".parse().unwrap(),
+        ];
+        let pinned = resolver.with_pinned_addresses("endpoint.fixture.invalid", approved.clone());
+        assert!(Arc::ptr_eq(&resolver.cache, &pinned.cache));
+        assert!(Arc::ptr_eq(&resolver.permits, &pinned.permits));
+        assert_eq!(resolver.servers, pinned.servers);
+        assert_eq!(
+            pinned
+                .resolve("ENDPOINT.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            approved
+                .iter()
+                .map(|ip| SocketAddr::new(*ip, 443))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            resolver
+                .resolve("endpoint.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["127.0.0.1:443".parse().unwrap()]
+        );
+    }
+    #[tokio::test]
+    async fn scoped_configured_dns_guard_rejects_udp_dot_doh_before_network_or_failure_cache() {
+        for protocol in ["udp", "dot", "doh"] {
+            let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+            let tcp = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            udp.set_nonblocking(true).unwrap();
+            tcp.set_nonblocking(true).unwrap();
+            let mut config = swirl_subscription::Dns {
+                query_family: DnsQueryFamily::Ipv4Only,
+                use_system_hosts: false,
+                ..Default::default()
+            };
+            if protocol == "udp" {
+                config.servers.push(udp.local_addr().unwrap());
+            } else {
+                config.tls_servers.push(DnsTlsServer {
+                    address: tcp.local_addr().unwrap(),
+                    tls: swirl_subscription::Tls {
+                        server_name: "dns.fixture.invalid".into(),
+                        alpn: vec![],
+                        ca_der_base64: None,
+                    },
+                    https_path: (protocol == "doh").then(|| "/dns-query".into()),
+                });
+            }
+            let original = Resolver::default().with_config(&config).unwrap();
+            let guarded = original.clone().with_endpoint_guard(|_| false);
+            assert_eq!(
+                guarded.resolve("protected.fixture.invalid", 443).await,
+                Err("DnsEndpointForbidden")
+            );
+            if protocol != "udp" {
+                assert_eq!(
+                    guarded
+                        .resolve_with_transport(
+                            "transport.fixture.invalid",
+                            443,
+                            &DirectQueryTransport
+                        )
+                        .await,
+                    Err("DnsEndpointForbidden")
+                );
+            }
+            assert!(
+                original.cache.lock().unwrap().is_empty(),
+                "an ingress denial must not poison the shared cache"
+            );
+            assert_eq!(original.permits.available_permits(), 8);
+            assert_eq!(
+                udp.recv_from(&mut [0; 512]).unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+            assert_eq!(
+                tcp.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn guarded_dns_view_keeps_cache_static_answers_and_ordinary_host_policy() {
+        let peer = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let address = peer.local_addr().unwrap();
+        let worker = tokio::spawn(async move {
+            for _ in 0..2 {
+                let mut query = [0; 512];
+                let (length, client) = timeout(Duration::from_secs(4), peer.recv_from(&mut query))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(&query[length - 4..length], &[0, 1, 0, 1]);
+                let mut reply = query[..length].to_vec();
+                reply[2..4].copy_from_slice(&[0x81, 0x80]);
+                reply[6..8].copy_from_slice(&[0, 1]);
+                reply.extend([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 203, 0, 113, 8]);
+                peer.send_to(&reply, client).await.unwrap();
+            }
+        });
+        let original = Resolver::default()
+            .with_config(&swirl_subscription::Dns {
+                query_family: DnsQueryFamily::Ipv4Only,
+                use_system_hosts: false,
+                servers: vec![address],
+                hosts: vec![swirl_subscription::HostMapping {
+                    name: "static.fixture.invalid".into(),
+                    address: "203.0.113.9".parse().unwrap(),
+                }],
+                ..Default::default()
+            })
+            .unwrap();
+        let guarded = original.clone().with_endpoint_guard(|_| false);
+        assert!(Arc::ptr_eq(&original.cache, &guarded.cache));
+        assert!(Arc::ptr_eq(&original.permits, &guarded.permits));
+        assert_eq!(
+            original
+                .resolve("cached.fixture.invalid", 80)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:80".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded
+                .resolve("cached.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded
+                .resolve("static.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.9:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded.resolve("2001:db8::1", 443).await.unwrap(),
+            vec!["[2001:db8::1]:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded.resolve("uncached.fixture.invalid", 443).await,
+            Err("DnsEndpointForbidden")
+        );
+        assert!(
+            original
+                .cached("uncached.fixture.invalid", 443)
+                .unwrap()
+                .is_none()
+        );
+        // The restricted view has not modified the ordinary host resolver or
+        // inserted a shared failure: its next real query must still succeed.
+        assert_eq!(
+            original
+                .resolve("uncached.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:443".parse().unwrap()]
+        );
+        worker.await.unwrap();
+    }
+
     #[tokio::test]
     async fn ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback() {
         use swirl_subscription::{Dns, HostMapping};

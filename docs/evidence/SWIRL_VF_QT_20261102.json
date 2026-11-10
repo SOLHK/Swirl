@@ -1,0 +1,184 @@
+{
+  "QTest_incidents_including_init_and_cleanup": {
+    "font-axis-policy.xml": {
+      "fail": 0,
+      "pass": 36,
+      "skip": 0
+    },
+    "font-selection.xml": {
+      "fail": 0,
+      "pass": 25,
+      "skip": 9
+    }
+  },
+  "authored_fixture_sha256": {
+    "automation-other.ttf": "0eb62b2ac107e24d5aa2f4bd6847a0129cbbedea85b6f2ccb8b6e464022b5a9f",
+    "automation-width.otc": "4ea6f828aaa58ee73a4e5663d262f8629764ddde43ce2cde86b19a5fbdcbb7d1",
+    "automation-width.ttf": "9dba4906fc5d70e76a456226ed438a9a98bd173c24a31b9eaecff4ca9a9488a4",
+    "automation.ttf": "67127058f1577d91ccebacedb995c55b17f42cab51c0b21b605238448d0e8e7f",
+    "avar-duplicate.ttf": "f7052749612d3f65b8159a8241eda7daa02ec7df8a73985afcc6b32e0eb72334",
+    "avar-empty.ttf": "82a81ab9f8e43d2282da6f945aff321259b72334fcd724ee11191167241bb955",
+    "avar-nonmonotonic.ttf": "ef3bac35b513ecea32ae5ce6c72188a5c27f340bc01de60cf16b2e7cc954fdd3",
+    "avar-unanchored.ttf": "9b5f60839b9d14d8ff181d0a82d6337c151604504351c1386a9bd5d41ac88e52",
+    "cff.otf": "a0a7a61bb743990ef1f698fe6584fdcf937eb5c5c4559a8d5782de65831f4efb",
+    "custom-width-outline-impostor.ttf": "8f4cb4bf7e83ecbbb4aaad8e15a5d161d4c15894c983e22eba4b5c2cdbc47a0c",
+    "custom-width-sc.ttf": "a76967d95e23470cd346c6accaf502cf93dce3ddbcb642177f197d40d5f42def",
+    "custom-width-static-impostor.ttf": "c666a04c7f85b7d7cebfd1ab8941b7fae0e45de992da81344d0207936d15b5ba",
+    "custom-width-tc.ttf": "c0462bc8b2f88ba7b7df362f551fea2333c9c9c06a237664afb2763c4e53eac0",
+    "custom-width-watch.ttf": "9dbe8be34321ea418415a9274aa56af96aa1873cf843be4a7106449a09a1890b",
+    "hvgl-only.ttf": "1e09f6407126b23f940a0217148726178747b4476aae0a766fdbbb3ace3dd67f",
+    "range.ttf": "c83c763ece45b8ffbfae18bcb3951295db1ac4cff1c61865ec999003bf2019b1",
+    "static.ttf": "98449618dc7efc0ae5a9579b4a63d598aac3e9acefca3afee1d0a4a99c16f1fa",
+    "swirl-vf-probe.ttc": "77e890b0cad52a1d292d0c7f1e2ed52debfab6bab13e73e4cbf73889aae697c5",
+    "variable.ttf": "578bc2f753557050dd4e29590995bf8d53787402eebc29e9d5522e9b5b9743f1"
+  },
+  "boundaries": {
+    "Qt_Windows_backend": "NOT_RUN",
+    "Windows_11": "NOT_RUN",
+    "final_SwirlVF_font": "NOT_RUN; accepted final font does not exist",
+    "full_Swirl_application": "NOT_RUN; standalone production font classes compiled and tested",
+    "native_GPU_physical_DPI_or_frame_rate": "NOT_RUN; offscreen software only",
+    "original_HVF_font": "NOT_USED",
+    "system_installation": "NOT_RUN"
+  },
+  "code_tree_manifest": {
+    "file_count": 285,
+    "format": "sorted UTF-8 lines: lowercase_sha256 + two spaces + repository_relative_path + LF",
+    "scope": "all .cpp/.h/.qml under src/Swirl.Quick/app,tests,qml plus src/Swirl.Quick/CMakeLists.txt",
+    "sha256": "f04c5c89e180e3feb5e069010e3021fb8501fd05687ed018ef0e743d6412ee7b"
+  },
+  "commands": [
+    {
+      "command": "aqt install-qt mac desktop 6.12.0 clang_64 --archives qtbase qtdeclarative --modules qtshadertools --outputdir ${PRIVATE_ROOT}/qt-sdk",
+      "exit_status": 0
+    },
+    {
+      "command": "${PRIVATE_ROOT}/qt-sdk/6.12.0/macos/bin/qmake -query QT_VERSION",
+      "exit_status": 0,
+      "output": "6.12.0"
+    },
+    {
+      "command": "${PRIVATE_ROOT}/venv/bin/python src/Swirl.Quick/tests/generate_font_metadata_fixtures.py ${PRIVATE_ROOT}/qt-font-fixtures",
+      "exit_status": 0
+    },
+    {
+      "command": "cmake -S src/Swirl.Quick -B ${PRIVATE_ROOT}/qt-fonts-build-20261102 -G Ninja -DSWIRL_FONT_TESTS_ONLY=ON -DCMAKE_PREFIX_PATH=${PRIVATE_ROOT}/qt-sdk/6.12.0/macos -DSWIRL_TEST_FONT_DIRECTORY=${PRIVATE_ROOT}/qt-font-offscreen",
+      "exit_status": 0
+    },
+    {
+      "command": "cmake --build ${PRIVATE_ROOT}/qt-fonts-build-20261102 --parallel 4",
+      "exit_status": 0
+    },
+    {
+      "command": "env SWIRL_FONT_METADATA_FIXTURES=${PRIVATE_ROOT}/qt-font-fixtures QT_FORCE_STDERR_LOGGING=1 ctest --test-dir ${PRIVATE_ROOT}/qt-fonts-build-20261102 -R '^swirl-font-' --no-tests=error --output-on-failure --output-junit ${PRIVATE_ROOT}/qt-font-ctest.xml",
+      "exit_status": 0
+    }
+  ],
+  "commands_path_convention": "PRIVATE_ROOT is an external directory outside the checkout; commands preserve actual arguments with that path prefix substituted for privacy",
+  "ctest": {
+    "elapsed_seconds": 16.75,
+    "failed": 0,
+    "passed": 2,
+    "total": 2
+  },
+  "dependency_install": {
+    "available_architecture": "clang_64",
+    "modules": [
+      "qtbase",
+      "qtdeclarative",
+      "qtshadertools"
+    ],
+    "package_hash_verification": "enabled; aqt default verification retained",
+    "qmake_reported_QT_VERSION": "6.12.0",
+    "version_queried_with": "aqt list-qt mac desktop --arch 6.12.0"
+  },
+  "dependency_source": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6120/qt6_6120/",
+  "environment": {
+    "CMake": "4.4.5",
+    "CxxStandard": 23,
+    "Python": "3.12.16",
+    "QT_QPA_PLATFORM": "offscreen",
+    "QT_QUICK_BACKEND": "software",
+    "Qt": "6.12.0",
+    "Qt_SDK_architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "aqtinstall": "3.3.0",
+    "architecture": "arm64",
+    "build": "25F80",
+    "compiler": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "fonttools": "4.61.1",
+    "generator": "Ninja",
+    "os": "macOS",
+    "version": "26.5.1"
+  },
+  "font_artifact_published": false,
+  "key_authored_checks": {
+    "customAxesChangeRealGlyphsAtMixedCoordinates": "PASS; authored WDTH/wght/HGHT paths actually change",
+    "localSwirlCollectionUsesPhysicalFaces": "PASS; authored collection placed under exact name SwirlVF.ttc",
+    "physicalIdentityRejectsMissingAndChangedOutlineTables": "PASS"
+  },
+  "optional_skips": [
+    {
+      "reason": "Set SWIRL_TEST_TTC to test a local PingFang UI collection",
+      "test": "importOptionalPingFangUiCollection"
+    },
+    {
+      "reason": "Local-only variable font fixture not supplied",
+      "test": "optionalVariableAxesAndLivePreview"
+    },
+    {
+      "reason": "Only run as the independent restoration child",
+      "test": "optionalRestartRead"
+    },
+    {
+      "reason": "Local-only matrix requires fixture and evidence directory",
+      "test": "optionalRenderMatrix"
+    },
+    {
+      "reason": "Local Windows font fixture required",
+      "test": "optionalNativePointSizes"
+    },
+    {
+      "reason": "Local font fixture required",
+      "test": "optionalPaintedPreviewAxes"
+    },
+    {
+      "reason": "An authorized local font and local evidence directory are required",
+      "test": "optionalRasterQualityMatrix"
+    },
+    {
+      "reason": "Local source font and evidence path required",
+      "test": "optionalPhysicalFontIdentity"
+    },
+    {
+      "reason": "Requires the native Windows platform",
+      "test": "nativeGlyphsHaveNoColourFringes"
+    }
+  ],
+  "private_font_used": false,
+  "recorded_utc": "2026-11-01T18:18:55.378440+00:00",
+  "repository_checkout_commit": "726da837eb97ca45ef2d02a96eddc01253a46ed5",
+  "schema": 1,
+  "scope": "authored_fixtures_macOS_Qt_offscreen_software_font_integration_only",
+  "source_hashes": {
+    "src/Swirl.Quick/CMakeLists.txt": "9a0b81cab92d1d1114d40fb1110c929f10e6f0be819c04d07b4ef5d5089649f5",
+    "src/Swirl.Quick/app/FontAxisPolicy.cpp": "76f0272834c0b02967cc9a526cae18fbefaf6c40c72104fc807871954b9f4da9",
+    "src/Swirl.Quick/app/FontAxisPolicy.h": "16c8a43c52d5476b0aa940da4453e0ba8ed15e952bfa799dc4e88b327db9ba31",
+    "src/Swirl.Quick/app/FontDisplayContext.cpp": "7c202662ac00c213e649fca78e9cb1760beddb1e36bc7d8bcd95671c6b9fdaca",
+    "src/Swirl.Quick/app/FontDisplayContext.h": "e624ef89f916aed42fc685df3d607f73de9dc0e4242078d212e015b51e4d0d8c",
+    "src/Swirl.Quick/app/FontFileInspection.h": "c581aa3b994b55212a2a74a0ffab58f33f7dfeb687c5b79eafeede8313d68b43",
+    "src/Swirl.Quick/app/FontManager.cpp": "d4cc28676afd23fc8a3f551c6529d41c8c8e7b6bd49846c5e638bc08ea249380",
+    "src/Swirl.Quick/app/FontManager.h": "764ed7b23ec3263f143b64bfdf5e257f3a5b450e3a7b324f29309248d0f88bf5",
+    "src/Swirl.Quick/app/VariableFontPreview.cpp": "6b2547bfe66aa01939ac4f3e2038d353c40221f95cfc1bc0f726ee0c4255b6f1",
+    "src/Swirl.Quick/app/VariableFontPreview.h": "c292f9e348424031c6e9a7c1bf5f114a0684a87ee5fa6adb0cb84c90cd944756",
+    "src/Swirl.Quick/tests/FontAxisPolicyTests.cpp": "cb8da8a8dea65c4b5ec80099088911c6e681ba8ea7ee9ce27e71442f4b8dcef8",
+    "src/Swirl.Quick/tests/FontSwirlVfChecks.h": "d57639f2ce2697cae3c5adf64ff9fb6210a031ea7d3ba8df152607edf005c811",
+    "src/Swirl.Quick/tests/FontTests.cpp": "d2bbe5f44949a730ae21e85caf32e0898a0a707b4b4055a66576fde90d20e3e7",
+    "src/Swirl.Quick/tests/generate_font_metadata_fixtures.py": "5a00a3f5da0277cf745c6729adc89886adceb41a13fe18bc3e68a3c7af447d03"
+  },
+  "source_identity": "working_tree_content_hashes_below; checkout commit alone does not identify uncommitted changes",
+  "status": "PASS_WITH_EXPLICIT_OPTIONAL_SKIPS"
+}

@@ -1,0 +1,86 @@
+name: Swirl VF A3 native normalized channels
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-normalized-runtime.yml'
+      - 'tools/swirl_vf/platform/probe_axis_a3_normalized_runtime.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_normalized_runtime.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source parsers and real native libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz0b libfreetype6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Preserve existing A3 failures and test authored controls
+        run: |
+          python -c 'import ctypes.util; assert ctypes.util.find_library("harfbuzz") and ctypes.util.find_library("freetype")'
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3*.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_input_resolution.py' -v
+          python tools/swirl_vf/platform/probe_axis_a3_normalized_runtime.py --output build/a3-normalized-runtime/linux.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a3-normalized-runtime-linux-${{ github.sha }}
+          path: build/a3-normalized-runtime/*.json
+          retention-days: 7
+
+  windows-native-channel:
+    needs: independent-controls
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install original fixture builder
+        run: python -m pip install fonttools==4.61.1
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-freetype
+      - name: Record actual native library package inventory
+        shell: msys2 {0}
+        run: |
+          mkdir -p build/a3-normalized-runtime
+          pacman -Q > build/a3-normalized-runtime/native-packages.txt
+          echo "A3_NATIVE_DIR=$(cygpath -w /mingw64/bin)" >> "$GITHUB_ENV"
+      - name: Exercise real Windows DLLs in two independent processes
+        shell: pwsh
+        run: |
+          python -c "import sys; assert sys.platform == 'win32'"
+          python tools/swirl_vf/platform/probe_axis_a3_normalized_runtime.py --library-dir "$env:A3_NATIVE_DIR" --output "build/a3-normalized-runtime/${{ matrix.os }}.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a3-normalized-runtime-${{ matrix.os }}-${{ github.sha }}
+          path: build/a3-normalized-runtime/
+          retention-days: 7
+          if-no-files-found: error

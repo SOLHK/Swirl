@@ -70,7 +70,7 @@ class LocalDirectWriteTests(unittest.TestCase):
                              'dpi': dpi, 'theme': theme, 'file': name,
                              'sizes_dip': [12, 16, 24, 36], 'antialiasing': 'grayscale'})
         rows.append({'record': 'summary', 'status': 'PASS_NATIVE_PROBE',
-                     'faces_passed': 1, 'faces_failed': 0})
+                     'faces_passed': 1, 'faces_failed': 0, 'all_glyphs': False})
         report = {'status': 'PASS_NATIVE_PROBE', 'input_sha256': self.sha,
                   'input_sha256_after': self.sha, 'input_unchanged': True,
                   'source_sha256': probe.digest(PLATFORM / 'directwrite_probe.cpp')}
@@ -106,6 +106,32 @@ class LocalDirectWriteTests(unittest.TestCase):
         self.assertEqual(result['raster_captures'], 10)
         self.assertFalse(result['font_only_equivalence_accepted'])
         self.assertEqual(result['original_HVF_parity'], 'NOT_RUN')
+        self.assertEqual(result['glyph_coverage'], 'SAMPLED_GIDS')
+
+    def test_all_glyph_mode_requires_native_confirmation_and_exact_physical_count(self):
+        rows, report = self.authored_transcript()
+        with self.assertRaisesRegex(ValueError, 'glyph_coverage_mode_mismatch'):
+            probe.validate_transcript(self.contract, rows, report, 0, self.root, all_glyphs=True)
+        rows[-1]['all_glyphs'] = True
+        rows[1]['probed_glyph_count'] = 6
+        with self.assertRaisesRegex(ValueError, 'all_glyph_coverage_incomplete'):
+            probe.validate_transcript(self.contract, rows, report, 0, self.root, all_glyphs=True)
+        rows[1]['probed_glyph_count'] = 7
+        result = probe.validate_transcript(self.contract, rows, report, 0, self.root, all_glyphs=True)
+        self.assertEqual(result['glyph_coverage'], 'ALL_GIDS')
+        self.assertFalse(result['font_only_equivalence_accepted'])
+
+    def test_glyph_coverage_mode_cannot_be_missing_boolean_or_oversized(self):
+        original, report = self.authored_transcript()
+        for invalid in (None, 0, 1, 'false', True):
+            rows = copy.deepcopy(original)
+            rows[-1]['all_glyphs'] = invalid
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, 'glyph_coverage_mode_mismatch'):
+                self.validate(rows, report)
+        rows = copy.deepcopy(original)
+        rows[1]['probed_glyph_count'] = 8
+        with self.assertRaisesRegex(ValueError, 'invalid_probed_glyph_count'):
+            self.validate(rows, report)
 
     def test_truncated_or_wrong_input_evidence_is_rejected(self):
         original, report = self.authored_transcript()
@@ -164,11 +190,12 @@ class LocalDirectWriteTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             code = probe.main(['--font', str(self.font), '--expected-sha256', self.sha,
                                '--font-scope', 'authored_control', '--expected-glyphs', '7',
-                               '--output', str(output)])
+                               '--output', str(output), '--all-glyphs'])
         report = json.loads((output / 'p8-local-report.json').read_text())
         self.assertEqual(code, 77)
         self.assertEqual(report['status'], 'NOT_RUN')
         self.assertEqual(report['Windows11'], 'NOT_RUN')
+        self.assertTrue(report['all_glyphs_requested'])
         self.assertTrue(report['input_unchanged'])
         self.assertEqual(self.font.read_bytes(), before)
 

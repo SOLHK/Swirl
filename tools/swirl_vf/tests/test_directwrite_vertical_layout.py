@@ -70,6 +70,33 @@ def transcript(records=None, metadata=None, summary=None):
 
 
 class DirectWriteLayoutProtocolTests(unittest.TestCase):
+    def test_scaled_control_requires_explicit_UPM_and_keeps_physical_em_size(self):
+        metadata=literal_metadata();metadata['units_per_em']=16000
+        data=transcript(metadata=metadata)
+        with self.assertRaisesRegex(probe.ObservationError,'metadata_or_fixture_identity'):
+            probe.parse_transcript(data,[literal_request()],SOURCE,0)
+        probe.parse_transcript(data,[literal_request()],SOURCE,0,expected_upm=16000)
+        metadata['font_em_size_DIP']=16000
+        with self.assertRaisesRegex(probe.ObservationError,'metadata_or_fixture_identity'):
+            probe.parse_transcript(transcript(metadata=metadata),[literal_request()],SOURCE,0,expected_upm=16000)
+
+    def test_axis_observation_retains_raw_failure_without_changing_strict_default(self):
+        record=literal_layout();run=record['runs'][0]
+        run['actual_face_axes']['WDTH']=500.0000305175781
+        run['raw_axis_echo_matches']=False
+        metadata=literal_metadata();metadata['axis_echo_policy']='OBSERVE_RAW_FAILURES'
+        output=transcript([record],metadata=metadata)
+        with self.assertRaisesRegex(probe.ObservationError,'axis_missing'):
+            probe.parse_transcript(output,[literal_request()],SOURCE,0)
+        parsed=probe.parse_transcript(output,[literal_request()],SOURCE,0,observe_axis_echo=True)
+        self.assertFalse(parsed['records'][0]['runs'][0]['raw_axis_echo_matches'])
+        run['raw_axis_echo_matches']=True
+        with self.assertRaisesRegex(probe.ObservationError,'raw_axis_failure_not_recorded'):
+            probe.parse_transcript(transcript([record],metadata=metadata),[literal_request()],SOURCE,0,observe_axis_echo=True)
+        run['raw_axis_echo_matches']=False;del run['actual_face_axes']['HGHT']
+        with self.assertRaisesRegex(probe.ObservationError,'missing_or_invalid_observed_axis'):
+            probe.parse_transcript(transcript([record],metadata=metadata),[literal_request()],SOURCE,0,observe_axis_echo=True)
+
     def test_request_matrix_retains_all_axes_routes_positions_and_directions(self):
         rows = probe.requests()
         self.assertEqual(len(rows), 2304)

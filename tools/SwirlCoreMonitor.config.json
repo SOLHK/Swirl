@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "proxyPort": 7898,
+  "passiveIntervalSeconds": 30,
+  "activeIntervalMinutes": 30,
+  "activeRequestCount": 3
+}

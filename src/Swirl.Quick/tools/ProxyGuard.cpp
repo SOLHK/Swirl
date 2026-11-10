@@ -2,6 +2,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include "engine/SystemProxySession.h"
+#include "network/LanFirewall.h"
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -51,6 +52,7 @@ int main(int argc,char **argv) {
     }
     if(app.arguments().size()==5&&app.arguments().at(1)=="--repair-shortcut")return repairShortcut(app.arguments());
 #endif
+    if(app.arguments().size()==3&&app.arguments().at(1)=="--lan-firewall")return LanFirewall::guard(app.arguments().at(2));
     if(app.arguments().size()!=2)return 2;
     return SystemProxySession::guard(app.arguments().at(1));
 }

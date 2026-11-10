@@ -54,7 +54,7 @@ bool migrate(NodeStore &store,const QJsonObject &configuration) {
 }
 QJsonObject decryptSnapshot(const QString &path) {
 #ifdef Q_OS_WIN
-    const auto bytes=readFile(path);if(!bytes.startsWith("SWIRLNODE2\n"))return {};
+    const auto bytes=readFile(path);if(!bytes.startsWith("SWIRLNODE2\n")&&!bytes.startsWith("SWIRLNODE1\n"))return {};
     const auto encrypted=bytes.mid(11);const QByteArray context("Swirl.NodeStore.v1");
     DATA_BLOB input{DWORD(encrypted.size()),reinterpret_cast<BYTE *>(const_cast<char *>(encrypted.constData()))},output{};
     DATA_BLOB entropy{DWORD(context.size()),reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
@@ -65,16 +65,16 @@ QJsonObject decryptSnapshot(const QString &path) {
     Q_UNUSED(path);return {};
 #endif
 }
-bool encryptFixture(const QString &path,const QJsonObject &snapshot) {
+bool encryptFixture(const QString &path,const QJsonObject &snapshot,bool version2=true) {
 #ifdef Q_OS_WIN
     auto plaintext=QJsonDocument(snapshot).toJson(QJsonDocument::Compact);const QByteArray context("Swirl.NodeStore.v1");
     DATA_BLOB input{DWORD(plaintext.size()),reinterpret_cast<BYTE *>(plaintext.data())},output{};
     DATA_BLOB entropy{DWORD(context.size()),reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
     const bool protectedOk=CryptProtectData(&input,L"Swirl catalog malformed fixture",&entropy,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&output);plaintext.fill('\0');if(!protectedOk)return false;
-    QByteArray encrypted(reinterpret_cast<char *>(output.pbData),output.cbData);SecureZeroMemory(output.pbData,output.cbData);LocalFree(output.pbData);const auto bytes=QByteArrayLiteral("SWIRLNODE2\n")+encrypted;encrypted.fill('\0');
+    QByteArray encrypted(reinterpret_cast<char *>(output.pbData),output.cbData);SecureZeroMemory(output.pbData,output.cbData);LocalFree(output.pbData);const auto bytes=(version2?QByteArrayLiteral("SWIRLNODE2\n"):QByteArrayLiteral("SWIRLNODE1\n"))+encrypted;encrypted.fill('\0');
     QSaveFile file(path);file.setDirectWriteFallback(false);return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
 #else
-    Q_UNUSED(path);Q_UNUSED(snapshot);return false;
+    Q_UNUSED(path);Q_UNUSED(snapshot);Q_UNUSED(version2);return false;
 #endif
 }
 QByteArray sharedXrayDocument() {
@@ -96,6 +96,73 @@ private slots:
 #ifndef Q_OS_WIN
         QSKIP("Real current-user DPAPI and Windows file-lock coverage requires Windows");
 #endif
+    }
+    void downloadRouteSurvivesV1ReloadAndLegacyEditsWithoutChangingNodes() {
+        QTemporaryDir temporary;const auto path=temporary.filePath("download-route.dpapi");NodeStore store(path);
+        const auto url=QUrl::fromEncoded("https://source.fixture.invalid/signed%2Fpath?token=SYNTHETIC%2B%2F%3D&same=1&same=2");
+        QVERIFY(store.saveNode(editorInput("selected manual fixture")));const auto selected=store.nodes().first().id;QVERIFY(store.select(selected));
+        QVERIFY(store.saveSubscription({},"route fixture",url,360,false,"loon","nodes-only"));
+        const auto source=store.subscriptions().first().id;
+        const auto otherUrl=QUrl("https://other.fixture.invalid/list");QVERIFY(store.saveSubscription({},"independent source",otherUrl,720,false));const auto otherSource=store.subscriptions().last().id;
+        ProxyNode incoming;incoming.id=QStringLiteral("22222222-2222-4222-8222-333333333333");incoming.name="source-owned fixture";incoming.protocol="socks5";incoming.host="127.0.0.1";incoming.port=10;
+        QVERIFY(store.importNodes({incoming},source));const auto owned=store.nodes().last().id;
+        const auto configuration=network(selected);QVERIFY(store.saveNetworkConfiguration(configuration));const auto lastSuccess=store.subscriptions().first().lastSuccess;
+        NodeStore::ImportPlan plan;QVERIFY(store.prepareSaveSubscription(source,"route fixture",{},360,false,{}, {},&plan,"physical"));QVERIFY(plan.removedNodeIds().isEmpty());
+        QCOMPARE(plan.nodes().size(),2);QVERIFY(store.commitImport(plan));
+        NodeStore loaded(path);QVERIFY2(loaded.error().isEmpty(),qPrintable(loaded.error()));
+        QCOMPARE(loaded.subscriptions().first().downloadRoute,QString("physical"));QCOMPARE(loaded.publicSubscriptions().first().toMap().value("downloadRoute").toString(),QString("physical"));
+        QCOMPARE(loaded.subscriptions().first().url.toEncoded(),url.toEncoded());QCOMPARE(loaded.subscriptions().first().id,source);
+        QCOMPARE(loaded.subscriptions().first().lastSuccess,lastSuccess);QVERIFY(!loaded.subscriptions().first().enabled);
+        QCOMPARE(loaded.nodes().size(),2);QCOMPARE(loaded.nodes().last().id,owned);QCOMPARE(loaded.selectedId(),selected);QCOMPARE(loaded.networkConfiguration(),configuration);
+        QVERIFY(loaded.saveSubscription(source,"renamed fixture",{},360,false));QCOMPARE(loaded.subscriptions().first().downloadRoute,QString("physical"));
+        const auto retained=readFile(path);QVERIFY(!loaded.saveSubscription(source,"invalid route",{},360,false,{}, {},"direct"));QCOMPARE(readFile(path),retained);
+        QVERIFY(loaded.saveSubscription(source,"renamed fixture",{},360,false,{}, {},"system"));QCOMPARE(loaded.subscriptions().first().downloadRoute,QString("system"));
+        QCOMPARE(loaded.nodes().last().id,owned);QCOMPARE(loaded.selectedId(),selected);QCOMPARE(loaded.networkConfiguration(),configuration);QVERIFY(!loaded.subscriptions().first().enabled);
+        QCOMPARE(loaded.subscriptions().size(),2);QCOMPARE(loaded.subscriptions().last().id,otherSource);QCOMPARE(loaded.subscriptions().last().url,otherUrl);QCOMPARE(loaded.subscriptions().last().downloadRoute,QString("system"));QCOMPARE(loaded.subscriptions().last().lastSuccess,qint64(0));QVERIFY(!loaded.subscriptions().last().enabled);
+    }
+    void downloadRouteSnapshotBoundary_data() {
+        QTest::addColumn<bool>("version2");QTest::addColumn<QJsonValue>("route");QTest::addColumn<bool>("accepted");QTest::addColumn<QString>("expected");
+        for(const bool v2:{false,true}){
+            const QByteArray prefix=v2?"v2-":"v1-";
+            QTest::newRow((prefix+"legacy-missing").constData())<<v2<<QJsonValue(QJsonValue::Undefined)<<true<<QString("system");
+            QTest::newRow((prefix+"system").constData())<<v2<<QJsonValue("system")<<true<<QString("system");
+            QTest::newRow((prefix+"physical").constData())<<v2<<QJsonValue("physical")<<true<<QString("physical");
+            QTest::newRow((prefix+"unknown-route").constData())<<v2<<QJsonValue("direct")<<false<<QString();
+            QTest::newRow((prefix+"boolean-route").constData())<<v2<<QJsonValue(true)<<false<<QString();
+            QTest::newRow((prefix+"null-route").constData())<<v2<<QJsonValue(QJsonValue::Null)<<false<<QString();
+            QTest::newRow((prefix+"empty-route").constData())<<v2<<QJsonValue("")<<false<<QString();
+        }
+    }
+    void downloadRouteSnapshotBoundary() {
+        QFETCH(bool,version2);QFETCH(QJsonValue,route);QFETCH(bool,accepted);QFETCH(QString,expected);
+        QTemporaryDir temporary;const auto path=temporary.filePath("download-route-schema.dpapi");QString source;
+        {NodeStore initial(path);QVERIFY(initial.saveSubscription({},"route boundary fixture",QUrl("https://source.fixture.invalid/list"),360,false));source=initial.subscriptions().first().id;if(version2)QVERIFY(migrate(initial,network()));}
+        auto envelope=decryptSnapshot(path);auto committed=envelope.value("committed").toObject();auto snapshot=version2?committed.value("snapshot").toObject():envelope;
+        auto rows=snapshot.value("subscriptions").toArray();auto row=rows.first().toObject();if(route.isUndefined())row.remove("downloadRoute");else row.insert("downloadRoute",route);rows[0]=row;snapshot.insert("subscriptions",rows);
+        if(version2){committed.insert("snapshot",snapshot);envelope.insert("committed",committed);}else envelope=snapshot;
+        QVERIFY(encryptFixture(path,envelope,version2));const auto bytes=readFile(path);NodeStore loaded(path);
+        QCOMPARE(loaded.error().isEmpty(),accepted);QCOMPARE(readFile(path),bytes);
+        if(accepted){QCOMPARE(loaded.subscriptions().size(),1);QCOMPARE(loaded.subscriptions().first().id,source);QCOMPARE(loaded.subscriptions().first().downloadRoute,expected);QVERIFY(!loaded.subscriptions().first().enabled);}
+    }
+    void downloadRouteCatalogIntentCommitsOnlySourceMetadata() {
+        QTemporaryDir temporary;const auto path=temporary.filePath("route-intent.dpapi");QString selected,revision;QJsonObject configuration;
+        const auto url=QUrl("https://source.fixture.invalid/signed?token=SYNTHETIC-ROUTE-TOKEN");
+        {
+        NodeStore store(path);
+        QVERIFY(store.saveNode(editorInput("retained selected fixture")));selected=store.nodes().first().id;QVERIFY(store.select(selected));
+        QVERIFY(store.saveSubscription({},"intent source",url,360,false));const auto source=store.subscriptions().first().id;
+        configuration=network(selected);QVERIFY(migrate(store,configuration));
+        NodeStore::ImportPlan plan;QVERIFY(store.prepareSaveSubscription(source,"intent source",{},360,false,{}, {},&plan,"physical"));QVERIFY(plan.removedNodeIds().isEmpty());revision=store.issueConfigurationRevision();
+        QVERIFY(bool(perform(store,[&](auto callback){return store.beginCatalogIntent(plan,configuration,requestTwo,revision,digestTwo,std::move(callback));})));
+        QCOMPARE(store.subscriptions().first().downloadRoute,QString("system"));QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes().size(),1);
+        const auto envelope=decryptSnapshot(path),pending=envelope.value("pending").toObject();
+        QCOMPARE(envelope.value("committed").toObject().value("snapshot").toObject().value("subscriptions").toArray().first().toObject().value("downloadRoute").toString(),QString("system"));
+        QCOMPARE(pending.value("catalog_snapshot").toObject().value("subscriptions").toArray().first().toObject().value("downloadRoute").toString(),QString("physical"));
+        {NodeStore beforeReceipt(path);QCOMPARE(beforeReceipt.subscriptions().first().downloadRoute,QString("system"));QCOMPARE(beforeReceipt.configurationRevision(),QString("1"));}
+        QVERIFY(bool(perform(store,[&](auto callback){return store.commitConfigurationIntent(std::move(callback));})));store.releaseConfigurationLease();
+        }
+        NodeStore loaded(path);QVERIFY2(loaded.error().isEmpty(),qPrintable(loaded.error()));QCOMPARE(loaded.subscriptions().first().downloadRoute,QString("physical"));QCOMPARE(loaded.subscriptions().first().url,url);QVERIFY(!loaded.subscriptions().first().enabled);
+        QCOMPARE(loaded.selectedId(),selected);QCOMPARE(loaded.nodes().first().id,selected);QCOMPARE(loaded.nodes().size(),1);QCOMPARE(loaded.networkConfiguration(),configuration);QCOMPARE(loaded.configurationRevision(),revision);
     }
     void v1MigrationProducesOneEncryptedCommittedAuthority() {
         QTemporaryDir temporary;QVERIFY(temporary.isValid());const auto path=temporary.filePath("catalog.dpapi");QString id,storeId;

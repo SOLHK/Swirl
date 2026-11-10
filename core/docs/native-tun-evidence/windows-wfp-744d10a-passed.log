@@ -1,0 +1,5 @@
+   Compiling windows-sys v0.61.2
+   Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+    Finished `release` profile [optimized] target(s) in 15.09s
+     Running `target\release\examples\windows-wfp-scoped-smoke.exe --disposable-network --receipt D:\a\_temp\swirl-wfp-scoped-receipt.json`
+{"boot_acceptance":false,"control_endpoints_unchanged":true,"evidence":"scoped WFP application loopback transaction smoke","existing_flow_revocation_guarantee":false,"new_flow_block_ipv4_ipv6_tcp_udp":true,"nonce_conflict_refused":true,"observations":{"existing_tcp_echo_after_commit":[false,false],"existing_udp_echo_after_commit":[false,false]},"ok":true,"other_application_unchanged":true,"owned_policy_removed":true,"persistent_across_engine_reopen":true,"rules":4,"source_sha":"fedd4098b1815beb94ab66a593972cf6d7be6111","system_kill_switch_acceptance":false,"transaction_error_rollback":true}

@@ -1,0 +1,29 @@
+{
+    "current": {
+        "closed": {
+            "connected": false,
+            "deadline_ms": 3000,
+            "elapsed_ms": 3005,
+            "error_observed": false,
+            "outcome": "deadline",
+            "refused": false,
+            "signal_error": -1,
+            "socket_error": -1,
+            "socket_state": 2,
+            "terminal_observed": false
+        }
+    },
+    "legacy": {
+        "closed": {
+            "deadline_ms": 1500,
+            "elapsed_ms": 1500,
+            "finished": false,
+            "predicate_result": false,
+            "socket_error": -1,
+            "socket_state": 2
+        }
+    },
+    "schema": 1,
+    "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+    "success": false
+}

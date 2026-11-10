@@ -1,0 +1,512 @@
+{
+  "schema": 1,
+  "kind": "swirl-qt612-product-sdk-fixed-artifact-candidate",
+  "qt_version": "6.12.0",
+  "architecture": "x86_64-windows-msvc",
+  "repository": {
+    "name": "SOLHK/Swirl",
+    "id": 1411888911,
+    "branch": "work/node-probe-render-20261105",
+    "pr": 61,
+    "base": "test"
+  },
+  "producer": {
+    "run": 42338365419,
+    "attempt": 1,
+    "job": 128300316535,
+    "workflow": ".github/workflows/diagnose-qt612-runtime-patch.yml",
+    "job_name": "qt612-runtime-comparison",
+    "head": "d136505cb1ac8cfeb5b80c554daebbbb06ff1aa9",
+    "merge": "e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab",
+    "tree": "7c90f7e754f373e4dcac0bbfd656ccaa5ec061bc",
+    "conclusion": "failure",
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "conclusion": "success"
+      },
+      {
+        "number": 2,
+        "name": "Checkout the exact PR merge source",
+        "conclusion": "success"
+      },
+      {
+        "number": 3,
+        "name": "Select the x64 MSVC environment",
+        "conclusion": "success"
+      },
+      {
+        "number": 4,
+        "name": "Select Python",
+        "conclusion": "success"
+      },
+      {
+        "number": 5,
+        "name": "Prepare a fresh public evidence directory and SDK tools",
+        "conclusion": "success"
+      },
+      {
+        "number": 6,
+        "name": "Restore archive candidates without saving or trusting an extracted SDK",
+        "conclusion": "success"
+      },
+      {
+        "number": 7,
+        "name": "Verify pure path, identity and failure-preservation boundaries",
+        "conclusion": "success"
+      },
+      {
+        "number": 8,
+        "name": "Build a pinned Qml module and compose a separate complete derived kit",
+        "conclusion": "success"
+      },
+      {
+        "number": 9,
+        "name": "Run unchanged fixtures once with each complete runtime and preserve baseline failures",
+        "conclusion": "failure"
+      },
+      {
+        "number": 10,
+        "name": "Record actual step outcomes, including failed or skipped work",
+        "conclusion": "success"
+      },
+      {
+        "number": 11,
+        "name": "Preserve original logs, identities, source and fixture receipts",
+        "conclusion": "success"
+      },
+      {
+        "number": 21,
+        "name": "Post Select Python",
+        "conclusion": "skipped"
+      },
+      {
+        "number": 22,
+        "name": "Post Checkout the exact PR merge source",
+        "conclusion": "success"
+      },
+      {
+        "number": 23,
+        "name": "Complete job",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "artifact": {
+    "artifact": 13561016761,
+    "run": 42338365419,
+    "name": "Swirl-Qt612-Isolated-Runtime-Patch-Diagnosis",
+    "bytes": 60774580,
+    "sha256": "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
+    "member_count": 1470,
+    "expanded_bytes": 139661307,
+    "member_inventory_sha256": "a4e29512de626954c498c7d3a4657f3596d74eb6670818f4093f792c17dfb74c"
+  },
+  "installation_qtenv2": {
+    "path": "bin/qtenv2.bat",
+    "generator": {
+      "distribution": "aqtinstall==3.3.0",
+      "source_url": "https://github.com/miurahr/aqtinstall/blob/v3.3.0/aqt/updater.py",
+      "source_bytes": 16166,
+      "source_sha256": "421046f246a0dee2f743e29a18ba9bbd2c12f9268af46c0b06c64887d80dda2b",
+      "function": "Updater.make_qtenv2",
+      "encoding": "ASCII without BOM; five CRLF-terminated lines"
+    },
+    "producer_kit_root": "D:\\a\\_temp\\qt612-patch-42338365419-1\\stock\\6.12.0\\msvc2022_64",
+    "producer_file": {
+      "bytes": 276,
+      "sha256": "91e5545f0e77a2e07f914d6f24660611c2c4d7d944b2f4cb6af470ec383f1d8f"
+    },
+    "policy": "Regenerate the exact expected bytes for the actual stock root; compare the whole inventories with only this one expected leaf changed. Preserve stock and its cloned batch file byte-for-byte. Never execute qtenv2 or treat it as selected-kit environment setup."
+  },
+  "critical_members": {
+    "step-outcomes.json": {
+      "bytes": 636,
+      "sha256": "c14a566fe3fa99378fcc869c433f0d64cc50916d59668ab2e8f5920f2a068d1e"
+    },
+    "sdk/receipt.json": {
+      "bytes": 66395,
+      "sha256": "ca9c401827665956e929be87934d20252b61d525154da97148990fc1d0b7f361"
+    },
+    "sdk/stock-files-before.json": {
+      "bytes": 1884420,
+      "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+    },
+    "sdk/stock-files-after.json": {
+      "bytes": 1884420,
+      "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+    },
+    "sdk/derived-files.json": {
+      "bytes": 1884576,
+      "sha256": "cf3853876854a7cf88e1dfceb700c6174cfe2291a1de69c0b754bef489ed0a1a"
+    },
+    "sdk/module-files.json": {
+      "bytes": 61027,
+      "sha256": "dcbc21d7d6394bc88a5d9b73cccb9cdc7a2efb27a7eed869e9c02e73ae895f04"
+    },
+    "sdk/header-alignment.json": {
+      "bytes": 244886,
+      "sha256": "48e12238a77625668c803abeb366bc02c38cc6a06e4462489c48b39d971eb17e"
+    },
+    "sdk/module-header-retention.json": {
+      "bytes": 242884,
+      "sha256": "5f695da83db225c35542c3b8788fbdc79d190915dcfeddac20f56cb24a331f9f"
+    },
+    "sdk/configuration-identity.json": {
+      "bytes": 10159,
+      "sha256": "63c9e1e04482bb5291bd2d24df59e51030514319b273d8f93e0f124d9c5c48a4"
+    },
+    "sdk/native-toolchain-files.json": {
+      "bytes": 1072830,
+      "sha256": "fff07a252295c5fdbf45da732cbf63af1920caa5ebe6fad8af5eb29394350f29"
+    },
+    "sdk/source-snapshot-files.json": {
+      "bytes": 7234465,
+      "sha256": "8000d2e3d6a5903d1732d19f717087239907955594a817165224c369c50e755c"
+    },
+    "sdk/corresponding-source.json": {
+      "bytes": 2116,
+      "sha256": "65f20366b34512e1b0b450c00c95e6d4d5ed3f191f8786e9f15e40085b1c1bf4"
+    },
+    "sdk/qtdeclarative-corresponding-source.zip": {
+      "bytes": 54653393,
+      "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+    },
+    "sdk/pe-interface-review.json": {
+      "bytes": 943,
+      "sha256": "c3eb860aeece60e98a0bf59ae1f4618beb42ca37fc68b73868326806cac3044a"
+    },
+    "sdk/stock-sdk-receipt.json": {
+      "bytes": 8545,
+      "sha256": "46a02c48f0e128fed32f4a8f9377dd0703e32e805935f1bdc71d662179b1f7b8"
+    },
+    "sdk/stock-Qml.json": {
+      "bytes": 538,
+      "sha256": "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f"
+    },
+    "comparison/comparison.json": {
+      "bytes": 11833,
+      "sha256": "7a4a058437ec330d36f787e852919a2a16732a3d6e62bb406363bf09a5ad5708"
+    },
+    "comparison/stock/aggregate.json": {
+      "bytes": 20086,
+      "sha256": "3b06c627f7edb360d1964f6837ea2005eac8b0920f9214db0590571daa0f6082"
+    },
+    "comparison/patched/aggregate.json": {
+      "bytes": 19960,
+      "sha256": "02e6323df1ea419c06e142d5ff458e0c9936d001433255759eb870772241d8b3"
+    },
+    "sdk/reproduction/tools/qt612-qml-patch.lock.json": {
+      "bytes": 9857,
+      "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+    },
+    "sdk/reproduction/tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
+      "bytes": 2284,
+      "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
+    }
+  },
+  "recipe": {
+    "schema": 1,
+    "kind": "qt612-public-diagnostic-only",
+    "qt_version": "6.12.0",
+    "architecture": "win64_msvc2022_64",
+    "stock": {
+      "metadata_url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/Updates.xml",
+      "metadata_sha256": "ba09f355a6e42e1373b939d26d7742df7348f298a465420083b3cfd28ed2914b",
+      "package_names": [
+        "qt.qt6.6120.win64_msvc2022_64",
+        "qt.qt6.6120.addons.qtshadertools.win64_msvc2022_64"
+      ],
+      "package_versions": {
+        "qt.qt6.6120.win64_msvc2022_64": "6.12.0-0-202609280346",
+        "qt.qt6.6120.addons.qtshadertools.win64_msvc2022_64": "6.12.0-0-202609280346"
+      },
+      "archives": [
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "219d1b86def3be418e31d704572bc4acc91b2ec373c65595c9fb12b42bf098dc"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "dfcad02224b71724e3314d0bc3ffc0b862dfa6e02bc4aadd39f1738f6c364c79"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "258146e9972fadbc1162cda31c7d7ed7e627f5022b2a848f2edb84d9c2ce27db"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qtdoc-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qtdoc-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "ebe18226f9d1477177746d53d53094108f7747583ceb3b1c1d2c5d077dac80eb"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "73328e361429378df518f391ebe4d82c51e833f4d5a951692768ab5a5a1d7da5"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "328321e8879a3dc119775b4404d6e32ec2a361696e73f760540a732921507917"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346d3dcompiler_47-x64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346d3dcompiler_47-x64.7z",
+          "sha256": "067506b5424849133fb4291737da010ff336be91195fd6299f47096fbf413a50"
+        },
+        {
+          "package": "qt.qt6.6120.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+          "sha256": "edc94ad93e8bb6a97b27932fe01a71c37dd435690eeeff2d0085880e1eda8be6"
+        },
+        {
+          "package": "qt.qt6.6120.addons.qtshadertools.win64_msvc2022_64",
+          "filename": "6.12.0-0-202609280346qtshadertools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.addons.qtshadertools.win64_msvc2022_64/6.12.0-0-202609280346qtshadertools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+          "sha256": "dfceb86842d60a81ff75c1c2c98d49d186efc5c6cc49f0225b3b2ed699beca4b"
+        }
+      ],
+      "qml_module_json": {
+        "path": "modules/Qml.json",
+        "bytes": 538,
+        "sha256": "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f",
+        "compiler_id": "MSVC",
+        "compiler_version": "19.44.35227.0",
+        "targets": [
+          {
+            "architecture": "x86_64",
+            "abi": "x86_64-little_endian-lp64"
+          }
+        ],
+        "scope": "Exact metadata label from pinned official Windows package; not an assertion about C++ long size."
+      }
+    },
+    "source": {
+      "repository": "https://github.com/qt/qtdeclarative.git",
+      "commit": "4332fbbb4c340463dc8cee36dda0c85d932122d8",
+      "tree": "98324181f2eebf01e806603a01829a40b8683631",
+      "qtbase_tag_commit": "025bdad181de241e81bf853c8a2d7bf3d19261a9",
+      "checkout_eol_contract": {
+        "path": "tests/auto/qml/qqmlecmascript/data/rewriteMultiLineStrings_crlf.1.qml",
+        "attribute_source": ".gitattributes",
+        "attribute_rule": "*_crlf.*         eol=crlf",
+        "git_blob_sha1": "f84ba8c722b55690a5ab9ae4c7b572b0775af72b",
+        "git_blob_sha256": "67839d6b26c29f4d0c4b354e7233b224eb839cb45ce15a368e7fb6d6c099c525",
+        "checkout_sha256": "d5beca780bde5745e8041e2ba618874b313deb753d7c30b58b8ba4242b527e8a",
+        "git_blob_bytes": 235,
+        "checkout_bytes": 248,
+        "participates_in_qml_build": false
+      }
+    },
+    "patch": {
+      "upstream_commit": "8c92fe01338c76885f412a68fd39238147e21a81",
+      "path": "tools/patches/qt612-qv4-sweep-8c92fe0.patch",
+      "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac",
+      "production_path": "src/qml/memory/qv4mm.cpp",
+      "preimage_sha256": "574d2d3d973a78cc6b3cb214069148dae5d0563d2c53c8602015f4735ee52780",
+      "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
+      "added_lines": 15,
+      "deleted_lines": 7
+    },
+    "build": {
+      "configuration": "Release",
+      "generator": "Ninja",
+      "targets": [
+        "Qml",
+        "BuiltinsOutput"
+      ],
+      "parallel": 2,
+      "runtime_library": "MultiThreadedDLL"
+    },
+    "scope": "Independent Windows fixture diagnosis only. Neither an official Qt release nor a Swirl VME/product fix. Original stock SDK is preserved; changed source and corresponding-source provenance accompany diagnostic outputs.",
+    "compiler_retirement": {
+      "kind": "one-owned-pinned-msvc-vctip",
+      "image": "vctip.exe",
+      "msvc_tools_version": "14.44.35207",
+      "bytes": 335288,
+      "sha256": "d591358c6aee4b673562ca3b3a15c250e612708394fe3b44a7a7eda2470570a5",
+      "maximum_survivors": 1,
+      "grace_seconds": 2,
+      "proof_seconds": 5,
+      "source_repository": "https://github.com/microsoft/BuildXL",
+      "source_commit": "8afb09668504a91787aa416e46447b8e2c218eae",
+      "source_paths": [
+        "Public/Src/FrontEnd/Ninja/NinjaPipConstructor.cs",
+        "Public/Src/Engine/Processes/SandboxedProcess.cs",
+        "Public/Src/Engine/ProcessPipExecutor/SandboxedProcessPipExecutor.cs"
+      ],
+      "scope": "Explicit public compiler phases only. Natural root exit 0, held image-file/process identities, targeted owned vctip termination and actual exit/empty Job proof are required. This is not a graceful shutdown claim or an exception for private/runtime fixtures."
+    },
+    "header_identity": {
+      "source_headers": 286,
+      "source_header_mapping_sha256": "c3adbc969c9b8f418f52199256b6a4469c8b5fd86fe2cef2dd998684ee2b03dd",
+      "header_review_count": 290,
+      "parser": {
+        "path": "include/QtQml/6.12.0/QtQml/private/qqmljsparser_p.h",
+        "stock_raw": {
+          "bytes": 9665,
+          "sha256": "36d412acb8f64114424faa0ee7452cd6592e4146f29b29a1e8a60d9ea91bcc7c"
+        },
+        "stock_grammar_path": "../../../qtdeclarative/src/qml/parser/qqmljs.g",
+        "build_grammar_path": "../../../source/src/qml/parser/qqmljs.g",
+        "line_numbers": [
+          154,
+          2031,
+          2043,
+          3647,
+          4313,
+          4865,
+          5140
+        ],
+        "stock_crlf_count": 305,
+        "stock_lf_count": 319,
+        "expected_built_lf": {
+          "bytes": 9311,
+          "sha256": "9cd08c14d9a348dfd969a83aa85b4bce9140c9e40626f28adf5134a8fbad7dd2"
+        },
+        "scope": "Expected build bytes derived from the pinned stock parser and official qlalr generation rules; not an observation of the missing 48b Windows rebuilt header. Only 305 CRLF pairs and these seven exact source-location directives may differ."
+      },
+      "scope": "Canonical source checkout remains byte-exact to the pinned Git blobs. Only the 286 fixed source headers may reproduce their pinned stock bytes through whole-file LF to CRLF; generated feature and other headers remain exact. Derived kit retains official stock headers."
+    }
+  },
+  "content": {
+    "stock": "941a8e89532137a1424758fd158d39af4f6522a1f315457f5e75a74f44d51de6",
+    "derived": "6a2b82cc4a2133e128f83511a91764a121178c90cd3717399af612136ab2fc1c",
+    "derivation": "265d7eb96a1d29d10c4e09ba75070d89b826b4b2bbbdb56bd35701dfd2a70c48",
+    "native_toolchain": "7610e3e82b24ead330531d77fbc6a4df7c3bbd2616d795ea533ee836097fc49b",
+    "stock_files": 11380,
+    "derived_files": 11381,
+    "module_files": 380,
+    "delta": {
+      "added": [
+        "lib/cmake/Qt6Qml/Qt6QmlTargets-release.cmake"
+      ],
+      "removed": [],
+      "changed": [
+        "bin/Qt6Qml.dll",
+        "lib/Qt6Qml.lib",
+        "lib/cmake/Qt6Qml/Qt6QmlAdditionalTargetInfo.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlCopyFiles.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlDeploySupport.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlFindQmlscInternal.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlMacros.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlModuleDirMappingTemplate.qrc.in",
+        "lib/cmake/Qt6Qml/Qt6QmlPluginTemplate.cpp.in",
+        "lib/cmake/Qt6Qml/Qt6QmlProperties.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlPublicCMakeHelpers.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmlTargets.cmake",
+        "lib/cmake/Qt6Qml/Qt6QmllintEmptyJsonTemplate.json",
+        "lib/cmake/Qt6Qml/Qt6QmltcFileMappingTemplate.qrc.in",
+        "lib/cmake/Qt6Qml/Qt6UpdateQmllsIni.cmake",
+        "lib/cmake/Qt6Qml/Qt6WriteQtConfPart.cmake",
+        "lib/cmake/Qt6Qml/Qt6qmldirTemplate.cmake.in",
+        "lib/cmake/Qt6QmlPrivate/Qt6QmlPrivateAdditionalTargetInfo.cmake",
+        "lib/cmake/Qt6QmlPrivate/Qt6QmlPrivateTargets.cmake",
+        "modules/Qml.json"
+      ]
+    },
+    "qml_stock": {
+      "bytes": 5390136,
+      "sha256": "2572e315c36d8cea89a5becb910ddccdcf5d34e5421eef1e033187a99b68f84b"
+    },
+    "qml_patched": {
+      "bytes": 5377536,
+      "sha256": "66d291c47770c366627cfd68f3e050e30dbb6f1747639f32c6ea812803ad1cb3"
+    },
+    "qml_import_library": {
+      "bytes": 2763402,
+      "sha256": "453b598dbcc4b85ec94517d90724573b2bd5f3071cbe1cf347bbea928c42f083"
+    },
+    "producer_compiler": {
+      "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
+      "CMAKE_CXX_COMPILER_ID": "MSVC",
+      "CMAKE_CXX_COMPILER_VERSION": "19.44.35229.0",
+      "MSVC_CXX_ARCHITECTURE_ID": "x64"
+    },
+    "patched_qml_platform": {
+      "name": "Windows",
+      "version": "10.0.20348",
+      "compiler_id": "MSVC",
+      "compiler_version": "19.44.35229.0",
+      "targets": [
+        {
+          "architecture": "x86_64",
+          "abi": "x86_64-little_endian-lp64"
+        }
+      ]
+    },
+    "producer_compiler_metadata": {
+      "bytes": 6603,
+      "sha256": "6b785cbe38f04d4be2b1b10fce27f15347e8298adb88db5b7a8f76cd5a1d5820"
+    },
+    "producer_compiler_binary": {
+      "path": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+      "bytes": 677776,
+      "sha256": "fe251ef50a1545b1b0835ee17b1e785459712b38d79e45b5c1d3d28970a36619"
+    }
+  },
+  "pe_interface": {
+    "stock_count": 6659,
+    "patched_count": 6659,
+    "names_and_ordinals_equal": true,
+    "stock_dependencies": [
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "kernel32.dll",
+      "msvcp140.dll",
+      "qt6core.dll",
+      "qt6network.dll",
+      "vcruntime140.dll",
+      "vcruntime140_1.dll"
+    ],
+    "patched_dependencies": [
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "kernel32.dll",
+      "msvcp140.dll",
+      "qt6core.dll",
+      "qt6network.dll",
+      "vcruntime140.dll",
+      "vcruntime140_1.dll"
+    ],
+    "dependencies_equal": true,
+    "scope": "PE interface comparison plus identical source/feature headers; not a proof of all ABI behavior."
+  },
+  "reuse_inputs": {
+    "tools/Build-Qt612QmlDiagnosticSdk.py": {
+      "bytes": 134627,
+      "sha256": "e841d43516cf4a4ba8a1920dcf820ac606155db9b52965a05113497e9bff8600"
+    },
+    "tools/ReadPr61ArtifactEvidence.py": {
+      "bytes": 24830,
+      "sha256": "e9156fb5f27c7b5c42f752ce5f3ec3ddd036146464de47a2717fc858d095727e"
+    },
+    "tools/qt612-qml-patch.lock.json": {
+      "bytes": 9857,
+      "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+    },
+    "tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
+      "bytes": 2284,
+      "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
+    }
+  },
+  "scope": "Product SDK candidate from the exact reviewed QtDeclarative single-file upstream patch. This separate composition admission does not alter diagnostic scope or claim full Swirl VME causality, release acceptance, Rust/OpenSSL/CRT pairing, or corresponding source for all Qt modules. Producer failure remains failure; only its completed build and explicitly verified patched fixtures are reused."
+}

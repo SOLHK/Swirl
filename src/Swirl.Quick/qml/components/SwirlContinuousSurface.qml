@@ -15,9 +15,12 @@ Item {
         visible: Theme.effectsSupported
         property vector2d surfaceSize: Qt.vector2d(width, height)
         property real cornerRadius: surface.radius
-        property real borderWidth: surface.border.width
+        // A page teardown can evaluate this binding after the inline SurfaceBorder
+        // object has already been released. Read it defensively so a closed route
+        // cannot emit a QML TypeError that fails the native full-motion smoke.
+        property real borderWidth: surface.border ? surface.border.width : 0
         property color fillColor: surface.color
-        property color rimColor: surface.border.color
+        property color rimColor: surface.border ? surface.border.color : "transparent"
         fragmentShader: "qrc:/swirl/shaders/swirl-surface.frag.qsb"
     }
     SwirlShellOutline {
@@ -25,7 +28,7 @@ Item {
         visible: !Theme.effectsSupported
         radius: surface.radius
         fillColor: surface.color
-        strokeWidth: surface.border.width
-        strokeColor: surface.border.color
+        strokeWidth: surface.border ? surface.border.width : 0
+        strokeColor: surface.border ? surface.border.color : "transparent"
     }
 }

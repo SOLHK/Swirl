@@ -1,4 +1,5 @@
 #include "AppearanceChecks.h"
+#include "app/SwirlPressClock.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
@@ -18,6 +19,9 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QEnterEvent>
+#include <QMouseEvent>
+#include <QKeyEvent>
 #include <QElapsedTimer>
 #include <QDateTime>
 #include <QFileInfo>
@@ -27,8 +31,96 @@
 #include <QJsonObject>
 #include <QEventLoop>
 #include <QTimer>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QtMath>
+#include <array>
+#include <chrono>
 #include <functional>
+#include <memory>
+#include <QSGRendererInterface>
+#include <QSGTransformNode>
+#include <private/qquickitem_p.h>
+#ifdef Q_OS_WIN
+#include <private/qdxgivsyncservice_p.h>
+#include <private/qrhid3d11_p.h>
+#endif
+
+static QJsonArray appearanceMatrixValues(const QMatrix4x4 &matrix) {
+    QJsonArray values;
+    for(int row=0;row<4;++row)for(int column=0;column<4;++column)values.append(matrix(row,column));
+    return values;
+}
+
+static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
+    QJsonObject result{{"scope","read-only normal-frame barrier before timed input"}};
+#ifdef Q_OS_WIN
+    result.insert("platformSupported",true);
+    auto *renderer=window->rendererInterface();
+    result.insert("rendererInterfacePresent",renderer!=nullptr);
+    if(!renderer)return result;
+    result.insert("graphicsApi",int(renderer->graphicsApi()));
+    const bool d3d11=renderer->graphicsApi()==QSGRendererInterface::Direct3D11;
+    result.insert("d3d11",d3d11);
+    if(!d3d11)return result;
+    // Qt 6.12 QRhiSwapChain has no nativeHandles() API. Reuse the same
+    // version-locked GuiPrivate backend type as the existing Hero checks.
+    // The caller runs on the render thread; retain only values, not pointers.
+    auto *rhiChain=static_cast<QRhiSwapChain *>(renderer->getResource(window,QSGRendererInterface::RhiSwapchainResource));
+    result.insert("rhiSwapchainPresent",rhiChain!=nullptr);
+    if(!rhiChain)return result;
+    auto *chain=static_cast<QD3D11SwapChain *>(rhiChain);
+    result.insert("qtSwapInterval",qint64(chain->swapInterval));
+    result.insert("qtSwapchainFlags",qint64(chain->swapChainFlags));
+    result.insert("qtFrameLatencyWaitableObjectPresent",chain->frameLatencyWaitableObject!=nullptr);
+    // The platform's update-request watcher is independent of the swapchain
+    // waitable object. Observe its actual path before timed input, not per frame.
+    result.insert("qtVBlankServiceSupportsWindow",QDxgiVSyncService::instance()->supportsWindow(window));
+    result.insert("dxgiSwapchainPresent",chain->swapChain!=nullptr);
+    if(!chain->swapChain)return result;
+    const auto hresult=[](HRESULT value){
+        return QJsonObject{{"hresult",QStringLiteral("0x")+QString::number(quint32(value),16).rightJustified(8,QLatin1Char('0'))},
+            {"succeeded",SUCCEEDED(value)}};
+    };
+    DXGI_SWAP_CHAIN_DESC desc{};
+    const HRESULT descStatus=chain->swapChain->GetDesc(&desc);
+    auto description=hresult(descStatus);
+    if(SUCCEEDED(descStatus)){
+        description.insert("flags",qint64(desc.Flags));
+        description.insert("bufferCount",qint64(desc.BufferCount));
+        description.insert("swapEffect",int(desc.SwapEffect));
+        description.insert("frameLatencyWaitableFlag",bool(desc.Flags&DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT));
+    }
+    result.insert("getDesc",description);
+    IDXGISwapChain2 *queriedChain=nullptr;
+    const HRESULT interfaceStatus=chain->swapChain->QueryInterface(__uuidof(IDXGISwapChain2),reinterpret_cast<void **>(&queriedChain));
+    auto release=[](IDXGISwapChain2 *value){if(value)value->Release();};
+    const std::unique_ptr<IDXGISwapChain2,decltype(release)> nativeChain(queriedChain,release);
+    auto query=hresult(interfaceStatus);
+    query.insert("interfacePresent",nativeChain!=nullptr);
+    result.insert("queryInterfaceSwapChain2",query);
+    if(FAILED(interfaceStatus)||!nativeChain)return result;
+    UINT maximumFrameLatency=0;
+    const HRESULT latencyStatus=nativeChain->GetMaximumFrameLatency(&maximumFrameLatency);
+    auto latency=hresult(latencyStatus);
+    if(SUCCEEDED(latencyStatus))latency.insert("frames",qint64(maximumFrameLatency));
+    result.insert("getMaximumFrameLatency",latency);
+    DXGI_SWAP_CHAIN_DESC1 desc1{};
+    const HRESULT desc1Status=nativeChain->GetDesc1(&desc1);
+    auto description1=hresult(desc1Status);
+    if(SUCCEEDED(desc1Status)){
+        description1.insert("flags",qint64(desc1.Flags));
+        description1.insert("bufferCount",qint64(desc1.BufferCount));
+        description1.insert("swapEffect",int(desc1.SwapEffect));
+        description1.insert("frameLatencyWaitableFlag",bool(desc1.Flags&DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT));
+    }
+    result.insert("getDesc1",description1);
+#else
+    Q_UNUSED(window);
+    result.insert("platformSupported",false);
+#endif
+    return result;
+}
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     if(!window)return 2;
@@ -63,12 +155,64 @@ Item {
         if(fixture){
             fixture->setParentItem(window->contentItem());
             struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
-            window->requestActivate();QTest::qWait(100);
+            window->requestActivate();
+            check(QTest::qWaitFor([&]{return window->isExposed()&&window->isActive();},1000),
+                "native review window is exposed and active before pointer input");
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
+#ifdef Q_OS_WIN
+            class NativePointerObservation final : public QObject {
+            public:
+                quint64 positionEvents=0,moves=0,enters=0,leaves=0;
+                QPoint global;
+                QEvent::Type positionEventType=QEvent::None;
+                bool spontaneous=false;
+                bool eventFilter(QObject *,QEvent *event) override {
+                    if(event->type()==QEvent::MouseMove){
+                        ++moves;global=static_cast<QMouseEvent *>(event)->globalPosition().toPoint();
+                        ++positionEvents;positionEventType=event->type();spontaneous=event->spontaneous();
+                    }else if(event->type()==QEvent::Enter){
+                        ++enters;global=static_cast<QEnterEvent *>(event)->globalPosition().toPoint();
+                        ++positionEvents;positionEventType=event->type();spontaneous=event->spontaneous();
+                    }else if(event->type()==QEvent::Leave){++leaves;}
+                    return false;
+                }
+            } pointerObservation;
+            window->installEventFilter(&pointerObservation);
+#endif
             const auto movePointer=[&](QPoint local,int settle=160){
-                QCursor::setPos(window->mapToGlobal(local));
+                const auto global=window->mapToGlobal(local);
+#ifdef Q_OS_WIN
+                // Use one input path. QTest's QWindow mouse helper bypasses the
+                // platform pointer tracker and cannot acknowledge SetCursorPos.
+                // A distinct native move also covers a reused cursor position
+                // after a hide/show or a previous process at the same location.
+                // Qt's Windows backend can consume the first WM_MOUSEMOVE after
+                // show as Enter only. Its real QEnterEvent still carries the
+                // delivered position, so acknowledge either fresh positional event.
+                const auto nativeAt=QCursor::pos();
+                if(nativeAt==global || pointerObservation.global==global){
+                    const auto before=pointerObservation.positionEvents;
+                    const auto adjacent=global+(nativeAt==global+QPoint(1,0)?QPoint(-1,0):QPoint(1,0));
+                    QCursor::setPos(adjacent);
+                    check(QTest::qWaitFor([&]{return pointerObservation.positionEvents>before&&pointerObservation.global==adjacent&&pointerObservation.spontaneous;},1000),
+                        "native pointer acknowledges the distinct departure position");
+                }
+                const auto before=pointerObservation.positionEvents,moves=pointerObservation.moves;
+                const auto enters=pointerObservation.enters,leaves=pointerObservation.leaves;
+                QCursor::setPos(global);
+                const bool delivered=QTest::qWaitFor([&]{return pointerObservation.positionEvents>before&&pointerObservation.global==global&&pointerObservation.spontaneous;},1000);
+                qInfo()<<"APPEARANCE_NATIVE_POINTER"<<"requestedGlobal"<<global<<"observedGlobal"<<pointerObservation.global
+                    <<"delivered"<<delivered<<"moves"<<(pointerObservation.moves-moves)
+                    <<"enters"<<(pointerObservation.enters-enters)<<"leaves"<<(pointerObservation.leaves-leaves)
+                    <<"spontaneous"<<pointerObservation.spontaneous<<"exposed"<<window->isExposed()<<"active"<<window->isActive()
+                    <<"positionEvents"<<(pointerObservation.positionEvents-before)
+                    <<"eventType"<<(pointerObservation.positionEventType==QEvent::Enter?"Enter":pointerObservation.positionEventType==QEvent::MouseMove?"MouseMove":"None");
+                check(delivered,"native pointer move reaches the review window before sampling");
+#else
+                QCursor::setPos(global);
                 QCoreApplication::processEvents();
                 QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));
+#endif
                 QTest::qWait(settle);
             };
             std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
@@ -77,8 +221,28 @@ Item {
                 for(auto *child:parent->childItems())if(auto *match=visualItem(child,name))return match;
                 return nullptr;
             };
+            const auto windowInventory=[&](const char *phase,const QString &theme,const QString &control=QString()){
+                QJsonArray windows;
+                for(auto *candidate:QGuiApplication::allWindows()){
+                    auto *quick=qobject_cast<QQuickWindow *>(candidate);
+                    const auto geometry=candidate->geometry();
+                    // handle() only observes platform-window creation. Do not
+                    // call winId(), which would create the hidden panel's HWND.
+                    windows.append(QJsonObject{{"address",QStringLiteral("0x")+QString::number(reinterpret_cast<quintptr>(candidate),16)},
+                        {"objectName",candidate->objectName()},{"className",QString::fromLatin1(candidate->metaObject()->className())},
+                        {"title",candidate->title()},{"main",candidate==window},{"visible",candidate->isVisible()},
+                        {"exposed",candidate->isExposed()},{"active",candidate->isActive()},{"visibility",int(candidate->visibility())},
+                        {"flags",QStringLiteral("0x")+QString::number(candidate->flags().toInt(),16)},
+                        {"hasPlatformWindow",candidate->handle()!=nullptr},{"quickWindow",quick!=nullptr},
+                        {"sceneGraphInitialized",quick&&quick->isSceneGraphInitialized()},{"dpr",candidate->devicePixelRatio()},
+                        {"geometry",QJsonObject{{"x",geometry.x()},{"y",geometry.y()},{"width",geometry.width()},{"height",geometry.height()}}}});
+                }
+                qInfo().noquote()<<"APPEARANCE_WINDOW_INVENTORY"<<phase<<theme<<control<<QJsonDocument(windows).toJson(QJsonDocument::Compact);
+            };
             for(const auto &theme:QStringList{"Light","Dark"}){
+                windowInventory("before-theme",theme);
                 eval("Theme.mode='"+theme+"';Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.increaseContrast=false");QTest::qWait(160);
+                windowInventory("after-theme",theme);
                 for(const auto &name:QStringList{"reviewButton","reviewIcon","reviewCombo","reviewAction","reviewNavigation"}){
                     auto *control=fixture->findChild<QQuickItem *>(name);auto *paint=surface(control);
                     check(paint&&qAbs(paint->property("radius").toReal()-(name=="reviewNavigation"?eval("Theme.sidebarRowRadius").toReal():paint->height()/2))<0.01,"shared surfaces retain the requested capsule or navigation curve");
@@ -147,19 +311,56 @@ Item {
                     const auto focusedPixels=window->grabWindow();
                     check(!focusedPixels.isNull()&&focusedPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"keyboard focus visibly tints the actual rendered button pixels");
                     if(name!="reviewCombo"){
-                        // A grab performs synchronous render-thread readback. Start the
-                        // input deadline only after its next normal frame is delivered.
+                        windowInventory("before-press",theme,name);
+                        // grabWindow() already blocks until readback completes. Pair a
+                        // subsequent normal sync and swap so an older in-flight frame
+                        // cannot satisfy this barrier. This does not drain DXGI's queue.
+                        struct NormalFrameBarrier {
+                            QMutex mutex;
+                            std::chrono::steady_clock::time_point start;
+                            bool armed=false,pending=false,retired=false;
+                            quint64 frame=0,ignoredSwaps=0;
+                            qreal synchronizedMs=-1,swappedMs=-1;
+                            QJsonObject swapchainProbe;
+                        };
+                        auto normalFrame=std::make_shared<NormalFrameBarrier>();
                         bool readbackRetired=false;
-                        QObject readbackContext;
-                        const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[&]{readbackRetired=true;},Qt::QueuedConnection);
-                        window->update();
-                        check(QTest::qWaitFor([&]{return readbackRetired;},1000),"a normal frame retires screenshot readback before timed input");
-                        QObject::disconnect(readbackFrame);
+                        {
+                            QObject readbackContext;
+                            const auto readbackSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&readbackContext,[normalFrame,window]{
+                                QMutexLocker lock(&normalFrame->mutex);
+                                if(!normalFrame->armed||normalFrame->retired)return;
+                                ++normalFrame->frame;normalFrame->pending=true;
+                                normalFrame->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-normalFrame->start).count();
+                                if(normalFrame->swapchainProbe.isEmpty())normalFrame->swapchainProbe=appearanceSwapChainProbe(window);
+                            },Qt::DirectConnection);
+                            const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[normalFrame]{
+                                QMutexLocker lock(&normalFrame->mutex);
+                                if(!normalFrame->armed||normalFrame->retired)return;
+                                if(!normalFrame->pending){++normalFrame->ignoredSwaps;return;}
+                                normalFrame->swappedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-normalFrame->start).count();
+                                normalFrame->pending=false;normalFrame->retired=true;
+                            },Qt::DirectConnection);
+                            {QMutexLocker lock(&normalFrame->mutex);normalFrame->start=std::chrono::steady_clock::now();normalFrame->armed=true;}
+                            window->update();
+                            readbackRetired=QTest::qWaitFor([normalFrame]{QMutexLocker lock(&normalFrame->mutex);return normalFrame->retired;},1000);
+                            {QMutexLocker lock(&normalFrame->mutex);normalFrame->armed=false;}
+                            QObject::disconnect(readbackSync);QObject::disconnect(readbackFrame);
+                        }
+                        check(readbackRetired,"a normal frame retires screenshot readback before timed input");
+                        {
+                            QMutexLocker lock(&normalFrame->mutex);
+                            qInfo().noquote()<<"CONTROL_PRESS_NORMAL_FRAME"<<theme<<name<<QJsonDocument(QJsonObject{
+                                {"retired",normalFrame->retired},{"frame",qint64(normalFrame->frame)},
+                                {"ignoredUnpairedSwaps",qint64(normalFrame->ignoredSwaps)},
+                                {"synchronizedMs",normalFrame->synchronizedMs},{"swappedMs",normalFrame->swappedMs},
+                                {"swapchainProbe",normalFrame->swapchainProbe}}).toJson(QJsonDocument::Compact);
+                        }
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();
                         QElapsedTimer pressClock;
                         QJsonArray pressFrames;
-                        bool contractedWithin40ms=false;
+                        bool legacyObservedWithin40ms=false;
                         const auto samplePress=[&](const char *phase){
                             if(!pressClock.isValid())return;
                             const qreal elapsed=pressClock.nsecsElapsed()/1000000.0;
@@ -167,29 +368,471 @@ Item {
                             const auto scale=paint->scale();
                             const auto labelScale=content?content->scale():0;
                             pressFrames.append(QJsonObject{{"phase",QString::fromLatin1(phase)},{"elapsedMs",elapsed},{"down",down},{"contact",paint->property("contactProgress").toReal()},{"surfaceScale",scale},{"contentScale",labelScale}});
-                            if((qstrcmp(phase,"afterAnimating")==0||qstrcmp(phase,"frameSwappedQueued")==0)&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)contractedWithin40ms=true;
+                            if((qstrcmp(phase,"afterAnimating")==0||qstrcmp(phase,"frameSwappedQueued")==0)&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)legacyObservedWithin40ms=true;
                         };
+                        struct SubmittedPressFrames {
+                            QMutex mutex;
+                            std::chrono::steady_clock::time_point start;
+                            bool armed=false;
+                            bool inputDown=false;
+                            bool pending=false;
+                            quint64 frame=0;
+                            qreal latestFrameBeginMs=-1;
+                            qreal frameBeginMs=-1;
+                            qreal synchronizedMs=0;
+                            qreal renderStartMs=-1;
+                            qreal renderEndMs=-1;
+                            qreal surfaceScale=1;
+                            qreal contentScale=1;
+                            qreal surfaceScaleY=1,contentScaleY=1;
+                            qreal surfacePropertyScale=1,contentPropertyScale=1;
+                            qreal geometryCapturedMs=-1;
+                            QMatrix4x4 surfaceMatrix,contentMatrix;
+                            bool hasSceneGraphNodes=false,geometryValid=false;
+                            bool hasContent=false;
+                            QJsonArray frames;
+                            // Keep the natural frame pipeline across timed arms.
+                            // Recording uses fixed storage and the existing lock;
+                            // conversion and output happen only after the gate.
+                            struct PhaseSample {
+                                const char *phase=nullptr;
+                                std::chrono::steady_clock::time_point at;
+                                quint64 serial=0,frame=0;
+                                bool frameBoundaryKnown=false,inFrame=false,armed=false,timedFramePending=false,geometryValid=false;
+                                qreal surfaceScale=-1,contentScale=-1,surfaceScaleY=-1,contentScaleY=-1;
+                            };
+                            std::array<PhaseSample,128> phaseHistory;
+                            std::array<PhaseSample,48> preArmHistory;
+                            size_t phaseCount=0,phaseNext=0,preArmCount=0;
+                            quint64 phaseSerial=0,phaseFrame=0,armPhaseSerial=0;
+                            bool tracing=true,phaseFrameBoundaryKnown=false,phaseInFrame=false;
+                            bool preArmFrameBoundaryKnown=false,preArmInFrame=false,preArmTimedFramePending=false;
+                            void recordPhase(const char *phase,bool valid=false,qreal sx=-1,qreal cx=-1,qreal sy=-1,qreal cy=-1) {
+                                if(!tracing)return;
+                                phaseHistory[phaseNext]={phase,std::chrono::steady_clock::now(),++phaseSerial,phaseFrame,
+                                    phaseFrameBoundaryKnown,phaseInFrame,armed,pending,valid,sx,cx,sy,cy};
+                                phaseNext=(phaseNext+1)%phaseHistory.size();
+                                phaseCount=std::min(phaseCount+1,phaseHistory.size());
+                            }
+                            void retainPreArmPhases() {
+                                armPhaseSerial=phaseSerial;
+                                preArmFrameBoundaryKnown=phaseFrameBoundaryKnown;
+                                preArmInFrame=phaseInFrame;preArmTimedFramePending=pending;
+                                preArmCount=std::min(phaseCount,preArmHistory.size());
+                                const size_t begin=(phaseNext+phaseHistory.size()-preArmCount)%phaseHistory.size();
+                                for(size_t i=0;i<preArmCount;++i)preArmHistory[i]=phaseHistory[(begin+i)%phaseHistory.size()];
+                            }
+                            QJsonObject phaseSnapshot() const {
+                                const auto encode=[this](const PhaseSample &sample){
+                                    QJsonObject result{{"phase",QString::fromLatin1(sample.phase)},
+                                        {"elapsedMs",std::chrono::duration<qreal,std::milli>(sample.at-start).count()},
+                                        {"serial",qint64(sample.serial)},{"frame",qint64(sample.frame)},
+                                        {"frameBoundaryKnown",sample.frameBoundaryKnown},{"inFrame",sample.inFrame},{"armed",sample.armed},
+                                        {"timedFramePending",sample.timedFramePending}};
+                                    if(qstrcmp(sample.phase,"afterSynchronizing")==0){
+                                        result.insert("geometryValid",sample.geometryValid);
+                                        result.insert("surfaceScale",sample.surfaceScale);result.insert("contentScale",sample.contentScale);
+                                        result.insert("surfaceScaleY",sample.surfaceScaleY);result.insert("contentScaleY",sample.contentScaleY);
+                                    }
+                                    return result;
+                                };
+                                QJsonArray before,after;
+                                for(size_t i=0;i<preArmCount;++i)before.append(encode(preArmHistory[i]));
+                                const size_t begin=(phaseNext+phaseHistory.size()-phaseCount)%phaseHistory.size();
+                                for(size_t i=0;i<phaseCount;++i){
+                                    const auto &sample=phaseHistory[(begin+i)%phaseHistory.size()];
+                                    if(sample.serial>armPhaseSerial)after.append(encode(sample));
+                                }
+                                return {{"scope","bounded passive phase observations; original input origin and frameSwapped deadline unchanged"},
+                                    {"preArmFrameBoundaryKnown",preArmFrameBoundaryKnown},
+                                    {"preArmInFrame",preArmInFrame},{"preArmTimedFramePending",preArmTimedFramePending},
+                                    {"preArm",before},{"afterArm",after},
+                                    {"afterArmHistoryTruncated",phaseSerial-armPhaseSerial>phaseHistory.size()}};
+                            }
+                        };
+                        auto presented=std::make_shared<SubmittedPressFrames>();
                         QObject pressContext;
                         const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});
                         const auto pressDelivery=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[&]{samplePress("frameSwappedQueued");},Qt::QueuedConnection);
+                        const auto pressTraceAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);presented->recordPhase("afterAnimating");
+                        });
+                        const auto pressFrameBegin=QObject::connect(window,&QQuickWindow::beforeFrameBegin,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(!presented->tracing)return;
+                            ++presented->phaseFrame;presented->phaseFrameBoundaryKnown=true;
+                            presented->phaseInFrame=true;presented->recordPhase("beforeFrameBegin");
+                            // A frame may have begun before input armed this probe.
+                            // Keep that boundary unknown instead of inventing a time.
+                            presented->latestFrameBeginMs=presented->armed
+                                ?std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count():-1;
+                        },Qt::DirectConnection);
+                        // Qt 6.12 advances GUI animations after its sync wait.
+                        // A queued frameSwapped handler can read the next frame's
+                        // values, and itemTransform() can recompute a matrix that was
+                        // never adopted by the scene graph. Keep GUI scale as a
+                        // diagnostic, but capture the actual existing SG nodes after
+                        // sync, then pair those matrices with this frame's submission.
+                        // This is not a physical display scan-out timestamp.
+                        const auto pressSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&pressContext,[presented,paint,content]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("beforeSynchronizing");
+                            if(!presented->armed)return;
+                            presented->frameBeginMs=presented->latestFrameBeginMs;
+                            presented->latestFrameBeginMs=-1;
+                            presented->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->renderStartMs=-1;
+                            presented->renderEndMs=-1;
+                            presented->surfacePropertyScale=paint->scale();
+                            presented->hasContent=content!=nullptr;
+                            presented->contentPropertyScale=content?content->scale():0;
+                            presented->geometryCapturedMs=-1;
+                            presented->hasSceneGraphNodes=false;presented->geometryValid=false;
+                            ++presented->frame;
+                            presented->pending=true;
+                        },Qt::DirectConnection);
+                        const auto pressGeometry=QObject::connect(window,&QQuickWindow::afterSynchronizing,&pressContext,[presented,paint,content]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(!presented->tracing)return;
+                            // Qt6.12's itemNodeInstance is the already-created node.
+                            // Calling itemNode() here would create a missing node and
+                            // turn this observation into a scene-graph mutation.
+                            const auto *surfaceNode=QQuickItemPrivate::get(paint)->itemNodeInstance;
+                            const auto *contentNode=content?QQuickItemPrivate::get(content)->itemNodeInstance:nullptr;
+                            if(!presented->armed||!presented->pending){
+                                bool valid=surfaceNode&&contentNode;
+                                qreal sx=-1,cx=-1,sy=-1,cy=-1;
+                                if(valid){
+                                    const auto sm=surfaceNode->matrix(),cm=contentNode->matrix();
+                                    for(int row=0;row<4;++row)for(int column=0;column<4;++column)
+                                        valid=valid&&qIsFinite(sm(row,column))&&qIsFinite(cm(row,column));
+                                    sx=qSqrt(qreal(sm(0,0))*sm(0,0)+qreal(sm(1,0))*sm(1,0));
+                                    cx=qSqrt(qreal(cm(0,0))*cm(0,0)+qreal(cm(1,0))*cm(1,0));
+                                    sy=qSqrt(qreal(sm(0,1))*sm(0,1)+qreal(sm(1,1))*sm(1,1));
+                                    cy=qSqrt(qreal(cm(0,1))*cm(0,1)+qreal(cm(1,1))*cm(1,1));
+                                    valid=valid&&sx>0&&cx>0&&sy>0&&cy>0;
+                                }
+                                presented->recordPhase("afterSynchronizing",valid,sx,cx,sy,cy);
+                                return;
+                            }
+                            presented->geometryCapturedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->hasSceneGraphNodes=surfaceNode&&contentNode;
+                            if(!presented->hasSceneGraphNodes){presented->recordPhase("afterSynchronizing");return;}
+                            presented->surfaceMatrix=surfaceNode->matrix();presented->contentMatrix=contentNode->matrix();
+                            bool finite=true;
+                            for(int row=0;row<4;++row)for(int column=0;column<4;++column)
+                                finite=finite&&qIsFinite(presented->surfaceMatrix(row,column))&&qIsFinite(presented->contentMatrix(row,column));
+                            const auto scaleX=[](const QMatrix4x4 &matrix){return qSqrt(qreal(matrix(0,0))*matrix(0,0)+qreal(matrix(1,0))*matrix(1,0));};
+                            const auto scaleY=[](const QMatrix4x4 &matrix){return qSqrt(qreal(matrix(0,1))*matrix(0,1)+qreal(matrix(1,1))*matrix(1,1));};
+                            presented->surfaceScale=scaleX(presented->surfaceMatrix);presented->surfaceScaleY=scaleY(presented->surfaceMatrix);
+                            presented->contentScale=scaleX(presented->contentMatrix);presented->contentScaleY=scaleY(presented->contentMatrix);
+                            presented->geometryValid=finite&&presented->surfaceScale>0&&presented->surfaceScaleY>0
+                                &&presented->contentScale>0&&presented->contentScaleY>0;
+                            presented->recordPhase("afterSynchronizing",presented->geometryValid,presented->surfaceScale,
+                                presented->contentScale,presented->surfaceScaleY,presented->contentScaleY);
+                        },Qt::DirectConnection);
+                        const auto pressRenderStart=QObject::connect(window,&QQuickWindow::beforeRendering,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("beforeRendering");
+                            if(presented->armed&&presented->pending)
+                                presented->renderStartMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                        },Qt::DirectConnection);
+                        const auto pressRenderEnd=QObject::connect(window,&QQuickWindow::afterRendering,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("afterRendering");
+                            if(presented->armed&&presented->pending)
+                                presented->renderEndMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                        },Qt::DirectConnection);
+                        const auto pressSwap=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->recordPhase("frameSwapped");
+                            if(!presented->armed||!presented->pending)return;
+                            const qreal elapsed=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->frames.append(QJsonObject{{"frame",qint64(presented->frame)},
+                                {"frameBeginMs",presented->frameBeginMs},
+                                {"synchronizedMs",presented->synchronizedMs},{"swappedMs",elapsed},
+                                {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                {"down",presented->inputDown},{"surfaceScale",presented->surfaceScale},
+                                {"contentScale",presented->contentScale},{"hasContent",presented->hasContent},
+                                {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY},
+                                {"surfacePropertyScale",presented->surfacePropertyScale},{"contentPropertyScale",presented->contentPropertyScale},
+                                {"geometryCapturedMs",presented->geometryCapturedMs},{"hasSceneGraphNodes",presented->hasSceneGraphNodes},
+                                {"geometryValid",presented->geometryValid},
+                                {"surfaceMatrix",appearanceMatrixValues(presented->surfaceMatrix)},
+                                {"contentMatrix",appearanceMatrixValues(presented->contentMatrix)}});
+                            presented->pending=false;
+                        },Qt::DirectConnection);
+                        const auto pressFrameEnd=QObject::connect(window,&QQuickWindow::afterFrameEnd,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            presented->phaseFrameBoundaryKnown=true;presented->phaseInFrame=false;presented->recordPhase("afterFrameEnd");
+                        },Qt::DirectConnection);
+                        const auto traceInput=[presented](const char *phase){
+                            QMutexLocker lock(&presented->mutex);presented->recordPhase(phase);
+                        };
                         // QTest::qWait polls with sleeps of up to10ms, which can
                         // starve a fast render loop during this strict deadline.
                         QEventLoop pressObservation;
                         QTimer pressDeadline;pressDeadline.setTimerType(Qt::PreciseTimer);pressDeadline.setSingleShot(true);
                         QObject::connect(&pressDeadline,&QTimer::timeout,&pressObservation,&QEventLoop::quit);
+                        const QPointF globalAt=window->mapToGlobal(at);
+                        QMouseEvent pressEvent(QEvent::MouseButtonPress,QPointF(at),globalAt,
+                            Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);
+                        {
+                            QMutexLocker lock(&presented->mutex);
+                            presented->start=std::chrono::steady_clock::now();
+                            presented->retainPreArmPhases();
+                            presented->armed=true;
+                        }
                         pressClock.start();pressDeadline.start(40);
-                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);samplePress("inputDelivered");pressObservation.exec();
+                        // Qt 6.12's QTest mouse helper drains processEvents after
+                        // delivery. Send the same-stack press before entering the
+                        // observation loop so its first frame cannot escape arming.
+                        traceInput("mousePressDispatchBegin");
+                        const bool pressDelivered=QCoreApplication::sendEvent(window,&pressEvent);
+                        traceInput("mousePressDispatchEnd");
+                        samplePress("inputDelivered");
+                        const bool pressDown=control->property("down").toBool();
+                        {
+                            QMutexLocker lock(&presented->mutex);
+                            presented->inputDown=pressDown;
+                        }
+                        pressObservation.exec();
                         samplePress("deadlineObservation");
+                        QJsonArray presentedFrames;
+                        {
+                            // Freeze the timed arm under the same lock as the
+                            // render callbacks. Passive phase/SG observations remain
+                            // active for the later reversal; tracing is disabled
+                            // under this lock before disconnect and item teardown.
+                            QMutexLocker lock(&presented->mutex);
+                            presented->armed=false;
+                            presentedFrames=presented->frames;
+                        }
+
+                        check(pressDelivered&&pressDown,"same-stack timed press reaches the actual control");
+                        bool contractedWithin40ms=false;
+                        bool submittedGeometryPresent=!presentedFrames.isEmpty();
+                        for(const auto &frame:presentedFrames){
+                            const auto sample=frame.toObject();
+                            submittedGeometryPresent=submittedGeometryPresent&&sample.value("hasSceneGraphNodes").toBool()&&sample.value("geometryValid").toBool();
+                            if(sample.value("swappedMs").toDouble()<=40&&sample.value("down").toBool()
+                                &&sample.value("hasSceneGraphNodes").toBool()&&sample.value("geometryValid").toBool()
+                                &&sample.value("surfaceScale").toDouble()<.995&&sample.value("hasContent").toBool()
+                                &&sample.value("surfaceScaleY").toDouble()<.995
+                                &&qAbs(sample.value("contentScale").toDouble()-sample.value("surfaceScale").toDouble())<.001
+                                &&qAbs(sample.value("contentScaleY").toDouble()-sample.value("surfaceScaleY").toDouble())<.001)
+                                contractedWithin40ms=true;
+                        }
                         qInfo().noquote()<<"CONTROL_PRESS_FRAMES"<<theme<<name<<QJsonDocument(pressFrames).toJson(QJsonDocument::Compact);
+                        qInfo().noquote()<<"CONTROL_PRESS_SUBMITTED_FRAMES"<<theme<<name
+                            <<"legacyObservedWithin40ms"<<legacyObservedWithin40ms<<QJsonDocument(presentedFrames).toJson(QJsonDocument::Compact);
+                        QJsonObject ordinaryPhaseTrace;
+                        {QMutexLocker lock(&presented->mutex);ordinaryPhaseTrace=presented->phaseSnapshot();}
+                        qInfo().noquote()<<"CONTROL_PRESS_PHASE_TRACE"<<theme<<name<<QJsonDocument(ordinaryPhaseTrace).toJson(QJsonDocument::Compact);
+                        check(submittedGeometryPresent,"submitted press frames contain finite scene-graph transforms for surface and label");
                         check(contractedWithin40ms,"a short press contracts both the surface and its label within the first40ms");
                         QObject::disconnect(pressAnimation);QObject::disconnect(pressDelivery);
                         QTest::qWait(100);
                         check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
                         check(QQmlProperty(paint,"border.width").read().toReal()==0,"press feedback does not introduce an outline stroke");
-                        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+                        QMouseEvent releaseEvent(QEvent::MouseButtonRelease,QPointF(at),globalAt,
+                            Qt::LeftButton,Qt::NoButton,Qt::NoModifier);
+                        traceInput("mouseReleaseDispatchBegin");
+                        const bool releaseDelivered=QCoreApplication::sendEvent(window,&releaseEvent);
+                        traceInput("mouseReleaseDispatchEnd");
+                        const bool released=!control->property("down").toBool();
                         QTest::qWait(30);
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
+                        check(releaseDelivered&&released,"same-stack timed release reaches the actual control");
                         check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
+                        if(theme=="Light" && name=="reviewButton"){
+                            SwirlPressClock *nativeClock=nullptr;
+                            for(auto *candidate:control->findChildren<SwirlPressClock *>())
+                                if(candidate->surfaceTarget()==paint && candidate->contentTarget()==content)nativeClock=candidate;
+                            check(nativeClock!=nullptr,"ordinary review button owns its production native press clock");
+                            if(nativeClock){
+                                const auto armNative=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    presented->start=std::chrono::steady_clock::now();
+                                    presented->retainPreArmPhases();
+                                    presented->frames=QJsonArray();presented->pending=false;
+                                    presented->latestFrameBeginMs=-1;presented->inputDown=true;presented->armed=true;
+                                };
+                                const auto submittedContraction=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    for(const auto &entry:presented->frames){const auto frame=entry.toObject();
+                                        if(frame.value("geometryValid").toBool() && frame.value("surfaceScale").toDouble()<.995
+                                            && frame.value("surfaceScaleY").toDouble()<.995
+                                            && qAbs(frame.value("surfaceScaleY").toDouble()-frame.value("contentScaleY").toDouble())<.001
+                                            && frame.value("swappedMs").toDouble()<=40
+                                            && qAbs(frame.value("surfaceScale").toDouble()-frame.value("contentScale").toDouble())<.001)
+                                            return true;
+                                    }
+                                    return false;
+                                };
+                                const auto adoptedScale=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    return QPointF(presented->surfaceScale,presented->contentScale);
+                                };
+                                const auto sendMouse=[&](QEvent::Type type){
+                                    QMouseEvent event(type,QPointF(at),globalAt,Qt::LeftButton,
+                                        type==QEvent::MouseButtonPress?Qt::LeftButton:Qt::NoButton,Qt::NoModifier);
+                                    traceInput(type==QEvent::MouseButtonPress?"mousePressDispatchBegin":"mouseReleaseDispatchBegin");
+                                    const bool delivered=QCoreApplication::sendEvent(window,&event);
+                                    traceInput(type==QEvent::MouseButtonPress?"mousePressDispatchEnd":"mouseReleaseDispatchEnd");
+                                    return delivered;
+                                };
+                                armNative();pressDeadline.start(40);
+                                const bool initialInputDelivered=sendMouse(QEvent::MouseButtonPress);
+                                const bool initialInputDown=control->property("down").toBool();
+                                pressObservation.exec();
+                                const bool initialContractedWithin40ms=submittedContraction();
+                                QJsonArray initialFrames;
+                                QJsonObject initialObservation,initialPhaseTrace;
+                                {
+                                    QMutexLocker lock(&presented->mutex);
+                                    initialFrames=presented->frames;
+                                    initialPhaseTrace=presented->phaseSnapshot();
+                                    initialObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
+                                        {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
+                                    // A frame waiting for Present is not in frames yet. Only
+                                    // expose its phase values when this arm has a paired sync;
+                                    // otherwise those values can belong to the previous press.
+                                    if(presented->pending)initialObservation.insert("pendingFrame",QJsonObject{
+                                        {"frame",qint64(presented->frame)},{"frameBeginMs",presented->frameBeginMs},
+                                        {"synchronizedMs",presented->synchronizedMs},{"geometryCapturedMs",presented->geometryCapturedMs},
+                                        {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                        {"hasSceneGraphNodes",presented->hasSceneGraphNodes},{"geometryValid",presented->geometryValid},
+                                        {"surfaceScale",presented->surfaceScale},{"contentScale",presented->contentScale},
+                                        {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY}});
+                                }
+                                const bool initialObservedDown=control->property("down").toBool();
+                                const bool initialClockRunning=nativeClock->running();
+                                // Preserve this phase before the later arm clears its frames.
+                                // Logging follows the unchanged deadline decision; only the
+                                // subsequent release sequence can observe its I/O cost.
+                                qInfo().noquote()<<"NATIVE_PRESS_REVERSAL_INITIAL"<<QJsonDocument(QJsonObject{
+                                    {"inputDelivered",initialInputDelivered},{"inputDown",initialInputDown},
+                                    {"observedDown",initialObservedDown},{"nativeClockRunningAtObservation",initialClockRunning},
+                                    {"contractedWithin40ms",initialContractedWithin40ms},{"frames",initialFrames},
+                                    {"observation",initialObservation},{"phaseTrace",initialPhaseTrace}
+                                }).toJson(QJsonDocument::Compact);
+                                check(initialContractedWithin40ms,"native reversal fixture observes a submitted paired contraction within the first40ms");
+                                // These values came from existing SG nodes after sync. The
+                                // same-stack release must hand off that adopted pose to
+                                // the GUI spring, rather than the earlier GUI clock value.
+                                const auto adopted=adoptedScale();sendMouse(QEvent::MouseButtonRelease);
+                                check(qAbs(paint->scale()-adopted.x())<.001 && qAbs(content->scale()-adopted.y())<.001,
+                                    "native press release starts its spring from the actual adopted paired geometry");
+                                // Deliver re-press during a real GUI spring update that
+                                // has not yet reached the scene graph. The previous node
+                                // matrices remain the visual origin for this reversal.
+                                QPointF springOrigin;
+                                bool reversedSpring=false,repressContinuous=false;
+                                QEventLoop reversalObservation;
+                                QTimer reversalBudget,repressDeadline;
+                                reversalBudget.setSingleShot(true);repressDeadline.setSingleShot(true);
+                                repressDeadline.setTimerType(Qt::PreciseTimer);
+                                QObject::connect(&reversalBudget,&QTimer::timeout,&reversalObservation,&QEventLoop::quit);
+                                QObject::connect(&repressDeadline,&QTimer::timeout,&reversalObservation,&QEventLoop::quit);
+                                const auto reverseSpring=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{
+                                    if(reversedSpring)return;
+                                    const auto actual=adoptedScale();const auto gui=paint->scale();
+                                    if(actual.x()<=.983 || gui>=.999 || qAbs(gui-actual.x())<.0001)return;
+                                    springOrigin=actual;armNative();repressDeadline.start(40);
+                                    sendMouse(QEvent::MouseButtonPress);reversedSpring=true;
+                                    repressContinuous=qAbs(paint->scale()-springOrigin.x())<.001
+                                        && qAbs(content->scale()-springOrigin.y())<.001;
+                                });
+                                reversalBudget.start(1400);reversalObservation.exec();reversalBudget.stop();repressDeadline.stop();
+                                QObject::disconnect(reverseSpring);
+                                QJsonArray reverseFrames;
+                                {QMutexLocker lock(&presented->mutex);reverseFrames=presented->frames;}
+                                bool firstRepressContinuous=false;
+                                if(!reverseFrames.isEmpty()){
+                                    const auto first=reverseFrames.first().toObject();
+                                    firstRepressContinuous=first.value("swappedMs").toDouble()<=40
+                                        && first.value("geometryValid").toBool()
+                                        && first.value("surfaceScale").toDouble()<=springOrigin.x()+.001
+                                        && first.value("contentScale").toDouble()<=springOrigin.y()+.001
+                                        && first.value("surfaceScaleY").toDouble()<=springOrigin.x()+.001
+                                        && first.value("contentScaleY").toDouble()<=springOrigin.y()+.001
+                                        && qAbs(first.value("surfaceScaleY").toDouble()-first.value("contentScaleY").toDouble())<.001
+                                        && qAbs(first.value("surfaceScale").toDouble()-first.value("contentScale").toDouble())<.001;
+                            }
+                            QJsonObject reversePhaseTrace;
+                            {QMutexLocker lock(&presented->mutex);reversePhaseTrace=presented->phaseSnapshot();}
+                            qInfo().noquote()<<"NATIVE_PRESS_SPRING_REVERSAL"<<QJsonDocument(QJsonObject{
+                                {"exercised",reversedSpring},{"sameStackContinuous",repressContinuous},
+                                {"adoptedSurfaceBefore",springOrigin.x()},{"adoptedContentBefore",springOrigin.y()},
+                                {"submittedFrames",reverseFrames},{"phaseTrace",reversePhaseTrace}}).toJson(QJsonDocument::Compact);
+                            check(reversedSpring && repressContinuous,"re-press reverses from the actual adopted spring pose in the input stack");
+                            check(reversedSpring && firstRepressContinuous,"the first submitted re-press preserves adopted geometry within40ms");
+                            sendMouse(QEvent::MouseButtonRelease);
+                            check(QTest::qWaitFor([&]{return !nativeClock->running() && qAbs(paint->scale()-1)<.001;},1400),
+                                "native release retires its clock and settles normally");
+                            control->forceActiveFocus(Qt::TabFocusReason);armNative();pressDeadline.start(40);
+                            QKeyEvent keyDown(QEvent::KeyPress,Qt::Key_Space,Qt::NoModifier);
+                            traceInput("spaceDispatchBegin");
+                            const bool keyboardDelivered=QCoreApplication::sendEvent(window,&keyDown);
+                            traceInput("spaceDispatchEnd");
+                            const bool keyboardDown=control->property("down").toBool();
+                            pressObservation.exec();
+                            const bool keyboardContractedWithin40ms=submittedContraction();
+                            const bool keyboardPassed=keyboardDelivered && keyboardDown && keyboardContractedWithin40ms;
+                            if(!keyboardPassed){
+                                QJsonArray keyboardFrames;
+                                QJsonObject keyboardObservation,keyboardPhaseTrace;
+                                {
+                                    QMutexLocker lock(&presented->mutex);
+                                    keyboardFrames=presented->frames;
+                                    keyboardPhaseTrace=presented->phaseSnapshot();
+                                    keyboardObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
+                                        {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
+                                    if(presented->pending)keyboardObservation.insert("pendingFrame",QJsonObject{
+                                        {"frame",qint64(presented->frame)},{"frameBeginMs",presented->frameBeginMs},
+                                        {"synchronizedMs",presented->synchronizedMs},{"geometryCapturedMs",presented->geometryCapturedMs},
+                                        {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                        {"hasSceneGraphNodes",presented->hasSceneGraphNodes},{"geometryValid",presented->geometryValid},
+                                        {"surfaceScale",presented->surfaceScale},{"contentScale",presented->contentScale},
+                                        {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY}});
+                                }
+                                // The unchanged deadline decision precedes all diagnostic
+                                // allocation and logging, which run only for a failed Space.
+                                qInfo().noquote()<<"NATIVE_PRESS_SPACE"<<QJsonDocument(QJsonObject{
+                                    {"theme",theme},{"control",name},{"inputDelivered",keyboardDelivered},{"inputDown",keyboardDown},
+                                    {"observedDown",control->property("down").toBool()},{"nativeClockRunningAtObservation",nativeClock->running()},
+                                    {"contractedWithin40ms",keyboardContractedWithin40ms},{"frames",keyboardFrames},{"observation",keyboardObservation},
+                                    {"phaseTrace",keyboardPhaseTrace}
+                                }).toJson(QJsonDocument::Compact);
+                            }
+                            check(keyboardPassed,
+                                "Space activation submits paired native surface and label geometry within the first40ms");
+                            const auto keyboardAdopted=adoptedScale();
+                            QKeyEvent keyUp(QEvent::KeyRelease,Qt::Key_Space,Qt::NoModifier);
+                            QCoreApplication::sendEvent(window,&keyUp);
+                            check(!control->property("down").toBool() && qAbs(paint->scale()-keyboardAdopted.x())<.001
+                                && qAbs(content->scale()-keyboardAdopted.y())<.001 && control->scale()==1,
+                                "Space release preserves the adopted pose and stable hit area");
+                            check(QTest::qWaitFor([&]{return !nativeClock->running() && qAbs(paint->scale()-1)<.001;},1400),
+                                "Space release settles the production native clock");
+                            const auto visibility=window->visibility();
+                            sendMouse(QEvent::MouseButtonPress);
+                            check(nativeClock && nativeClock->running(),"window hide interrupts an active production native press");
+                            window->hide();
+                            check(!nativeClock->running() && !paint->property("moving").toBool(),
+                                "hiding the real window retires native press callbacks and feedback motion");
+                            window->setVisibility(visibility);window->requestActivate();sendMouse(QEvent::MouseButtonRelease);
+                            check(QTest::qWaitFor([&]{return window->isExposed() && window->isActive()
+                                && !control->property("down").toBool() && !nativeClock->running()
+                                && qAbs(paint->scale()-1)<.001 && qAbs(content->scale()-1)<.001;},1400),
+                                "restoring the real window is ready for input and leaves no stale paired press transform");
+                            {QMutexLocker lock(&presented->mutex);presented->armed=false;}
+                            }
+                        }
+                        {QMutexLocker lock(&presented->mutex);presented->armed=false;presented->tracing=false;}
+                        QObject::disconnect(pressTraceAnimation);QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);QObject::disconnect(pressFrameEnd);
                     }
                     control->setEnabled(false);
                     // Compare exact premultiplied channels: RGB hidden by alpha=0
@@ -232,7 +875,26 @@ Item {
                 check(qAbs(metrics.horizontalAdvance("111111")-metrics.horizontalAdvance("888888"))<0.05,"numeric glyph updates retain equal advances in bundled and Windows fonts");
                 check(figures->baselineOffset()>0&&figures->baselineOffset()<=figures->height(),"mixed-script baseline remains inside measured text height");
             }
+            auto *teardownButton=fixture->findChild<QQuickItem *>("reviewButton");
+            QPointer<SwirlPressClock> teardownClock;
+            if(teardownButton)for(auto *candidate:teardownButton->findChildren<SwirlPressClock *>())
+                if(candidate->surfaceTarget()==teardownButton->property("background").value<QQuickItem *>()
+                    && candidate->contentTarget()==teardownButton->property("contentItem").value<QQuickItem *>())teardownClock=candidate;
+            if(teardownButton){
+                const auto at=teardownButton->mapToScene(QPointF(teardownButton->width()/2,teardownButton->height()/2));
+                QMouseEvent press(QEvent::MouseButtonPress,at,window->mapToGlobal(at.toPoint()),
+                    Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);
+                QCoreApplication::sendEvent(window,&press);
+            }
+            check(teardownClock && teardownClock->running(),"fixture destruction interrupts a live native paired press");
             delete fixture;
+            check(teardownClock.isNull(),"destroying a pressed control releases its production clock and transforms");
+            int fullMotionIdleFrames=0;
+            QObject idleReceiver;
+            const auto idleConnection=QObject::connect(window,&QQuickWindow::frameSwapped,&idleReceiver,[&]{++fullMotionIdleFrames;});
+            QTest::qWait(650);QObject::disconnect(idleConnection);
+            qInfo()<<"NATIVE_PRESS_FULL_MOTION_IDLE_FRAMES"<<fullMotionIdleFrames;
+            check(fullMotionIdleFrames<=4,"completed and destroyed native press clocks leave no full-motion idle drawing loop");
         }
     }
     stage("shared-controls-and-fonts");
@@ -364,7 +1026,7 @@ Item {
             check(unchangedParent(),"parent wing, colour and foreground RGBA pixels are unchanged through the sidebar");
             if(theme=="Light"){
                 lightMaterial=material;
-                check(eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool(),"accepted neutral light canvas and surface colours remain unchanged");
+                check(eval("Theme.canvas.toString()==='#f7f7f7' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool(),"accepted neutral light canvas and surface colours remain unchanged");
             }else darkMaterial=material;
         }
         qint64 lightAlpha=0,darkAlpha=0;int lightPeak=0,darkPeak=0;

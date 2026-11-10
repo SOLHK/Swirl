@@ -1,0 +1,75 @@
+name: Swirl VF D1 patched Qt regression
+on:
+  push:
+    branches: [work/vf-windows-d1]
+    paths:
+      - '.github/workflows/swirl-vf-windows-d1-patched-qt.yml'
+      - 'tools/swirl_vf/platform/win_axis_precision/d2_patched.py'
+      - 'tools/swirl_vf/platform/win_axis_precision/run_patched_qt.ps1'
+      - 'tools/swirl_vf/tests/test_windows_d2_patched.py'
+      - 'docs/patches/SWIRL_VF_WINDOWS_D2_1_QT_6_10_3.patch'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: swirl-vf-d1-patched-qt-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  patched-qt:
+    if: github.ref == 'refs/heads/work/vf-windows-d1' && !github.event.repository.private
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run unchanged and new portable regressions
+        run: |
+          python -m pip install fonttools==4.61.1 pillow==11.3.0 ninja==1.13.0
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          foreach ($test in @('test_windows_axis_precision.py','test_windows_d2_state.py','test_windows_d2_patched.py')) {
+            python -m unittest discover -s tools/swirl_vf/tests -p $test -v
+            if ($LASTEXITCODE -ne 0) { throw "Regression failed: $test" }
+          }
+      - name: Use canonical LF for the disposable upstream checkout
+        run: git config --global core.autocrlf false
+      - name: Check out full pinned Qt source
+        uses: actions/checkout@v4
+        with:
+          repository: qt/qtbase
+          ref: 7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4
+          path: build/d2-qt-source
+          persist-credentials: false
+      - name: Build baseline then patched Qt and run unchanged public queries
+        run: |
+          ./tools/swirl_vf/platform/win_axis_precision/run_patched_qt.ps1 -QtSource build/d2-qt-source -OutputDirectory build/d2-patched-qt
+          if ($LASTEXITCODE -ne 0) { throw 'Rebuilt Qt validation failed' }
+      - name: Preserve original failures and rebuilt DLL evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-VF-D1-PatchedQt-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            build/d2-patched-qt/**/*.json
+            build/d2-patched-qt/**/*.jsonl
+            build/d2-patched-qt/**/*.log
+            build/d2-patched-qt/**/*.png
+            build/d2-patched-qt/**/*.bin
+            build/d2-patched-qt/**/*.txt
+            build/d2-patched-qt/**/*.tsv
+            build/d2-patched-qt/d2-prepared/**
+            !build/d2-patched-qt/qt-build/**
+            !build/d2-patched-qt/qt-prefix/**
+          if-no-files-found: error
+          retention-days: 14

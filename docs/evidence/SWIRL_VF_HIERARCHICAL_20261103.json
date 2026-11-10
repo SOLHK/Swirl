@@ -1,0 +1,527 @@
+{
+  "status": "PARTIAL_FULL_TARGET_CUBES_NOT_ACCEPTED",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "source_face": 0,
+  "axis_order": [
+    "WDTH",
+    "wght",
+    "HGHT"
+  ],
+  "limit_source_font_units": 0.03125,
+  "base_commit": "64edf480ada893b28e01be6473a46ee82996c9cf",
+  "branch": "work/swirlvf-continuation-20261102",
+  "tests": {
+    "executed": 993,
+    "passed": 986,
+    "skipped": 7,
+    "failures": 0,
+    "audits_passed": 6
+  },
+  "hierarchical_source_boxes": {
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "face_index": 0,
+    "axis_order": [
+      "WDTH",
+      "wght",
+      "HGHT"
+    ],
+    "scope": "declared_domains_only_authored_template_no_source_metrics_or_cmap",
+    "source_font_acceptance": false,
+    "cases": [
+      {
+        "glyph_id": 1166,
+        "box": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            -0.5,
+            -0.25
+          ],
+          [
+            -1.0,
+            -0.5
+          ]
+        ],
+        "knots": [
+          65,
+          33,
+          9
+        ],
+        "training_count": 19305,
+        "holdout_count": 1024,
+        "full_cube": false,
+        "max_holdout_error": 0.012299365240735391,
+        "holdout_failures": 0,
+        "regions": 339,
+        "serialized": {
+          "observations": 1024,
+          "failures": 0,
+          "max_error": 0.012299365240326146
+        },
+        "native": {
+          "observations": 72,
+          "failures": 0,
+          "topology_failures": 0,
+          "max_cff2_libhvf_error": 0.007979109499351697,
+          "max_portable_libhvf_error": 4.633397912876327e-13,
+          "receipt": {
+            "error_count": 0,
+            "request_count": 72,
+            "source_sha256": "940b0011448293a4d9eececf7aac66768eb86310f82cabe511ff5b4b0a482670",
+            "successful_glyph_count": 72,
+            "type": "summary",
+            "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+            "verified_batch_count": 72,
+            "internal_native_request_count": 144,
+            "internal_native_glyph_count": 144,
+            "upstream_native_summary": {
+              "error_count": 0,
+              "request_count": 144,
+              "source_sha256": "940b0011448293a4d9eececf7aac66768eb86310f82cabe511ff5b4b0a482670",
+              "successful_glyph_count": 144,
+              "type": "summary"
+            },
+            "source_unchanged": true
+          }
+        },
+        "passed": true,
+        "compression": {
+          "input_regions": 1951,
+          "output_regions": 339,
+          "error_budget": 0.0078125,
+          "max_control_error_bound": 0.007753879453105447,
+          "within_budget": true,
+          "scope": "reference_encoded_model_on_declared_box_only",
+          "proof": "multiaffine_vertex_convexity_with_outward_interval_synthesis",
+          "source_error_certified": false
+        },
+        "flat_encodable": true,
+        "font_sha256": "940b0011448293a4d9eececf7aac66768eb86310f82cabe511ff5b4b0a482670",
+        "font_bytes": 108120
+      },
+      {
+        "glyph_id": 19177,
+        "box": [
+          [
+            -0.5,
+            0.0
+          ],
+          [
+            0.25,
+            0.5
+          ],
+          [
+            0.25,
+            0.5
+          ]
+        ],
+        "knots": [
+          65,
+          33,
+          5
+        ],
+        "training_count": 10725,
+        "holdout_count": 1024,
+        "full_cube": false,
+        "max_holdout_error": 0.011591158060366626,
+        "holdout_failures": 0,
+        "regions": 372,
+        "serialized": {
+          "observations": 1024,
+          "failures": 0,
+          "max_error": 0.011591158059680147
+        },
+        "native": {
+          "observations": 72,
+          "failures": 0,
+          "topology_failures": 0,
+          "max_cff2_libhvf_error": 0.009607542293863182,
+          "max_portable_libhvf_error": 5.116031054099358e-13,
+          "receipt": {
+            "error_count": 0,
+            "request_count": 72,
+            "source_sha256": "e915e750cd1d12cc5f90fc4620fd9aeb86c4537262cc5f7c02aa6e3d0919733e",
+            "successful_glyph_count": 72,
+            "type": "summary",
+            "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+            "verified_batch_count": 72,
+            "internal_native_request_count": 144,
+            "internal_native_glyph_count": 144,
+            "upstream_native_summary": {
+              "error_count": 0,
+              "request_count": 144,
+              "source_sha256": "e915e750cd1d12cc5f90fc4620fd9aeb86c4537262cc5f7c02aa6e3d0919733e",
+              "successful_glyph_count": 144,
+              "type": "summary"
+            },
+            "source_unchanged": true
+          }
+        },
+        "passed": true,
+        "flat_encodable": true,
+        "font_sha256": "e915e750cd1d12cc5f90fc4620fd9aeb86c4537262cc5f7c02aa6e3d0919733e",
+        "font_bytes": 283524
+      }
+    ],
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "manifest_sha256": "641052d2f3cb4648c50d7fbf67ea34be3a84a6537c9ef8ac1ed903ec268fe15c",
+    "native_binary_sha256": "50ea0a16b96f3c381a072f282b3bbe75c2c87e2e6b24b669768ab285b74dc841",
+    "hvf_binary_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9"
+  },
+  "retained_global_grid_failures": [
+    {
+      "gid": 1166,
+      "shape": [
+        65,
+        65,
+        17
+      ],
+      "nodes": 71825,
+      "max_error": 1.3583111018252045,
+      "failures": 218,
+      "samples": 2048,
+      "seconds": 1.9701597910025157,
+      "scope": "unencoded_global_interpolant_development_only"
+    },
+    {
+      "gid": 1166,
+      "shape": [
+        65,
+        65,
+        33
+      ],
+      "nodes": 139425,
+      "max_error": 0.8135568879985519,
+      "failures": 155,
+      "samples": 2048,
+      "seconds": 3.7769927499903133,
+      "scope": "unencoded_global_interpolant_development_only"
+    },
+    {
+      "gid": 19177,
+      "shape": [
+        65,
+        65,
+        17
+      ],
+      "nodes": 71825,
+      "max_error": 0.8245570252910627,
+      "failures": 655,
+      "samples": 2048,
+      "seconds": 5.366475499991793,
+      "scope": "unencoded_global_interpolant_development_only"
+    },
+    {
+      "gid": 19177,
+      "shape": [
+        65,
+        65,
+        33
+      ],
+      "nodes": 139425,
+      "max_error": 0.4560936408046956,
+      "failures": 389,
+      "samples": 2048,
+      "seconds": 10.403386499994667,
+      "scope": "unencoded_global_interpolant_development_only"
+    }
+  ],
+  "harfbuzz": {
+    "version": "14.6.0",
+    "bindings": "uharfbuzz 0.56.3",
+    "new_hierarchical_observations": 546,
+    "failures": 0,
+    "scope": "authored source only; full target glyphs not evaluated"
+  },
+  "previous_commit_ci": {
+    "head_sha": "64edf480ada893b28e01be6473a46ee82996c9cf",
+    "merge_sha": "af9a2a9468bf04963fb9981c61816a831721edaa",
+    "base_sha": "63dde8812f85839aa6024cbba6c498c96cae022d",
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41503468663",
+    "python": {
+      "executed": 987,
+      "passed": 987,
+      "skipped": 0,
+      "audits": 6
+    },
+    "windows": [
+      {
+        "artifact_id": 13170636231,
+        "archive_sha256": "da8142ca2993507ea27cf32ed3f20987272057be7bf7f4722081fb77bd3a4485",
+        "platform": "Windows-2022Server-10.0.20348-SP0",
+        "ordinary_geometry_passed": true,
+        "font_sha256": "68751550bf86fcff0997f60ac3626db5d69ad004a88bccd188e3e2515980b15d",
+        "font_bytes": 13268,
+        "windows_product": "Microsoft Windows Server 2022 Datacenter",
+        "windows_build": "20348",
+        "native_architecture": {
+          "compiled_machine": 34404,
+          "query_succeeded": true,
+          "native_machine": 34404,
+          "process_emulated": false,
+          "process_machine": 0
+        },
+        "geometry": {
+          "scope": "authored independent source geometry only",
+          "limit_source_units": 0.03125,
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "failed_observations": 0,
+          "failures": [],
+          "production_accepted": false,
+          "transcript_sha256": "8d55552fdef35ecea32d346f88834d3953b8586731eac2f1904dc7707705dfdd",
+          "native_completed_successfully": true,
+          "complete_coverage": true,
+          "exact_axis_plan_verified": true,
+          "status": "PASS_AUTHORED_GEOMETRY"
+        },
+        "retained_matrix_failures": [
+          {
+            "variant": "factored",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "factored_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_default",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_subr_blend",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          }
+        ]
+      },
+      {
+        "artifact_id": 13170446240,
+        "archive_sha256": "b73b15dfef2f99233888ed4759d98426a68308a8f7dfb176d7eb61290cf44608",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "ordinary_geometry_passed": true,
+        "font_sha256": "68751550bf86fcff0997f60ac3626db5d69ad004a88bccd188e3e2515980b15d",
+        "font_bytes": 13268,
+        "windows_product": "Microsoft Windows Server 2025 Datacenter",
+        "windows_build": "26100",
+        "native_architecture": {
+          "process_machine": 0,
+          "compiled_machine": 34404,
+          "query_succeeded": true,
+          "process_emulated": false,
+          "native_machine": 34404
+        },
+        "geometry": {
+          "scope": "authored independent source geometry only",
+          "limit_source_units": 0.03125,
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "failed_observations": 0,
+          "failures": [],
+          "production_accepted": false,
+          "transcript_sha256": "8d55552fdef35ecea32d346f88834d3953b8586731eac2f1904dc7707705dfdd",
+          "native_completed_successfully": true,
+          "complete_coverage": true,
+          "exact_axis_plan_verified": true,
+          "status": "PASS_AUTHORED_GEOMETRY"
+        },
+        "retained_matrix_failures": [
+          {
+            "variant": "factored",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "factored_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_default",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_subr_blend",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          }
+        ]
+      },
+      {
+        "artifact_id": 13170297206,
+        "archive_sha256": "a5371bbb103f11d76651b714a0e1da311a889e813f09691cffd30f3db98ab85a",
+        "platform": "Windows-11-10.0.26200-SP0",
+        "ordinary_geometry_passed": true,
+        "font_sha256": "68751550bf86fcff0997f60ac3626db5d69ad004a88bccd188e3e2515980b15d",
+        "font_bytes": 13268,
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "windows_build": "26200",
+        "native_architecture": {
+          "process_machine": 0,
+          "process_emulated": true,
+          "native_machine": 43620,
+          "query_succeeded": true,
+          "compiled_machine": 34404
+        },
+        "geometry": {
+          "scope": "authored independent source geometry only",
+          "limit_source_units": 0.03125,
+          "observations": 372,
+          "controls": 1240,
+          "max_control_error": 0.007074311149236485,
+          "failed_observations": 0,
+          "failures": [],
+          "production_accepted": false,
+          "transcript_sha256": "8d55552fdef35ecea32d346f88834d3953b8586731eac2f1904dc7707705dfdd",
+          "native_completed_successfully": true,
+          "complete_coverage": true,
+          "exact_axis_plan_verified": true,
+          "status": "PASS_AUTHORED_GEOMETRY"
+        },
+        "retained_matrix_failures": [
+          {
+            "variant": "factored",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "factored_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_default",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_delta_sparse",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          },
+          {
+            "variant": "nested_subr_blend",
+            "status": "FAIL_AUTHORED_GEOMETRY",
+            "failed": 124
+          }
+        ]
+      }
+    ],
+    "apple_job": "CANCELLED",
+    "qt_workflow": "SKIPPED_BRANCH_FILTER",
+    "scope": "ramp encoding before the new hierarchical change"
+  },
+  "remaining": [
+    "Neither target glyph has an accepted complete three-axis model.",
+    "New hierarchical DirectWrite CI is pending; prior ramp results do not certify it.",
+    "Box selection, common atlas seams and full-font region/GID budgets remain unaccepted.",
+    "Source cmap/metrics and final SwirlVF.ttc are not produced by diagnostic templates.",
+    "No Windows 11 x64 physical-machine or Qt 6.12 acceptance."
+  ],
+  "code_sha256": {
+    "tools/swirl_vf/platform/diagnose_cff2_directwrite.py": "947cff3bfc5aafc7d9dce01aa4a8b0dda5379604e536cc523a958cea1faeb98c",
+    "tools/swirl_vf/platform/make_cff2_fixture.py": "8023afd20ec5a8a2770c89614424f4dd480c3aa3eafc81a1f64ff0b95d015a02",
+    "tools/swirl_vf/platform/probe_local_cff2_basis.py": "ed59ea5936544eb968906003639f3c197607fbd9461a73e3c8234da9621eccc2",
+    "tools/swirl_vf/platform/test_coretext_cff2.py": "0569fd63c582462aed24e084e8f9c5e8c428a1ff1def281323de9c0d320f04bc",
+    "tools/swirl_vf/platform/verify_cff2_directwrite_geometry.py": "60d1da846b0f3ea143d8fb5b788406227e5fe00bb15ec6f22d9fbd4a329ed0e0",
+    "tools/swirl_vf/tests/test_hierarchical_cff2_compression.py": "6ce4c518ec7b326426f4acbe86b2bb1e1716cbc35fdeded37503e0ea6e9d5aec",
+    "tools/swirl_vf/tests/test_local_cff2_geometry.py": "fe2c83bff237b1ed0ecc4c4269c2eb37cc1121255da3c7fe168d21cbde441311",
+    "tools/swirl_vf/tests/test_ramp_harfbuzz.py": "c2474419fca301a6f5355d1984da2fd30042e788f3180a818bf29094996a2cee",
+    "tools/swirl_vf/tools/hierarchical_cff2_compression.py": "49a24d4ade306e7a1960e3bab7e8350858cfb82e3e35ee68ce6061f7dc66a9c0",
+    "tools/swirl_vf/tools/local_cff2_geometry.py": "708db152eca54e2920cfd5b23a6f5bfb4982adbfcfbd3a7cd15d8aa50a21e4da"
+  },
+  "private_artifact_sha256": {
+    "wide-basis-manifest.json": "641052d2f3cb4648c50d7fbf67ea34be3a84a6537c9ef8ac1ed903ec268fe15c",
+    "wide-basis-native/report.json": "3602300df028d38b2ae26f096ee79d5a261e9a69b70179745c36e379829e77d8",
+    "hierarchical-final-tests.log": "9ae99674fa16e823ea9e21d5778d82b69baf2d49047eb3f14752446ba6e3bcfe",
+    "hierarchical-audits.log": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d",
+    "vector-encoding-check.log": "33f6a521ae78769df3a788ddc48e01bfd3b47275a9fc07ecd47c70d468ca7fcd",
+    "local-minimax/global-grid-results.json": "5443a68d9481e58079993643197a3387cd2d0c11489594f876edc0a28ebedd85",
+    "local-minimax/global-failures-1166.json": "2a01213e72f5847bbfbb1f7b7a4c5fb482b427441589e061f852c74bfde4c1f1",
+    "local-minimax/global-failures-19177.json": "7e333b7485caf360e4fd48f363708f89558fb59132e34f298bfeb013f5f8ef38",
+    "local-minimax/global_grid_probe.py": "f6ffa73b90d48f136eb7cfd26bf7ef07cc6325dff7c84ada8eb0b780561e179e",
+    "local-minimax/global_failures.py": "7fe5712719a3d52193c421ac80ef3eb654d0c790c5a5f1265fd4b2a78a21b4c2",
+    "check_vector_encoding.py": "06ec30af07587a094f627fa2866e0e31e23b4d48a01f7289cbb4c5333460fa24",
+    "ramp-windows-ci-64edf.json": "be17665055b072a458b246164c7897adf043f9df97b80dad63e0103e77ae9256",
+    "hierarchical-authored-coretext/cff2-result.json": "17d523aede3ac0290afbb2034c0d8b0f1b8aa67fea196fdf8241164a94e9328a"
+  },
+  "authored_coretext": {
+    "status": "FAIL_STRICT_METRICS_OR_GEOMETRY",
+    "total_retained_metric_failures": 476,
+    "hierarchical": {
+      "fixture": {
+        "scope": "authored CFF2 control, not original-font conversion",
+        "sha256": "edfb588b4730d32966ee822c7ecd6d33c634d1df4fd3ed18bee04f11ceff159f",
+        "bytes": 8660,
+        "faces": 2,
+        "glyphs_per_face": 3,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "factored_blends": false,
+        "compact_blends": false,
+        "adaptive_three_axis_blends": false,
+        "ramp_three_axis_blends": false,
+        "compressed_hierarchical_three_axis_blends": true,
+        "repeat_contours": 1,
+        "production_accepted": false
+      },
+      "glyph_observations": 174,
+      "geometry_failures": 0,
+      "max_cubic_control_error": 0.001940972658155366,
+      "raw_metric_failures": 68,
+      "max_metric_errors": {
+        "CoreText.advance_width": 0.0011759327650224805,
+        "CoreText.advance_height": 0.33750000000009095,
+        "CoreText.vertical_origin_x": 70.0,
+        "CoreText.vertical_origin_y": 0.0005273437500363798,
+        "HarfBuzz.advance_width": 0.21659375000001546,
+        "HarfBuzz.advance_height": 0.33750000000009095,
+        "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+        "HarfBuzz.vertical_origin_y": 0.00687500000003638
+      },
+      "summary": {
+        "error_count": 0,
+        "request_count": 58,
+        "source_sha256": "edfb588b4730d32966ee822c7ecd6d33c634d1df4fd3ed18bee04f11ceff159f",
+        "successful_glyph_count": 174,
+        "type": "summary"
+      }
+    }
+  }
+}

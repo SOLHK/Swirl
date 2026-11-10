@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QRegularExpression>
 #include <QTextStream>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -17,6 +18,9 @@ namespace {
 // Only fixed classifications are public. Source-derived text is never echoed.
 QString reasonCode(const QString &reason) {
     static const QHash<QString,QString> known{
+        {QStringLiteral("skip-cert-verify=true 请求关闭 TLS 证书验证，已拒绝。请使用证书验证开启的订阅配置。"), "InsecureCertificateVerification"},
+        {QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。"), "AmbiguousProfileNodeName"},
+        {QStringLiteral("无法解析 Clash YAML/JSON：请检查格式、重复键、锚点循环和嵌套层数。"), "InvalidClashDocument"},
         {QStringLiteral("节点 URI 含重复参数，无法安全确定配置。"), "DuplicateUriParameter"},
         {QStringLiteral("节点 URI 别名参数冲突；未应用配置。"), "ConflictingUriParameter"},
         {QStringLiteral("节点 URI 布尔参数无效；未应用配置。"), "InvalidUriBoolean"},
@@ -75,8 +79,9 @@ QString reasonCode(const QString &reason) {
         {QStringLiteral("源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。"), "UtlsFingerprintConflict"},
         {QStringLiteral("源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。"), "UtlsSecurityRequired"},
     };
+    static const QRegularExpression nodePrefix(QStringLiteral("^第 [0-9]+ 个节点："));
     return reason.isEmpty()?QStringLiteral("TcpCandidateNotYetVerified"):
-        known.value(reason,QStringLiteral("UnclassifiedNativeOrImportDiagnostic"));
+        known.value(QString(reason).remove(nodePrefix),QStringLiteral("UnclassifiedNativeOrImportDiagnostic"));
 }
 
 QString choice(const QJsonValue &value,const QStringList &allowed,const QString &missing="not-declared") {
@@ -143,7 +148,7 @@ int main(int argc,char **argv) {
 #else
     const bool existing=app.arguments()[1]=="--node-store";
     const auto path=app.arguments()[2];
-    QByteArray before;QList<ProxyNode> saved;QString selected;
+    QByteArray before;QList<ProxyNode> saved;QString selected;qsizetype parsedNodeRecords=0;
     if(existing){
         before=readFile(path,1024*1024);
         if(!before.startsWith("SWIRLNODE1\n"))return error(output,"NodeStoreInputInvalid",3);
@@ -156,6 +161,7 @@ int main(int argc,char **argv) {
         QByteArray plain(reinterpret_cast<char *>(out.pbData),out.cbData);SecureZeroMemory(out.pbData,out.cbData);LocalFree(out.pbData);
         auto result=NodeImporter::parse(plain);plain.fill('\0');
         if(!result)return error(output,"SubscriptionParseFailed",5,result.error);
+        parsedNodeRecords=result.nodes.size();
         NodeStore store(path);
         if(!store.importNodes(result.nodes))return error(output,"NodeStoreImportFailed",6);
         saved=store.nodes();selected=store.selectedId();before=readFile(path,1024*1024);
@@ -183,6 +189,8 @@ int main(int argc,char **argv) {
         {"inputMode",existing?"existing-node-store":"encrypted-response-to-new-store"},
         {"offlineOnly",true},{"networkRequests",0},{"inputUnchanged",true},
         {"encryptedSaveReload",existing?"reload-only":"passed"},{"nodes",nodes.size()},
+        {"parsedNodeRecords",existing?QJsonValue():QJsonValue(parsedNodeRecords)},
+        {"coalescedNodeRecords",existing?QJsonValue():QJsonValue(parsedNodeRecords-nodes.size())},
         {"nativeTcpCandidates",candidates},{"incompleteNodes",incomplete},{"protocols",protocols},{"cases",rows}}).toJson(QJsonDocument::Compact)<<Qt::endl;
     return 0;
 #endif

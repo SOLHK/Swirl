@@ -51,6 +51,19 @@ else()
  endif()
 endif()
 set(SWIRL_RUST_LIBRARY "${SWIRL_RUST_TARGET}/${SWIRL_RUST_TRIPLE}/release/${SWIRL_RUST_LIBRARY_NAME}")
+set(SWIRL_RUST_PRODUCT_BINS)
+set(SWIRL_RUST_PRODUCT_OUTPUTS "${SWIRL_RUST_LIBRARY}")
+if(WIN32 AND NOT SWIRL_PRIVATE_UI_QUOTA)
+ set(SWIRL_TUN_BROKER "${SWIRL_RUST_TARGET}/${SWIRL_RUST_TRIPLE}/release/swirl-tun-broker.exe" CACHE INTERNAL "Paired product TUN broker" FORCE)
+ set(SWIRL_TUN_HELPER "${SWIRL_RUST_TARGET}/${SWIRL_RUST_TRIPLE}/release/swirl-tun-helper.exe" CACHE INTERNAL "Paired private TUN supervisor" FORCE)
+ list(APPEND SWIRL_RUST_PRODUCT_BINS --bin swirl-tun-broker --bin swirl-tun-helper)
+ list(APPEND SWIRL_RUST_PRODUCT_OUTPUTS "${SWIRL_TUN_BROKER}" "${SWIRL_TUN_HELPER}")
+elseif(SWIRL_PRIVATE_UI_QUOTA)
+ # The mandatory QA feature is a separate library profile, never a product
+ # broker/helper build or an installer input.
+ set(SWIRL_TUN_BROKER "" CACHE INTERNAL "No TUN broker in private UI QA" FORCE)
+ set(SWIRL_TUN_HELPER "" CACHE INTERNAL "No TUN helper in private UI QA" FORCE)
+endif()
 
 # Reconfigure when existing production inputs change, not just when the glob's
 # file list changes. Build scripts, vendored sources and the lockfile are inputs.
@@ -92,6 +105,12 @@ foreach(git_entry IN ITEMS HEAD "${SWIRL_GIT_REF}" packed-refs)
  endif()
 endforeach()
 set(identity "swirl-cabi-1\n${SWIRL_RUST_TRIPLE}\nrelease\n${SWIRL_SOURCE_SHA}\n")
+set(SWIRL_RUST_PRIVATE_FEATURES)
+if(SWIRL_PRIVATE_UI_QUOTA)
+ # This separately staged QA DLL must never pair with an ordinary product EXE.
+ string(APPEND identity "private-acceptance-ui-v1\n")
+ list(APPEND SWIRL_RUST_PRIVATE_FEATURES --features private-acceptance-ui)
+endif()
 foreach(input IN LISTS SWIRL_RUST_INPUTS)
  file(SHA256 "${input}" digest)
  file(RELATIVE_PATH relative "${SWIRL_REPOSITORY_ROOT}" "${input}")
@@ -114,11 +133,12 @@ file(CONFIGURE OUTPUT "${SWIRL_BUILD_IDENTITY_DIRECTORY}/SwirlBuildIdentity.h"
 add_custom_target(SwirlRustCore
  COMMAND "${CMAKE_COMMAND}" -E env
   "SWIRL_BUILD_ID=${SWIRL_RUST_BUILD_ID}" "SWIRL_SOURCE_SHA=${SWIRL_SOURCE_SHA}"
-  "${SWIRL_CARGO}" build --release --locked --lib --target "${SWIRL_RUST_TRIPLE}"
+  "${SWIRL_CARGO}" build --release --locked --lib --target "${SWIRL_RUST_TRIPLE}" ${SWIRL_RUST_PRODUCT_BINS} ${SWIRL_RUST_PRIVATE_FEATURES}
   --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
  COMMAND "${CMAKE_COMMAND}" "-DSWIRL_LIBRARY=${SWIRL_RUST_LIBRARY}"
+  "-DSWIRL_BROKER=${SWIRL_TUN_BROKER}" "-DSWIRL_HELPER=${SWIRL_TUN_HELPER}"
   -P "${CMAKE_CURRENT_LIST_DIR}/RequireRustLibrary.cmake"
- BYPRODUCTS "${SWIRL_RUST_LIBRARY}"
+ BYPRODUCTS ${SWIRL_RUST_PRODUCT_OUTPUTS}
  WORKING_DIRECTORY "${SWIRL_RUST_SOURCE}"
  COMMENT "Build the paired Rust Core with Cargo; stale DLL fallback is forbidden"
  VERBATIM USES_TERMINAL)
@@ -137,4 +157,10 @@ function(swirl_stage_rust_core target)
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/swirl-rust-build.json" "$<TARGET_FILE_DIR:${target}>/swirl-rust-build.json"
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SWIRL_QUICK_SOURCE}/packaging/rules" "$<TARGET_FILE_DIR:${target}>/rules"
   VERBATIM)
+ if(WIN32 AND NOT SWIRL_PRIVATE_UI_QUOTA)
+  add_custom_command(TARGET SwirlRustCore POST_BUILD
+   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_TUN_BROKER}" "$<TARGET_FILE_DIR:${target}>/swirl-tun-broker.exe"
+   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_TUN_HELPER}" "$<TARGET_FILE_DIR:${target}>/swirl-tun-helper.exe"
+   VERBATIM)
+ endif()
 endfunction()

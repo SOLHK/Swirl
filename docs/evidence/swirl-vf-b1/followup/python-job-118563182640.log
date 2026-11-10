@@ -1,0 +1,845 @@
+﻿2026-10-20T09:48:15.1045307Z Current runner version: '2.337.0'
+2026-10-20T09:48:15.1071876Z ##[group]Runner Image Provisioner
+2026-10-20T09:48:15.1072758Z Hosted Compute Agent
+2026-10-20T09:48:15.1073436Z Version: 20261015.610
+2026-10-20T09:48:15.1074151Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+2026-10-20T09:48:15.1074891Z Build Date: 2026-10-14T17:06:54Z
+2026-10-20T09:48:15.1075636Z Worker ID: {7c9613bb-5c31-41f5-9f8d-2626722dc1cd}
+2026-10-20T09:48:15.1076347Z Region: eastus2
+2026-10-20T09:48:15.1076883Z Cloud: Azure
+2026-10-20T09:48:15.1077527Z ##[endgroup]
+2026-10-20T09:48:15.1079338Z ##[group]Operating System
+2026-10-20T09:48:15.1080506Z Ubuntu
+2026-10-20T09:48:15.1081109Z 24.04.5
+2026-10-20T09:48:15.1081607Z LTS
+2026-10-20T09:48:15.1082233Z ##[endgroup]
+2026-10-20T09:48:15.1082801Z ##[group]Runner Image
+2026-10-20T09:48:15.1083437Z Image: ubuntu-24.04
+2026-10-20T09:48:15.1084030Z Version: 20261018.339.1
+2026-10-20T09:48:15.1085439Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-20T09:48:15.1087012Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+2026-10-20T09:48:15.1088556Z ##[endgroup]
+2026-10-20T09:48:15.1090183Z ##[group]GITHUB_TOKEN Permissions
+2026-10-20T09:48:15.1092539Z Contents: read
+2026-10-20T09:48:15.1093179Z Metadata: read
+2026-10-20T09:48:15.1093745Z ##[endgroup]
+2026-10-20T09:48:15.1096175Z Secret source: Actions
+2026-10-20T09:48:15.1097222Z Cache mode: write
+2026-10-20T09:48:15.1098221Z Prepare workflow directory
+2026-10-20T09:48:15.1541036Z Prepare all required actions
+2026-10-20T09:48:15.1610840Z Getting action download info
+2026-10-20T09:48:15.3922184Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-20T09:48:15.5006004Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-10-20T09:48:15.6885711Z Complete job name: python
+2026-10-20T09:48:15.7671251Z ##[group]Run actions/checkout@v4
+2026-10-20T09:48:15.7672162Z with:
+2026-10-20T09:48:15.7672643Z   ref: aeb2574879ca76290f9e22c2e319f27f422e7ae6
+2026-10-20T09:48:15.7673318Z   persist-credentials: false
+2026-10-20T09:48:15.7673840Z   repository: SOLHK/Swirl
+2026-10-20T09:48:15.7677798Z   token: ***
+2026-10-20T09:48:15.7678237Z   ssh-strict: true
+2026-10-20T09:48:15.7678671Z   ssh-user: git
+2026-10-20T09:48:15.7679093Z   clean: true
+2026-10-20T09:48:15.7679775Z   sparse-checkout-cone-mode: true
+2026-10-20T09:48:15.7680323Z   fetch-depth: 1
+2026-10-20T09:48:15.7680764Z   fetch-tags: false
+2026-10-20T09:48:15.7681232Z   show-progress: true
+2026-10-20T09:48:15.7681688Z   lfs: false
+2026-10-20T09:48:15.7682115Z   submodules: false
+2026-10-20T09:48:15.7682572Z   set-safe-directory: true
+2026-10-20T09:48:15.7683088Z   allow-unsafe-pr-checkout: false
+2026-10-20T09:48:15.7683917Z ##[endgroup]
+2026-10-20T09:48:15.8723287Z Syncing repository: SOLHK/Swirl
+2026-10-20T09:48:15.8725905Z ##[group]Getting Git version info
+2026-10-20T09:48:15.8726983Z Working directory is '/home/runner/work/Swirl/Swirl'
+2026-10-20T09:48:15.8728555Z [command]/usr/bin/git version
+2026-10-20T09:48:15.8813219Z git version 2.55.0
+2026-10-20T09:48:15.8848437Z ##[endgroup]
+2026-10-20T09:48:15.8856557Z Temporarily overriding HOME='/home/runner/work/_temp/926396d7-7182-4e43-abc9-6bed25f43f69' before making global git config changes
+2026-10-20T09:48:15.8858863Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T09:48:15.8862140Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Swirl/Swirl
+2026-10-20T09:48:15.8921751Z Deleting the contents of '/home/runner/work/Swirl/Swirl'
+2026-10-20T09:48:15.8931435Z ##[group]Initializing the repository
+2026-10-20T09:48:15.8932694Z [command]/usr/bin/git init /home/runner/work/Swirl/Swirl
+2026-10-20T09:48:15.9087028Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-20T09:48:15.9088990Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-20T09:48:15.9091529Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-20T09:48:15.9092840Z hint: call:
+2026-10-20T09:48:15.9093539Z hint:
+2026-10-20T09:48:15.9094391Z hint: 	git config --global init.defaultBranch <name>
+2026-10-20T09:48:15.9095375Z hint:
+2026-10-20T09:48:15.9096290Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-20T09:48:15.9097846Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-20T09:48:15.9099150Z hint:
+2026-10-20T09:48:15.9100103Z hint: 	git branch -m <name>
+2026-10-20T09:48:15.9100861Z hint:
+2026-10-20T09:48:15.9101858Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-20T09:48:15.9103472Z Initialized empty Git repository in /home/runner/work/Swirl/Swirl/.git/
+2026-10-20T09:48:15.9106057Z [command]/usr/bin/git remote add origin https://github.com/SOLHK/Swirl
+2026-10-20T09:48:15.9164822Z ##[endgroup]
+2026-10-20T09:48:15.9166249Z ##[group]Disabling automatic garbage collection
+2026-10-20T09:48:15.9168521Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-20T09:48:15.9203359Z ##[endgroup]
+2026-10-20T09:48:15.9204514Z ##[group]Setting up auth
+2026-10-20T09:48:15.9210717Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T09:48:15.9246334Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T09:48:15.9699599Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T09:48:15.9747425Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T09:48:15.9997200Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T09:48:16.0042551Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T09:48:16.0289178Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-20T09:48:16.0337614Z ##[endgroup]
+2026-10-20T09:48:16.0338574Z ##[group]Fetching the repository
+2026-10-20T09:48:16.0347538Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin aeb2574879ca76290f9e22c2e319f27f422e7ae6
+2026-10-20T09:48:16.9796713Z From https://github.com/SOLHK/Swirl
+2026-10-20T09:48:16.9798943Z  * branch            aeb2574879ca76290f9e22c2e319f27f422e7ae6 -> FETCH_HEAD
+2026-10-20T09:48:16.9805003Z ##[endgroup]
+2026-10-20T09:48:16.9807470Z ##[group]Determining the checkout info
+2026-10-20T09:48:16.9810390Z ##[endgroup]
+2026-10-20T09:48:16.9812785Z [command]/usr/bin/git sparse-checkout disable
+2026-10-20T09:48:16.9878526Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-20T09:48:16.9920521Z ##[group]Checking out the ref
+2026-10-20T09:48:16.9926465Z [command]/usr/bin/git checkout --progress --force aeb2574879ca76290f9e22c2e319f27f422e7ae6
+2026-10-20T09:48:17.2729878Z Note: switching to 'aeb2574879ca76290f9e22c2e319f27f422e7ae6'.
+2026-10-20T09:48:17.2731223Z 
+2026-10-20T09:48:17.2731554Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-20T09:48:17.2732281Z changes and commit them, and you can discard any commits you make in this
+2026-10-20T09:48:17.2732988Z state without impacting any branches by switching back to a branch.
+2026-10-20T09:48:17.2733406Z 
+2026-10-20T09:48:17.2733701Z If you want to create a new branch to retain commits you create, you may
+2026-10-20T09:48:17.2734357Z do so (now or later) by using -c with the switch command. Example:
+2026-10-20T09:48:17.2734735Z 
+2026-10-20T09:48:17.2734975Z   git switch -c <new-branch-name>
+2026-10-20T09:48:17.2735555Z 
+2026-10-20T09:48:17.2735731Z Or undo this operation with:
+2026-10-20T09:48:17.2735969Z 
+2026-10-20T09:48:17.2736115Z   git switch -
+2026-10-20T09:48:17.2736390Z 
+2026-10-20T09:48:17.2736727Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-20T09:48:17.2737179Z 
+2026-10-20T09:48:17.2737553Z HEAD is now at aeb2574 test(swirl-vf): isolate B1 axis units without weakening native identity
+2026-10-20T09:48:17.2747913Z ##[endgroup]
+2026-10-20T09:48:17.2804205Z [command]/usr/bin/git log -1 --format=%H
+2026-10-20T09:48:17.2838453Z aeb2574879ca76290f9e22c2e319f27f422e7ae6
+2026-10-20T09:48:17.2848467Z ##[group]Removing auth
+2026-10-20T09:48:17.2852512Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T09:48:17.2892049Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T09:48:17.3134918Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T09:48:17.3172028Z http.https://github.com/.extraheader
+2026-10-20T09:48:17.3179835Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-20T09:48:17.3222996Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T09:48:17.3463095Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T09:48:17.3504095Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T09:48:17.3743014Z ##[endgroup]
+2026-10-20T09:48:17.4006342Z ##[group]Run actions/setup-python@v5
+2026-10-20T09:48:17.4006727Z with:
+2026-10-20T09:48:17.4006987Z   python-version: 3.12
+2026-10-20T09:48:17.4007270Z   check-latest: false
+2026-10-20T09:48:17.4010244Z   token: ***
+2026-10-20T09:48:17.4010522Z   update-environment: true
+2026-10-20T09:48:17.4010822Z   allow-prereleases: false
+2026-10-20T09:48:17.4011099Z   freethreaded: false
+2026-10-20T09:48:17.4011362Z ##[endgroup]
+2026-10-20T09:48:17.5376209Z ##[group]Installed versions
+2026-10-20T09:48:17.5480053Z (node:2387) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-20T09:48:17.5481130Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-20T09:48:17.5482097Z Successfully set up CPython (3.12.15)
+2026-10-20T09:48:17.5483161Z ##[endgroup]
+2026-10-20T09:48:17.5704589Z ##[group]Run python -m pip install fonttools==4.61.1 numpy==2.2.6
+2026-10-20T09:48:17.5705285Z [36;1mpython -m pip install fonttools==4.61.1 numpy==2.2.6[0m
+2026-10-20T09:48:17.5705801Z [36;1mpython -m unittest discover -s tools/swirl_vf/tests -v[0m
+2026-10-20T09:48:17.5706341Z [36;1mpython -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v[0m
+2026-10-20T09:48:17.5946991Z shell: /usr/bin/bash -e {0}
+2026-10-20T09:48:17.6026688Z env:
+2026-10-20T09:48:17.6027091Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-20T09:48:17.6027684Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-20T09:48:17.6028230Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-20T09:48:17.6028695Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-20T09:48:17.6029134Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-20T09:48:17.6029860Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-20T09:48:17.6030265Z ##[endgroup]
+2026-10-20T09:48:18.6477709Z Collecting fonttools==4.61.1
+2026-10-20T09:48:18.7128286Z   Downloading fonttools-4.61.1-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl.metadata (114 kB)
+2026-10-20T09:48:18.9683937Z Collecting numpy==2.2.6
+2026-10-20T09:48:18.9754789Z   Downloading numpy-2.2.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (62 kB)
+2026-10-20T09:48:19.0012374Z Downloading fonttools-4.61.1-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl (5.0 MB)
+2026-10-20T09:48:19.1793764Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.0/5.0 MB 30.2 MB/s  0:00:00
+2026-10-20T09:48:19.1872212Z Downloading numpy-2.2.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.5 MB)
+2026-10-20T09:48:19.6413004Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.5/16.5 MB 36.3 MB/s  0:00:00
+2026-10-20T09:48:19.7396408Z Installing collected packages: numpy, fonttools
+2026-10-20T09:48:22.5837547Z 
+2026-10-20T09:48:22.5848079Z Successfully installed fonttools-4.61.1 numpy-2.2.6
+2026-10-20T09:48:23.5329996Z test_anchor_echo_must_equal_plan_and_only_exact_default_may_be_omitted (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_anchor_echo_must_equal_plan_and_only_exact_default_may_be_omitted) ... ok
+2026-10-20T09:48:23.5332923Z test_base_metadata_and_seed_identity_are_preserved_with_optical_receipts (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_base_metadata_and_seed_identity_are_preserved_with_optical_receipts) ... ok
+2026-10-20T09:48:23.5335697Z test_both_hops_require_original_production_optical_inheritance (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_both_hops_require_original_production_optical_inheritance) ... ok
+2026-10-20T09:48:23.5338456Z test_exact_reviewed_production_prefix_and_strict_guard_are_preserved (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_exact_reviewed_production_prefix_and_strict_guard_are_preserved) ... ok
+2026-10-20T09:48:23.5351470Z test_five_modes_are_allowlisted_and_unknown_modes_fail_closed (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_five_modes_are_allowlisted_and_unknown_modes_fail_closed) ... ok
+2026-10-20T09:48:23.5404663Z test_independent_exact_range_proof_at_boundaries_midpoints_and_mixed_axes (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_independent_exact_range_proof_at_boundaries_midpoints_and_mixed_axes) ... ok
+2026-10-20T09:48:23.5459278Z test_missing_duplicate_or_changed_generation_anchors_are_rejected (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_missing_duplicate_or_changed_generation_anchors_are_rejected) ... ok
+2026-10-20T09:48:23.5462225Z test_original_extraction_transport_and_not_accepted_markers_are_retained (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_original_extraction_transport_and_not_accepted_markers_are_retained) ... ok
+2026-10-20T09:48:23.5464919Z test_production_dispatch_does_not_create_anchor_or_seed (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_production_dispatch_does_not_create_anchor_or_seed) ... ok
+2026-10-20T09:48:23.5467278Z test_scalar_helper_checks_range_and_the_required_distance (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_scalar_helper_checks_range_and_the_required_distance) ... ok
+2026-10-20T09:48:23.5469907Z test_target_validation_and_anchor_plan_are_complete_and_feedback_free (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_target_validation_and_anchor_plan_are_complete_and_feedback_free) ... ok
+2026-10-20T09:48:23.5475329Z test_unreviewed_prefix_changes_and_already_generated_sources_fail_closed (test_anchor_construction_harness.AnchorConstructionHarnessTests.test_unreviewed_prefix_changes_and_already_generated_sources_fail_closed) ... ok
+2026-10-20T09:48:23.5487162Z test_anchor_selector_restores_prior_environment_on_launch_failure (test_axis_anchor.AxisAnchorTests.test_anchor_selector_restores_prior_environment_on_launch_failure) ... ok
+2026-10-20T09:48:23.5501524Z test_closure_native_subset_is_predeclared_for_all_faces_and_actual_ranges (test_axis_anchor.AxisAnchorTests.test_closure_native_subset_is_predeclared_for_all_faces_and_actual_ranges) ... ok
+2026-10-20T09:48:23.5504088Z test_fixed_profiles_keep_old_modes_and_reject_unknown_profile (test_axis_anchor.AxisAnchorTests.test_fixed_profiles_keep_old_modes_and_reject_unknown_profile) ... ok
+2026-10-20T09:48:23.5511174Z test_native_failure_wrapper_retains_only_explicit_public_codes (test_axis_anchor.AxisAnchorTests.test_native_failure_wrapper_retains_only_explicit_public_codes) ... ok
+2026-10-20T09:48:23.5513620Z test_numeric_control_failure_is_counted_in_both_verdicts (test_axis_anchor.AxisAnchorTests.test_numeric_control_failure_is_counted_in_both_verdicts) ... ok
+2026-10-20T09:48:23.5516864Z test_omitted_nondefault_and_unstable_replay_are_retained_separately (test_axis_anchor.AxisAnchorTests.test_omitted_nondefault_and_unstable_replay_are_retained_separately) ... ok
+2026-10-20T09:48:23.5523934Z test_predeclared_cast_location_and_original_record_order_are_distinct (test_axis_anchor.AxisAnchorTests.test_predeclared_cast_location_and_original_record_order_are_distinct) ... ok
+2026-10-20T09:48:23.5531559Z test_replay_uses_existing_axis_policy_and_complete_blank_glyph_payload (test_axis_anchor.AxisAnchorTests.test_replay_uses_existing_axis_policy_and_complete_blank_glyph_payload) ... ok
+2026-10-20T09:48:23.5538292Z test_unknown_payload_fields_and_identity_mismatches_cannot_pass (test_axis_anchor.AxisAnchorTests.test_unknown_payload_fields_and_identity_mismatches_cannot_pass) ... ok
+2026-10-20T09:48:23.5589717Z test_all_selected_faces_and_27_original_axis_combinations (test_axis_anchor_cases.AxisAnchorCaseTests.test_all_selected_faces_and_27_original_axis_combinations) ... ok
+2026-10-20T09:48:23.5623791Z test_declared_boundary_controls_and_all_seven_mixed_positions (test_axis_anchor_cases.AxisAnchorCaseTests.test_declared_boundary_controls_and_all_seven_mixed_positions) ... ok
+2026-10-20T09:48:23.5671672Z test_duplicate_locations_keep_aliases_and_input_is_unchanged (test_axis_anchor_cases.AxisAnchorCaseTests.test_duplicate_locations_keep_aliases_and_input_is_unchanged) ... ok
+2026-10-20T09:48:23.5706155Z test_endpoint_steps_and_binary64_neighbours_are_not_lost_in_delta (test_axis_anchor_cases.AxisAnchorCaseTests.test_endpoint_steps_and_binary64_neighbours_are_not_lost_in_delta) ... ok
+2026-10-20T09:48:23.5883022Z test_holdouts_are_deterministic_fresh_and_independent_by_face (test_axis_anchor_cases.AxisAnchorCaseTests.test_holdouts_are_deterministic_fresh_and_independent_by_face) ... ok
+2026-10-20T09:48:23.5920942Z test_invalid_face_sets_tags_and_even_unselected_ranges_are_rejected (test_axis_anchor_cases.AxisAnchorCaseTests.test_invalid_face_sets_tags_and_even_unselected_ranges_are_rejected) ... ok
+2026-10-20T09:48:23.5954954Z test_near_defaults_and_midpoints_use_each_actual_original_range (test_axis_anchor_cases.AxisAnchorCaseTests.test_near_defaults_and_midpoints_use_each_actual_original_range) ... ok
+2026-10-20T09:48:23.5985350Z test_outside_candidates_are_omitted_without_clamping (test_axis_anchor_cases.AxisAnchorCaseTests.test_outside_candidates_are_omitted_without_clamping) ... ok
+2026-10-20T09:48:23.5987418Z test_changed_native_helpers_are_not_silently_reused (test_axis_cache_probe.AxisCacheProbeTests.test_changed_native_helpers_are_not_silently_reused) ... ok
+2026-10-20T09:48:23.5989621Z test_equal_observations_are_not_font_acceptance (test_axis_cache_probe.AxisCacheProbeTests.test_equal_observations_are_not_font_acceptance) ... ok
+2026-10-20T09:48:23.5991805Z test_failed_observations_remain_errors_without_fabricated_comparison (test_axis_cache_probe.AxisCacheProbeTests.test_failed_observations_remain_errors_without_fabricated_comparison) ... ok
+2026-10-20T09:48:23.5994150Z test_incomplete_or_reordered_or_different_source_is_rejected (test_axis_cache_probe.AxisCacheProbeTests.test_incomplete_or_reordered_or_different_source_is_rejected) ... ok
+2026-10-20T09:48:23.5996331Z test_metric_geometry_and_topology_changes_remain_separate (test_axis_cache_probe.AxisCacheProbeTests.test_metric_geometry_and_topology_changes_remain_separate) ... ok
+2026-10-20T09:48:23.5998487Z test_missing_readback_or_glyph_observations_are_rejected (test_axis_cache_probe.AxisCacheProbeTests.test_missing_readback_or_glyph_observations_are_rejected) ... ok
+2026-10-20T09:48:23.6001081Z test_nonfinite_or_negative_discrepancy_is_rejected (test_axis_cache_probe.AxisCacheProbeTests.test_nonfinite_or_negative_discrepancy_is_rejected) ... ok
+2026-10-20T09:48:23.6003117Z test_opposite_initial_orders_cover_the_same_exact_requests (test_axis_cache_probe.AxisCacheProbeTests.test_opposite_initial_orders_cover_the_same_exact_requests) ... ok
+2026-10-20T09:48:23.6042387Z test_all_type_cases_and_fresh_holdouts_remain_distinct (test_axis_counterexamples.CounterexampleProbeTests.test_all_type_cases_and_fresh_holdouts_remain_distinct) ... ok
+2026-10-20T09:48:23.6045333Z test_invalid_source_ranges_are_rejected_instead_of_clipping_cases (test_axis_counterexamples.CounterexampleProbeTests.test_invalid_source_ranges_are_rejected_instead_of_clipping_cases) ... ok
+2026-10-20T09:48:23.6065860Z test_narrow_samples_bracket_normalized16_steps_without_outcome_selection (test_axis_counterexamples.CounterexampleProbeTests.test_narrow_samples_bracket_normalized16_steps_without_outcome_selection) ... ok
+2026-10-20T09:48:23.6091824Z test_three_way_diagnosis_keeps_strict_type_failures (test_axis_counterexamples.CounterexampleProbeTests.test_three_way_diagnosis_keeps_strict_type_failures) ... ok
+2026-10-20T09:48:23.6097687Z test_all_four_exact_comparisons_preserve_raw_records_and_publish_only_counts (test_axis_first_writer.FirstWriterTests.test_all_four_exact_comparisons_preserve_raw_records_and_publish_only_counts) ... ok
+2026-10-20T09:48:23.6100484Z test_canonical_value_cannot_be_selected_from_a_convenient_observation (test_axis_first_writer.FirstWriterTests.test_canonical_value_cannot_be_selected_from_a_convenient_observation) ... ok
+2026-10-20T09:48:23.6102722Z test_changed_production_guard_cannot_be_silently_reused (test_axis_first_writer.FirstWriterTests.test_changed_production_guard_cannot_be_silently_reused) ... ok
+2026-10-20T09:48:23.6105593Z test_ignored_vector_components_and_advance_sums_must_be_equal (test_axis_first_writer.FirstWriterTests.test_ignored_vector_components_and_advance_sums_must_be_equal) ... ok
+2026-10-20T09:48:23.6110513Z test_local_equality_cannot_hide_opposite_first_writer_cache_effect (test_axis_first_writer.FirstWriterTests.test_local_equality_cannot_hide_opposite_first_writer_cache_effect) ... ok
+2026-10-20T09:48:23.6112906Z test_missing_nondefault_axis_fails_even_when_other_fields_are_correct (test_axis_first_writer.FirstWriterTests.test_missing_nondefault_axis_fails_even_when_other_fields_are_correct) ... ok
+2026-10-20T09:48:23.6116276Z test_missing_nonfinite_unknown_fields_and_different_gids_are_rejected (test_axis_first_writer.FirstWriterTests.test_missing_nonfinite_unknown_fields_and_different_gids_are_rejected) ... ok
+2026-10-20T09:48:23.6118837Z test_nonidempotent_arithmetic_does_not_replace_the_required_stable_native_echo (test_axis_first_writer.FirstWriterTests.test_nonidempotent_arithmetic_does_not_replace_the_required_stable_native_echo) ... ok
+2026-10-20T09:48:23.6121728Z test_positive_truncation_candidate_rejects_values_outside_its_stated_domain (test_axis_first_writer.FirstWriterTests.test_positive_truncation_candidate_rejects_values_outside_its_stated_domain) ... ok
+2026-10-20T09:48:23.6124379Z test_precomputed_candidate_truncates_instead_of_rounding_distinguishing_positions (test_axis_first_writer.FirstWriterTests.test_precomputed_candidate_truncates_instead_of_rounding_distinguishing_positions) ... ok
+2026-10-20T09:48:23.6126918Z test_requested_echo_is_validated_against_precomputed_decimal_rule (test_axis_first_writer.FirstWriterTests.test_requested_echo_is_validated_against_precomputed_decimal_rule) ... ok
+2026-10-20T09:48:23.6131310Z test_single_binary64_step_is_not_hidden_under_the_original_axis_tolerance (test_axis_first_writer.FirstWriterTests.test_single_binary64_step_is_not_hidden_under_the_original_axis_tolerance) ... ok
+2026-10-20T09:48:23.6133820Z test_small_probe_covers_three_axis_endpoints_and_both_mixed_weight_targets (test_axis_first_writer.FirstWriterTests.test_small_probe_covers_three_axis_endpoints_and_both_mixed_weight_targets) ... ok
+2026-10-20T09:48:23.6136341Z test_typed_commands_and_path_status_cannot_be_discarded (test_axis_first_writer.FirstWriterTests.test_typed_commands_and_path_status_cannot_be_discarded) ... ok
+2026-10-20T09:48:23.6138515Z test_an_unsorted_later_exact_knot_is_not_given_priority (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_an_unsorted_later_exact_knot_is_not_given_priority) ... ok
+2026-10-20T09:48:23.6141169Z test_candidate_never_claims_geometry_or_metric_acceptance (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_candidate_never_claims_geometry_or_metric_acceptance) ... ok
+2026-10-20T09:48:23.6161337Z test_duplicate_nonidentity_endpoints_retain_raw_record_order (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_duplicate_nonidentity_endpoints_retain_raw_record_order) ... ok
+2026-10-20T09:48:23.6171478Z test_invalid_data_is_rejected_without_sorting_or_clamping (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_invalid_data_is_rejected_without_sorting_or_clamping) ... ok
+2026-10-20T09:48:23.6174149Z test_original_left_limit_does_not_become_actual_default (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_original_left_limit_does_not_become_actual_default) ... ok
+2026-10-20T09:48:23.6176446Z test_original_right_limit_is_distinct_from_default_and_left_limit (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_original_right_limit_is_distinct_from_default_and_left_limit) ... ok
+2026-10-20T09:48:23.6179542Z test_probe_coverage_uses_original_ranges_and_all_three_tags (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_probe_coverage_uses_original_ranges_and_all_three_tags) ... ok
+2026-10-20T09:48:23.6182362Z test_rounding_ties_keep_the_original_side (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_rounding_ties_keep_the_original_side) ... ok
+2026-10-20T09:48:23.6184195Z test_unsorted_plateau_boundary_is_a_falsifiable_prequantization_rule (test_axis_geometry_candidates.AxisGeometryCandidateTests.test_unsorted_plateau_boundary_is_a_falsifiable_prequantization_rule) ... ok
+2026-10-20T09:48:23.6185709Z test_flat_axis_stays_ambiguous (test_axis_inference.AxisInferenceTests.test_flat_axis_stays_ambiguous) ... ok
+2026-10-20T09:48:23.6321192Z test_independent_fractional_coordinates_and_endpoints (test_axis_inference.AxisInferenceTests.test_independent_fractional_coordinates_and_endpoints) ... ok
+2026-10-20T09:48:23.6323116Z test_invalid_or_nonfinite_observations_fail (test_axis_inference.AxisInferenceTests.test_invalid_or_nonfinite_observations_fail) ... ok
+2026-10-20T09:48:23.6325267Z test_multiple_metrics_reject_non_equivalent_mapping (test_axis_inference.AxisInferenceTests.test_multiple_metrics_reject_non_equivalent_mapping) ... ok
+2026-10-20T09:48:23.6327300Z test_outside_axis_domain_is_not_extrapolated_to_a_pass (test_axis_inference.AxisInferenceTests.test_outside_axis_domain_is_not_extrapolated_to_a_pass) ... ok
+2026-10-20T09:48:23.6332867Z test_closed_intervals_clip_to_each_branch_domain (test_axis_inference_intervals.AxisInferenceIntervalTests.test_closed_intervals_clip_to_each_branch_domain) ... ok
+2026-10-20T09:48:23.6334702Z test_disjoint_nonflat_constraints_have_no_interval (test_axis_inference_intervals.AxisInferenceIntervalTests.test_disjoint_nonflat_constraints_have_no_interval) ... ok
+2026-10-20T09:48:23.6336994Z test_exact_positive_fit_has_a_nonzero_tolerance_interval (test_axis_inference_intervals.AxisInferenceIntervalTests.test_exact_positive_fit_has_a_nonzero_tolerance_interval) ... ok
+2026-10-20T09:48:23.6339283Z test_feasible_interval_does_not_reclassify_old_least_squares_failure (test_axis_inference_intervals.AxisInferenceIntervalTests.test_feasible_interval_does_not_reclassify_old_least_squares_failure) ... ok
+2026-10-20T09:48:23.6342545Z test_flat_branches_preserve_full_domain_at_the_exact_tolerance (test_axis_inference_intervals.AxisInferenceIntervalTests.test_flat_branches_preserve_full_domain_at_the_exact_tolerance) ... ok
+2026-10-20T09:48:23.6344822Z test_negative_branch_reverses_bounds_and_mixed_slope_signs (test_axis_inference_intervals.AxisInferenceIntervalTests.test_negative_branch_reverses_bounds_and_mixed_slope_signs) ... ok
+2026-10-20T09:48:23.6346904Z test_nonzero_residual_retains_the_analytic_intersection (test_axis_inference_intervals.AxisInferenceIntervalTests.test_nonzero_residual_retains_the_analytic_intersection) ... ok
+2026-10-20T09:48:23.6349027Z test_one_constant_metric_contradiction_rejects_the_whole_interval (test_axis_inference_intervals.AxisInferenceIntervalTests.test_one_constant_metric_contradiction_rejects_the_whole_interval) ... ok
+2026-10-20T09:48:23.6351697Z test_all_six_predeclared_points_keep_order_and_every_original_axis (test_axis_input_resolution.AxisInputResolutionTests.test_all_six_predeclared_points_keep_order_and_every_original_axis) ... ok
+2026-10-20T09:48:23.6353588Z test_distinct_binary64_collision_inputs_share_the_declared_fixed_integer (test_axis_input_resolution.AxisInputResolutionTests.test_distinct_binary64_collision_inputs_share_the_declared_fixed_integer) ... ok
+2026-10-20T09:48:23.6361028Z test_distinct_request_locations_do_not_become_payload_differences (test_axis_input_resolution.AxisInputResolutionTests.test_distinct_request_locations_do_not_become_payload_differences) ... ok
+2026-10-20T09:48:23.6362963Z test_exact_half_grid_rounds_toward_positive_infinity_for_both_signs (test_axis_input_resolution.AxisInputResolutionTests.test_exact_half_grid_rounds_toward_positive_infinity_for_both_signs) ... ok
+2026-10-20T09:48:23.6365692Z test_input_ranges_and_returned_locations_are_not_mutated_or_aliased (test_axis_input_resolution.AxisInputResolutionTests.test_input_ranges_and_returned_locations_are_not_mutated_or_aliased) ... ok
+2026-10-20T09:48:23.6367273Z test_integer_grid_and_nontie_controls (test_axis_input_resolution.AxisInputResolutionTests.test_integer_grid_and_nontie_controls) ... ok
+2026-10-20T09:48:23.6369155Z test_invalid_fixed_inputs_are_refused (test_axis_input_resolution.AxisInputResolutionTests.test_invalid_fixed_inputs_are_refused) ... ok
+2026-10-20T09:48:23.6375481Z test_pair_requires_matching_gid_sets_and_actual_face_gid_identity (test_axis_input_resolution.AxisInputResolutionTests.test_pair_requires_matching_gid_sets_and_actual_face_gid_identity) ... ok
+2026-10-20T09:48:23.6382419Z test_quadratic_control_difference_remains_outside_budget_in_legacy_and_raw (test_axis_input_resolution.AxisInputResolutionTests.test_quadratic_control_difference_remains_outside_budget_in_legacy_and_raw) ... ok
+2026-10-20T09:48:23.6387298Z test_tiny_vertical_origin_difference_remains_exact_even_for_blank_glyph (test_axis_input_resolution.AxisInputResolutionTests.test_tiny_vertical_origin_difference_remains_exact_even_for_blank_glyph) ... ok
+2026-10-20T09:48:23.6399960Z test_unknown_private_payload_difference_is_detected_without_value_disclosure (test_axis_input_resolution.AxisInputResolutionTests.test_unknown_private_payload_difference_is_detected_without_value_disclosure) ... ok
+2026-10-20T09:48:23.6405436Z test_wrong_defaults_axis_sets_and_invalid_or_excluding_ranges_are_refused (test_axis_input_resolution.AxisInputResolutionTests.test_wrong_defaults_axis_sets_and_invalid_or_excluding_ranges_are_refused) ... ok
+2026-10-20T09:48:23.6424774Z test_actual_reference_q_is_not_substituted_by_a_matching_candidate (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_actual_reference_q_is_not_substituted_by_a_matching_candidate) ... ok
+2026-10-20T09:48:23.6670708Z test_changed_report_identity_incomplete_reports_and_lost_geometry_are_rejected (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_changed_report_identity_incomplete_reports_and_lost_geometry_are_rejected) ... ok
+2026-10-20T09:48:23.6870187Z test_independent_reproduction_changes_and_actual_native_coverage_are_separate (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_independent_reproduction_changes_and_actual_native_coverage_are_separate) ... ok
+2026-10-20T09:48:23.6973535Z test_missing_direct_native_historical_checks_never_become_full_native_pass (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_missing_direct_native_historical_checks_never_become_full_native_pass) ... ok
+2026-10-20T09:48:23.6996734Z test_prepare_preserves_orders_hashes_and_historical_ids_without_mutation (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_prepare_preserves_orders_hashes_and_historical_ids_without_mutation) ... ok
+2026-10-20T09:48:23.7046365Z test_prepare_rejects_missing_reordered_duplicate_and_changed_user_coordinates (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_prepare_rejects_missing_reordered_duplicate_and_changed_user_coordinates) ... ok
+2026-10-20T09:48:23.7150092Z test_real_numeric_failures_unknown_q_and_replay_failures_stay_visible (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_real_numeric_failures_unknown_q_and_replay_failures_stay_visible) ... ok
+2026-10-20T09:48:23.7159736Z test_real_reference_is_small_hash_bound_and_contains_no_payload (test_axis_mapping_closure_archive.MappingClosureArchiveTests.test_real_reference_is_small_hash_bound_and_contains_no_payload) ... ok
+2026-10-20T09:48:23.7436104Z test_all_faces_have_defaults_corners_and_both_direct_hvf_weight_controls (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_all_faces_have_defaults_corners_and_both_direct_hvf_weight_controls) ... ok
+2026-10-20T09:48:23.7886158Z test_archived_duplicates_survive_and_new_aliases_attach_to_first_occurrence (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_archived_duplicates_survive_and_new_aliases_attach_to_first_occurrence) ... ok
+2026-10-20T09:48:23.8337601Z test_calls_original_request_generator_once_and_retains_every_archived_row (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_calls_original_request_generator_once_and_retains_every_archived_row) ... ok
+2026-10-20T09:48:23.8575250Z test_every_original_range_and_axis_order_are_used_without_archive_reordering (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_every_original_range_and_axis_order_are_used_without_archive_reordering) ... ok
+2026-10-20T09:48:23.9283963Z test_fresh_eight_triples_use_the_declared_new_seed_for_every_face (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_fresh_eight_triples_use_the_declared_new_seed_for_every_face) ... ok
+2026-10-20T09:48:23.9422514Z test_generated_aliases_and_output_mutation_cannot_change_archived_requests (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_generated_aliases_and_output_mutation_cannot_change_archived_requests) ... ok
+2026-10-20T09:48:23.9495240Z test_invalid_face_sets_axis_tags_and_ranges_fail_before_archive_generation (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_invalid_face_sets_axis_tags_and_ranges_fail_before_archive_generation) ... ok
+2026-10-20T09:48:23.9600016Z test_malformed_archive_identity_order_locations_and_missing_faces_fail_closed (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_malformed_archive_identity_order_locations_and_missing_faces_fail_closed) ... ok
+2026-10-20T09:48:23.9790761Z test_out_of_range_supplemental_points_are_omitted_never_clamped (test_axis_mapping_closure_cases.AxisMappingClosureCaseTests.test_out_of_range_supplemental_points_are_omitted_never_clamped) ... ok
+2026-10-20T09:48:23.9802771Z test_complete_payload_differences_are_not_hidden_by_metric_or_path_equality (test_axis_plateau.AxisPlateauTests.test_complete_payload_differences_are_not_hidden_by_metric_or_path_equality) ... ok
+2026-10-20T09:48:23.9817692Z test_constructor_environment_is_restored_after_normal_and_failed_launches (test_axis_plateau.AxisPlateauTests.test_constructor_environment_is_restored_after_normal_and_failed_launches) ... ok
+2026-10-20T09:48:23.9819696Z test_failure_reports_do_not_publish_untrusted_native_payload_text (test_axis_plateau.AxisPlateauTests.test_failure_reports_do_not_publish_untrusted_native_payload_text) ... ok
+2026-10-20T09:48:23.9848502Z test_predeclared_cases_keep_boundaries_and_mixed_source_axes (test_axis_plateau.AxisPlateauTests.test_predeclared_cases_keep_boundaries_and_mixed_source_axes) ... ok
+2026-10-20T09:48:23.9851618Z test_duplicated_endpoints_and_zero_have_distinct_semantics (test_axis_quantization.QuantizationArithmeticTests.test_duplicated_endpoints_and_zero_have_distinct_semantics) ... ok
+2026-10-20T09:48:23.9853377Z test_fixed_conversion_ties_have_the_documented_sign (test_axis_quantization.QuantizationArithmeticTests.test_fixed_conversion_ties_have_the_documented_sign) ... ok
+2026-10-20T09:48:23.9855074Z test_nonfinite_and_outside_source_values_are_not_silently_clamped (test_axis_quantization.QuantizationArithmeticTests.test_nonfinite_and_outside_source_values_are_not_silently_clamped) ... ok
+2026-10-20T09:48:23.9858762Z test_original_affine_examples_and_all_default_endpoints (test_axis_quantization.QuantizationArithmeticTests.test_original_affine_examples_and_all_default_endpoints) ... ok
+2026-10-20T09:48:23.9861469Z test_requested_example_is_exactly_binary32_representable (test_axis_quantization.QuantizationArithmeticTests.test_requested_example_is_exactly_binary32_representable) ... ok
+2026-10-20T09:48:23.9863738Z test_signed_fixed_division_is_independent_of_python_round (test_axis_quantization.QuantizationArithmeticTests.test_signed_fixed_division_is_independent_of_python_round) ... ok
+2026-10-20T09:48:23.9865638Z test_three_axis_tags_are_preserved_in_predictor (test_axis_quantization.QuantizationArithmeticTests.test_three_axis_tags_are_preserved_in_predictor) ... ok
+2026-10-20T09:48:23.9867045Z test_two_stage_rounding_has_a_real_distinguishing_counterexample (test_axis_quantization.QuantizationArithmeticTests.test_two_stage_rounding_has_a_real_distinguishing_counterexample) ... ok
+2026-10-20T09:48:23.9869119Z test_unordered_near_zero_record_is_not_sorted_or_deduplicated (test_axis_quantization.QuantizationArithmeticTests.test_unordered_near_zero_record_is_not_sorted_or_deduplicated) ... ok
+2026-10-20T09:48:23.9871059Z test_ambiguous_metric_inference_is_not_invented_as_zero (test_axis_quantization.QuantizationEvidenceTests.test_ambiguous_metric_inference_is_not_invented_as_zero) ... ok
+2026-10-20T09:48:23.9872361Z test_every_unexplained_row_is_preserved_without_tolerance_growth (test_axis_quantization.QuantizationEvidenceTests.test_every_unexplained_row_is_preserved_without_tolerance_growth) ... ok
+2026-10-20T09:48:23.9873536Z test_face_and_observation_counts_must_agree (test_axis_quantization.QuantizationEvidenceTests.test_face_and_observation_counts_must_agree) ... ok
+2026-10-20T09:48:23.9874909Z test_failed_original_metric_budget_cannot_pass_any_candidate (test_axis_quantization.QuantizationEvidenceTests.test_failed_original_metric_budget_cannot_pass_any_candidate) ... ok
+2026-10-20T09:48:23.9876745Z test_matching_hypotheses_stay_plural_and_do_not_claim_geometry (test_axis_quantization.QuantizationEvidenceTests.test_matching_hypotheses_stay_plural_and_do_not_claim_geometry) ... ok
+2026-10-20T09:48:23.9878522Z test_off_grid_inference_is_retained_even_if_rounded_grid_matches (test_axis_quantization.QuantizationEvidenceTests.test_off_grid_inference_is_retained_even_if_rounded_grid_matches) ... ok
+2026-10-20T09:48:23.9880360Z test_tampered_contract_and_nonfinite_data_fail (test_axis_quantization.QuantizationEvidenceTests.test_tampered_contract_and_nonfinite_data_fail) ... ok
+2026-10-20T09:48:23.9884099Z test_both_actual_failures_and_binary64_decimal_neighbors_are_predeclared (test_axis_readback_boundaries.BoundaryProbeTests.test_both_actual_failures_and_binary64_decimal_neighbors_are_predeclared) ... ok
+2026-10-20T09:48:23.9885842Z test_candidate_domain_is_explicit_and_never_clamps (test_axis_readback_boundaries.BoundaryProbeTests.test_candidate_domain_is_explicit_and_never_clamps) ... ok
+2026-10-20T09:48:23.9894446Z test_complete_raw_metric_vectors_and_typed_commands_stay_strict (test_axis_readback_boundaries.BoundaryProbeTests.test_complete_raw_metric_vectors_and_typed_commands_stay_strict) ... ok
+2026-10-20T09:48:23.9903336Z test_cross_process_difference_cannot_hide_behind_local_exact_equality (test_axis_readback_boundaries.BoundaryProbeTests.test_cross_process_difference_cannot_hide_behind_local_exact_equality) ... ok
+2026-10-20T09:48:23.9905757Z test_diagnostic_calls_raw_constructor_and_preserves_the_strict_guard (test_axis_readback_boundaries.BoundaryProbeTests.test_diagnostic_calls_raw_constructor_and_preserves_the_strict_guard) ... ok
+2026-10-20T09:48:23.9907435Z test_echo_reports_bit_difference_without_reclassifying_it_as_equal (test_axis_readback_boundaries.BoundaryProbeTests.test_echo_reports_bit_difference_without_reclassifying_it_as_equal) ... ok
+2026-10-20T09:48:23.9908754Z test_equal_control_candidates_are_retained_as_separate_constructions (test_axis_readback_boundaries.BoundaryProbeTests.test_equal_control_candidates_are_retained_as_separate_constructions) ... ok
+2026-10-20T09:48:23.9918778Z test_every_candidate_is_compared_and_original_reference_is_never_self_compared (test_axis_readback_boundaries.BoundaryProbeTests.test_every_candidate_is_compared_and_original_reference_is_never_self_compared) ... ok
+2026-10-20T09:48:23.9920666Z test_failed_weights_distinguish_multiplication_from_division_by_one_binary64_step (test_axis_readback_boundaries.BoundaryProbeTests.test_failed_weights_distinguish_multiplication_from_division_by_one_binary64_step) ... ok
+2026-10-20T09:48:23.9930673Z test_missing_candidate_GID_or_raw_metric_fails_without_private_data_in_error (test_axis_readback_boundaries.BoundaryProbeTests.test_missing_candidate_GID_or_raw_metric_fails_without_private_data_in_error) ... ok
+2026-10-20T09:48:23.9932316Z test_missing_nondefault_axis_is_reported_and_not_hidden_by_the_default (test_axis_readback_boundaries.BoundaryProbeTests.test_missing_nondefault_axis_is_reported_and_not_hidden_by_the_default) ... ok
+2026-10-20T09:48:23.9935428Z test_native_request_bits_identity_and_GID_cannot_change (test_axis_readback_boundaries.BoundaryProbeTests.test_native_request_bits_identity_and_GID_cannot_change) ... ok
+2026-10-20T09:48:23.9937180Z test_second_layer_and_changes_during_glyph_reads_are_preserved (test_axis_readback_boundaries.BoundaryProbeTests.test_second_layer_and_changes_during_glyph_reads_are_preserved) ... ok
+2026-10-20T09:48:24.0246137Z test_self_authored_fixture_is_private_and_original_mode_requires_the_exact_source (test_axis_readback_boundaries.BoundaryProbeTests.test_self_authored_fixture_is_private_and_original_mode_requires_the_exact_source) ... ok
+2026-10-20T09:48:24.0250336Z test_all_27_corners_and_six_single_axis_endpoints (test_axis_threshold_cases.AxisThresholdCaseTests.test_all_27_corners_and_six_single_axis_endpoints) ... ok
+2026-10-20T09:48:24.0254092Z test_asymmetric_original_spans_and_decimal_default_controls (test_axis_threshold_cases.AxisThresholdCaseTests.test_asymmetric_original_spans_and_decimal_default_controls) ... ok
+2026-10-20T09:48:24.0261119Z test_controls_and_width_readback_are_only_added_inside_original_ranges (test_axis_threshold_cases.AxisThresholdCaseTests.test_controls_and_width_readback_are_only_added_inside_original_ranges) ... ok
+2026-10-20T09:48:24.0268825Z test_exact_location_deduplication_preserves_aliases_and_source (test_axis_threshold_cases.AxisThresholdCaseTests.test_exact_location_deduplication_preserves_aliases_and_source) ... ok
+2026-10-20T09:48:24.0270756Z test_invalid_ranges_tags_and_face_are_rejected (test_axis_threshold_cases.AxisThresholdCaseTests.test_invalid_ranges_tags_and_face_are_rejected) ... ok
+2026-10-20T09:48:24.0274495Z test_neighbours_are_distinct_adjacent_user_binary64_values (test_axis_threshold_cases.AxisThresholdCaseTests.test_neighbours_are_distinct_adjacent_user_binary64_values) ... ok
+2026-10-20T09:48:24.0284466Z test_random_holdouts_repeat_by_face_and_do_not_reuse_prior_cases (test_axis_threshold_cases.AxisThresholdCaseTests.test_random_holdouts_repeat_by_face_and_do_not_reuse_prior_cases) ... ok
+2026-10-20T09:48:24.0297198Z test_target_thresholds_have_binary_and_decimal_neighbours (test_axis_threshold_cases.AxisThresholdCaseTests.test_target_thresholds_have_binary_and_decimal_neighbours) ... ok
+2026-10-20T09:48:24.0299086Z test_binary64_evidence_preserves_signed_zero_and_fractional_value (test_axis_threshold_probe.ThresholdProbeTests.test_binary64_evidence_preserves_signed_zero_and_fractional_value) ... ok
+2026-10-20T09:48:24.0302289Z test_checked_batch_rejects_bad_glyph_data_without_an_echo_tolerance (test_axis_threshold_probe.ThresholdProbeTests.test_checked_batch_rejects_bad_glyph_data_without_an_echo_tolerance) ... ok
+2026-10-20T09:48:24.0307560Z test_cross_process_comparison_keeps_complete_typed_payload (test_axis_threshold_probe.ThresholdProbeTests.test_cross_process_comparison_keeps_complete_typed_payload) ... ok
+2026-10-20T09:48:24.0347930Z test_direct_HVF_requires_matching_identity_and_complete_final_summary (test_axis_threshold_probe.ThresholdProbeTests.test_direct_HVF_requires_matching_identity_and_complete_final_summary) ... ok
+2026-10-20T09:48:24.0352291Z test_global_candidates_use_original_ranges_and_keep_duplicate_records (test_axis_threshold_probe.ThresholdProbeTests.test_global_candidates_use_original_ranges_and_keep_duplicate_records) ... ok
+2026-10-20T09:48:24.0362725Z test_metadata_binds_every_face_and_original_table (test_axis_threshold_probe.ThresholdProbeTests.test_metadata_binds_every_face_and_original_table) ... ok
+2026-10-20T09:48:24.0369774Z test_rejected_clipped_inverse_never_becomes_a_conditioned_grid (test_axis_threshold_probe.ThresholdProbeTests.test_rejected_clipped_inverse_never_becomes_a_conditioned_grid) ... ok
+2026-10-20T09:48:24.0374369Z test_weight_inverse_refuses_fractional_other_axes_and_nonidentity_maps (test_axis_threshold_probe.ThresholdProbeTests.test_weight_inverse_refuses_fractional_other_axes_and_nonidentity_maps) ... ok
+2026-10-20T09:48:24.0387111Z test_analytic_rotation_translation_and_child_axis (test_batch_geometry.BatchGeometryTests.test_analytic_rotation_translation_and_child_axis) ... ok
+2026-10-20T09:48:24.0391208Z test_independent_fractional_shape_coordinates_and_trace (test_batch_geometry.BatchGeometryTests.test_independent_fractional_shape_coordinates_and_trace) ... ok
+2026-10-20T09:48:24.0395316Z test_invalid_shape_location_and_resource_budget (test_batch_geometry.BatchGeometryTests.test_invalid_shape_location_and_resource_budget) ... ok
+2026-10-20T09:48:24.0399332Z test_parallel_factor_preserves_source_parameter (test_batch_geometry.BatchGeometryTests.test_parallel_factor_preserves_source_parameter) ... ok
+2026-10-20T09:48:24.0406738Z test_remapped_part_identity_is_retained (test_batch_geometry.BatchGeometryTests.test_remapped_part_identity_is_retained) ... ok
+2026-10-20T09:48:24.0955091Z test_scalar_equivalence_at_seeded_heldout_positions (test_batch_geometry.BatchGeometryTests.test_scalar_equivalence_at_seeded_heldout_positions) ... ok
+2026-10-20T09:48:24.0960277Z test_shape_with_no_axes_and_empty_shape (test_batch_geometry.BatchGeometryTests.test_shape_with_no_axes_and_empty_shape) ... ok
+2026-10-20T09:48:24.0967164Z test_unsupported_tangents_not_silently_accepted (test_batch_geometry.BatchGeometryTests.test_unsupported_tangents_not_silently_accepted) ... ok
+2026-10-20T09:48:24.0974089Z test_actual_production_validator_and_caller_are_preserved_verbatim (test_coretext_axis_guard.CoreTextAxisGuardHarnessTests.test_actual_production_validator_and_caller_are_preserved_verbatim) ... ok
+2026-10-20T09:48:24.0978448Z test_changed_guard_or_unbound_production_caller_requires_review (test_coretext_axis_guard.CoreTextAxisGuardHarnessTests.test_changed_guard_or_unbound_production_caller_requires_review) ... ok
+2026-10-20T09:48:24.0981750Z test_diagnostic_guard_removal_also_removes_the_new_presence_requirement (test_coretext_axis_guard.CoreTextAxisGuardHarnessTests.test_diagnostic_guard_removal_also_removes_the_new_presence_requirement) ... ok
+2026-10-20T09:48:24.0993147Z test_legacy_readback_diagnosis_uses_the_same_reviewed_guard (test_coretext_axis_guard.CoreTextAxisGuardHarnessTests.test_legacy_readback_diagnosis_uses_the_same_reviewed_guard) ... ok
+2026-10-20T09:48:24.0999273Z test_empty_glyph_origins_are_not_silently_ignored (test_coretext_precision.CoreTextPrecisionTests.test_empty_glyph_origins_are_not_silently_ignored) ... ok
+2026-10-20T09:48:24.1002239Z test_harness_preserves_production_axis_guard_and_pins_generated_sources (test_coretext_precision.CoreTextPrecisionTests.test_harness_preserves_production_axis_guard_and_pins_generated_sources) ... ok
+2026-10-20T09:48:24.1011542Z test_measurement_size_is_not_a_font_coordinate_change (test_coretext_precision.CoreTextPrecisionTests.test_measurement_size_is_not_a_font_coordinate_change) ... ok
+2026-10-20T09:48:24.1033766Z test_missing_duplicate_nonfinite_and_changed_identity_are_rejected (test_coretext_precision.CoreTextPrecisionTests.test_missing_duplicate_nonfinite_and_changed_identity_are_rejected) ... ok
+2026-10-20T09:48:24.1336263Z test_no_native_runtime_cannot_be_reported_as_pass (test_coretext_precision.CoreTextPrecisionTests.test_no_native_runtime_cannot_be_reported_as_pass) ... ok
+2026-10-20T09:48:24.1342095Z test_one_unit_vertical_failure_is_retained_at_every_size (test_coretext_precision.CoreTextPrecisionTests.test_one_unit_vertical_failure_is_retained_at_every_size) ... ok
+2026-10-20T09:48:24.1345732Z test_run_fallback_is_not_a_comparable_metric (test_coretext_precision.CoreTextPrecisionTests.test_run_fallback_is_not_a_comparable_metric) ... ok
+2026-10-20T09:48:24.1351346Z test_unavailable_run_api_is_reported_without_losing_direct_measurements (test_coretext_precision.CoreTextPrecisionTests.test_unavailable_run_api_is_reported_without_losing_direct_measurements) ... ok
+2026-10-20T09:48:24.1353700Z test_already_fixed_source_exposes_double_compensation_even_when_gpos_applies_correctly (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_already_fixed_source_exposes_double_compensation_even_when_gpos_applies_correctly) ... ok
+2026-10-20T09:48:24.1355506Z test_changed_glyph_matrix_clipping_or_missing_ink_are_not_hidden (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_changed_glyph_matrix_clipping_or_missing_ink_are_not_hidden) ... ok
+2026-10-20T09:48:24.1357321Z test_correct_gpos_effect_and_final_fixed_origin_are_independent_checks (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_correct_gpos_effect_and_final_fixed_origin_are_independent_checks) ... ok
+2026-10-20T09:48:24.1358922Z test_every_predeclared_rotation_model_is_preserved (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_every_predeclared_rotation_model_is_preserved) ... ok
+2026-10-20T09:48:24.1361315Z test_ignored_feature_is_visible_without_claiming_compensation_succeeded (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_ignored_feature_is_visible_without_claiming_compensation_succeeded) ... ok
+2026-10-20T09:48:24.1369919Z test_linux_run_is_explicitly_not_native_and_never_overwrites_existing_evidence (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_linux_run_is_explicitly_not_native_and_never_overwrites_existing_evidence) ... ok
+2026-10-20T09:48:24.1371720Z test_native_harness_checks_actual_font_and_draws_without_exporting_paths_or_images (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_native_harness_checks_actual_font_and_draws_without_exporting_paths_or_images) ... ok
+2026-10-20T09:48:24.1373435Z test_raster_calibration_and_both_comparison_limits_remain_explicit (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_raster_calibration_and_both_comparison_limits_remain_explicit) ... ok
+2026-10-20T09:48:24.1375571Z test_registration_cleanup_requires_same_fixture_process_scope_and_actual_success (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_registration_cleanup_requires_same_fixture_process_scope_and_actual_success) ... ok
+2026-10-20T09:48:24.1419052Z test_request_grid_keeps_feature_policies_languages_spaces_and_axes (test_coretext_vertical_gpos_probe.CoreTextGPOSProbeTests.test_request_grid_keeps_feature_policies_languages_spaces_and_axes) ... ok
+2026-10-20T09:48:24.1537010Z test_encoded_gpos_and_real_layout_residual_have_distinct_budgets (test_directwrite_vertical_layout.DirectWriteLayoutDiagnosticTests.test_encoded_gpos_and_real_layout_residual_have_distinct_budgets) ... ok
+2026-10-20T09:48:24.1651263Z test_ignored_axis_with_constant_bounds_cannot_look_like_compensation (test_directwrite_vertical_layout.DirectWriteLayoutDiagnosticTests.test_ignored_axis_with_constant_bounds_cannot_look_like_compensation) ... ok
+2026-10-20T09:48:24.1763809Z test_ignored_gpos_remains_a_large_failed_compensation_observation (test_directwrite_vertical_layout.DirectWriteLayoutDiagnosticTests.test_ignored_gpos_remains_a_large_failed_compensation_observation) ... ok
+2026-10-20T09:48:24.1775309Z test_non_windows_driver_never_claims_native_layout (test_directwrite_vertical_layout.DirectWriteLayoutDiagnosticTests.test_non_windows_driver_never_claims_native_layout) ... ok
+2026-10-20T09:48:25.6116086Z test_non_windows_native_stub_compiles_and_returns_not_run (test_directwrite_vertical_layout.DirectWriteLayoutDiagnosticTests.test_non_windows_native_stub_compiles_and_returns_not_run) ... ok
+2026-10-20T09:48:25.6124146Z test_cluster_and_layout_metric_fields_are_not_optional (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_cluster_and_layout_metric_fields_are_not_optional) ... ok
+2026-10-20T09:48:25.6130005Z test_duplicate_ranges_cannot_hide_missing_mixed_characters (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_duplicate_ranges_cannot_hide_missing_mixed_characters) ... ok
+2026-10-20T09:48:25.6149845Z test_each_actual_face_must_preserve_physical_identity_and_axes (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_each_actual_face_must_preserve_physical_identity_and_axes) ... ok
+2026-10-20T09:48:25.6151387Z test_explicit_native_error_and_nonfinite_json_do_not_become_results (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_explicit_native_error_and_nonfinite_json_do_not_become_results) ... ok
+2026-10-20T09:48:25.6152774Z test_late_record_metric_failure_rejects_whole_transcript (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_late_record_metric_failure_rejects_whole_transcript) ... ok
+2026-10-20T09:48:25.6154199Z test_literal_protocol_accepts_extra_static_axis_but_checks_source_axis_case (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_literal_protocol_accepts_extra_static_axis_but_checks_source_axis_case) ... ok
+2026-10-20T09:48:25.6160242Z test_metadata_requires_own_source_and_isolated_collection (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_metadata_requires_own_source_and_isolated_collection) ... ok
+2026-10-20T09:48:25.6161601Z test_request_line_keeps_original_double_and_axis_case (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_request_line_keeps_original_double_and_axis_case) ... ok
+2026-10-20T09:48:25.6215726Z test_request_matrix_retains_all_axes_routes_positions_and_directions (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_request_matrix_retains_all_axes_routes_positions_and_directions) ... ok
+2026-10-20T09:48:25.6228788Z test_summary_exit_and_unique_terminal_record_are_required (test_directwrite_vertical_layout.DirectWriteLayoutProtocolTests.test_summary_exit_and_unique_terminal_record_are_required) ... ok
+2026-10-20T09:48:25.7134147Z test_all_cyclic_shifts_for_line_quad_and_mixed_contours (test_geometry_comparison.GeometryComparisonTests.test_all_cyclic_shifts_for_line_quad_and_mixed_contours) ... ok
+2026-10-20T09:48:25.7144666Z test_empty_contours_zero_length_segments_and_reverse_order_are_preserved (test_geometry_comparison.GeometryComparisonTests.test_empty_contours_zero_length_segments_and_reverse_order_are_preserved) ... ok
+2026-10-20T09:48:25.7185952Z test_lower_bound_ties_cannot_skip_the_correct_shift (test_geometry_comparison.GeometryComparisonTests.test_lower_bound_ties_cannot_skip_the_correct_shift) ... ok
+2026-10-20T09:48:25.7258192Z test_noncanonical_numeric_inputs_retain_scalar_behavior (test_geometry_comparison.GeometryComparisonTests.test_noncanonical_numeric_inputs_retain_scalar_behavior) ... ok
+2026-10-20T09:48:25.7269746Z test_path_segment_and_noncyclic_type_mismatches_keep_original_errors (test_geometry_comparison.GeometryComparisonTests.test_path_segment_and_noncyclic_type_mismatches_keep_original_errors) ... ok
+2026-10-20T09:48:25.7971639Z test_random_multiple_contours_and_unseen_perturbations_are_bit_equal (test_geometry_comparison.GeometryComparisonTests.test_random_multiple_contours_and_unseen_perturbations_are_bit_equal) ... ok
+2026-10-20T09:48:25.7973456Z test_small_error_and_exact_budget_boundaries_are_not_rounded (test_geometry_comparison.GeometryComparisonTests.test_small_error_and_exact_budget_boundaries_are_not_rounded) ... ok
+2026-10-20T09:48:25.8036736Z test_native_records_and_unrounded_reference_vectors_remain_unchanged (test_gvar_residual_quantization.GvarResidualQuantizationTests.test_native_records_and_unrounded_reference_vectors_remain_unchanged) ... ok
+2026-10-20T09:48:25.8073839Z test_negative_default_half_coordinates_keep_opentype_rounding (test_gvar_residual_quantization.GvarResidualQuantizationTests.test_negative_default_half_coordinates_keep_opentype_rounding) ... ok
+2026-10-20T09:48:25.8127261Z test_one_residual_quantization_preserves_an_expressible_adaptive_peak (test_gvar_residual_quantization.GvarResidualQuantizationTests.test_one_residual_quantization_preserves_an_expressible_adaptive_peak) ... ok
+2026-10-20T09:48:25.8391070Z test_serialized_font_retains_the_same_analytic_error (test_gvar_residual_quantization.GvarResidualQuantizationTests.test_serialized_font_retains_the_same_analytic_error) ... ok
+2026-10-20T09:48:25.8544212Z test_all28_encoded_hierarchies_have_correct_structure (test_hierarchy_probe.HierarchyProbeTests.test_all28_encoded_hierarchies_have_correct_structure) ... ok
+2026-10-20T09:48:25.8556175Z test_internal_axis_cases_expose_current_extrapolation_hypothesis (test_hierarchy_probe.HierarchyProbeTests.test_internal_axis_cases_expose_current_extrapolation_hypothesis) ... ok
+2026-10-20T09:48:25.8562650Z test_native_event_comparator_accepts_exact_cycles_only (test_hierarchy_probe.HierarchyProbeTests.test_native_event_comparator_accepts_exact_cycles_only) ... ok
+2026-10-20T09:48:25.8564757Z test_native_event_comparator_rejects_malformed_or_cubic_data (test_hierarchy_probe.HierarchyProbeTests.test_native_event_comparator_rejects_malformed_or_cubic_data) ... ok
+2026-10-20T09:48:25.8574763Z test_nested_rotation_and_deep_translation_do_not_commute (test_hierarchy_probe.HierarchyProbeTests.test_nested_rotation_and_deep_translation_do_not_commute) ... ok
+2026-10-20T09:48:25.8633662Z test_single_rotation_and_translation_match_independent_formula (test_hierarchy_probe.HierarchyProbeTests.test_single_rotation_and_translation_match_independent_formula) ... ok
+2026-10-20T09:48:25.8669776Z test_tangent_experiments_decode_all22_and_do_not_enter_renderer (test_hierarchy_probe.HierarchyProbeTests.test_tangent_experiments_decode_all22_and_do_not_enter_renderer) ... ok
+2026-10-20T09:48:25.8686981Z test_unequal_parallel_factors_match_independent_formula (test_hierarchy_probe.HierarchyProbeTests.test_unequal_parallel_factors_match_independent_formula) ... ok
+2026-10-20T09:48:25.8690918Z test_curve_parallel_factor (test_hvf.HVFTests.test_curve_parallel_factor) ... ok
+2026-10-20T09:48:25.8693701Z test_incompatible_part_mapping_rejected (test_hvf.HVFTests.test_incompatible_part_mapping_rejected) ... ok
+2026-10-20T09:48:25.8697390Z test_index_relative_base_and_shape (test_hvf.HVFTests.test_index_relative_base_and_shape) ... ok
+2026-10-20T09:48:25.8699101Z test_nan_float_rejected (test_hvf.HVFTests.test_nan_float_rejected) ... ok
+2026-10-20T09:48:25.8705686Z test_negative_and_fractional_extrema (test_hvf.HVFTests.test_negative_and_fractional_extrema) ... ok
+2026-10-20T09:48:25.8710054Z test_remapping_at_leaf (test_hvf.HVFTests.test_remapping_at_leaf) ... ok
+2026-10-20T09:48:25.8712110Z test_root_axis_bounds (test_hvf.HVFTests.test_root_axis_bounds) ... ok
+2026-10-20T09:48:25.8714829Z test_tangent_not_silently_turned_into_corner (test_hvf.HVFTests.test_tangent_not_silently_turned_into_corner) ... ok
+2026-10-20T09:48:25.8721582Z test_tree_axis_master_translation_and_rotation (test_hvf.HVFTests.test_tree_axis_master_translation_and_rotation) ... ok
+2026-10-20T09:48:25.8724379Z test_tree_cycle_rejected (test_hvf.HVFTests.test_tree_cycle_rejected) ... ok
+2026-10-20T09:48:25.8725650Z test_truncated_float_payload (test_hvf.HVFTests.test_truncated_float_payload) ... ok
+2026-10-20T09:48:25.8727165Z test_unknown_shape_blend_rejected (test_hvf.HVFTests.test_unknown_shape_blend_rejected) ... ok
+2026-10-20T09:48:25.8728214Z test_unknown_version (test_hvf.HVFTests.test_unknown_version) ... ok
+2026-10-20T09:48:25.8729431Z test_unsorted_mapping_rejected (test_hvf.HVFTests.test_unsorted_mapping_rejected) ... ok
+2026-10-20T09:48:25.8733488Z test_wrong_tree_offsets_rejected (test_hvf.HVFTests.test_wrong_tree_offsets_rejected) ... ok
+2026-10-20T09:48:25.8937934Z test_empty_line_is_distinct_from_eof (test_incremental_pipe.IncrementalPipeTests.test_empty_line_is_distinct_from_eof) ... ok
+2026-10-20T09:48:25.8940685Z test_invalid_deadline_is_rejected (test_incremental_pipe.IncrementalPipeTests.test_invalid_deadline_is_rejected) ... ok
+2026-10-20T09:48:25.8942808Z test_invalid_utf8_is_not_replaced (test_incremental_pipe.IncrementalPipeTests.test_invalid_utf8_is_not_replaced) ... ok
+2026-10-20T09:48:25.8944902Z test_last_unterminated_line_at_eof (test_incremental_pipe.IncrementalPipeTests.test_last_unterminated_line_at_eof) ... ok
+2026-10-20T09:48:25.8946739Z test_overlong_response_is_rejected (test_incremental_pipe.IncrementalPipeTests.test_overlong_response_is_rejected) ... ok
+2026-10-20T09:48:25.8948041Z test_response_before_eof_and_next_request (test_incremental_pipe.IncrementalPipeTests.test_response_before_eof_and_next_request) ... ok
+2026-10-20T09:48:25.9149226Z test_timeout_does_not_drop_partial_utf8 (test_incremental_pipe.IncrementalPipeTests.test_timeout_does_not_drop_partial_utf8) ... ok
+2026-10-20T09:48:26.2634531Z test_53_over_64_control_reaches_swift_as_13568_without_axis_relabeling (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_53_over_64_control_reaches_swift_as_13568_without_axis_relabeling) ... ok
+2026-10-20T09:48:26.2666708Z test_all_550_requests_keep_ids_order_normalized_design_and_predictions (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_all_550_requests_keep_ids_order_normalized_design_and_predictions) ... ok
+2026-10-20T09:48:26.2674674Z test_before_after_provenance_hashes_match_real_bytes (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_before_after_provenance_hashes_match_real_bytes) ... ok
+2026-10-20T09:48:26.3260432Z test_corrupt_frozen_source_is_rejected_before_any_output_is_written (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_corrupt_frozen_source_is_rejected_before_any_output_is_written) ... ok
+2026-10-20T09:48:26.3318362Z test_every_other_table_payload_is_byte_identical (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_every_other_table_payload_is_byte_identical) ... ok
+2026-10-20T09:48:26.4022275Z test_fonttools_user_axis_path_reaches_the_same_unrounded_outline (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_fonttools_user_axis_path_reaches_the_same_unrounded_outline) ... ok
+2026-10-20T09:48:26.4080921Z test_fvar_changes_only_hght_min_default_max (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_fvar_changes_only_hght_min_default_max) ... ok
+2026-10-20T09:48:26.4084461Z test_invalid_scales_and_repeated_conversion_are_rejected (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_invalid_scales_and_repeated_conversion_are_rejected) ... ok
+2026-10-20T09:48:26.4118908Z test_native_user_axes_map_exactly_back_using_the_saved_basis (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_native_user_axes_map_exactly_back_using_the_saved_basis) ... ok
+2026-10-20T09:48:26.4162520Z test_sfnt_and_directory_checksums_are_valid_after_raw_patch (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_sfnt_and_directory_checksums_are_valid_after_raw_patch) ... ok
+2026-10-20T09:48:26.4204136Z test_supplied_frozen_manifest_and_all_original_files_are_unchanged (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_supplied_frozen_manifest_and_all_original_files_are_unchanged) ... ok
+2026-10-20T09:48:26.4206328Z test_unit_control_never_grants_native_axis_or_metric_acceptance (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_unit_control_never_grants_native_axis_or_metric_acceptance) ... ok
+2026-10-20T09:48:26.4271080Z test_vvar_coefficients_remain_the_same_normalized_function (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_vvar_coefficients_remain_the_same_normalized_function) ... ok
+2026-10-20T09:48:26.4291682Z test_wire_requests_fall_back_to_original_axes_and_are_independent_copies (test_metric_b1_axis_units.B1MetricAxisUnitTests.test_wire_requests_fall_back_to_original_axes_and_are_independent_copies) ... ok
+2026-10-20T09:48:26.4356857Z test_altered_scalar_or_forged_bits_are_rejected (test_metric_b1_discriminator.B1DiscriminatorTests.test_altered_scalar_or_forged_bits_are_rejected) ... ok
+2026-10-20T09:48:26.4381039Z test_complete_diagnosis_with_correct_witness_still_retains_849_failure (test_metric_b1_discriminator.B1DiscriminatorTests.test_complete_diagnosis_with_correct_witness_still_retains_849_failure) ... ok
+2026-10-20T09:48:26.4400707Z test_fixed_outline_control_is_compared_with_its_own_model (test_metric_b1_discriminator.B1DiscriminatorTests.test_fixed_outline_control_is_compared_with_its_own_model) ... ok
+2026-10-20T09:48:26.4422954Z test_holdout_failure_is_counted_separately_from_training (test_metric_b1_discriminator.B1DiscriminatorTests.test_holdout_failure_is_counted_separately_from_training) ... ok
+2026-10-20T09:48:26.4497209Z test_identical_missing_layout_path_or_global_bits_still_fail_completeness (test_metric_b1_discriminator.B1DiscriminatorTests.test_identical_missing_layout_path_or_global_bits_still_fail_completeness) ... ok
+2026-10-20T09:48:26.4500115Z test_invalid_unit_basis_is_rejected (test_metric_b1_discriminator.B1DiscriminatorTests.test_invalid_unit_basis_is_rejected) ... ok
+2026-10-20T09:48:26.4517182Z test_missing_whole_bit_map_is_rejected (test_metric_b1_discriminator.B1DiscriminatorTests.test_missing_whole_bit_map_is_rejected) ... ok
+2026-10-20T09:48:26.4541144Z test_native_json_integer_spelling_of_negative_zero_keeps_ieee_sign (test_metric_b1_discriminator.B1DiscriminatorTests.test_native_json_integer_spelling_of_negative_zero_keeps_ieee_sign) ... ok
+2026-10-20T09:48:26.4543645Z test_negative_zero_raw_bits_are_retained (test_metric_b1_discriminator.B1DiscriminatorTests.test_negative_zero_raw_bits_are_retained) ... ok
+2026-10-20T09:48:26.4611663Z test_nonfinite_raw_values_never_enter_evidence (test_metric_b1_discriminator.B1DiscriminatorTests.test_nonfinite_raw_values_never_enter_evidence) ... ok
+2026-10-20T09:48:26.4633654Z test_raw_decimal_and_binary64_survive_json_roundtrip (test_metric_b1_discriminator.B1DiscriminatorTests.test_raw_decimal_and_binary64_survive_json_roundtrip) ... ok
+2026-10-20T09:48:26.4658579Z test_replay_rejects_lost_request_or_binary64_provenance (test_metric_b1_discriminator.B1DiscriminatorTests.test_replay_rejects_lost_request_or_binary64_provenance) ... ok
+2026-10-20T09:48:26.4761510Z test_required_raw_bit_provenance_cannot_be_removed (test_metric_b1_discriminator.B1DiscriminatorTests.test_required_raw_bit_provenance_cannot_be_removed) ... ok
+2026-10-20T09:48:26.4803040Z test_reverse_process_replay_ignores_order_but_covers_every_field (test_metric_b1_discriminator.B1DiscriminatorTests.test_reverse_process_replay_ignores_order_but_covers_every_field) ... ok
+2026-10-20T09:48:26.4920976Z test_source_fallback_duplicate_and_incomplete_records_fail_validation (test_metric_b1_discriminator.B1DiscriminatorTests.test_source_fallback_duplicate_and_incomplete_records_fail_validation) ... ok
+2026-10-20T09:48:26.4923267Z test_unit_conversion_uses_exact_raw_rational_once (test_metric_b1_discriminator.B1DiscriminatorTests.test_unit_conversion_uses_exact_raw_rational_once) ... ok
+2026-10-20T09:48:26.7402669Z test_default_phantoms_match_stored_metrics (test_metric_b1_fixture.B1MetricFixtureTests.test_default_phantoms_match_stored_metrics) ... ok
+2026-10-20T09:48:26.7443825Z test_dyadic_inputs_are_exact_in_standard_encodings (test_metric_b1_fixture.B1MetricFixtureTests.test_dyadic_inputs_are_exact_in_standard_encodings) ... ok
+2026-10-20T09:48:26.7614275Z test_equivalent_metric_coefficients_from_serialized_tables (test_metric_b1_fixture.B1MetricFixtureTests.test_equivalent_metric_coefficients_from_serialized_tables) ... ok
+2026-10-20T09:48:26.7616366Z test_internal_points_separate_phantom_rounding_from_height_rounding (test_metric_b1_fixture.B1MetricFixtureTests.test_internal_points_separate_phantom_rounding_from_height_rounding) ... ok
+2026-10-20T09:48:26.7667737Z test_manifest_hashes_and_no_native_acceptance_claim (test_metric_b1_fixture.B1MetricFixtureTests.test_manifest_hashes_and_no_native_acceptance_claim) ... ok
+2026-10-20T09:48:26.7669808Z test_os2_combined_control_changes_only_selection_bit_from_typo_sentinel (test_metric_b1_fixture.B1MetricFixtureTests.test_os2_combined_control_changes_only_selection_bit_from_typo_sentinel) ... ok
+2026-10-20T09:48:26.7724422Z test_pairs_change_only_upem_and_required_checksum (test_metric_b1_fixture.B1MetricFixtureTests.test_pairs_change_only_upem_and_required_checksum) ... ok
+2026-10-20T09:48:26.7747208Z test_phantom_only_freezes_outline_without_altering_metric_deltas (test_metric_b1_fixture.B1MetricFixtureTests.test_phantom_only_freezes_outline_without_altering_metric_deltas) ... ok
+2026-10-20T09:48:26.7749586Z test_preregistered_minimum_separates_upem_candidate (test_metric_b1_fixture.B1MetricFixtureTests.test_preregistered_minimum_separates_upem_candidate) ... ok
+2026-10-20T09:48:26.7751405Z test_preserves_fractional_expected_values (test_metric_b1_fixture.B1MetricFixtureTests.test_preserves_fractional_expected_values) ... ok
+2026-10-20T09:48:26.7753729Z test_rejects_nonfinite_or_invalid_model_inputs (test_metric_b1_fixture.B1MetricFixtureTests.test_rejects_nonfinite_or_invalid_model_inputs) ... ok
+2026-10-20T09:48:26.7756615Z test_semantic_sentinels_are_isolated (test_metric_b1_fixture.B1MetricFixtureTests.test_semantic_sentinels_are_isolated) ... ok
+2026-10-20T09:48:26.8114709Z test_serialized_variable_outline_preserves_fractional_witness_height (test_metric_b1_fixture.B1MetricFixtureTests.test_serialized_variable_outline_preserves_fractional_witness_height) ... ok
+2026-10-20T09:48:26.8116740Z test_translation_separates_per_point_and_difference_quantization (test_metric_b1_fixture.B1MetricFixtureTests.test_translation_separates_per_point_and_difference_quantization) ... ok
+2026-10-20T09:48:26.8123384Z test_visible_witness_and_phantom_deltas_agree (test_metric_b1_fixture.B1MetricFixtureTests.test_visible_witness_and_phantom_deltas_agree) ... ok
+2026-10-20T09:48:27.0222413Z test_delta_half_ties_are_away_from_zero_and_sign_symmetric (test_metric_b1_followup.B1MetricFollowupTests.test_delta_half_ties_are_away_from_zero_and_sign_symmetric) ... ok
+2026-10-20T09:48:27.0224240Z test_exact_normalization_control_rejects_universal_nondefault_minus_one (test_metric_b1_followup.B1MetricFollowupTests.test_exact_normalization_control_rejects_universal_nondefault_minus_one) ... ok
+2026-10-20T09:48:27.0226152Z test_fresh_coordinates_do_not_reuse_any_first_stage_height (test_metric_b1_followup.B1MetricFollowupTests.test_fresh_coordinates_do_not_reuse_any_first_stage_height) ... ok
+2026-10-20T09:48:27.0228091Z test_invalid_candidate_inputs_and_variants_fail (test_metric_b1_followup.B1MetricFollowupTests.test_invalid_candidate_inputs_and_variants_fail) ... ok
+2026-10-20T09:48:27.0331411Z test_metric_variation_coefficients_stay_equivalent_with_odd_base_and_vorg (test_metric_b1_followup.B1MetricFollowupTests.test_metric_variation_coefficients_stay_equivalent_with_odd_base_and_vorg) ... ok
+2026-10-20T09:48:27.0337441Z test_minimal_plan_preserves_546_cases_and_appends_four_normalization_controls (test_metric_b1_followup.B1MetricFollowupTests.test_minimal_plan_preserves_546_cases_and_appends_four_normalization_controls) ... ok
+2026-10-20T09:48:27.0348734Z test_models_are_inferences_and_manifest_never_claims_native_pass (test_metric_b1_followup.B1MetricFollowupTests.test_models_are_inferences_and_manifest_never_claims_native_pass) ... ok
+2026-10-20T09:48:27.0351677Z test_negative_half_tie_discriminates_from_absolute_phantom_rounding (test_metric_b1_followup.B1MetricFollowupTests.test_negative_half_tie_discriminates_from_absolute_phantom_rounding) ... ok
+2026-10-20T09:48:27.0355801Z test_new_delta_candidate_is_shift_invariant_but_old_candidates_are_retained (test_metric_b1_followup.B1MetricFollowupTests.test_new_delta_candidate_is_shift_invariant_but_old_candidates_are_retained) ... ok
+2026-10-20T09:48:27.0363433Z test_odd_default_changes_only_stored_advance_and_derived_header (test_metric_b1_followup.B1MetricFollowupTests.test_odd_default_changes_only_stored_advance_and_derived_header) ... ok
+2026-10-20T09:48:27.0365638Z test_prediction_retains_exact_em_quantization_basis (test_metric_b1_followup.B1MetricFollowupTests.test_prediction_retains_exact_em_quantization_basis) ... ok
+2026-10-20T09:48:27.0614248Z test_serialized_outline_follows_its_own_unrounded_model (test_metric_b1_followup.B1MetricFollowupTests.test_serialized_outline_follows_its_own_unrounded_model) ... ok
+2026-10-20T09:48:27.0643085Z test_upem_pairs_are_identical_except_upem_and_required_checksum (test_metric_b1_followup.B1MetricFollowupTests.test_upem_pairs_are_identical_except_upem_and_required_checksum) ... ok
+2026-10-20T09:48:27.0656200Z test_vorg_addition_changes_only_vorg_and_no_x_is_stored (test_metric_b1_followup.B1MetricFollowupTests.test_vorg_addition_changes_only_vorg_and_no_x_is_stored) ... ok
+2026-10-20T09:48:27.6018750Z test_849_candidate_match_does_not_change_the_original_850_strict_reference (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_849_candidate_match_does_not_change_the_original_850_strict_reference) ... ok
+2026-10-20T09:48:27.6051773Z test_ceil_bbox_and_floor_bearing_are_algebraic_candidates_not_proven_sources (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_ceil_bbox_and_floor_bearing_are_algebraic_candidates_not_proven_sources) ... ok
+2026-10-20T09:48:27.6071546Z test_fabricated_record_marker_cannot_be_admitted_as_native_completion (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_fabricated_record_marker_cannot_be_admitted_as_native_completion) ... ok
+2026-10-20T09:48:27.6092603Z test_gvar_and_vvar_height_candidates_are_selected_by_actual_table_presence (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_gvar_and_vvar_height_candidates_are_selected_by_actual_table_presence) ... ok
+2026-10-20T09:48:27.8790729Z test_non_macos_pipeline_emits_not_run_and_never_invokes_native_process (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_non_macos_pipeline_emits_not_run_and_never_invokes_native_process) ... ok
+2026-10-20T09:48:27.8801294Z test_odd_stored_half_width_distinguishes_500_from_500_point_5 (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_odd_stored_half_width_distinguishes_500_from_500_point_5) ... ok
+2026-10-20T09:48:27.9228848Z test_origin_freeze_rejects_duplicate_requests_instead_of_overwriting (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_origin_freeze_rejects_duplicate_requests_instead_of_overwriting) ... ok
+2026-10-20T09:48:28.0193751Z test_origin_predictions_are_frozen_from_predeclared_source_not_observations (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_origin_predictions_are_frozen_from_predeclared_source_not_observations) ... ok
+2026-10-20T09:48:28.0299764Z test_paired_effects_cover_every_declared_nonreference_request (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_paired_effects_cover_every_declared_nonreference_request) ... ok
+2026-10-20T09:48:28.7806048Z test_paired_effects_reject_duplicate_extra_or_missing_observations (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_paired_effects_reject_duplicate_extra_or_missing_observations) ... ok
+2026-10-20T09:48:28.9931467Z test_paired_effects_reject_wrong_coordinate_even_when_request_id_matches (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_paired_effects_reject_wrong_coordinate_even_when_request_id_matches) ... ok
+2026-10-20T09:48:28.9934139Z test_predeclared_negative_tie_and_sixteenth_origins_separate_candidates (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_predeclared_negative_tie_and_sixteenth_origins_separate_candidates) ... ok
+2026-10-20T09:48:28.9941212Z test_vorg_origin_source_has_priority_without_becoming_a_strict_override (test_metric_b1_followup_analysis.B1FollowupAnalysisTests.test_vorg_origin_source_has_priority_without_becoming_a_strict_override) ... ok
+2026-10-20T09:48:28.9953080Z test_decimal_alteration_and_missing_axis_bits_are_rejected (test_metric_b1_followup_failure_evidence.FailureEvidenceTests.test_decimal_alteration_and_missing_axis_bits_are_rejected) ... ok
+2026-10-20T09:48:28.9956421Z test_missing_bits_and_inconsistent_partial_counts_fail (test_metric_b1_followup_failure_evidence.FailureEvidenceTests.test_missing_bits_and_inconsistent_partial_counts_fail) ... ok
+2026-10-20T09:48:28.9958726Z test_partial_rows_never_become_admitted_metrics (test_metric_b1_followup_failure_evidence.FailureEvidenceTests.test_partial_rows_never_become_admitted_metrics) ... ok
+2026-10-20T09:48:28.9961108Z test_wrong_source_cannot_supply_a_readback_failure (test_metric_b1_followup_failure_evidence.FailureEvidenceTests.test_wrong_source_cannot_supply_a_readback_failure) ... ok
+2026-10-20T09:48:28.9962987Z test_849_850_remains_a_strict_failure_and_no_rounding_is_applied (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_849_850_remains_a_strict_failure_and_no_rounding_is_applied) ... ok
+2026-10-20T09:48:28.9965388Z test_bad_summary_or_failed_eof_exit_never_grants_diagnostic_completion (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_bad_summary_or_failed_eof_exit_never_grants_diagnostic_completion) ... ok
+2026-10-20T09:48:28.9967519Z test_binary64_hex_is_exact_big_endian_bits_including_signed_zero (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_binary64_hex_is_exact_big_endian_bits_including_signed_zero) ... ok
+2026-10-20T09:48:28.9969598Z test_complete_protocol_can_remain_red_after_metric_failure (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_complete_protocol_can_remain_red_after_metric_failure) ... ok
+2026-10-20T09:48:28.9971783Z test_default_nonzero_avar_target_is_not_silently_forced_to_zero (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_default_nonzero_avar_target_is_not_silently_forced_to_zero) ... ok
+2026-10-20T09:48:28.9974088Z test_duplicate_or_missing_requested_avar_anchor_stays_unavailable (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_duplicate_or_missing_requested_avar_anchor_stays_unavailable) ... ok
+2026-10-20T09:48:28.9976554Z test_fvar_defaults_and_endpoints_are_read_not_assumed (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_fvar_defaults_and_endpoints_are_read_not_assumed) ... ok
+2026-10-20T09:48:28.9978797Z test_matching_stored_half_width_does_not_override_production_failure (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_matching_stored_half_width_does_not_override_production_failure) ... ok
+2026-10-20T09:48:28.9981124Z test_metric_budget_boundary_is_unchanged (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_metric_budget_boundary_is_unchanged) ... ok
+2026-10-20T09:48:28.9983390Z test_numeric_whitelist_discards_outline_bounds_paths_and_untrusted_nested_payloads (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_numeric_whitelist_discards_outline_bounds_paths_and_untrusted_nested_payloads) ... ok
+2026-10-20T09:48:28.9986387Z test_production_gate_accepts_correct_half_current_width_and_preserves_tight_budget (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_production_gate_accepts_correct_half_current_width_and_preserves_tight_budget) ... ok
+2026-10-20T09:48:28.9988020Z test_production_gate_rejects_both_signs_of_100_unit_vertical_x_offset (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_production_gate_rejects_both_signs_of_100_unit_vertical_x_offset) ... ok
+2026-10-20T09:48:28.9990548Z test_public_ci_summary_retains_all_safe_row_evidence_and_omits_private_payloads (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_public_ci_summary_retains_all_safe_row_evidence_and_omits_private_payloads) ... ok
+2026-10-20T09:48:28.9992950Z test_reference_refuses_interior_axis_mapping (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_reference_refuses_interior_axis_mapping) ... ok
+2026-10-20T09:48:28.9994203Z test_successful_finite_sample_never_accepts_or_reconstructs_original (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_successful_finite_sample_never_accepts_or_reconstructs_original) ... ok
+2026-10-20T09:48:28.9995623Z test_unavailable_reference_is_not_reported_as_measured_metric_difference (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_unavailable_reference_is_not_reported_as_measured_metric_difference) ... ok
+2026-10-20T09:48:28.9997052Z test_whitelist_rejects_bool_nonfinite_missing_and_incomplete_vectors (test_metric_b1_original_check.B1OriginalMetricCheckTests.test_whitelist_rejects_bool_nonfinite_missing_and_incomplete_vectors) ... ok
+2026-10-20T09:48:29.0096665Z test_complete_failed_status_and_count_confusion_is_rejected (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_complete_failed_status_and_count_confusion_is_rejected) ... ok
+2026-10-20T09:48:29.0170865Z test_duplicate_extra_and_missing_request_are_not_ignored (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_duplicate_extra_and_missing_request_are_not_ignored) ... ok
+2026-10-20T09:48:29.0350930Z test_every_channel_numeric_leaf_requires_native_bits (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_every_channel_numeric_leaf_requires_native_bits) ... ok
+2026-10-20T09:48:29.0396783Z test_failed_partial_baseline_is_not_promoted_and_channels_are_exact (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_failed_partial_baseline_is_not_promoted_and_channels_are_exact) ... ok
+2026-10-20T09:48:29.0437861Z test_integral_raw_double_and_forged_bits_cannot_evade_validation (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_integral_raw_double_and_forged_bits_cannot_evade_validation) ... ok
+2026-10-20T09:48:29.0497258Z test_manifest_normalized_and_user_unit_semantics_cannot_be_guessed (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_manifest_normalized_and_user_unit_semantics_cannot_be_guessed) ... ok
+2026-10-20T09:48:29.0573783Z test_nonidentity_channel_fields_and_missing_values_are_not_dropped (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_nonidentity_channel_fields_and_missing_values_are_not_dropped) ... ok
+2026-10-20T09:48:29.0612395Z test_signed_zero_is_a_bits_mismatch_without_numeric_tolerance (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_signed_zero_is_a_bits_mismatch_without_numeric_tolerance) ... ok
+2026-10-20T09:48:29.0714014Z test_source_hash_upem_table_hash_and_axis_domains_must_match (test_metric_b1_unit_comparison.UnitChannelComparisonTests.test_source_hash_upem_table_hash_and_axis_domains_must_match) ... ok
+2026-10-20T09:48:29.0717230Z test_disagreeing_visible_top_and_bottom_are_reported_without_fitting (test_metric_b1_unit_comparison.WitnessInferenceTests.test_disagreeing_visible_top_and_bottom_are_reported_without_fitting) ... ok
+2026-10-20T09:48:29.0719752Z test_fixed_phantom_only_outline_cannot_identify_height_axis (test_metric_b1_unit_comparison.WitnessInferenceTests.test_fixed_phantom_only_outline_cannot_identify_height_axis) ... ok
+2026-10-20T09:48:29.0721486Z test_fraction_conversion_recovers_axes_without_intermediate_rounding (test_metric_b1_unit_comparison.WitnessInferenceTests.test_fraction_conversion_recovers_axes_without_intermediate_rounding) ... ok
+2026-10-20T09:48:29.1009611Z test_cli_stable_complete_ablations_remain_red_for_original_production_failures (test_metric_b1_vorg_ablation.PrivateNativeSessionTests.test_cli_stable_complete_ablations_remain_red_for_original_production_failures) ... ok
+2026-10-20T09:48:29.1064035Z test_rejected_variant_does_not_skip_original_repeat_and_private_font_is_removed (test_metric_b1_vorg_ablation.PrivateNativeSessionTests.test_rejected_variant_does_not_skip_original_repeat_and_private_font_is_removed) ... ok
+2026-10-20T09:48:29.1090428Z test_whole_protocol_is_required_and_cleanup_rejection_is_contained (test_metric_b1_vorg_ablation.PrivateNativeSessionTests.test_whole_protocol_is_required_and_cleanup_rejection_is_contained) ... ok
+2026-10-20T09:48:29.1129146Z test_all_32_shared_table_faces_keep_original_payloads_and_raw_avar_order (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_all_32_shared_table_faces_keep_original_payloads_and_raw_avar_order) ... ok
+2026-10-20T09:48:29.1133517Z test_duplicate_tables_face_offsets_and_header_overlap_are_rejected (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_duplicate_tables_face_offsets_and_header_overlap_are_rejected) ... ok
+2026-10-20T09:48:29.1136961Z test_out_of_bounds_input_and_repeat_ablation_fail_closed (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_out_of_bounds_input_and_repeat_ablation_fail_closed) ... ok
+2026-10-20T09:48:29.1139248Z test_power_of_two_search_fields_and_v2_header_are_preserved (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_power_of_two_search_fields_and_v2_header_are_preserved) ... ok
+2026-10-20T09:48:29.1144364Z test_retained_checksum_offset_and_search_metadata_are_verified (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_retained_checksum_offset_and_search_metadata_are_verified) ... ok
+2026-10-20T09:48:29.1147770Z test_unreachable_vorg_bytes_cannot_be_rewritten_or_discarded (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_unreachable_vorg_bytes_cannot_be_rewritten_or_discarded) ... ok
+2026-10-20T09:48:29.1154085Z test_verifier_rejects_retained_payload_changes_including_head_adjustment (test_metric_b1_vorg_ablation.RawVorgDirectoryTests.test_verifier_rejects_retained_payload_changes_including_head_adjustment) ... ok
+2026-10-20T09:48:29.1155501Z test_arbitrary_error_payload_is_never_public (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_arbitrary_error_payload_is_never_public) ... ok
+2026-10-20T09:48:29.1204670Z test_complete_stable_diagnostic_does_not_clear_24_original_representation_failures (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_complete_stable_diagnostic_does_not_clear_24_original_representation_failures) ... ok
+2026-10-20T09:48:29.1208750Z test_duplicate_missing_sample_and_nonidentical_locations_are_rejected (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_duplicate_missing_sample_and_nonidentical_locations_are_rejected) ... ok
+2026-10-20T09:48:29.1211545Z test_only_measured_100_unit_x_change_is_reported_and_849_remains_849 (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_only_measured_100_unit_x_change_is_reported_and_849_remains_849) ... ok
+2026-10-20T09:48:29.1214056Z test_public_log_rewhitelists_native_metrics_and_recomputes_ieee_bits (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_public_log_rewhitelists_native_metrics_and_recomputes_ieee_bits) ... ok
+2026-10-20T09:48:29.1216391Z test_rejected_ablation_has_no_differences_but_original_repeat_is_audited (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_rejected_ablation_has_no_differences_but_original_repeat_is_audited) ... ok
+2026-10-20T09:48:29.1218849Z test_repeat_instability_and_signed_zero_are_distinguished (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_repeat_instability_and_signed_zero_are_distinguished) ... ok
+2026-10-20T09:48:29.1220934Z test_wrong_original_or_unchanged_ablation_source_cannot_be_compared (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_wrong_original_or_unchanged_ablation_source_cannot_be_compared) ... ok
+2026-10-20T09:48:29.1222317Z test_zero_observed_failures_on_incomplete_original_is_not_strict_pass (test_metric_b1_vorg_ablation.VorgEvidenceTests.test_zero_observed_failures_on_incomplete_original_is_not_strict_pass) ... ok
+2026-10-20T09:48:29.1226719Z test_holdout_origin_error_is_not_lost_or_accepted_as_general_metric_budget (test_metric_failure_evidence.MetricFailureEvidenceTests.test_holdout_origin_error_is_not_lost_or_accepted_as_general_metric_budget) ... ok
+2026-10-20T09:48:29.1521414Z test_late_glyph_origin_failure_retains_actual_sample_and_blocks_TTC (test_metric_failure_evidence.MetricFailureEvidenceTests.test_late_glyph_origin_failure_retains_actual_sample_and_blocks_TTC) ... ok
+2026-10-20T09:48:29.1523907Z test_public_metric_allowlist_excludes_paths_raw_metrics_and_nonfinite_values (test_metric_failure_evidence.MetricFailureEvidenceTests.test_public_metric_allowlist_excludes_paths_raw_metrics_and_nonfinite_values) ... ok
+2026-10-20T09:48:29.1692469Z test_all_faces_three_axes_independent_fractional_metric_formulas (test_metric_variations.MetricVariationTests.test_all_faces_three_axes_independent_fractional_metric_formulas) ... ok
+2026-10-20T09:48:29.1754640Z test_bad_origin_rejected_before_any_font_mutation (test_metric_variations.MetricVariationTests.test_bad_origin_rejected_before_any_font_mutation) ... ok
+2026-10-20T09:48:29.1830458Z test_existing_tables_are_not_silently_replaced (test_metric_variations.MetricVariationTests.test_existing_tables_are_not_silently_replaced) ... ok
+2026-10-20T09:48:29.1928799Z test_horizontal_only_font_does_not_gain_vertical_tables (test_metric_variations.MetricVariationTests.test_horizontal_only_font_does_not_gain_vertical_tables) ... ok
+2026-10-20T09:48:29.2047552Z test_missing_or_corrupt_head_flag_is_not_a_pass (test_metric_variations.MetricVariationTests.test_missing_or_corrupt_head_flag_is_not_a_pass) ... ok
+2026-10-20T09:48:29.2167735Z test_mutated_metric_coefficients_are_rejected (test_metric_variations.MetricVariationTests.test_mutated_metric_coefficients_are_rejected) ... ok
+2026-10-20T09:48:29.2258585Z test_no_variations_and_blank_glyph_keep_metrics (test_metric_variations.MetricVariationTests.test_no_variations_and_blank_glyph_keep_metrics) ... ok
+2026-10-20T09:48:29.2323006Z test_nonrepresentable_support_is_rejected_without_rounding (test_metric_variations.MetricVariationTests.test_nonrepresentable_support_is_rejected_without_rounding) ... ok
+2026-10-20T09:48:29.2386390Z test_nonzero_left_phantom_is_rejected (test_metric_variations.MetricVariationTests.test_nonzero_left_phantom_is_rejected) ... ok
+2026-10-20T09:48:29.2484224Z test_omitted_phantoms_are_zero_not_interpolated (test_metric_variations.MetricVariationTests.test_omitted_phantoms_are_zero_not_interpolated) ... ok
+2026-10-20T09:48:29.2595260Z test_repeated_supports_are_added_not_overwritten (test_metric_variations.MetricVariationTests.test_repeated_supports_are_added_not_overwritten) ... ok
+2026-10-20T09:48:29.2597184Z test_changed_native_source_is_rejected_not_blindly_patched (test_native_calibration_helpers.NativeCalibrationHelperTests.test_changed_native_source_is_rejected_not_blindly_patched) ... ok
+2026-10-20T09:48:29.2601899Z test_coordinate_error_is_detected (test_native_calibration_helpers.NativeCalibrationHelperTests.test_coordinate_error_is_detected) ... ok
+2026-10-20T09:48:29.2603708Z test_duplicate_records_remain_falsifiable_alternatives (test_native_calibration_helpers.NativeCalibrationHelperTests.test_duplicate_records_remain_falsifiable_alternatives) ... ok
+2026-10-20T09:48:29.2606734Z test_line_parameterization_and_cyclic_start_are_not_geometry_changes (test_native_calibration_helpers.NativeCalibrationHelperTests.test_line_parameterization_and_cyclic_start_are_not_geometry_changes) ... ok
+2026-10-20T09:48:29.2611208Z test_native_unhandled_cubic_and_broken_topology_rejected (test_native_calibration_helpers.NativeCalibrationHelperTests.test_native_unhandled_cubic_and_broken_topology_rejected) ... ok
+2026-10-20T09:48:29.2613093Z test_normalization_distinguishes_source_default_from_numeric_midpoint (test_native_calibration_helpers.NativeCalibrationHelperTests.test_normalization_distinguishes_source_default_from_numeric_midpoint) ... ok
+2026-10-20T09:48:29.3391209Z test_complete_transcript_requires_summary_eof_and_successful_process_exit (test_native_protocol.NativeProtocolTests.test_complete_transcript_requires_summary_eof_and_successful_process_exit) ... ok
+2026-10-20T09:48:29.3843298Z test_diagnostic_transport_remains_available_outside_production_run (test_native_protocol.NativeProtocolTests.test_diagnostic_transport_remains_available_outside_production_run) ... ok
+2026-10-20T09:48:29.3848112Z test_duplicate_glyph_responses_are_rejected (test_native_protocol.NativeProtocolTests.test_duplicate_glyph_responses_are_rejected) ... ok
+2026-10-20T09:48:29.3852235Z test_exact_fractional_success_echoes_full_request (test_native_protocol.NativeProtocolTests.test_exact_fractional_success_echoes_full_request) ... ok
+2026-10-20T09:48:29.3854878Z test_failure_context_filter_rejects_invalid_types_and_nonfinite_values (test_native_protocol.NativeProtocolTests.test_failure_context_filter_rejects_invalid_types_and_nonfinite_values) ... ok
+2026-10-20T09:48:29.3857741Z test_failure_context_keeps_axis_evidence_and_excludes_private_payloads (test_native_protocol.NativeProtocolTests.test_failure_context_keeps_axis_evidence_and_excludes_private_payloads) ... ok
+2026-10-20T09:48:29.3861152Z test_glyph_failure_is_not_relabelled_as_missing_coordinates (test_native_protocol.NativeProtocolTests.test_glyph_failure_is_not_relabelled_as_missing_coordinates) ... ok
+2026-10-20T09:48:29.3864066Z test_missing_request_error_message_cannot_be_a_success (test_native_protocol.NativeProtocolTests.test_missing_request_error_message_cannot_be_a_success) ... ok
+2026-10-20T09:48:29.9274542Z test_production_cli_preserves_legacy_and_explicit_nondiagnostic_metadata (test_native_protocol.NativeProtocolTests.test_production_cli_preserves_legacy_and_explicit_nondiagnostic_metadata) ... ok
+2026-10-20T09:48:32.6187833Z test_production_cli_rejects_diagnostic_and_malformed_markers_before_sampling (test_native_protocol.NativeProtocolTests.test_production_cli_rejects_diagnostic_and_malformed_markers_before_sampling) ... ok
+2026-10-20T09:48:32.6325209Z test_real_protocol_cannot_admit_unverified_axis_observation_mode (test_native_protocol.NativeProtocolTests.test_real_protocol_cannot_admit_unverified_axis_observation_mode) ... ok
+2026-10-20T09:48:32.6328478Z test_request_error_preserves_native_reason_before_missing_location (test_native_protocol.NativeProtocolTests.test_request_error_preserves_native_reason_before_missing_location) ... ok
+2026-10-20T09:48:32.6332555Z test_successful_location_mismatch_remains_strict (test_native_protocol.NativeProtocolTests.test_successful_location_mismatch_remains_strict) ... ok
+2026-10-20T09:48:32.6350996Z test_wrong_identity_is_rejected_before_reading_error (test_native_protocol.NativeProtocolTests.test_wrong_identity_is_rejected_before_reading_error) ... ok
+2026-10-20T09:48:32.6409728Z test_changed_native_curve_cannot_pass_using_correct_metric_tables (test_native_table_metric_gate.NativeTableMetricGateTests.test_changed_native_curve_cannot_pass_using_correct_metric_tables) ... ok
+2026-10-20T09:48:32.6475922Z test_erasing_raw_error_or_dropping_a_record_is_rejected (test_native_table_metric_gate.NativeTableMetricGateTests.test_erasing_raw_error_or_dropping_a_record_is_rejected) ... ok
+2026-10-20T09:48:32.6539303Z test_table_pass_keeps_visible_one_unit_native_API_failure (test_native_table_metric_gate.NativeTableMetricGateTests.test_table_pass_keeps_visible_one_unit_native_API_failure) ... ok
+2026-10-20T09:48:32.6545019Z test_unavailable_CoreText_is_not_native_reconstruction_success (test_native_table_metric_gate.NativeTableMetricGateTests.test_unavailable_CoreText_is_not_native_reconstruction_success) ... ok
+2026-10-20T09:48:32.6549168Z test_another_contours_numeric_failure_cannot_be_hidden_by_recovery (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_another_contours_numeric_failure_cannot_be_hidden_by_recovery) ... ok
+2026-10-20T09:48:32.6551838Z test_count_mismatch_and_empty_paths_keep_the_original_policy (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_count_mismatch_and_empty_paths_keep_the_original_policy) ... ok
+2026-10-20T09:48:32.6558560Z test_curve_bound_below_budget_cannot_hide_a_control_point_failure (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_curve_bound_below_budget_cannot_hide_a_control_point_failure) ... ok
+2026-10-20T09:48:32.6560689Z test_existing_canonical_line_match_keeps_its_original_result (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_existing_canonical_line_match_keeps_its_original_result) ... ok
+2026-10-20T09:48:32.6563033Z test_existing_matching_cycle_with_numeric_failure_is_not_reconsidered (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_existing_matching_cycle_with_numeric_failure_is_not_reconsidered) ... ok
+2026-10-20T09:48:32.6565425Z test_explicit_line_quadratic_type_mismatch_is_never_degree_elevated (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_explicit_line_quadratic_type_mismatch_is_never_degree_elevated) ... ok
+2026-10-20T09:48:32.6573196Z test_forward_cycle_can_restore_but_reverse_order_gets_no_new_permission (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_forward_cycle_can_restore_but_reverse_order_gets_no_new_permission) ... ok
+2026-10-20T09:48:32.6576781Z test_full_control_point_gate_includes_exact_boundary_and_rejects_next_value (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_full_control_point_gate_includes_exact_boundary_and_rejects_next_value) ... ok
+2026-10-20T09:48:32.6578985Z test_new_control_branch_cannot_round_an_exact_excess_down_onto_the_gate (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_new_control_branch_cannot_round_an_exact_excess_down_onto_the_gate) ... ok
+2026-10-20T09:48:32.6582510Z test_numeric_failure_in_matching_segment_survives_same_contour_recovery (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_numeric_failure_in_matching_segment_survives_same_contour_recovery) ... ok
+2026-10-20T09:48:32.6584660Z test_original_quadratic_controls_restore_a_type_only_failure (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_original_quadratic_controls_restore_a_type_only_failure) ... ok
+2026-10-20T09:48:32.6586799Z test_recovery_report_contains_no_raw_geometry (test_path_type_diagnostic.PreservedQuadraticComparisonTests.test_recovery_report_contains_no_raw_geometry) ... ok
+2026-10-20T09:48:32.6597486Z test_closed_contour_forward_rotation_preserves_order (test_path_type_diagnostic.RawPathDiagnosticTests.test_closed_contour_forward_rotation_preserves_order) ... ok
+2026-10-20T09:48:32.6602911Z test_collinearity_alone_does_not_hide_control_overshoot (test_path_type_diagnostic.RawPathDiagnosticTests.test_collinearity_alone_does_not_hide_control_overshoot) ... ok
+2026-10-20T09:48:32.6608416Z test_count_and_ambiguous_correspondence_never_produce_a_bound (test_path_type_diagnostic.RawPathDiagnosticTests.test_count_and_ambiguous_correspondence_never_produce_a_bound) ... ok
+2026-10-20T09:48:32.6611909Z test_exact_extremum_between_sample_locations_rounds_outward (test_path_type_diagnostic.RawPathDiagnosticTests.test_exact_extremum_between_sample_locations_rounds_outward) ... ok
+2026-10-20T09:48:32.6616749Z test_genuine_curvature_with_identical_endpoints_is_not_called_flat (test_path_type_diagnostic.RawPathDiagnosticTests.test_genuine_curvature_with_identical_endpoints_is_not_called_flat) ... ok
+2026-10-20T09:48:32.6619775Z test_invalid_and_nonfinite_inputs_fail_closed (test_path_type_diagnostic.RawPathDiagnosticTests.test_invalid_and_nonfinite_inputs_fail_closed) ... ok
+2026-10-20T09:48:32.6630641Z test_line_degree_elevation_is_exact_only_at_midpoint (test_path_type_diagnostic.RawPathDiagnosticTests.test_line_degree_elevation_is_exact_only_at_midpoint) ... ok
+2026-10-20T09:48:32.6637862Z test_raw_parsers_preserve_controls_and_legacy_close_policy (test_path_type_diagnostic.RawPathDiagnosticTests.test_raw_parsers_preserve_controls_and_legacy_close_policy) ... ok
+2026-10-20T09:48:32.6640945Z test_safe_report_contains_no_raw_point_fields_or_values (test_path_type_diagnostic.RawPathDiagnosticTests.test_safe_report_contains_no_raw_point_fields_or_values) ... ok
+2026-10-20T09:48:32.6646843Z test_tiny_coincident_endpoints_do_not_hide_the_original_type_failure (test_path_type_diagnostic.RawPathDiagnosticTests.test_tiny_coincident_endpoints_do_not_hide_the_original_type_failure) ... ok
+2026-10-20T09:48:32.6652320Z test_all_production_helpers_and_strict_validator_are_unchanged (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_all_production_helpers_and_strict_validator_are_unchanged) ... ok
+2026-10-20T09:48:32.6654188Z test_alternates_never_preconstruct_production_baseline (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_alternates_never_preconstruct_production_baseline) ... ok
+2026-10-20T09:48:32.6657602Z test_comparison_helper_drift_and_already_generated_source_are_rejected (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_comparison_helper_drift_and_already_generated_source_are_rejected) ... ok
+2026-10-20T09:48:32.6659799Z test_existing_public_api_helpers_are_reused_without_comparison_main (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_existing_public_api_helpers_are_reused_without_comparison_main) ... ok
+2026-10-20T09:48:32.6684523Z test_missing_duplicate_or_changed_run_anchors_are_rejected (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_missing_duplicate_or_changed_run_anchors_are_rejected) ... ok
+2026-10-20T09:48:32.6686465Z test_modes_are_exact_allowlist_and_unknown_modes_fail_closed (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_modes_are_exact_allowlist_and_unknown_modes_fail_closed) ... ok
+2026-10-20T09:48:32.6689162Z test_protocol_remains_full_payload_with_original_eof_and_error_accounting (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_protocol_remains_full_payload_with_original_eof_and_error_accounting) ... ok
+2026-10-20T09:48:32.6692076Z test_rebase_uses_original_defaults_and_verifies_complete_seed_identity (test_plateau_construction_harness.PlateauConstructionHarnessTests.test_rebase_uses_original_defaults_and_verifies_complete_seed_identity) ... ok
+2026-10-20T09:48:32.6693609Z test_all_three_axis_corners_and_independent_holdouts (test_rebuild.RebuildTests.test_all_three_axis_corners_and_independent_holdouts) ... ok
+2026-10-20T09:48:32.6695523Z test_cubic_approximation_budget_is_charged_to_total_outline_bound (test_rebuild.RebuildTests.test_cubic_approximation_budget_is_charged_to_total_outline_bound) ... ok
+2026-10-20T09:48:32.6697643Z test_default_vertical_metrics_use_the_same_rounded_phantoms (test_rebuild.RebuildTests.test_default_vertical_metrics_use_the_same_rounded_phantoms) ... ok
+2026-10-20T09:48:32.6839997Z test_deliberately_mutated_serialized_gvar_is_rejected (test_rebuild.RebuildTests.test_deliberately_mutated_serialized_gvar_is_rejected) ... ok
+2026-10-20T09:48:32.6965152Z test_deliberately_mutated_serialized_vertical_metric_is_rejected (test_rebuild.RebuildTests.test_deliberately_mutated_serialized_vertical_metric_is_rejected) ... ok
+2026-10-20T09:48:32.6967395Z test_joint_cubic_conversion_keeps_topology (test_rebuild.RebuildTests.test_joint_cubic_conversion_keeps_topology) ... ok
+2026-10-20T09:48:32.6974881Z test_missing_native_metric_does_not_default_to_zero (test_rebuild.RebuildTests.test_missing_native_metric_does_not_default_to_zero) ... ok
+2026-10-20T09:48:32.7083400Z test_missing_oracle_creates_no_final_font_and_keeps_source (test_rebuild.RebuildTests.test_missing_oracle_creates_no_final_font_and_keeps_source) ... ok
+2026-10-20T09:48:32.7133339Z test_mixed_axis_term_preserved (test_rebuild.RebuildTests.test_mixed_axis_term_preserved) ... ok
+2026-10-20T09:48:32.7134820Z test_original_user_coordinate_ranges_and_fractional_weights (test_rebuild.RebuildTests.test_original_user_coordinate_ranges_and_fractional_weights) ... ok
+2026-10-20T09:48:32.7380866Z test_serialize_and_instantiate_three_face_collection (test_rebuild.RebuildTests.test_serialize_and_instantiate_three_face_collection) ... ok
+2026-10-20T09:48:32.7508910Z test_serialized_coefficients_and_metric_phantoms_match (test_rebuild.RebuildTests.test_serialized_coefficients_and_metric_phantoms_match) ... ok
+2026-10-20T09:48:32.7510869Z test_topology_change_is_not_hidden (test_rebuild.RebuildTests.test_topology_change_is_not_hidden) ... ok
+2026-10-20T09:48:32.7513477Z test_training_default_quantization_is_checked_without_holdouts (test_rebuild.RebuildTests.test_training_default_quantization_is_checked_without_holdouts) ... ok
+2026-10-20T09:48:32.7714522Z test_ttc_shared_table_packing_and_deliberate_face_swap (test_rebuild.RebuildTests.test_ttc_shared_table_packing_and_deliberate_face_swap) ... ok
+2026-10-20T09:48:32.7763753Z test_unsampled_nonlinear_error_is_detected (test_rebuild.RebuildTests.test_unsampled_nonlinear_error_is_detected) ... ok
+2026-10-20T09:48:32.7770527Z test_vertical_origin_not_assumed (test_rebuild.RebuildTests.test_vertical_origin_not_assumed) ... ok
+2026-10-20T09:48:32.8158833Z test_changed_cached_bytes_block_resume_before_any_new_sampling (test_rebuild_checkpoints.RebuildCheckpointTests.test_changed_cached_bytes_block_resume_before_any_new_sampling) ... face=0 glyphs=2/3
+2026-10-20T09:48:32.8207803Z face=0 glyphs=3/3
+2026-10-20T09:48:32.8426067Z ok
+2026-10-20T09:48:32.8755112Z test_changed_error_budget_cannot_reuse_a_prior_acceptance (test_rebuild_checkpoints.RebuildCheckpointTests.test_changed_error_budget_cannot_reuse_a_prior_acceptance) ... face=0 glyphs=2/3
+2026-10-20T09:48:32.8804384Z face=0 glyphs=3/3
+2026-10-20T09:48:32.8994007Z ok
+2026-10-20T09:48:32.9319805Z test_changed_source_cannot_reuse_a_prior_acceptance (test_rebuild_checkpoints.RebuildCheckpointTests.test_changed_source_cannot_reuse_a_prior_acceptance) ... face=0 glyphs=2/3
+2026-10-20T09:48:32.9369078Z face=0 glyphs=3/3
+2026-10-20T09:48:32.9563166Z ok
+2026-10-20T09:48:32.9896577Z test_every_restored_face_retains_prior_proof_and_new_empty_session_must_finish (test_rebuild_checkpoints.RebuildCheckpointTests.test_every_restored_face_retains_prior_proof_and_new_empty_session_must_finish) ... face=0 glyphs=2/3
+2026-10-20T09:48:32.9945878Z face=0 glyphs=3/3
+2026-10-20T09:48:33.0188846Z face=1 glyphs=2/3
+2026-10-20T09:48:33.0238872Z face=1 glyphs=3/3
+2026-10-20T09:48:33.0478934Z face=2 glyphs=2/3
+2026-10-20T09:48:33.0530067Z face=2 glyphs=3/3
+2026-10-20T09:48:33.0768960Z face=0 restored_verified_glyphs=3
+2026-10-20T09:48:33.0776854Z face=1 restored_verified_glyphs=3
+2026-10-20T09:48:33.0785835Z face=2 restored_verified_glyphs=3
+2026-10-20T09:48:33.0885209Z face=0 restored_verified_glyphs=3
+2026-10-20T09:48:33.0893437Z face=1 restored_verified_glyphs=3
+2026-10-20T09:48:33.0902442Z face=2 restored_verified_glyphs=3
+2026-10-20T09:48:33.0960877Z ok
+2026-10-20T09:48:33.1292238Z test_later_diagnostic_session_preserves_verified_face_and_blocks_new_sampling (test_rebuild_checkpoints.RebuildCheckpointTests.test_later_diagnostic_session_preserves_verified_face_and_blocks_new_sampling) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.1341947Z face=0 glyphs=3/3
+2026-10-20T09:48:33.1491091Z ok
+2026-10-20T09:48:33.2235282Z test_mock_summary_counts_must_obey_the_same_strict_integer_contract (test_rebuild_checkpoints.RebuildCheckpointTests.test_mock_summary_counts_must_obey_the_same_strict_integer_contract) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.2284807Z face=0 glyphs=3/3
+2026-10-20T09:48:33.2554655Z face=0 glyphs=2/3
+2026-10-20T09:48:33.2605097Z face=0 glyphs=3/3
+2026-10-20T09:48:33.2876994Z face=0 glyphs=2/3
+2026-10-20T09:48:33.2927586Z face=0 glyphs=3/3
+2026-10-20T09:48:33.3204429Z face=0 glyphs=2/3
+2026-10-20T09:48:33.3255575Z face=0 glyphs=3/3
+2026-10-20T09:48:33.3384984Z ok
+2026-10-20T09:48:33.3726879Z test_native_batch_failure_records_face_gid_range_and_user_location (test_rebuild_checkpoints.RebuildCheckpointTests.test_native_batch_failure_records_face_gid_range_and_user_location) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.3776683Z face=0 glyphs=3/3
+2026-10-20T09:48:33.3938994Z ok
+2026-10-20T09:48:33.4284902Z test_new_session_rechecks_original_tables_in_every_physical_face (test_rebuild_checkpoints.RebuildCheckpointTests.test_new_session_rechecks_original_tables_in_every_physical_face) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.4333937Z face=0 glyphs=3/3
+2026-10-20T09:48:33.4485425Z ok
+2026-10-20T09:48:33.4824712Z test_provisional_or_unbound_face_transcripts_cannot_be_restored (test_rebuild_checkpoints.RebuildCheckpointTests.test_provisional_or_unbound_face_transcripts_cannot_be_restored) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.4873422Z face=0 glyphs=3/3
+2026-10-20T09:48:33.5446620Z ok
+2026-10-20T09:48:33.5798140Z test_rejected_final_transcript_cannot_be_restored_with_a_zero_request_session (test_rebuild_checkpoints.RebuildCheckpointTests.test_rejected_final_transcript_cannot_be_restored_with_a_zero_request_session) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.5847847Z face=0 glyphs=3/3
+2026-10-20T09:48:33.6027940Z ok
+2026-10-20T09:48:33.6386057Z test_source_change_after_last_glyph_blocks_checkpoint_publication (test_rebuild_checkpoints.RebuildCheckpointTests.test_source_change_after_last_glyph_blocks_checkpoint_publication) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.6436180Z face=0 glyphs=3/3
+2026-10-20T09:48:33.6564541Z ok
+2026-10-20T09:48:33.6788149Z test_unowned_directory_is_not_overwritten (test_rebuild_checkpoints.RebuildCheckpointTests.test_unowned_directory_is_not_overwritten) ... ok
+2026-10-20T09:48:33.7124891Z test_verified_face_survives_and_resume_rechecks_complete_ttc (test_rebuild_checkpoints.RebuildCheckpointTests.test_verified_face_survives_and_resume_rechecks_complete_ttc) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.7173527Z face=0 glyphs=3/3
+2026-10-20T09:48:33.7371032Z face=0 restored_verified_glyphs=3
+2026-10-20T09:48:33.7480549Z face=1 glyphs=2/3
+2026-10-20T09:48:33.7530987Z face=1 glyphs=3/3
+2026-10-20T09:48:33.7776293Z face=2 glyphs=2/3
+2026-10-20T09:48:33.7826923Z face=2 glyphs=3/3
+2026-10-20T09:48:33.8043237Z ok
+2026-10-20T09:48:33.8062646Z test_broken_output_symlink_is_not_overwritten (test_rebuild_path_safety.RebuildPathSafetyTests.test_broken_output_symlink_is_not_overwritten) ... ok
+2026-10-20T09:48:33.8076519Z test_existing_report_is_preserved (test_rebuild_path_safety.RebuildPathSafetyTests.test_existing_report_is_preserved) ... ok
+2026-10-20T09:48:33.8085989Z test_log_hardlink_cannot_truncate_source (test_rebuild_path_safety.RebuildPathSafetyTests.test_log_hardlink_cannot_truncate_source) ... ok
+2026-10-20T09:48:33.8096699Z test_oracle_executable_cannot_be_the_report (test_rebuild_path_safety.RebuildPathSafetyTests.test_oracle_executable_cannot_be_the_report) ... ok
+2026-10-20T09:48:33.8107301Z test_report_cannot_be_output (test_rebuild_path_safety.RebuildPathSafetyTests.test_report_cannot_be_output) ... ok
+2026-10-20T09:48:33.8115438Z test_report_cannot_be_source (test_rebuild_path_safety.RebuildPathSafetyTests.test_report_cannot_be_source) ... ok
+2026-10-20T09:48:33.8145888Z test_report_cannot_be_stderr_log (test_rebuild_path_safety.RebuildPathSafetyTests.test_report_cannot_be_stderr_log) ... ok
+2026-10-20T09:48:33.8147537Z test_report_hardlink_cannot_truncate_source (test_rebuild_path_safety.RebuildPathSafetyTests.test_report_hardlink_cannot_truncate_source) ... ok
+2026-10-20T09:48:33.8148742Z test_source_named_native_log_is_protected (test_rebuild_path_safety.RebuildPathSafetyTests.test_source_named_native_log_is_protected) ... ok
+2026-10-20T09:48:33.8459830Z test_complete_three_face_pipeline_and_unseen_mixed_coordinates (test_rebuild_pipeline.RebuildPipelineTests.test_complete_three_face_pipeline_and_unseen_mixed_coordinates) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.8509615Z face=0 glyphs=3/3
+2026-10-20T09:48:33.8732847Z face=1 glyphs=2/3
+2026-10-20T09:48:33.8784105Z face=1 glyphs=3/3
+2026-10-20T09:48:33.8995694Z face=2 glyphs=2/3
+2026-10-20T09:48:33.9046822Z face=2 glyphs=3/3
+2026-10-20T09:48:33.9333196Z ok
+2026-10-20T09:48:33.9637222Z test_corrupted_saved_gvar_blocks_publication_after_partial_face_progress (test_rebuild_pipeline.RebuildPipelineTests.test_corrupted_saved_gvar_blocks_publication_after_partial_face_progress) ... face=0 glyphs=2/3
+2026-10-20T09:48:33.9687230Z face=0 glyphs=3/3
+2026-10-20T09:48:33.9899295Z face=1 glyphs=2/3
+2026-10-20T09:48:33.9950426Z face=1 glyphs=3/3
+2026-10-20T09:48:34.0098530Z ok
+2026-10-20T09:48:34.0398142Z test_corrupted_ttc_face_order_blocks_publication_after_all_face_gates (test_rebuild_pipeline.RebuildPipelineTests.test_corrupted_ttc_face_order_blocks_publication_after_all_face_gates) ... face=0 glyphs=2/3
+2026-10-20T09:48:34.0448646Z face=0 glyphs=3/3
+2026-10-20T09:48:34.0666047Z face=1 glyphs=2/3
+2026-10-20T09:48:34.0717546Z face=1 glyphs=3/3
+2026-10-20T09:48:34.0934147Z face=2 glyphs=2/3
+2026-10-20T09:48:34.0985364Z face=2 glyphs=3/3
+2026-10-20T09:48:34.1174369Z ok
+2026-10-20T09:48:34.1388227Z test_failed_batch_preserves_safe_numeric_evidence_and_completed_observation_counts (test_rebuild_pipeline.RebuildPipelineTests.test_failed_batch_preserves_safe_numeric_evidence_and_completed_observation_counts) ... ok
+2026-10-20T09:48:34.1571653Z test_final_name_and_existing_output_are_guarded_before_oracle (test_rebuild_pipeline.RebuildPipelineTests.test_final_name_and_existing_output_are_guarded_before_oracle) ... ok
+2026-10-20T09:48:34.1870502Z test_final_native_failure_blocks_already_serialized_collection (test_rebuild_pipeline.RebuildPipelineTests.test_final_native_failure_blocks_already_serialized_collection) ... face=0 glyphs=2/3
+2026-10-20T09:48:34.1920224Z face=0 glyphs=3/3
+2026-10-20T09:48:34.2136839Z face=1 glyphs=2/3
+2026-10-20T09:48:34.2187542Z face=1 glyphs=3/3
+2026-10-20T09:48:34.2397936Z face=2 glyphs=2/3
+2026-10-20T09:48:34.2449436Z face=2 glyphs=3/3
+2026-10-20T09:48:34.2609231Z ok
+2026-10-20T09:48:34.2682685Z test_HVAR_precedes_gvar_advance_without_double_application (test_source_metrics.SourceMetricsTests.test_HVAR_precedes_gvar_advance_without_double_application) ... ok
+2026-10-20T09:48:34.2755178Z test_VORG_default_and_per_glyph_override_without_glyf (test_source_metrics.SourceMetricsTests.test_VORG_default_and_per_glyph_override_without_glyf) ... ok
+2026-10-20T09:48:34.2847622Z test_all_source_table_bytes_remain_unchanged (test_source_metrics.SourceMetricsTests.test_all_source_table_bytes_remain_unchanged) ... ok
+2026-10-20T09:48:34.2926480Z test_gvar_phantoms_preserve_fractional_metrics_and_empty_origins (test_source_metrics.SourceMetricsTests.test_gvar_phantoms_preserve_fractional_metrics_and_empty_origins) ... ok
+2026-10-20T09:48:34.2987602Z test_invalid_coordinates_and_glyphs_are_rejected (test_source_metrics.SourceMetricsTests.test_invalid_coordinates_and_glyphs_are_rejected) ... ok
+2026-10-20T09:48:34.3048970Z test_omitted_phantoms_are_zero_and_do_not_copy_outline_deltas (test_source_metrics.SourceMetricsTests.test_omitted_phantoms_are_zero_and_do_not_copy_outline_deltas) ... ok
+2026-10-20T09:48:34.3116965Z test_optional_bearing_maps_use_control_bounds_and_can_change_origins (test_source_metrics.SourceMetricsTests.test_optional_bearing_maps_use_control_bounds_and_can_change_origins) ... ok
+2026-10-20T09:48:34.3209244Z test_serialized_HVAR_VVAR_and_phantoms_are_equivalent (test_source_metrics.SourceMetricsTests.test_serialized_HVAR_VVAR_and_phantoms_are_equivalent) ... ok
+2026-10-20T09:48:34.3269197Z test_static_odd_width_keeps_half_unit_vertical_origin (test_source_metrics.SourceMetricsTests.test_static_odd_width_keeps_half_unit_vertical_origin) ... ok
+2026-10-20T09:48:34.3345620Z test_unknown_outline_or_variation_version_fails_explicitly (test_source_metrics.SourceMetricsTests.test_unknown_outline_or_variation_version_fails_explicitly) ... ok
+2026-10-20T09:48:34.3409296Z test_849_is_preserved_and_distinguished_from_850_table_input (test_table_metric_oracle.TableMetricAdapterTests.test_849_is_preserved_and_distinguished_from_850_table_input) ... ok
+2026-10-20T09:48:34.3470720Z test_blank_origin_keeps_raw_zero_without_losing_table_origin (test_table_metric_oracle.TableMetricAdapterTests.test_blank_origin_keeps_raw_zero_without_losing_table_origin) ... ok
+2026-10-20T09:48:34.3557054Z test_identity_policy_cannot_admit_HVGL_or_changed_avar (test_table_metric_oracle.TableMetricAdapterTests.test_identity_policy_cannot_admit_HVGL_or_changed_avar) ... ok
+2026-10-20T09:48:34.3616445Z test_identity_policy_requires_complete_original_user_coordinates (test_table_metric_oracle.TableMetricAdapterTests.test_identity_policy_requires_complete_original_user_coordinates) ... ok
+2026-10-20T09:48:34.3675039Z test_metadata_retains_native_policy_and_rejects_diagnostic_axis_bypass (test_table_metric_oracle.TableMetricAdapterTests.test_metadata_retains_native_policy_and_rejects_diagnostic_axis_bypass) ... ok
+2026-10-20T09:48:34.3733794Z test_native_failure_missing_metrics_and_second_adaptation_are_rejected (test_table_metric_oracle.TableMetricAdapterTests.test_native_failure_missing_metrics_and_second_adaptation_are_rejected) ... ok
+2026-10-20T09:48:34.3796273Z test_nonzero_stored_phantom_cannot_be_combined_with_shifted_native_path (test_table_metric_oracle.TableMetricAdapterTests.test_nonzero_stored_phantom_cannot_be_combined_with_shifted_native_path) ... ok
+2026-10-20T09:48:34.3804483Z test_batch_matches_scalar_and_does_not_mutate_input (test_tangent_geometry.TangentGeometryTests.test_batch_matches_scalar_and_does_not_mutate_input) ... ok
+2026-10-20T09:48:34.4619953Z test_batch_renderer_matches_scalar_and_retains_source_trace (test_tangent_geometry.TangentGeometryTests.test_batch_renderer_matches_scalar_and_retains_source_trace) ... ok
+2026-10-20T09:48:34.4622025Z test_degenerate_unsupported_and_malformed_paths_fail_explicitly (test_tangent_geometry.TangentGeometryTests.test_degenerate_unsupported_and_malformed_paths_fail_explicitly) ... ok
+2026-10-20T09:48:34.4708584Z test_legacy_renderer_still_requires_explicit_tangent_mode (test_tangent_geometry.TangentGeometryTests.test_legacy_renderer_still_requires_explicit_tangent_mode) ... ok
+2026-10-20T09:48:34.4718885Z test_native_observed_perturbations_match_measured_on_points (test_tangent_geometry.TangentGeometryTests.test_native_observed_perturbations_match_measured_on_points) ... ok
+2026-10-20T09:48:34.4721452Z test_outside_projection_stops_at_control_segment_endpoint (test_tangent_geometry.TangentGeometryTests.test_outside_projection_stops_at_control_segment_endpoint) ... ok
+2026-10-20T09:48:34.5092253Z test_projection_optimality_and_control_collinearity (test_tangent_geometry.TangentGeometryTests.test_projection_optimality_and_control_collinearity) ... ok
+2026-10-20T09:48:34.5100369Z test_rigid_transform_equivariance (test_tangent_geometry.TangentGeometryTests.test_rigid_transform_equivariance) ... ok
+2026-10-20T09:48:34.5103172Z test_short_nonzero_lines_are_not_discarded (test_tangent_geometry.TangentGeometryTests.test_short_nonzero_lines_are_not_discarded) ... ok
+2026-10-20T09:48:34.5115295Z test_master_rotation_and_ordered_extrema_do_not_commute (test_transform_geometry.TransformGeometryTests.test_master_rotation_and_ordered_extrema_do_not_commute) ... ok
+2026-10-20T09:48:34.5176702Z test_native_observed_curve_factor_bounds_in_all_renderers (test_transform_geometry.TransformGeometryTests.test_native_observed_curve_factor_bounds_in_all_renderers) ... ok
+2026-10-20T09:48:34.5179877Z test_native_observed_fraction_is_not_straight_translation (test_transform_geometry.TransformGeometryTests.test_native_observed_fraction_is_not_straight_translation) ... ok
+2026-10-20T09:48:34.5181582Z test_nonfinite_and_malformed_inputs_fail (test_transform_geometry.TransformGeometryTests.test_nonfinite_and_malformed_inputs_fail) ... ok
+2026-10-20T09:48:34.5188150Z test_rotation_centre_formula_at_independent_fractional_weights (test_transform_geometry.TransformGeometryTests.test_rotation_centre_formula_at_independent_fractional_weights) ... ok
+2026-10-20T09:48:34.5924392Z test_scalar_batch_and_source_immutability (test_transform_geometry.TransformGeometryTests.test_scalar_batch_and_source_immutability) ... ok
+2026-10-20T09:48:34.5928095Z test_sparse_zero_rows_do_not_require_dense_structure_allocations (test_transform_geometry.TransformGeometryTests.test_sparse_zero_rows_do_not_require_dense_structure_allocations) ... ok
+2026-10-20T09:48:34.5932976Z test_zero_and_tiny_angles_keep_translation_limit (test_transform_geometry.TransformGeometryTests.test_zero_and_tiny_angles_keep_translation_limit) ... ok
+2026-10-20T09:48:34.5934657Z test_failure_counts_and_order (test_triage_source_projection.TriageProjectionTests.test_failure_counts_and_order) ... ok
+2026-10-20T09:48:34.5935978Z test_invalid_or_missing_records_rejected (test_triage_source_projection.TriageProjectionTests.test_invalid_or_missing_records_rejected) ... ok
+2026-10-20T09:48:34.5937356Z test_no_failure_not_complete_font (test_triage_source_projection.TriageProjectionTests.test_no_failure_not_complete_font) ... ok
+2026-10-20T09:48:34.6004722Z test_all_axes_endpoints_defaults_fractional_and_mixed_are_sampled (test_user_axis_geometry.UserAxisGeometryTests.test_all_axes_endpoints_defaults_fractional_and_mixed_are_sampled) ... ok
+2026-10-20T09:48:34.6019193Z test_batched_reference_keeps_each_original_analytic_position_and_model (test_user_axis_geometry.UserAxisGeometryTests.test_batched_reference_keeps_each_original_analytic_position_and_model) ... ok
+2026-10-20T09:48:34.6021757Z test_closed_quadratic_geometry_keeps_fractional_points (test_user_axis_geometry.UserAxisGeometryTests.test_closed_quadratic_geometry_keeps_fractional_points) ... ok
+2026-10-20T09:48:34.6026689Z test_diagnostic_guard_is_explicit_and_original_is_unchanged (test_user_axis_geometry.UserAxisGeometryTests.test_diagnostic_guard_is_explicit_and_original_is_unchanged) ... ok
+2026-10-20T09:48:34.6028502Z test_invalid_paths_do_not_become_blank_glyphs (test_user_axis_geometry.UserAxisGeometryTests.test_invalid_paths_do_not_become_blank_glyphs) ... ok
+2026-10-20T09:48:34.6029985Z test_models_never_mix_to_turn_failures_into_acceptance (test_user_axis_geometry.UserAxisGeometryTests.test_models_never_mix_to_turn_failures_into_acceptance) ... ok
+2026-10-20T09:48:34.6326522Z test_109_independent_binary64_boundary_values_need_no_repeated_truncation (test_verified_axis_oracle.VerifiedAxisOracleTests.test_109_independent_binary64_boundary_values_need_no_repeated_truncation) ... ok
+2026-10-20T09:48:35.3083007Z test_EOF_deadline_and_buffer_limit_do_not_fabricate_empty_glyphs (test_verified_axis_oracle.VerifiedAxisOracleTests.test_EOF_deadline_and_buffer_limit_do_not_fabricate_empty_glyphs) ... ok
+2026-10-20T09:48:35.3164103Z test_a_second_step_candidate_still_requires_actual_stable_echo_and_every_payload_field (test_verified_axis_oracle.VerifiedAxisOracleTests.test_a_second_step_candidate_still_requires_actual_stable_echo_and_every_payload_field) ... ok
+2026-10-20T09:48:35.3238021Z test_actual_swift_axis_schema_flags_and_hidden_are_required (test_verified_axis_oracle.VerifiedAxisOracleTests.test_actual_swift_axis_schema_flags_and_hidden_are_required) ... ok
+2026-10-20T09:48:35.3325743Z test_all_tables_faces_axes_and_explicit_observation_metadata_are_bound (test_verified_axis_oracle.VerifiedAxisOracleTests.test_all_tables_faces_axes_and_explicit_observation_metadata_are_bound) ... ok
+2026-10-20T09:48:35.7815226Z test_bad_source_metadata_and_invalid_request_fail_before_glyph_release (test_verified_axis_oracle.VerifiedAxisOracleTests.test_bad_source_metadata_and_invalid_request_fail_before_glyph_release) ... ok
+2026-10-20T09:48:36.1154029Z test_builder_consumes_verified_launcher_and_external_final_summary (test_verified_axis_oracle.VerifiedAxisOracleTests.test_builder_consumes_verified_launcher_and_external_final_summary) ... ok
+2026-10-20T09:48:36.1224546Z test_candidate_failure_preserves_exact_binary64_values_and_stage (test_verified_axis_oracle.VerifiedAxisOracleTests.test_candidate_failure_preserves_exact_binary64_values_and_stage) ... ok
+2026-10-20T09:48:36.1312490Z test_commands_keep_type_order_and_every_coordinate_exact (test_verified_axis_oracle.VerifiedAxisOracleTests.test_commands_keep_type_order_and_every_coordinate_exact) ... ok
+2026-10-20T09:48:36.1378006Z test_complete_request_requires_finite_explicit_axes_unique_valid_GIDs (test_verified_axis_oracle.VerifiedAxisOracleTests.test_complete_request_requires_finite_explicit_axes_unique_valid_GIDs) ... ok
+2026-10-20T09:48:36.1447355Z test_echo_drift_is_rejected_without_any_recursive_request (test_verified_axis_oracle.VerifiedAxisOracleTests.test_echo_drift_is_rejected_without_any_recursive_request) ... ok
+2026-10-20T09:48:36.1522341Z test_exact_and_decimal_candidate_preserve_all_original_values (test_verified_axis_oracle.VerifiedAxisOracleTests.test_exact_and_decimal_candidate_preserve_all_original_values) ... ok
+2026-10-20T09:48:36.1595411Z test_fixed_second_step_is_predeclared_and_not_selected_from_the_first_echo (test_verified_axis_oracle.VerifiedAxisOracleTests.test_fixed_second_step_is_predeclared_and_not_selected_from_the_first_echo) ... ok
+2026-10-20T09:48:36.6373818Z test_invalid_summary_and_changed_source_have_no_success_summary (test_verified_axis_oracle.VerifiedAxisOracleTests.test_invalid_summary_and_changed_source_have_no_success_summary) ... ok
+2026-10-20T09:48:36.8642834Z test_late_GID_failure_releases_no_successful_record_from_the_batch (test_verified_axis_oracle.VerifiedAxisOracleTests.test_late_GID_failure_releases_no_successful_record_from_the_batch) ... ok
+2026-10-20T09:48:37.2313048Z test_launcher_runs_protocol_and_binds_native_and_dependency_hashes (test_verified_axis_oracle.VerifiedAxisOracleTests.test_launcher_runs_protocol_and_binds_native_and_dependency_hashes) ... ok
+2026-10-20T09:48:37.2386603Z test_missing_nondefault_axis_fails_even_inside_the_old_epsilon (test_verified_axis_oracle.VerifiedAxisOracleTests.test_missing_nondefault_axis_fails_even_inside_the_old_epsilon) ... ok
+2026-10-20T09:48:37.2487615Z test_missing_nonfinite_and_already_adapted_native_values_are_rejected (test_verified_axis_oracle.VerifiedAxisOracleTests.test_missing_nonfinite_and_already_adapted_native_values_are_rejected) ... ok
+2026-10-20T09:48:37.4742645Z test_native_error_is_forwarded_under_the_external_request_identity (test_verified_axis_oracle.VerifiedAxisOracleTests.test_native_error_is_forwarded_under_the_external_request_identity) ... ok
+2026-10-20T09:48:37.4909196Z test_one_changed_scalar_vector_sum_status_or_future_field_rejects_batch (test_verified_axis_oracle.VerifiedAxisOracleTests.test_one_changed_scalar_vector_sum_status_or_future_field_rejects_batch) ... ok
+2026-10-20T09:48:37.4975392Z test_predeclared_candidate_cannot_be_clamped_into_the_source_range (test_verified_axis_oracle.VerifiedAxisOracleTests.test_predeclared_candidate_cannot_be_clamped_into_the_source_range) ... ok
+2026-10-20T09:48:37.7504254Z test_real_pipe_protocol_counts_only_verified_external_records (test_verified_axis_oracle.VerifiedAxisOracleTests.test_real_pipe_protocol_counts_only_verified_external_records) ... ok
+2026-10-20T09:48:37.7574657Z test_replay_failure_retains_original_request_and_actual_second_readback (test_verified_axis_oracle.VerifiedAxisOracleTests.test_replay_failure_retains_original_request_and_actual_second_readback) ... ok
+2026-10-20T09:48:37.7648027Z test_response_request_GID_location_and_batch_readback_identity_are_checked (test_verified_axis_oracle.VerifiedAxisOracleTests.test_response_request_GID_location_and_batch_readback_identity_are_checked) ... ok
+2026-10-20T09:48:37.7718273Z test_wrong_decimal_candidate_unknown_axis_and_nonpositive_mismatch_fail (test_verified_axis_oracle.VerifiedAxisOracleTests.test_wrong_decimal_candidate_unknown_axis_and_nonpositive_mismatch_fail) ... ok
+2026-10-20T09:48:37.7916917Z test_gpos_retains_original_mapping_axes_metrics_and_geometric_symbols (test_vertical_gpos_experiment.VerticalGPOSCodecTests.test_gpos_retains_original_mapping_axes_metrics_and_geometric_symbols) ... ok
+2026-10-20T09:48:37.7975108Z test_odd_default_width_is_rejected_by_exact_value_record_encoder (test_vertical_gpos_experiment.VerticalGPOSCodecTests.test_odd_default_width_is_rejected_by_exact_value_record_encoder) ... ok
+2026-10-20T09:48:37.8074505Z test_odd_region_deltas_are_rejected_instead_of_silently_accumulating_rounding (test_vertical_gpos_experiment.VerticalGPOSCodecTests.test_odd_region_deltas_are_rejected_instead_of_silently_accumulating_rounding) ... ok
+2026-10-20T09:48:37.8152951Z test_serialized_multi_axis_compensation_has_independent_numerical_values (test_vertical_gpos_experiment.VerticalGPOSCodecTests.test_serialized_multi_axis_compensation_has_independent_numerical_values) ... ok
+2026-10-20T09:48:37.8415793Z test_true_type_static_instancing_retains_advance_variations_and_original_contours (test_vertical_gpos_experiment.VerticalGPOSCodecTests.test_true_type_static_instancing_retains_advance_variations_and_original_contours) ... ok
+2026-10-20T09:48:37.8421071Z test_default_feature_routing_keeps_horizontal_layout_and_exposes_missing_vertical_activation (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_default_feature_routing_keeps_horizontal_layout_and_exposes_missing_vertical_activation) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8426534Z test_disabling_feature_preserves_source_including_regional_and_vertical_substitutions (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_disabling_feature_preserves_source_including_regional_and_vertical_substitutions) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8431914Z test_explicit_enable_applies_the_same_cartesian_x_placement_in_both_directions (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_explicit_enable_applies_the_same_cartesian_x_placement_in_both_directions) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8436024Z test_failed_serialized_compensation_keeps_measured_evidence_in_safe_report (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_failed_serialized_compensation_keeps_measured_evidence_in_safe_report) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8440109Z test_fractional_gpos_application_and_hvar_integer_rounding_are_distinct_observations (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_fractional_gpos_application_and_hvar_integer_rounding_are_distinct_observations) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8444034Z test_rounded_counterexamples_preserve_both_exact_failure_and_reconstruction_budget (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_rounded_counterexamples_preserve_both_exact_failure_and_reconstruction_budget) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8446503Z test_static_serialized_gpos_keeps_compensation_including_empty_space (test_vertical_gpos_experiment.VerticalGPOSHarfBuzzTests.test_static_serialized_gpos_keeps_compensation_including_empty_space) ... skipped 'optional uharfbuzz dependency unavailable; native shaping NOT RUN'
+2026-10-20T09:48:37.8448167Z test_aggregation_keeps_mismatch_instead_of_choosing_per_point_models (test_vertical_layout_probe.VerticalLayoutProbeTests.test_aggregation_keeps_mismatch_instead_of_choosing_per_point_models) ... ok
+2026-10-20T09:48:37.8450063Z test_bitmap_coordinate_calibration_is_separate_from_font_acceptance (test_vertical_layout_probe.VerticalLayoutProbeTests.test_bitmap_coordinate_calibration_is_separate_from_font_acceptance) ... ok
+2026-10-20T09:48:38.0500365Z test_complete_report_rejects_missing_duplicate_or_unverified_observations (test_vertical_layout_probe.VerticalLayoutProbeTests.test_complete_report_rejects_missing_duplicate_or_unverified_observations) ... ok
+2026-10-20T09:48:38.0503133Z test_current_half_advance_drawing_is_not_classified_as_fixed_origin (test_vertical_layout_probe.VerticalLayoutProbeTests.test_current_half_advance_drawing_is_not_classified_as_fixed_origin) ... ok
+2026-10-20T09:48:38.0505636Z test_empty_space_clipping_and_missing_ink_do_not_fabricate_positions (test_vertical_layout_probe.VerticalLayoutProbeTests.test_empty_space_clipping_and_missing_ink_do_not_fabricate_positions) ... ok
+2026-10-20T09:48:38.0507749Z test_fixed_origin_drawing_is_distinguished_from_half_advance (test_vertical_layout_probe.VerticalLayoutProbeTests.test_fixed_origin_drawing_is_distinguished_from_half_advance) ... ok
+2026-10-20T09:48:38.0512287Z test_harness_preserves_the_production_guard_and_never_exports_images_or_paths (test_vertical_layout_probe.VerticalLayoutProbeTests.test_harness_preserves_the_production_guard_and_never_exports_images_or_paths) ... ok
+2026-10-20T09:48:38.0514905Z test_measured_rotation_preserves_its_own_explicit_hypothesis (test_vertical_layout_probe.VerticalLayoutProbeTests.test_measured_rotation_preserves_its_own_explicit_hypothesis) ... ok
+2026-10-20T09:48:38.0517325Z test_real_layout_changes_are_retained_instead_of_guessed_away (test_vertical_layout_probe.VerticalLayoutProbeTests.test_real_layout_changes_are_retained_instead_of_guessed_away) ... ok
+2026-10-20T09:48:38.0519001Z test_all_samples_contribute_even_if_different_models_fit_each_one (test_vertical_origin_probe.VerticalOriginProbeTests.test_all_samples_contribute_even_if_different_models_fit_each_one) ... ok
+2026-10-20T09:48:38.0525449Z test_diagnostic_harness_cannot_be_fed_to_reconstruction_oracle (test_vertical_origin_probe.VerticalOriginProbeTests.test_diagnostic_harness_cannot_be_fed_to_reconstruction_oracle) ... ok
+2026-10-20T09:48:38.0527734Z test_static_origin_is_not_mistaken_for_half_current_advance (test_vertical_origin_probe.VerticalOriginProbeTests.test_static_origin_is_not_mistaken_for_half_current_advance) ... ok
+2026-10-20T09:48:38.0530043Z test_unavailable_CGFont_advance_is_not_fabricated (test_vertical_origin_probe.VerticalOriginProbeTests.test_unavailable_CGFont_advance_is_not_fabricated) ... ok
+2026-10-20T09:48:38.0531053Z 
+2026-10-20T09:48:38.0531302Z ----------------------------------------------------------------------
+2026-10-20T09:48:38.0531853Z Ran 572 tests in 14.521s
+2026-10-20T09:48:38.0532097Z 
+2026-10-20T09:48:38.0532220Z OK (skipped=7)
+2026-10-20T09:48:38.0532833Z {"status": "NOT_RUN", "report": "/tmp/tmpmb0yz8ry/coretext_precision_diagnosis.json", "variants": {}}
+2026-10-20T09:48:38.0533779Z {"status": "NOT_RUN", "report": "/tmp/tmp2hc9kosv/native_table_metric_reconstruction.json"}
+2026-10-20T09:48:38.3092408Z test_hvgl_bad_index_fails_before_large_unpack (test_audit_font.AuditRegressions.test_hvgl_bad_index_fails_before_large_unpack) ... ok
+2026-10-20T09:48:38.3094210Z test_metric_long_advance_reuse_preserves_bearing (test_audit_font.AuditRegressions.test_metric_long_advance_reuse_preserves_bearing) ... ok
+2026-10-20T09:48:38.3095899Z test_order_violation_is_not_silently_sorted (test_audit_font.AuditRegressions.test_order_violation_is_not_silently_sorted) ... ok
+2026-10-20T09:48:38.3097535Z test_preserves_conflicting_duplicate_records (test_audit_font.AuditRegressions.test_preserves_conflicting_duplicate_records) ... ok
+2026-10-20T09:48:38.3098914Z test_standard_identity_map_passes (test_audit_font.AuditRegressions.test_standard_identity_map_passes) ... ok
+2026-10-20T09:48:38.3100275Z test_truncated_map_fails (test_audit_font.AuditRegressions.test_truncated_map_fails) ... ok
+2026-10-20T09:48:38.3100865Z 
+2026-10-20T09:48:38.3101092Z ----------------------------------------------------------------------
+2026-10-20T09:48:38.3101598Z Ran 6 tests in 0.001s
+2026-10-20T09:48:38.3101801Z 
+2026-10-20T09:48:38.3102323Z OK
+2026-10-20T09:48:38.3374859Z Post job cleanup.
+2026-10-20T09:48:38.4609988Z (node:2566) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-20T09:48:38.4611454Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-20T09:48:38.4812635Z Post job cleanup.
+2026-10-20T09:48:38.5708775Z [command]/usr/bin/git version
+2026-10-20T09:48:38.5757389Z git version 2.55.0
+2026-10-20T09:48:38.5795033Z Temporarily overriding HOME='/home/runner/work/_temp/6eb8151d-0886-44e3-baf2-3a984d21544d' before making global git config changes
+2026-10-20T09:48:38.5796325Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T09:48:38.5800716Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Swirl/Swirl
+2026-10-20T09:48:38.5843223Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T09:48:38.5881499Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T09:48:38.6152189Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T09:48:38.6192406Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T09:48:38.6466030Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T09:48:38.6508651Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T09:48:38.6960073Z Cleaning up orphan processes
+2026-10-20T09:48:38.7288606Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -141,6 +141,12 @@ impl Pool {
             udp_drop(&self.counters, &self.total);
             return;
         };
+        // Hysteria2 cannot encode an empty UDP payload. Reject this packet
+        // before creating or touching a worker, preserving the association.
+        if payload.is_empty() && matches!(&node.outbound, Outbound::Hysteria2(_)) {
+            udp_drop(&self.counters, &self.total);
+            return;
+        }
         // Classic VLESS UDP binds its stream to one destination. Include that
         // destination in the same bounded pool, never reuse a different target.
         let key = (
@@ -288,15 +294,16 @@ async fn run(
     discard_pending(&mut requests, &counters, &total);
 }
 
-enum ProxyAssociation {
+pub(super) enum ProxyAssociation {
     Hysteria2(swirl_protocol::hysteria2::UdpAssociation),
     Tuic(swirl_protocol::tuic::UdpAssociation),
+    Snell(Box<swirl_protocol::snell::UdpAssociation>),
     Shadowsocks2022(Box<swirl_protocol::ss2022::UdpAssociation>),
     Stream(swirl_protocol::stream_udp::UdpAssociation),
 }
 
 impl ProxyAssociation {
-    async fn connect(
+    pub(super) async fn connect(
         outbound: &Outbound,
         resolver: &Resolver,
         transport: Option<&Transport>,
@@ -304,6 +311,14 @@ impl ProxyAssociation {
         limit: Duration,
     ) -> Result<Self, &'static str> {
         match outbound {
+            Outbound::Snell(config) => {
+                if !matches!(transport, None | Some(Transport::Tcp {})) {
+                    return Err("SnellTransportUnsupported");
+                }
+                Ok(Self::Snell(Box::new(
+                    swirl_protocol::snell::UdpAssociation::connect(config, resolver, limit).await?,
+                )))
+            }
             Outbound::Hysteria2(config) => Ok(Self::Hysteria2(
                 swirl_protocol::hysteria2::UdpAssociation::connect(config, resolver, limit).await?,
             )),
@@ -323,6 +338,12 @@ impl ProxyAssociation {
                 )
                 .await?,
             ))),
+            outbound @ Outbound::AnyTls(config) if config.udp => Ok(Self::Stream(
+                swirl_protocol::stream_udp::UdpAssociation::connect(
+                    outbound, target, resolver, limit, transport,
+                )
+                .await?,
+            )),
             outbound @ (Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. }) => {
                 Ok(Self::Stream(
                     swirl_protocol::stream_udp::UdpAssociation::connect(
@@ -335,19 +356,25 @@ impl ProxyAssociation {
         }
     }
 
-    async fn send(&mut self, target: &Target, payload: &[u8]) -> Result<(), &'static str> {
+    pub(super) async fn send(
+        &mut self,
+        target: &Target,
+        payload: &[u8],
+    ) -> Result<(), &'static str> {
         match self {
             Self::Hysteria2(value) => value.send(target, payload).await,
             Self::Tuic(value) => value.send(target, payload).await,
+            Self::Snell(value) => value.send(target, payload).await,
             Self::Shadowsocks2022(value) => value.send(target, payload).await,
             Self::Stream(value) => value.send(target, payload).await,
         }
     }
 
-    async fn recv(&mut self) -> Result<(Target, Vec<u8>), &'static str> {
+    pub(super) async fn recv(&mut self) -> Result<(Target, Vec<u8>), &'static str> {
         match self {
             Self::Hysteria2(value) => value.recv().await,
             Self::Tuic(value) => value.recv().await,
+            Self::Snell(value) => value.recv().await,
             Self::Shadowsocks2022(value) => value.recv().await,
             Self::Stream(value) => value.recv().await,
         }

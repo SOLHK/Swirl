@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (/workspace/scratch/d849c9bea5b5/rust-target/debug/deps/swirl_protocol-530250389a345fc6)
+
+running 3 tests
+
+thread 'outbound_http_tests::informational_connect_responses_are_bounded_and_never_tunnel_data' (16493) panicked at crates/swirl-protocol/src/outbound_http_tests.rs:144:41:
+interim response must not reject a valid tunnel: "UpstreamRejected"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test outbound_http_tests::informational_connect_responses_are_bounded_and_never_tunnel_data ... FAILED
+
+thread 'outbound_http_tests::every_successful_connect_status_preserves_the_opaque_stream' (16492) panicked at crates/swirl-protocol/src/outbound_http_tests.rs:62:40:
+HTTP/1.0 CONNECT 201: UpstreamRejected
+test outbound_http_tests::every_successful_connect_status_preserves_the_opaque_stream ... FAILED
+test outbound_http_tests::unsuccessful_connect_statuses_never_become_tunnels ... ok
+
+failures:
+
+failures:
+    outbound_http_tests::every_successful_connect_status_preserves_the_opaque_stream
+    outbound_http_tests::informational_connect_responses_are_bounded_and_never_tunnel_data
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 127 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p swirl-protocol --lib`

@@ -1,0 +1,27 @@
+{
+  "scope": "Isolated Linux Qt QQmlExpression constructor; no full-application or Windows acceptance claim",
+  "qt_version": "6.12.0",
+  "pyside_version": "6.12.0",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "script_sha256": "31cf9760dffa8fd9d81570fa54722feb24e236e5889e381b90c85d356297c46e",
+  "qt_qml_library_sha256": "53d4866ee32ea978858a396a2545c699e964a32668cc2b0945790a3bbab4f713",
+  "cases": {
+    "old": {
+      "exit_code": -11,
+      "program_sha256": "9da7e616cff5253c225f64d786e281e968c4ded4eb39dcb4ef229e515e59bb0a",
+      "stdout_sha256": "48efe6ada6cf08298646f8f740c53e94cff2fae2568fba5f5bce9a0583e6ac98",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Qt 6.12.0 viewport type QQuickItem viewportContext None rootContext True\n",
+      "stderr": ""
+    },
+    "candidate": {
+      "exit_code": 0,
+      "program_sha256": "3c2e31233cb8f9d07eb6f3f8a69a2f07de1e43b708f932859c91b3942717615c",
+      "stdout_sha256": "47eb245a761ec2c547938d6dc33efa243ae09ec6bdc524459dda1688bfbb7966",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Qt 6.12.0 viewport type QQuickItem viewportContext None rootContext True\nconstructed\nevaluated (-0.0, False) error False\n",
+      "stderr": ""
+    }
+  },
+  "reproduced": true
+}

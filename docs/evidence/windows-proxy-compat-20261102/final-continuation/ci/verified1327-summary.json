@@ -1,0 +1,266 @@
+{
+  "head_sha": "1327cb4d587eddc60563c926672f67a6da5c16ce",
+  "checkout_sha": "139f8d5d4e0d4cad8f7502389719c606eb2636f2",
+  "tree_sha": "7a028adbb3bc6d6ba5bf35d50a13604160742b5b",
+  "rust_run_id": 41456316660,
+  "qt_run_id": 41456316644,
+  "scope": "Historical/current-at-start1327 exact artifacts; does not verify subsequent commits or Windows11 desktop",
+  "rust": [
+    {
+      "job_id": 125313781024,
+      "os": "macOS",
+      "passed": 816,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 40,
+      "six_v2_network_tests_passed": true
+    },
+    {
+      "job_id": 125313781354,
+      "os": "Linux",
+      "passed": 816,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 40,
+      "six_v2_network_tests_passed": true
+    },
+    {
+      "job_id": 125313781522,
+      "os": "Windows",
+      "passed": 817,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 40,
+      "six_v2_network_tests_passed": true
+    }
+  ],
+  "soak": [
+    {
+      "schema": 1,
+      "test": "production_v2_authenticated_socks5_verified_tls_sse_soak",
+      "requested_duration_seconds": 120,
+      "connections": 8,
+      "event_interval_seconds": 1,
+      "expected_events_per_connection": 121,
+      "peer_read_idle_budget_seconds": 160,
+      "client_origin_io_timeout_seconds": 8,
+      "core_handshake_timeout_ms": 3000,
+      "reconnection_permitted": false,
+      "platform": "darwin",
+      "scope": "controlled_local_network_no_desktop_acceptance",
+      "resource_observation_limit": "RSS and FD samples do not prove absence of leaks",
+      "binary_sha256": "53122cbf3211032b927e16d2bd312aec3d856fb7df2211ae76401aa5e670ed6e",
+      "core_pid": 9234,
+      "observed_stream_seconds": 120.135131,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97514,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "ready_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "delivered_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "independent_fixture_errors": [],
+      "errors": [],
+      "passed": true,
+      "artifact_id": 13147811317,
+      "artifact_sha256": "b0e476f31efa396abbebb8692cb4d6a691662e1a523bbf276b92beecce91ee7a",
+      "raw_sha256": "cd4dea552ba2f23941584b68049b851d94a75e4815853059a9e8eb964b8e61e8",
+      "clients_equal_origins": true,
+      "events": 968,
+      "all_clean_close": true
+    },
+    {
+      "schema": 1,
+      "test": "production_v2_authenticated_socks5_verified_tls_sse_soak",
+      "requested_duration_seconds": 120,
+      "connections": 8,
+      "event_interval_seconds": 1,
+      "expected_events_per_connection": 121,
+      "peer_read_idle_budget_seconds": 160,
+      "client_origin_io_timeout_seconds": 8,
+      "core_handshake_timeout_ms": 3000,
+      "reconnection_permitted": false,
+      "platform": "win32",
+      "scope": "controlled_local_network_no_desktop_acceptance",
+      "resource_observation_limit": "RSS and FD samples do not prove absence of leaks",
+      "binary_sha256": "f8bcd64e498b69881e4b2327630d061e638ee66ecc3a436178ae352081b748a8",
+      "core_pid": 5460,
+      "observed_stream_seconds": 120.027111,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97503,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "ready_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "delivered_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "independent_fixture_errors": [],
+      "errors": [],
+      "passed": true,
+      "artifact_id": 13147641863,
+      "artifact_sha256": "1fd398a620edfe067c026f14756458fc624b26c5c99e8af3ad755bb4cb0590ec",
+      "raw_sha256": "7e26056f9d28c5f56d15e99fc82ee2a43bc9b0f3f1f34329a87e5dd442d0e126",
+      "clients_equal_origins": true,
+      "events": 968,
+      "all_clean_close": true
+    },
+    {
+      "schema": 1,
+      "test": "production_v2_authenticated_socks5_verified_tls_sse_soak",
+      "requested_duration_seconds": 120,
+      "connections": 8,
+      "event_interval_seconds": 1,
+      "expected_events_per_connection": 121,
+      "peer_read_idle_budget_seconds": 160,
+      "client_origin_io_timeout_seconds": 8,
+      "core_handshake_timeout_ms": 3000,
+      "reconnection_permitted": false,
+      "platform": "linux",
+      "scope": "controlled_local_network_no_desktop_acceptance",
+      "resource_observation_limit": "RSS and FD samples do not prove absence of leaks",
+      "binary_sha256": "0a8c60b3919f0598787b27ef03d841eaa2e0aaa4467c8b3cb6a490f6d2fb21c4",
+      "core_pid": 12105,
+      "observed_stream_seconds": 120.003061,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 5688,
+        "download": 88793,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "ready_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "delivered_connections": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "independent_fixture_errors": [],
+      "errors": [],
+      "passed": true,
+      "artifact_id": 13146693156,
+      "artifact_sha256": "0f1ede7e6c8c5fb7a4d441dba126667a55e16cf44a3ad1015b8dfb936f0f50c5",
+      "raw_sha256": "3562b6db717debd82041ae170c166db22f8d0fa04dc98824868e7319ef5bfd74",
+      "clients_equal_origins": true,
+      "events": 968,
+      "all_clean_close": true
+    }
+  ],
+  "qt": {
+    "critical-ui": {
+      "tests": 9,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    "critical-network": {
+      "tests": 10,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    "full-regression": {
+      "tests": 22,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        "swirl-policy-ui"
+      ]
+    }
+  },
+  "package": {
+    "installer_bytes": 79148595,
+    "installer_sha256": "8b2e3f49bfb9fa90613ef72b1f394597d272c391eb9ad6816d3450117333a232",
+    "source_sha": "139f8d5d4e0d4cad8f7502389719c606eb2636f2",
+    "rust_identity": {
+      "abi_version": 1,
+      "build_id": "d448b09823344a34fc6a2ce45fcc9d1cc625b85d482affee8e05b0448c603e26",
+      "source_sha": "139f8d5d4e0d4cad8f7502389719c606eb2636f2",
+      "target": "x86_64-pc-windows-msvc"
+    },
+    "manifest_sha256": "4fd2dc483ad9add0f7ed9094c9c9dce811f5a221ab1ef0e4badf26c2cdc14006",
+    "recorded_files": [
+      {
+        "path": "libcrypto-3-x64.dll",
+        "sha256": "f8029a5d9069f3eb619dae9e387a48f502a59c093dc43f7ba02d688be6cf06a4"
+      },
+      {
+        "path": "libssl-3-x64.dll",
+        "sha256": "88bcaed498d36884b68dec7b1cd26527829fd84af88a6e91403f225a462ccfb0"
+      },
+      {
+        "path": "Qt6Core.dll",
+        "sha256": "39175459c4837c8cc0f709a637fb6eadb25d696785109c8393559ec876f02703"
+      },
+      {
+        "path": "swirl_api.dll",
+        "sha256": "9a7d14f4981c3b3c6af20f2658dfd7dce6261377155216df27cd5fc1bfd51511"
+      },
+      {
+        "path": "Swirl.exe",
+        "sha256": "f38141efa943a9037542750a43752c04a7c83710e5ebc5fa7d52b42ba97dd746"
+      }
+    ],
+    "actual_nsis_payload_verified": true,
+    "actual_nsis_files_verified": 1519,
+    "embedded_manifest_matches_evidence": true
+  }
+}

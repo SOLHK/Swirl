@@ -11,6 +11,7 @@ Item {
     property bool expanded: false
     property bool editable: true
     property bool refreshable: true
+    property bool activeSubscription: false
     property real insertionOffset: 0
     readonly property bool updating: record.status === "正在更新"
     readonly property bool failed: record.status === "更新失败"
@@ -23,6 +24,7 @@ Item {
     signal deleteRequested(Item source)
     signal reviewRequested(Item source)
     signal nodesRequested()
+    signal useRequested()
     objectName: "subscriptionCard-" + record.id
     implicitHeight: Theme.dp(76) + Math.round(details.implicitHeight * reveal)
     height: implicitHeight
@@ -66,7 +68,7 @@ Item {
             property string label: row.stateLabel
             property bool busy: row.updating
             property string tone: row.failed ? "warning" : row.record.status === "已保存真实节点" ? "success" : "neutral"
-            Layout.preferredWidth: Theme.dp(126); Layout.fillHeight: true
+            Layout.preferredWidth: Theme.dp(row.width < Theme.dp(560) ? 84 : 126); Layout.fillHeight: true
             ColumnLayout {
                 anchors.verticalCenter: parent.verticalCenter; width: parent.width; spacing: Theme.dp(5)
                 RowLayout {
@@ -78,7 +80,15 @@ Item {
             }
         }
         RowLayout {
-            Layout.preferredWidth: Theme.dp(88); spacing: 0
+            Layout.preferredWidth: Theme.dp(190); spacing: 0
+            SubscriptionAction {
+                objectName: "useSubscription-" + row.record.id
+                Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(34)
+                text: row.activeSubscription ? qsTr("使用中") : qsTr("使用此订阅")
+                selected: row.activeSubscription; enabled: row.editable
+                Accessible.name: qsTr("%1：%2").arg(row.record.name).arg(text)
+                onClicked: row.useRequested()
+            }
             SubscriptionAction {
                 id: refresh
                 objectName: "refreshSubscription-" + row.record.id
@@ -86,7 +96,7 @@ Item {
                 iconName: row.record.canCancel ? "dismiss" : "refresh-source"
                 enabled: row.record.canCancel || row.refreshable
                 Accessible.name: row.record.canCancel ? (row.record.queued ? qsTr("取消排队 %1").arg(row.record.name) : qsTr("取消更新 %1").arg(row.record.name)) : qsTr("更新 %1").arg(row.record.name)
-                tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible
+                tooltip: Accessible.name
                 onClicked: row.refreshRequested()
             }
             SubscriptionAction {
@@ -95,7 +105,7 @@ Item {
                 iconName: "ellipsis"; enabled: row.editable
                 Layout.preferredWidth: Theme.dp(44); Layout.preferredHeight: Theme.dp(44)
                 Accessible.name: qsTr("%1 的更多操作").arg(row.record.name)
-                tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible
+                tooltip: Accessible.name
                 onClicked: moreMenu.showAt()
             }
         }
@@ -108,7 +118,7 @@ Item {
             id: details
             width: parent.width; spacing: Theme.dp(8)
             SwirlText { Layout.fillWidth: true; text: row.record.enabled ? qsTr("下次更新  %1").arg(row.record.nextUpdate) : qsTr("自动更新已关闭，可随时手动更新。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
-            SwirlText { Layout.fillWidth: true; text: qsTr("更新失败 · 已保留上次有效节点"); visible: row.failed; color: Theme.red; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
+            SwirlText { objectName: "subscriptionFailure-" + row.record.id; Layout.fillWidth: true; text: Number(row.record.nodes) > 0 ? qsTr("更新失败 · 已保留 %1 个已保存节点").arg(row.record.nodes) : qsTr("更新失败 · 此来源尚无已保存节点"); visible: row.failed; color: Theme.red; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: row.record.error || ""; visible: text.length > 0; textFormat: Text.PlainText; color: Theme.red; font.pixelSize: Theme.fontSize(12) }
             SwirlText { Layout.fillWidth: true; text: qsTr("更新说明"); visible: String(row.record.warning || "").length > 0; color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: row.record.warning || ""; visible: text.length > 0; textFormat: Text.PlainText; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }

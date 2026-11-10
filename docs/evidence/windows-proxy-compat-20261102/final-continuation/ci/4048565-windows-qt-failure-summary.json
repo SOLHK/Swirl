@@ -1,0 +1,222 @@
+{
+  "scope": "4048565 Windows Qt REALITY Vision Chrome133 failure evidence; not latest-fix acceptance",
+  "run_id": 41467700964,
+  "job_id": 125352826267,
+  "source_head": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "checkout": "8762af6086f5b04249f94d7a97d7773cf3805858",
+  "tree": "cf1d0dd56ccc22f572aaf93e16f95f34d836d0bf",
+  "source_identity": {
+    "git_sha": "8762af6086f5b04249f94d7a97d7773cf3805858",
+    "tracked_worktree_changes": [],
+    "binaries": {
+      "SWIRL_RUST_HARNESS": {
+        "file": "swirl-api.exe",
+        "sha256": "fc86d67a17521bf18759decac48b18a99fcad95ecdff8dac3f2aa04fffeb7127"
+      },
+      "SWIRL_RUST_INSPECTOR": {
+        "file": "swirl-inspect.exe",
+        "sha256": "f1f0b0579382147207abfa2859de29c2fb285a5f539f808f01aeec5fb57be0c4"
+      },
+      "SWIRL_RUST_QT_TESTS": {
+        "file": "SwirlRustCoreTests.exe",
+        "sha256": "eef5bc8a7bb70c1a6ad45969f75f3786c93515d8dc3ba0d891f3b92d315f2871"
+      }
+    },
+    "test_sha256": "6d55c9ede5497f00122ab976bf71ccdc5b56c4256e396b269c7d0d8163bf782c"
+  },
+  "failure_step": "Qt persisted REALITY + Vision + Chrome133 through full Xray to HTTP and HTTPS",
+  "summary": {
+    "tests_run": 5,
+    "failures": 4,
+    "errors": 0,
+    "skipped": 0,
+    "successful": false,
+    "product_mode": "qt-dpapi",
+    "provider_connection": false,
+    "protocol": "vless+reality+vision",
+    "fingerprint": "chrome",
+    "selected_qt_tests": [
+      "test_actual_qt_import_dpapi_select_route_and_recreate",
+      "test_actual_qt_tls12_never_enters_vision_direct",
+      "test_actual_qt_bad_credentials_never_reach_origin_or_spare",
+      "test_actual_qt_cancels_authenticated_stream_and_releases_listener",
+      "test_actual_qt_domain_and_match_reject_a_proven_reachable_origin"
+    ],
+    "client_hello_profile": "chrome_133"
+  },
+  "primary_assertions": [
+    "RustCoreTests.cpp:983 check[frontend_response_valid].toBool()",
+    "RustCoreTests.cpp:981 !accepted && check[frontend_response_valid].toBool()"
+  ],
+  "qt_evidence": [
+    {
+      "file": "test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-public-key-qt.json",
+      "mode": "authentication-failure",
+      "stopped": true,
+      "listener_released": true,
+      "checks": [
+        {
+          "frontend": "http-connect",
+          "phase": "authentication-failure",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": false,
+          "proxy_status": 502,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "authentication-failure",
+          "stage": "proxy-reply",
+          "frontend_response_valid": false,
+          "tunnel_accepted": false,
+          "proxy_status": -1,
+          "closed": true,
+          "expected_result_observed": false
+        }
+      ]
+    },
+    {
+      "file": "test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-short-id-qt.json",
+      "mode": "authentication-failure",
+      "stopped": true,
+      "listener_released": true,
+      "checks": [
+        {
+          "frontend": "http-connect",
+          "phase": "authentication-failure",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": false,
+          "proxy_status": 502,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "authentication-failure",
+          "stage": "proxy-reply",
+          "frontend_response_valid": false,
+          "tunnel_accepted": false,
+          "proxy_status": -1,
+          "closed": true,
+          "expected_result_observed": false
+        }
+      ]
+    },
+    {
+      "file": "test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-servername-qt.json",
+      "mode": "authentication-failure",
+      "stopped": true,
+      "listener_released": true,
+      "checks": [
+        {
+          "frontend": "http-connect",
+          "phase": "authentication-failure",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": false,
+          "proxy_status": 502,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "authentication-failure",
+          "stage": "proxy-reply",
+          "frontend_response_valid": false,
+          "tunnel_accepted": false,
+          "proxy_status": -1,
+          "closed": true,
+          "expected_result_observed": false
+        }
+      ]
+    },
+    {
+      "file": "test_actual_qt_domain_and_match_reject_a_proven_reachable_origin-1793633562483142000/reject-qt.json",
+      "mode": "reject",
+      "stopped": true,
+      "listener_released": true,
+      "checks": [
+        {
+          "frontend": "http-connect",
+          "phase": "direct-control",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": true,
+          "proxy_status": 200,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "http-connect",
+          "phase": "direct-control",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": true,
+          "proxy_status": 200,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "http-connect",
+          "phase": "reject",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": false,
+          "proxy_status": 502,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "http-connect",
+          "phase": "reject",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": false,
+          "proxy_status": 502,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "direct-control",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": true,
+          "proxy_status": 0,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "direct-control",
+          "stage": "complete",
+          "frontend_response_valid": true,
+          "tunnel_accepted": true,
+          "proxy_status": 0,
+          "closed": true,
+          "expected_result_observed": true
+        },
+        {
+          "frontend": "socks5",
+          "phase": "reject",
+          "stage": "proxy-reply",
+          "frontend_response_valid": false,
+          "tunnel_accepted": false,
+          "proxy_status": -1,
+          "closed": true,
+          "expected_result_observed": false
+        }
+      ]
+    }
+  ],
+  "artifact_zip_sha256": "e2c3fcb0e276071dfc899a7f0a845ff616b4eff9c568b943cc813d8078ff41eb",
+  "raw_log_sha256": "8a9b8ff76c51d43d92347e2d91d45f124e109b0710e5b43dfeb3a021d1d689bf",
+  "post_failure_steps_not_run": [
+    "Windows Qt Chrome133 Vision product to public HTTP and HTTPS",
+    "Build complete native Rust application"
+  ],
+  "derived_upload_failure": "Public Qt output directory missing because preceding step prevented public test execution; not a second protocol failure."
+}

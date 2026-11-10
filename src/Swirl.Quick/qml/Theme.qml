@@ -50,7 +50,7 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // The light canvas runs continuously beneath content and the floating sidebar.
-    readonly property color canvas: dark ? "#121212" : "#F7F7F8"
+    readonly property color canvas: dark ? "#121212" : "#F7F7F7"
     readonly property color surface: dark ? "#1D1D1F" : "#FFFFFF"
     readonly property color independentCard: surface
     readonly property color cardHover: dark ? "#27272A" : "#F4F4F6"
@@ -137,15 +137,17 @@ QtObject {
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
     readonly property color windowCloseHover: dark ? "#C95058" : "#C8444C"
     readonly property color windowClosePressed: dark ? "#AF3943" : "#AD3039"
-    // Logical point-style design sizes, independent of content zoom.
-    // Qt maps these logical pixels to each screen's device pixel ratio.
-    // Apple image reference normalized to the existing 672-unit shell height.
-    // These are corner extents for the shared 2.5-power contour, not circle radii.
-    enum ShellMetrics { WindowCornerRadius = 14, SidebarCornerRadius = 24 }
-    readonly property real windowRadius: Theme.WindowCornerRadius
-    readonly property real sidebarRadius: dp(Theme.SidebarCornerRadius)
+    // Shared corner extent for the 2.5-power surface, native mask and shadows.
+    // Content zoom uses dp(); Qt applies monitor DPI exactly once afterwards.
+    readonly property real shapeCorner: dp(28)
+    readonly property real toolbarHeight: dp(30)
+    readonly property real toolbarPadding: dp(16)
+    readonly property real toolbarIconSize: dp(14)
+    readonly property real toolbarFontSize: fontSize(11)
+    readonly property real windowRadius: shapeCorner
+    readonly property real sidebarRadius: shapeCorner
     // Maximum corner extent; short cards adapt to their smaller dimension.
-    readonly property real cardRadius: dp(28)
+    readonly property real cardRadius: shapeCorner
     readonly property real containerRadius: cardRadius
     readonly property real radius: containerRadius
     readonly property real independentCardRadius: cardRadius
@@ -153,8 +155,8 @@ QtObject {
     readonly property real tableRadius: dp(10)
     readonly property real segmentedRadius: dp(10)
     readonly property real segmentedSelectedRadius: dp(8)
-    readonly property real menuRadius: dp(12)
-    readonly property real popupRadius: dp(20)
+    readonly property real menuRadius: popupRadius
+    readonly property real popupRadius: shapeCorner * 0.78
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(10)
     readonly property real buttonRadius: controlRadius

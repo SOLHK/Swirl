@@ -189,7 +189,9 @@ private slots:
             QCOMPARE(state.value("registryManualProxy"), expected.registry);
             QVERIFY(state.value("readError").toString().isEmpty());
         }
-        QCOMPARE(SystemProxySession::snapshot(), before);
+        // Preserve the exact comparison without printing the user's PAC,
+        // proxy credentials or raw registry values on a failing assertion.
+        QVERIFY2(SystemProxySession::snapshot()==before,"Reading proxy diagnostics changed the original system settings.");
     }
 #ifdef Q_OS_WIN
     void nativeRegistryReaderUsesIsolatedFixture() {

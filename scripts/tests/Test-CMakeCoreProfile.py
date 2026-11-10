@@ -20,6 +20,8 @@ UI_TESTS = {
     "swirl-all-pages", "swirl-motion", "swirl-hero", "swirl-navigation-ui",
     "swirl-gateway-network", "swirl-capture-network",
 }
+if "SWIRL_SYSTEM_PROXY_TEST" in os.environ:
+    UI_TESTS.add("swirl-system-proxy-app-exit")
 
 
 def checked(command):

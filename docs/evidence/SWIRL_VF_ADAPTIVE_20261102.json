@@ -1,0 +1,1788 @@
+{
+  "status": "PARTIAL",
+  "formal_font_generated": false,
+  "production_accepted_faces": 0,
+  "required_faces": 32,
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "source_gids": 47102,
+  "source_face_UPMs": [
+    1028,
+    1064,
+    1128,
+    1144,
+    1000,
+    1100
+  ],
+  "parent_commit": "b5619e21f754f4f5125d6aec4fa874010b3d4c60",
+  "macOS_vertical_advance": {
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "font_sha256": {
+      "original": "bf56536472a35d48ca48c3b150fa5600f54aa939dd4b9883c7e23eb1129651b1",
+      "vert": "11789882e4e360649f435a6d6cce29792f0c4f845209533e3e3bdfbdf7f1712e",
+      "vrt2": "e90c1c312a1d47a65f74bdcfbadb898dc03b4e7ab3fbf1274912940fd73ec032",
+      "vkrn": "83b482a156c53828ae0f8df56652168bf7364ba808ea11b2f4bedbf0d17eef56"
+    },
+    "CoreText_calls": 1152,
+    "HarfBuzz_calls": 1152,
+    "CoreText_groups": {
+      "vert/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vert/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vert/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vrt2/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vkrn/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vkrn/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.003662109375,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      }
+    },
+    "HarfBuzz_groups": {
+      "vert/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.007103652901150781,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 0.00732421875,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vert/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.007103652901150781,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 0.00732421875,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vert/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vert/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.007103652901150781,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 0.00732421875,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vrt2/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vrt2/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/default/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/default/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/enabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/enabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 0.007103652901150781,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 0.00732421875,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        }
+      },
+      "vkrn/disabled/ltr": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 260.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      },
+      "vkrn/disabled/ttb": {
+        "raw_metrics_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change": {
+          "checks": 128,
+          "max_abs_error": 0.0,
+          "above_1_over_32": 0,
+          "above_reconstruction_1_FUnit": 0
+        },
+        "advance_change_minus_requested_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        },
+        "advance_change_minus_observed_axis_model": {
+          "checks": 128,
+          "max_abs_error": 156.0,
+          "above_1_over_32": 116,
+          "above_reconstruction_1_FUnit": 116
+        }
+      }
+    },
+    "scope": "authored symbols only; raw metric APIs unchanged; feature-disabled residuals intentionally retained"
+  },
+  "windows_native_matrix": {
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41395154331",
+    "checkout_sha": "5d86b6469baf32565fbaa859ee41f31b797ebdc3",
+    "environments": [
+      {
+        "artifact_id": "13118614159",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "windows_product": "Microsoft Windows Server 2025 Datacenter",
+        "binary_sha256": "521e9ae42edbecdcf8be66660375f182bd4c32fab168ea2589705b84a8533365",
+        "raw_IsWow64Process2": {
+          "native_machine": 34404,
+          "process_emulated": false,
+          "process_machine": 0,
+          "query_succeeded": true
+        },
+        "architecture_caveat": "The previous process_emulated field misclassified x64 on ARM64; retain raw evidence. CMake records x64 target. Next probe adds the compiler target.",
+        "cases": {
+          "flat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_standalone": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_stat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_fdselect": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_private_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_default_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_post3": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "compact": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_default": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "artifact_id": "13119580734",
+        "platform": "Windows-11-10.0.26200-SP0",
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "binary_sha256": "532de177bba394098de214b9737b02b7273fc0d9f95f6d6ba96713d7374eaaee",
+        "raw_IsWow64Process2": {
+          "process_emulated": false,
+          "native_machine": 43620,
+          "process_machine": 0,
+          "query_succeeded": true
+        },
+        "architecture_caveat": "The previous process_emulated field misclassified x64 on ARM64; retain raw evidence. CMake records x64 target. Next probe adds the compiler target.",
+        "cases": {
+          "flat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_standalone": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_stat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_fdselect": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_private_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_default_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_post3": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "compact": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_default": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "artifact_id": "13119610034",
+        "platform": "Windows-2022Server-10.0.20348-SP0",
+        "windows_product": "Microsoft Windows Server 2022 Datacenter",
+        "binary_sha256": "32de28344f70727ab6093e07a5d7ff01e01bf6c54f3d7a5f0de5abc40f8020ad",
+        "raw_IsWow64Process2": {
+          "query_succeeded": true,
+          "native_machine": 34404,
+          "process_emulated": false,
+          "process_machine": 0
+        },
+        "architecture_caveat": "The previous process_emulated field misclassified x64 on ARM64; retain raw evidence. CMake records x64 target. Next probe adds the compiler target.",
+        "cases": {
+          "flat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_standalone": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_stat": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_fdselect": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_private_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_default_vsindex": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "flat_post3": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "compact": {
+            "native_exit_code": 0,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "PASS_NATIVE_PROBE",
+                "positions": 62
+              }
+            ]
+          },
+          "factored_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_default": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          },
+          "nested_delta_sparse": {
+            "native_exit_code": 1,
+            "face_results": [
+              {
+                "record": "face_result",
+                "face_index": 0,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              },
+              {
+                "record": "face_result",
+                "face_index": 1,
+                "status": "FAILED",
+                "error": "No actual outline/metrics movement detected for WDTH"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "private_model_experiments": {
+    "tensor_density": [
+      {
+        "gid": 1166,
+        "sizes": [
+          9,
+          65,
+          17
+        ],
+        "samples_used": 9804,
+        "maximum": 1.3211337152610148,
+        "failed": 539,
+        "p99": 0.7559837471599967,
+        "seconds": 1.8794845000011264
+      },
+      {
+        "gid": 1166,
+        "sizes": [
+          9,
+          129,
+          33
+        ],
+        "samples_used": 19694,
+        "maximum": 0.6327248752112369,
+        "failed": 449,
+        "p99": 0.552123956857536,
+        "seconds": 4.263169124998967
+      },
+      {
+        "gid": 1166,
+        "sizes": [
+          17,
+          257,
+          65
+        ],
+        "samples_used": 33515,
+        "maximum": 0.3051220574042536,
+        "failed": 179,
+        "p99": 0.20850135108118217,
+        "seconds": 7.575400791996799
+      },
+      {
+        "gid": 1166,
+        "sizes": [
+          33,
+          513,
+          129
+        ],
+        "samples_used": 47772,
+        "maximum": 0.17604508801807575,
+        "failed": 63,
+        "p99": 0.11911700984136502,
+        "seconds": 10.990648500002862
+      },
+      {
+        "gid": 19177,
+        "sizes": [
+          9,
+          65,
+          17
+        ],
+        "samples_used": 9804,
+        "maximum": 0.7776855300041341,
+        "failed": 773,
+        "p99": 0.6425295994086675,
+        "seconds": 4.471150999997917
+      },
+      {
+        "gid": 19177,
+        "sizes": [
+          9,
+          129,
+          33
+        ],
+        "samples_used": 19694,
+        "maximum": 0.39926506700426073,
+        "failed": 507,
+        "p99": 0.32265192218613364,
+        "seconds": 10.135872083999857
+      },
+      {
+        "gid": 19177,
+        "sizes": [
+          17,
+          257,
+          65
+        ],
+        "samples_used": 33515,
+        "maximum": 0.2031746558711823,
+        "failed": 226,
+        "p99": 0.1470520366897641,
+        "seconds": 17.980578791997686
+      },
+      {
+        "gid": 19177,
+        "sizes": [
+          33,
+          513,
+          129
+        ],
+        "samples_used": 47772,
+        "maximum": 0.12190478544944078,
+        "failed": 83,
+        "p99": 0.07828493296068756,
+        "seconds": 26.06388262499968
+      }
+    ],
+    "sparse_training_nodes_per_model": 2049,
+    "interpretation": "training peaks interpolate within 0.000248 but off-node failures remain; no model accepted",
+    "sparse_final_events": {
+      "1166": {
+        "models": 2049,
+        "nonzero": 2048,
+        "source_samples": 2413,
+        "max_frontier": 0.011611948502043758,
+        "held64_max": 1.546678279024897,
+        "held64_failed": 30,
+        "seconds": 33.17326275000232
+      },
+      "19177": {
+        "models": 2049,
+        "nonzero": 2048,
+        "source_samples": 2384,
+        "max_frontier": 0.3471399663477735,
+        "held64_max": 1.7040291357297672,
+        "held64_failed": 40,
+        "seconds": 46.750320500003
+      }
+    }
+  },
+  "default_lattice": {
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "scope": "portable default-design lattice diagnosis; not native acceptance",
+    "glyphs": 47102,
+    "points": 9410532,
+    "scales": {
+      "1": {
+        "control_fail_glyphs": 47080,
+        "oncurve_fail_glyphs": 47080,
+        "max_control_error": 0.7071029668007759,
+        "max_oncurve_error": 0.7071029668007759
+      },
+      "2": {
+        "control_fail_glyphs": 47079,
+        "oncurve_fail_glyphs": 47079,
+        "max_control_error": 0.3535111482952268,
+        "max_oncurve_error": 0.3535111482952268
+      },
+      "4": {
+        "control_fail_glyphs": 47078,
+        "oncurve_fail_glyphs": 47078,
+        "max_control_error": 0.17671374213782656,
+        "max_oncurve_error": 0.17669096157687805
+      },
+      "8": {
+        "control_fail_glyphs": 47075,
+        "oncurve_fail_glyphs": 47074,
+        "max_control_error": 0.08838356590225097,
+        "max_oncurve_error": 0.08838356590225097
+      },
+      "14": {
+        "control_fail_glyphs": 47049,
+        "oncurve_fail_glyphs": 47038,
+        "max_control_error": 0.05050109722813413,
+        "max_oncurve_error": 0.05050086400423346
+      },
+      "15": {
+        "control_fail_glyphs": 47014,
+        "oncurve_fail_glyphs": 46950,
+        "max_control_error": 0.0471366377656632,
+        "max_oncurve_error": 0.0471366377656632
+      },
+      "16": {
+        "control_fail_glyphs": 46973,
+        "oncurve_fail_glyphs": 46899,
+        "max_control_error": 0.04419340871901998,
+        "max_oncurve_error": 0.044193198112652196
+      }
+    },
+    "production_accepted": false,
+    "initial_probe_errors": [
+      {
+        "gid": 1,
+        "error": "design locations must be a sample-by-root-axis matrix"
+      },
+      {
+        "gid": 2,
+        "error": "design locations must be a sample-by-root-axis matrix"
+      }
+    ],
+    "corrected_observations": [
+      {
+        "gid": 1,
+        "axis_count": 0,
+        "paths": 0,
+        "result": "EMPTY_SOURCE_GLYPH_RECHECKED_WITH_CORRECT_INPUT_DIMENSION"
+      },
+      {
+        "gid": 2,
+        "axis_count": 0,
+        "paths": 0,
+        "result": "EMPTY_SOURCE_GLYPH_RECHECKED_WITH_CORRECT_INPUT_DIMENSION"
+      }
+    ],
+    "unresolved_errors": [],
+    "interpretation": "Nearest-lattice default quadratic on-curve/control error only; not a proof against shared composites, contour reparameterization or another font architecture. Scale 16 is legal only for source UPM <=1024; larger source UPMs allow less scaling."
+  },
+  "verification": {
+    "python_suite": {
+      "run": 926,
+      "failures": 0,
+      "platform_skips": 7
+    },
+    "additional_flat_capacity_tests": 3,
+    "audit_tests": 6,
+    "CoreText_raw_metric_gate": "FAIL_RETAINED",
+    "DirectWrite_nested_gate": "FAIL_RETAINED",
+    "Windows11_x64_formal_font": "NOT_RUN",
+    "Qt6_12_formal_font": "NOT_RUN",
+    "font_distribution_grant": "MATERIAL_NOT_LOCATED",
+    "test_merge": "NOT_PERFORMED"
+  },
+  "privacy": "Aggregate numbers and authored-font observations only; no font payload, source outlines or grant documents.",
+  "private_probe_sha256": {
+    "probe_source.py": "e19c6a03566bb96211a9535d87e42a4df7e1e73b9b9855fa2d3f7f2d4c52ff6f",
+    "sparse_probe.py": "b541794a8491f40d32de0b0981f894e58bf7ec0ffa51e0443e178dd3707ff933",
+    "tensor_probe.py": "75556de011a85bcf8e37bfdfca98bebb657f71ee810be1df265d566db238e94e",
+    "curve_distance_probe.py": "ecdb1d52a38603de6240796baefec566d23f8278a96065ed14cb183448e12e3c",
+    "anova_probe.py": "f284fd4bf03dc3e8afb7d255cf920bc491d67a70e7398ee16935670c340ea61e",
+    "lattice_probe.py": "5e1885c95dc7a4ef59964a150be56a890890898ae29f475c5dd4f1fe21145431"
+  }
+}

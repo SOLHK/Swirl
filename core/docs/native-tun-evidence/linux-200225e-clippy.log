@@ -1,0 +1,10 @@
+    Checking swirl-subscription v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-subscription)
+    Checking swirl-platform v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-platform)
+   Compiling swirl-api v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-api)
+    Checking swirl-tun v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-tun)
+    Checking swirl-transport v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-transport)
+    Checking swirl-routing v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-routing)
+    Checking swirl-dns v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-dns)
+    Checking swirl-protocol v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-protocol)
+    Checking swirl-core v0.1.0 (/workspace/scratch/619bd4bcb69d/Swirl/core/crates/swirl-core)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.53s

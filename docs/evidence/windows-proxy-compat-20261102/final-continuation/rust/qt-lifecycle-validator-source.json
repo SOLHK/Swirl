@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "base_commit_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "source_commit_sha": null,
+  "scope": "Uncommitted test-only contract correction; Rust core subtree and running soak binary unchanged. Baseline replays 404 Python validator with candidate tests.",
+  "files": {
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": {
+      "baseline_sha256": "a460897b6b3f82e1264742a8cb1d4db15fd5b78e11fbea176e611e95bda0880e",
+      "candidate_sha256": "10f79c916961a9ac89b84880af7ea18b256d6ddaec9acb0c1a5ef123371102dd"
+    },
+    "tools/tests/test_reality_runtime.py": {
+      "baseline_sha256": "6d55c9ede5497f00122ab976bf71ccdc5b56c4256e396b269c7d0d8163bf782c",
+      "candidate_sha256": "da29b4b80388bdd47eea88475105e43d98ef7eef321c1cba6c2f542c357ef73d"
+    },
+    "tools/tests/test_qt_reality_lifecycle.py": {
+      "baseline_sha256": "a279310f614d27d427bbcda557afdd70b090764c59cab570c9a5b326e6874582",
+      "candidate_sha256": "bf0a49c24c96b45c1811ab6a7aa1980870a8cb0ea4bed83caccd39c2e37cd347"
+    }
+  },
+  "local_tests": {
+    "methods": 10,
+    "baseline_failure_incidents": 4,
+    "candidate_passed": 10,
+    "candidate_failed": 0,
+    "candidate_skipped": 0
+  },
+  "native_windows_qt_result": "PENDING"
+}

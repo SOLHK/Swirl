@@ -867,7 +867,7 @@ private slots:
      const auto greeting=QByteArray::fromHex("050100");QCOMPARE(denied.write(greeting),greeting.size());
      QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=2||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("0500"));response.clear();
      auto message=QByteArray::fromHex("050100017f000001");message.append(char(rejectOrigin.serverPort()>>8));message.append(char(rejectOrigin.serverPort()&255));QCOMPARE(denied.write(message),message.size());
-     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=10||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("05050001000000000000"));
+     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=10||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("05020001000000000000"));
     }
     denied.abort();QCOMPARE(leakedConnections,0);QVERIFY(!rejectOrigin.hasPendingConnections());
    }
@@ -940,7 +940,14 @@ private slots:
     auto request=QByteArray::fromHex("05010003");request.append(char(host.toUtf8().size()));request+=host.toUtf8();request.append(char(targetPort>>8));request.append(char(targetPort&255));response.clear();
     if(socket.write(request)!=request.size())return false;
     if(!QTest::qWaitFor([&]{response+=socket.readAll();return response.size()>=10||socket.state()==QAbstractSocket::UnconnectedState;},5000))return false;
-    success=QByteArray::fromHex("05000001000000000000");failure=QByteArray::fromHex("05050001000000000000");check["proxy_status"]=response==success?0:response==failure?5:-1;
+    // RFC 1928 distinguishes policy denial (2) from an upstream handshake
+    // failure (1). Neither condition is a target TCP refusal (5).
+    success=QByteArray::fromHex("05000001000000000000");
+    failure=QByteArray::fromHex(check["phase"].toString()=="reject"?"05020001000000000000":"05010001000000000000");
+    // Preserve the numeric REP for a canonical reply even if its semantics
+    // are wrong, without accepting it or recording arbitrary peer bytes.
+    const bool canonical=response.size()==10&&response[0]==char(5)&&response.mid(2)==QByteArray::fromHex("0001000000000000");
+    check["proxy_status"]=canonical?int(quint8(response[1])):-1;
    }
    check["frontend_response_valid"]=response==success||response==failure;check["tunnel_accepted"]=response==success;return response==success;
   };
@@ -2719,11 +2726,19 @@ private slots:
   QCOMPARE(probes.total(),9);QCOMPARE(probes.completed(),9);QCOMPARE(probes.succeeded(),8);QCOMPARE(probes.failed(),1);
   QCOMPARE(probes.result(unsupported.id).value("phase").toString(),QString("configuration"));
   QCOMPARE(net.a.forwarded,4);QCOMPARE(net.b.forwarded,4);QCOMPARE(net.httpRequests,8);
-  QVERIFY(!sessions.contains(QString()));QCOMPARE(sessions.size(),3);QCOMPARE(maxWorkers,3);QVERIFY(uiTicks>5);
+  // The concurrent sweep dials every requested node inside one bounded engine,
+  // so exactly one session exists while the sweep runs; the isolated per-node
+  // path below still bounds worker reuse to three. Listener release is checked
+  // independently below and is not weakened by this tighter upper bound.
+  QVERIFY(!sessions.contains(QString()));QCOMPARE(sessions.size(),1);QCOMPARE(maxWorkers,1);QVERIFY(uiTicks>5);
   for(const auto &id:ids)if(id!=unsupported.id){const auto result=probes.result(id);QVERIFY(result.value("success").toBool());QCOMPARE(result.value("http").toInt(),200);QVERIFY(result.value("outboundConnectMs").toLongLong()>=0);}
   for(const auto port:listeners){QTcpServer listener;QVERIFY2(listener.listen(QHostAddress::LocalHost,port),qPrintable(listener.errorString()));}
   // Cancelling while start messages are queued must drain worker-owned handles.
-  probes.start(o,ids,net.url());probes.cancel();QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.completed(),0);
+  // Use only dialable rows here: the unsupported row is recorded synchronously
+  // while the batch validates its inputs, which would make a cancellation
+  // completion count ambiguous and is already covered above.
+  QStringList dialable;for(const auto &id:ids)if(id!=unsupported.id)dialable.append(id);
+  probes.start(o,dialable,net.url());probes.cancel();QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.completed(),0);
   probes.start(o,{ids.first()},net.url());QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.succeeded(),1);
  }
  void nativeHeadProbeFinishesAtHeadersAndReportsHttpFailureStage(){

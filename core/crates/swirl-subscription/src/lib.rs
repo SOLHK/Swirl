@@ -1,9 +1,13 @@
 //! Swirl IR v1. External documents remain available even if execution is rejected.
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
+pub mod anytls;
 mod dns_tls;
+pub use anytls::AnyTls;
 pub mod hysteria2;
+pub mod snell;
 pub mod ss2022;
+pub use snell::Snell;
 pub mod tuic;
 pub mod vmess;
 pub use hysteria2::Hysteria2;
@@ -76,6 +80,8 @@ pub enum Outbound {
     },
     Hysteria2(Hysteria2),
     Tuic(Tuic),
+    AnyTls(AnyTls),
+    Snell(Snell),
     Vless {
         host: String,
         port: u16,
@@ -456,6 +462,8 @@ impl Config {
                 }
                 Outbound::Hysteria2(config) => config.validate()?,
                 Outbound::Tuic(config) => config.validate()?,
+                Outbound::AnyTls(config) => config.validate()?,
+                Outbound::Snell(config) => config.validate()?,
                 Outbound::Socks4 {
                     host,
                     port,
@@ -581,6 +589,7 @@ impl Config {
                 Outbound::Trojan { tls, .. } => Some(tls),
                 Outbound::Hysteria2(config) => Some(&config.tls),
                 Outbound::Tuic(config) => Some(&config.tls),
+                Outbound::AnyTls(config) => Some(&config.tls),
                 _ => None,
             };
             if let Some(tls) = tls

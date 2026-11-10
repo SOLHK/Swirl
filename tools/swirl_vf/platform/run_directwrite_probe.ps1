@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
     [switch]$AllGlyphs,
     [switch]$Render,
+    [switch]$ExportOutlines,
     [string]$Binary
 )
 $ErrorActionPreference = 'Stop'
@@ -27,7 +28,7 @@ $report = [ordered]@{
     system_installation = 'NOT_TESTED'
     real_swirl_ui = 'NOT_TESTED'
     clarity_review = 'NOT_EVALUATED'
-    requested = @{ all_glyphs = $AllGlyphs.IsPresent; render = $Render.IsPresent }
+    requested = @{ all_glyphs = $AllGlyphs.IsPresent; render = $Render.IsPresent; outline_coordinates = $ExportOutlines.IsPresent }
 }
 $returnCode = 77
 $resolvedFont = $null
@@ -93,6 +94,7 @@ try {
             $nativeArgs = @($resolvedFont, $resultDirectory)
             if ($AllGlyphs) { $nativeArgs += '--all-glyphs' }
             if ($Render) { $nativeArgs += '--render' }
+            if ($ExportOutlines) { $nativeArgs += '--outline-coordinates' }
             $report.run_command = @($exe) + $nativeArgs
             & $exe @nativeArgs 1> (Join-Path $resultDirectory 'native.stdout.log') 2> (Join-Path $resultDirectory 'native.stderr.log')
             $returnCode = $LASTEXITCODE
@@ -104,9 +106,23 @@ try {
             # PSCustomObject cannot retain these distinct JSON keys.
             $rows = @(Get-Content -LiteralPath $nativeLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json -AsHashtable })
             $headers = @($rows | Where-Object { $_.record -eq 'header' })
+            if ($headers.Count -eq 1) {
+                $report.native_architecture = @{
+                    query_succeeded = $headers[0].architecture_query_succeeded
+                    process_machine = $headers[0].process_machine
+                    compiled_machine = $headers[0].compiled_machine
+                    native_machine = $headers[0].native_machine
+                    process_emulated = $headers[0].process_emulated
+                }
+            }
             $summaries = @($rows | Where-Object { $_.record -eq 'summary' })
             $failures = @($rows | Where-Object { $_.record -eq 'face_result' -and $_.status -eq 'FAILED' })
             $report.native_log_sha256 = (Get-FileHash -LiteralPath $nativeLog -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($ExportOutlines) {
+                $outlineLog = Join-Path $resultDirectory 'outline-coordinates.jsonl'
+                $report.outline_coordinates_sha256 = (Get-FileHash -LiteralPath $outlineLog -Algorithm SHA256).Hash.ToLowerInvariant()
+                $report.outline_coordinates_bytes = (Get-Item -LiteralPath $outlineLog).Length
+            }
             $report.native_summary = $summaries
             if ($returnCode -eq 0 -and $headers.Count -eq 1 -and $summaries.Count -eq 1 -and
                 $failures.Count -eq 0 -and $summaries[0].status -eq 'PASS_NATIVE_PROBE' -and

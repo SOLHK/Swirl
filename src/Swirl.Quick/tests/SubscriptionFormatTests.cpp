@@ -40,6 +40,49 @@ class SubscriptionFormatTests:public QObject {
     }
 private slots:
     void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+    void loonVmessPositionalCredentialsAndWebsocketReachNativeProjection(){
+        const QByteArray prefix="[Proxy]\nAuthored = vmess,edge.fixture.invalid,8443,aes-128-gcm,\"00112233-4455-4677-8899-aabbccddeeff\",";
+        for(const auto &tail:{QByteArray("transport=tcp,over-tls=false"),QByteArray("transport=ws,path=/authored,host=cdn.fixture.invalid,over-tls=true,tls-name=secure.fixture.invalid,alterId=0,fast-open=false")}){
+            const auto original=prefix+tail;
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,0);
+                const auto &node=parsed.nodes.first();QCOMPARE(node.cipher,QString("aes-128-gcm"));QCOMPARE(node.parameters.value("uuid").toString(),QString("00112233-4455-4677-8899-aabbccddeeff"));
+                QCOMPARE(node.originalConfiguration.value("line").toString(),QString::fromUtf8(original.split('\n').last()));
+                EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=node.id;options.routingMode="global";
+                QJsonObject config;const auto error=RustCoreEngine::configuration(options,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+                const auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+                QCOMPARE(outbound["type"],QJsonValue("vmess"));QCOMPARE(outbound["uuid"],QJsonValue("00112233-4455-4677-8899-aabbccddeeff"));QCOMPARE(outbound["security"],QJsonValue("aes-128-gcm"));QCOMPARE(outbound["alter_id"],QJsonValue(0));
+                if(tail.startsWith("transport=ws")){
+                    QCOMPARE(outbound["websocket"].toObject(),(QJsonObject{{"host","cdn.fixture.invalid"},{"path","/authored"}}));
+                    QCOMPARE(outbound["tls"].toObject()["server_name"],QJsonValue("secure.fixture.invalid"));
+                }else{QVERIFY(!outbound.contains("websocket"));QVERIFY(!outbound.contains("tls"));}
+            }
+        }
+    }
+    void loonHttpPositionalCredentialsPreserveQuotedDelimitersAndRejectAliases(){
+        for(const auto &protocol:{QByteArray("http"),QByteArray("https")}){
+            const QByteArray original="[Proxy]\nAuthored = "+protocol+",edge.fixture.invalid,8443,\"user,with+percent%25\",\"secret=with:+percent%25\"";
+            const auto parsed=NodeImporter::parse(original);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.incompleteNodes,0);
+            const auto &node=parsed.nodes.first();QCOMPARE(node.username,QString("user,with+percent%25"));QCOMPARE(node.password,QString("secret=with:+percent%25"));
+            EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=node.id;options.routingMode="global";
+            QJsonObject config;const auto error=RustCoreEngine::configuration(options,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+            const auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+            QCOMPARE(outbound["auth"].toObject(),(QJsonObject{{"username","user,with+percent%25"},{"password","secret=with:+percent%25"}}));
+            if(protocol=="https")QCOMPARE(outbound["tls"].toObject()["server_name"],QJsonValue("edge.fixture.invalid"));
+            else QVERIFY(!outbound.contains("tls"));
+            for(const auto &suffix:{QByteArray(",username=other"),QByteArray(",password=other")})QVERIFY(!NodeImporter::parse(original+suffix));
+        }
+        const QByteArray vmess="[Proxy]\nAuthored = vmess,edge.fixture.invalid,8443,aes-128-gcm,\"00112233-4455-4677-8899-aabbccddeeff\"";
+        for(const auto &suffix:{QByteArray(",uuid=ffeeddcc-bbaa-4988-8766-554433221100"),QByteArray(",alterId=broken"),QByteArray(",fast-open=invalid")})QVERIFY(!NodeImporter::parse(vmess+suffix));
+        for(const auto &suffix:{QByteArray(",transport=grpc"),QByteArray(",future-option=retained"),QByteArray(",udp=true")}){
+            const auto parsed=NodeImporter::parse(vmess+suffix);QVERIFY2(parsed,qPrintable(parsed.error));
+            EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=options.nodes.first().id;options.routingMode="global";
+            const QJsonObject sentinel{{"unchanged",true}};QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(options,&config).isEmpty());QCOMPARE(config,sentinel);
+        }
+        const auto invalidAuth=NodeImporter::parse("[Proxy]\nAuthored = http,edge.fixture.invalid,8443,\"user:ambiguous\",secret");QVERIFY(invalidAuth);
+        EngineStartOptions invalidOptions;invalidOptions.nodes=invalidAuth.nodes;invalidOptions.selectedNodeId=invalidAuth.nodes.first().id;invalidOptions.routingMode="global";
+        const QJsonObject sentinel{{"unchanged",true}};QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(invalidOptions,&config).isEmpty());QCOMPARE(config,sentinel);
+    }
     void singBoxQuicParametersSurviveStorageAndRustConversion(){
         for(const auto &type:QStringList{"tuic","hysteria2"}){
             QJsonObject raw{{"type",type},{"tag","synthetic"},{"server","localhost"},{"server_port",443},{"password","synthetic:password"},{"network","tcp"},

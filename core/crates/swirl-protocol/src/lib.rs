@@ -1,13 +1,17 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+pub mod anytls;
 mod diagnostics;
 mod dial;
 pub mod http_single;
 pub mod hysteria2;
 #[cfg(test)]
 mod inbound_http_tests;
+#[cfg(test)]
+mod outbound_http_tests;
 mod probe;
 mod shadowsocks;
+pub mod snell;
 mod socks4;
 mod socks5;
 pub mod ss2022;
@@ -183,6 +187,38 @@ async fn http_header(stream: &mut TcpStream, mut data: Vec<u8>) -> Result<(Vec<u
     }
 }
 
+fn credential_matches(expected: &[u8], candidate: &[u8]) -> bool {
+    // This key is a domain separator, not a stored password or a KDF. Hashing
+    // allows bounded variable-length credentials to use ring's verified
+    // constant-time comparison of fixed-size authentication tags.
+    let key = ring::hmac::Key::new(
+        ring::hmac::HMAC_SHA256,
+        b"Swirl inbound credential comparison v1",
+    );
+    let expected = ring::hmac::sign(&key, expected);
+    ring::hmac::verify(&key, candidate, expected.as_ref()).is_ok()
+}
+
+#[cfg(test)]
+mod credential_comparison_tests {
+    use super::credential_matches;
+
+    #[test]
+    fn exact_credentials_are_required_including_length_and_suffix() {
+        let expected = b"fixture-secret-123";
+        assert!(credential_matches(expected, expected));
+        for candidate in [
+            b"".as_slice(),
+            b"fixture-secret-12",
+            b"fixture-secret-1234",
+            b"fixture-secret-124",
+            b"Fixture-secret-123",
+        ] {
+            assert!(!credential_matches(expected, candidate));
+        }
+    }
+}
+
 pub async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -> Result<Inbound> {
     let first = stream.read_u8().await.map_err(|_| "InboundClosed")?;
     if first == 4 {
@@ -250,7 +286,11 @@ async fn accept_socks(stream: &mut TcpStream, auth: &Option<Credentials>) -> Res
             .read_exact(&mut pass)
             .await
             .map_err(|_| "InboundAuthentication")?;
-        let ok = user == auth.username.as_bytes() && pass == auth.password.as_bytes();
+        // Evaluate both credentials and use ring's constant-time tag
+        // verification, without prefix-sensitive byte/string comparisons.
+        let user_ok = credential_matches(auth.username.as_bytes(), &user);
+        let pass_ok = credential_matches(auth.password.as_bytes(), &pass);
+        let ok = user_ok & pass_ok;
         stream
             .write_all(&[1, if ok { 0 } else { 1 }])
             .await
@@ -268,7 +308,16 @@ async fn accept_socks(stream: &mut TcpStream, auth: &Option<Credentials>) -> Res
         let _ = stream.write_all(&[5, 7, 0, 1, 0, 0, 0, 0, 0, 0]).await;
         return Err("SocksCommand");
     }
-    let target = read_target(stream, header[1] == 3).await?;
+    let target = match read_target(stream, header[1] == 3).await {
+        Err(error @ "AddressType") => {
+            // Method/authentication has completed and ATYP is known. Reply
+            // with RFC 1928's unsupported-address-type code before closing;
+            // keep the original parser error even if the client stops reading.
+            let _ = reply_failure(stream, InboundKind::Socks5, error).await;
+            return Err(error);
+        }
+        result => result?,
+    };
     Ok(Inbound {
         kind: InboundKind::Socks5,
         target,
@@ -358,7 +407,7 @@ async fn accept_http(
             "Basic {}",
             STANDARD.encode(format!("{}:{}", auth.username, auth.password))
         );
-        if authorization != Some(expected.as_bytes()) {
+        if !authorization.is_some_and(|value| credential_matches(expected.as_bytes(), value)) {
             stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Swirl\"\r\nConnection: close\r\nContent-Length: 0\r\n\r\n").await.map_err(|_|"HttpWrite")?;
             // Return a distinct marker; caller must not emit a second response.
             return Err("InboundAuthentication");
@@ -445,6 +494,35 @@ pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Resul
     };
     stream.write_all(&bytes).await.map_err(|_| "InboundReply")
 }
+
+/// Reply to a parsed request that failed before a success reply was started.
+/// RFC 1928 section 6 gives distinct SOCKS5 meanings to policy denial,
+/// reachability and TCP refusal. Do not invent a more specific cause for an
+/// ambiguous upstream failure or label an ordinary timeout as TTL expiry.
+/// Only fixed protocol bytes are sent; internal error details stay internal.
+pub async fn reply_failure(stream: &mut TcpStream, kind: InboundKind, code: &str) -> Result<()> {
+    if matches!(kind, InboundKind::Socks5) {
+        let status = match code {
+            "RouteRejected" | "ProxyLoop" | "UpstreamPermissionDenied" => 2,
+            "UpstreamNetworkUnreachable" => 3,
+            "UpstreamHostUnreachable"
+            | "DnsNameError"
+            | "DnsEmpty"
+            | "RouteDnsEmpty"
+            | "DnsLookupFailed" => 4,
+            "UpstreamConnectionRefused" => 5,
+            "AddressType" => 8,
+            _ => 1,
+        };
+        stream
+            .write_all(&[5, status, 0, 1, 0, 0, 0, 0, 0, 0])
+            .await
+            .map_err(|_| "InboundReply")
+    } else {
+        reply(stream, kind, false).await
+    }
+}
+
 pub async fn connect(
     outbound: &Outbound,
     target: &Target,
@@ -482,6 +560,18 @@ pub(crate) async fn connect_udp_stream(
     handshake_limit: std::time::Duration,
     transport: Option<&Transport>,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::AnyTls(config) = outbound {
+        if !config.udp || transport.is_some() {
+            return Err("AnyTlsUdpDisabledOrUnsupported");
+        }
+        return Box::pin(anytls::connect_udp(
+            config,
+            target,
+            resolver,
+            handshake_limit,
+        ))
+        .await;
+    }
     match outbound {
         Outbound::Vless {
             udp: true, flow, ..
@@ -527,6 +617,9 @@ async fn connect_selected(
         }
         Outbound::Tuic(config) => {
             Box::pin(tuic::connect(config, target, resolver, handshake_limit)).await
+        }
+        Outbound::AnyTls(config) => {
+            Box::pin(anytls::connect(config, target, resolver, handshake_limit)).await
         }
         _ => {
             Box::pin(connect_stream_selected(
@@ -704,6 +797,10 @@ async fn connect_stream_selected(
             .await;
         }
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
+        Outbound::Snell(config) => {
+            config.validate()?;
+            (&config.host, config.port, None, None)
+        }
         Outbound::Socks5 {
             host,
             port,
@@ -726,7 +823,9 @@ async fn connect_stream_selected(
         | Outbound::Vmess {
             host, port, tls, ..
         } => (host, *port, None, tls.as_ref()),
-        Outbound::Hysteria2(_) | Outbound::Tuic(_) => return Err("QuicDispatchInvariant"),
+        Outbound::Hysteria2(_) | Outbound::Tuic(_) | Outbound::AnyTls(_) => {
+            return Err("ProtocolDispatchInvariant");
+        }
     };
     let tcp = connect_tcp(
         resolver,
@@ -805,6 +904,7 @@ pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Resul
     match outbound {
         Outbound::Hysteria2(config) => return hysteria2::validate(config),
         Outbound::Tuic(config) => return tuic::validate(config),
+        Outbound::AnyTls(config) => return anytls::validate(config),
         _ => {}
     }
     let tls = match outbound {
@@ -837,6 +937,7 @@ async fn handshake(
             | Outbound::Vless { .. }
             | Outbound::Trojan { .. }
             | Outbound::Shadowsocks { .. }
+            | Outbound::Snell(_)
     ) {
         // These protocols may defer a response until application data, or
         // have no acknowledgement. Measure encoding/writing, never auth OK.
@@ -855,6 +956,12 @@ async fn handshake_inner(
     handshake_limit: std::time::Duration,
     udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::Snell(config) = outbound {
+        if udp {
+            return Err("SnellUdpRequiresAssociation");
+        }
+        return snell::connect(stream, &config.psk, target).await;
+    }
     if let Outbound::Vmess {
         uuid,
         alter_id,
@@ -960,23 +1067,41 @@ async fn handshake_inner(
                 .await
                 .map_err(|_| "HttpUpstreamWrite")?;
             stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
-            // Read exactly through the header: tunnel bytes must stay in the socket.
-            let mut header = Vec::new();
-            while !header.ends_with(b"\r\n\r\n") {
-                if header.len() >= 16384 {
-                    return Err("UpstreamHeaderTooLarge");
+            // RFC 9110 9.3.6: every 2xx CONNECT establishes an opaque tunnel.
+            // Read exactly through each header so coalesced tunnel bytes stay
+            // in the socket, ignoring framing fields on the final success.
+            // Section 15.2 also permits unsolicited interim responses. Bound
+            // their count within the existing overall handshake deadline.
+            let mut informational = 0;
+            loop {
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    if header.len() >= 16384 {
+                        return Err("UpstreamHeaderTooLarge");
+                    }
+                    header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
                 }
-                header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
-            }
-            let mut fields = [httparse::EMPTY_HEADER; 64];
-            let mut response = httparse::Response::new(&mut fields);
-            if !response
-                .parse(&header)
-                .map_err(|_| "HttpUpstreamSyntax")?
-                .is_complete()
-                || response.code != Some(200)
-            {
-                return Err("UpstreamRejected");
+                let mut fields = [httparse::EMPTY_HEADER; 64];
+                let mut response = httparse::Response::new(&mut fields);
+                if !response
+                    .parse(&header)
+                    .map_err(|_| "HttpUpstreamSyntax")?
+                    .is_complete()
+                {
+                    return Err("HttpUpstreamSyntax");
+                }
+                let code = response.code.ok_or("HttpUpstreamSyntax")?;
+                if (100..200).contains(&code) && code != 101 {
+                    informational += 1;
+                    if informational > 8 {
+                        return Err("HttpUpstreamInformationalLimit");
+                    }
+                    continue;
+                }
+                if !(200..300).contains(&code) {
+                    return Err("UpstreamRejected");
+                }
+                break;
             }
             Ok(())
         })

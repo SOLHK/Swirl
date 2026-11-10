@@ -1,0 +1,7 @@
+   Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+    Finished `release` profile [optimized] target(s) in 4.90s
+     Running `target\release\examples\windows-restricted-worker-smoke.exe --disposable-environment --directory D:\a\_temp\swirl-restricted-worker-smoke`
+restricted smoke entered Rust main
+restricted worker child exited: code=3221225794 hex=0xc0000142 stdout_bytes=0 stderr_bytes=0
+restricted worker smoke failed: restricted worker capability probe failed; inspect preserved stdout/stderr
+error: process didn't exit successfully: `target\release\examples\windows-restricted-worker-smoke.exe --disposable-environment --directory D:\a\_temp\swirl-restricted-worker-smoke` (exit code: 1)

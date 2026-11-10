@@ -1,1 +1,5 @@
 cryptography==50.0.2
+# Independent HTTP/2 clients and origins used only by network regression tests.
+h2==4.3.0
+hpack==4.2.0
+hyperframe==6.1.0

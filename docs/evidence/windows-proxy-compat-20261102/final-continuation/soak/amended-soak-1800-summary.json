@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "verified_at_utc": "2026-11-02T15:42:10.735300+00:00",
+  "started_at_utc": "2026-11-02T15:12:05.616086+00:00",
+  "finished_at_utc": "2026-11-02T15:42:06.039493+00:00",
+  "runner_exit_code": 0,
+  "source_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "source_core_files_still_match_frozen_build": true,
+  "current_head": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "current_head_core_matches_frozen_build": false,
+  "binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+  "raw_result_sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875",
+  "harness_identity_file": "amended-soak-harness-identity.json",
+  "harness_files_still_match_run_start_base": true,
+  "observed_stream_seconds": 1800.004075,
+  "connections": 8,
+  "events_per_connection": 1801,
+  "total_events": 14408,
+  "all_peer_and_expected_event_hashes_match": true,
+  "all_peers_tls_close_notify_and_tcp_eof": true,
+  "listener_closed": true,
+  "final_core": {
+    "active": 0,
+    "accepted": 8,
+    "failed": 0,
+    "upload": 13800,
+    "download": 1198958,
+    "ended_records": 8
+  },
+  "resource_samples": 1800,
+  "observed_rss_kib_min_max": [
+    6888,
+    6912
+  ],
+  "observed_fd_min_max": [
+    23,
+    23
+  ],
+  "resource_observation_limit": "RSS and FD observations do not prove absence of leaks",
+  "scope": "Linux controlled local V2 HTTP CONNECT, authenticated upstream SOCKS5, verified TLS and SSE; no Windows desktop or provider acceptance",
+  "platform": "linux"
+}

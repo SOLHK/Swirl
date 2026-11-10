@@ -1,0 +1,45 @@
+name: Native TUN
+on:
+  push:
+    branches: [work/native-tun-windows-20261030]
+  pull_request:
+    branches: [main, test]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  simulated:
+    name: Packet flows and native TUN control on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Format, lint, packet and native control tests
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-core -p swirl-api --all-targets --all-features --locked -- -D warnings
+          cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns --all-targets
+          cargo test --locked -p swirl-core --features native-tun --lib
+          cargo test --locked -p swirl-api --lib
+  windows-compile:
+    name: Windows compile only
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal && rustup target add x86_64-pc-windows-msvc
+      - name: Check the TUN crates for Windows
+        run: cargo check --locked -p swirl-tun -p swirl-platform -p swirl-api --target x86_64-pc-windows-msvc

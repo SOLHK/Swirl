@@ -210,11 +210,11 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
         // Subscription authors cannot weaken Swirl's TLS policy. A correctly
-        // typed Trojan flag is safely projected to stricter verification, with
+        // typed TLS password-protocol flag is projected to stricter verification, with
         // an explicit persistent notice; originalConfiguration stays untouched.
         // This is not an insecure runtime option: manual/runtime true, wrong
         // types, nested flags and all unrelated options still fail validation.
-        if(n.protocol=="trojan" && params.value("skip-cert-verify")==QJsonValue(true)) {
+        if((n.protocol=="trojan" || n.protocol=="anytls") && params.value("skip-cert-verify")==QJsonValue(true)) {
             params["skip-cert-verify"]=false;
             n.certificateVerificationEnforced=true;
         }

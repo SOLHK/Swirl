@@ -1,0 +1,677 @@
+{
+  "head_sha": "d061c061e86d0df611fdd5e2bf7911b0133b2741",
+  "checkout_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+  "head_tree_sha": "8d5e39e327aa88fee97cb81dacdf771da0fbd3e0",
+  "checkout_tree_sha": "8d5e39e327aa88fee97cb81dacdf771da0fbd3e0",
+  "head_parents": [
+    "1410ee9f1d9158f32534892ccb7062ecab30be7f"
+  ],
+  "checkout_parents": [
+    "63dde8812f85839aa6024cbba6c498c96cae022d",
+    "d061c061e86d0df611fdd5e2bf7911b0133b2741"
+  ],
+  "tree_equality": true,
+  "expected_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "run_ids": {
+    "fullqt": 41499659849,
+    "security": 41499660103,
+    "policy": 41499659872,
+    "source": 41499660308,
+    "rust": 41499660432
+  },
+  "run": 41499659849,
+  "job": 125463553970,
+  "conclusion": "failure",
+  "artifact_id": 13168564433,
+  "artifact_zip_sha256": "4016e4cf95df2af0f8e24f915fc0c7982e8613b0924d4e08e4051ec8d0688b30",
+  "raw_job_log_sha256": "060d876720526b7737d9964754605914136b04d5df7d97532ba217dd8a981886",
+  "junit": {
+    "critical-ui.xml": {
+      "attributes": {
+        "name": "(empty)",
+        "tests": "10",
+        "failures": "0",
+        "disabled": "0",
+        "skipped": "0",
+        "hostname": "",
+        "time": "367",
+        "timestamp": "2026-11-02T18:24:52"
+      },
+      "cases": [
+        {
+          "name": "swirl-appearance-ui",
+          "classname": "swirl-appearance-ui",
+          "time": "32.9199",
+          "status": "run"
+        },
+        {
+          "name": "swirl-node-ui",
+          "classname": "swirl-node-ui",
+          "time": "44.9491",
+          "status": "run"
+        },
+        {
+          "name": "swirl-engine-ui",
+          "classname": "swirl-engine-ui",
+          "time": "12.4508",
+          "status": "run"
+        },
+        {
+          "name": "swirl-motion",
+          "classname": "swirl-motion",
+          "time": "37.8156",
+          "status": "run"
+        },
+        {
+          "name": "swirl-apec-motion",
+          "classname": "swirl-apec-motion",
+          "time": "17.4053",
+          "status": "run"
+        },
+        {
+          "name": "swirl-policy-ui",
+          "classname": "swirl-policy-ui",
+          "time": "59.3931",
+          "status": "run"
+        },
+        {
+          "name": "swirl-apec-glass",
+          "classname": "swirl-apec-glass",
+          "time": "10.5695",
+          "status": "run"
+        },
+        {
+          "name": "swirl-hero",
+          "classname": "swirl-hero",
+          "time": "45.2718",
+          "status": "run"
+        },
+        {
+          "name": "swirl-settings-material",
+          "classname": "swirl-settings-material",
+          "time": "32.4013",
+          "status": "run"
+        },
+        {
+          "name": "swirl-navigation-ui",
+          "classname": "swirl-navigation-ui",
+          "time": "74.487",
+          "status": "run"
+        }
+      ],
+      "sha256": "20bd7697837a1b09d945b5763ba81378b2f70404782bcaa791e217d1a5a37779"
+    },
+    "critical-network.xml": {
+      "attributes": {
+        "name": "(empty)",
+        "tests": "11",
+        "failures": "1",
+        "disabled": "0",
+        "skipped": "0",
+        "hostname": "",
+        "time": "138",
+        "timestamp": "2026-11-02T18:31:00"
+      },
+      "cases": [
+        {
+          "name": "swirl-system-proxy-state",
+          "classname": "swirl-system-proxy-state",
+          "time": "2.69927",
+          "status": "run"
+        },
+        {
+          "name": "swirl-system-proxy-recovery",
+          "classname": "swirl-system-proxy-recovery",
+          "time": "3.21823",
+          "status": "run"
+        },
+        {
+          "name": "swirl-system-proxy-app-exit",
+          "classname": "swirl-system-proxy-app-exit",
+          "time": "24.087",
+          "status": "fail"
+        },
+        {
+          "name": "swirl-node-real-chain",
+          "classname": "swirl-node-real-chain",
+          "time": "7.13605",
+          "status": "run"
+        },
+        {
+          "name": "swirl-stream-regression",
+          "classname": "swirl-stream-regression",
+          "time": "7.50444",
+          "status": "run"
+        },
+        {
+          "name": "swirl-subscription-download",
+          "classname": "swirl-subscription-download",
+          "time": "51.6094",
+          "status": "run"
+        },
+        {
+          "name": "swirl-qt-network-policy",
+          "classname": "swirl-qt-network-policy",
+          "time": "1.93223",
+          "status": "run"
+        },
+        {
+          "name": "swirl-subscription-formats",
+          "classname": "swirl-subscription-formats",
+          "time": "9.34381",
+          "status": "run"
+        },
+        {
+          "name": "swirl-import-subscription",
+          "classname": "swirl-import-subscription",
+          "time": "20.4909",
+          "status": "run"
+        },
+        {
+          "name": "swirl-import-boundaries",
+          "classname": "swirl-import-boundaries",
+          "time": "7.24493",
+          "status": "run"
+        },
+        {
+          "name": "swirl-gateway-network",
+          "classname": "swirl-gateway-network",
+          "time": "3.3541",
+          "status": "run"
+        }
+      ],
+      "sha256": "1f75f96818e6bb1073a81d45cbd4a870dc41dbe28a75b36121366d39768a4cd1"
+    },
+    "activity-diagnostic-regression.xml": {
+      "attributes": {
+        "name": "(empty)",
+        "tests": "7",
+        "failures": "0",
+        "disabled": "0",
+        "skipped": "0",
+        "hostname": "",
+        "time": "215",
+        "timestamp": "2026-11-02T18:33:48"
+      },
+      "cases": [
+        {
+          "name": "swirl-window-shadow",
+          "classname": "swirl-window-shadow",
+          "time": "7.3802",
+          "status": "run"
+        },
+        {
+          "name": "swirl-activity-layout",
+          "classname": "swirl-activity-layout",
+          "time": "16.4189",
+          "status": "run"
+        },
+        {
+          "name": "swirl-activity-details",
+          "classname": "swirl-activity-details",
+          "time": "44.6851",
+          "status": "run"
+        },
+        {
+          "name": "swirl-activity-perf-600",
+          "classname": "swirl-activity-perf-600",
+          "time": "40.9056",
+          "status": "run"
+        },
+        {
+          "name": "swirl-activity-perf-2000",
+          "classname": "swirl-activity-perf-2000",
+          "time": "41.6071",
+          "status": "run"
+        },
+        {
+          "name": "swirl-policy-ui",
+          "classname": "swirl-policy-ui",
+          "time": "59.0911",
+          "status": "run"
+        },
+        {
+          "name": "swirl-liquid-glass",
+          "classname": "swirl-liquid-glass",
+          "time": "5.20766",
+          "status": "run"
+        }
+      ],
+      "sha256": "028aab8fbc0b3ed97800b34c86d1042ce4a285742b2515b976d5e88f824bc194"
+    }
+  },
+  "app_exit_incidents": [
+    {
+      "function": "initTestCase",
+      "type": "pass",
+      "line": "0",
+      "tag": null,
+      "description": null
+    },
+    {
+      "function": "ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry",
+      "type": "pass",
+      "line": "0",
+      "tag": null,
+      "description": null
+    },
+    {
+      "function": "listenerProbeDistinguishesClosedAndLivePorts",
+      "type": "fail",
+      "line": "220",
+      "tag": null,
+      "description": "'closedProbe.refused()' returned FALSE. (A known-closed control port must produce an explicit connection refusal.)"
+    },
+    {
+      "function": "normalApplicationExitRestoresOwnedProxy",
+      "type": "fail",
+      "line": "381",
+      "tag": "pac-only",
+      "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+    },
+    {
+      "function": "normalApplicationExitRestoresOwnedProxy",
+      "type": "fail",
+      "line": "381",
+      "tag": "manual-and-pac",
+      "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+    },
+    {
+      "function": "normalApplicationExitRestoresOwnedProxy",
+      "type": "fail",
+      "line": "381",
+      "tag": "pac-only-external-edit",
+      "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+    },
+    {
+      "function": "normalApplicationExitRestoresOwnedProxy",
+      "type": "fail",
+      "line": "381",
+      "tag": "manual-and-pac-external-edit",
+      "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+    },
+    {
+      "function": "cleanupTestCase",
+      "type": "pass",
+      "line": "0",
+      "tag": null,
+      "description": null
+    }
+  ],
+  "safe_receipts": {
+    "listener-probe-controls.json": {
+      "current": {
+        "closed": {
+          "connected": false,
+          "deadline_ms": 3000,
+          "elapsed_ms": 3005,
+          "error_observed": false,
+          "outcome": "deadline",
+          "refused": false,
+          "signal_error": -1,
+          "socket_error": -1,
+          "socket_state": 2,
+          "terminal_observed": false
+        }
+      },
+      "legacy": {
+        "closed": {
+          "deadline_ms": 1500,
+          "elapsed_ms": 1500,
+          "finished": false,
+          "predicate_result": false,
+          "socket_error": -1,
+          "socket_state": 2
+        }
+      },
+      "schema": 1,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+      "success": false
+    },
+    "manual-and-pac-external-edit-final.json": {
+      "close_requested": true,
+      "failure_code": "",
+      "fixture_failed": false,
+      "journal_absent": true,
+      "journal_absent_at_release": true,
+      "native_backend": true,
+      "native_snapshot_readable": true,
+      "phase": "final",
+      "pid": 8172,
+      "proxy_busy": false,
+      "proxy_owned": false,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "release_finished": true,
+      "release_succeeded": true,
+      "release_while_runtime_alive": true,
+      "runtime_pid": 8172,
+      "runtime_stopped": true,
+      "rust_port": 60414,
+      "schema": 1,
+      "shutdown_coordinator_completed": true,
+      "shutdown_ms": 53,
+      "snapshot_restored_at_release": false,
+      "snapshot_restored_before_exit": false,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "manual-and-pac-external-edit-ready.json": {
+      "close_requested": false,
+      "failure_code": "",
+      "fixture_failed": false,
+      "guard_acknowledged": true,
+      "native_backend": true,
+      "native_listener_matches_rust": true,
+      "phase": "ready",
+      "pid": 8172,
+      "proxy_enabled": true,
+      "proxy_owned": true,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "runtime_alive": true,
+      "runtime_healthy": true,
+      "runtime_pid": 8172,
+      "rust_port": 60414,
+      "saved_applied_policy_matches": true,
+      "schema": 1,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "manual-and-pac-external-edit-result.json": {
+      "child_exit_code": 0,
+      "child_normal_exit": true,
+      "child_stopped": true,
+      "data_tag": "manual-and-pac-external-edit",
+      "exact_exit_snapshot": true,
+      "external_edit": true,
+      "flags": 7,
+      "http_roundtrip": true,
+      "journal_and_guard_markers_removed": true,
+      "listener_probe": {
+        "connected": false,
+        "deadline_ms": 3000,
+        "elapsed_ms": 3000,
+        "error_observed": false,
+        "outcome": "deadline",
+        "refused": false,
+        "signal_error": -1,
+        "socket_error": -1,
+        "socket_state": 2,
+        "terminal_observed": false
+      },
+      "pid": 8172,
+      "runner_original_restored": true,
+      "runtime_port": 60414,
+      "schema": 1,
+      "socks5_roundtrip": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+      "success": false,
+      "winhttp_unchanged": true
+    },
+    "manual-and-pac-final.json": {
+      "close_requested": true,
+      "failure_code": "",
+      "fixture_failed": false,
+      "journal_absent": true,
+      "journal_absent_at_release": true,
+      "native_backend": true,
+      "native_snapshot_readable": true,
+      "phase": "final",
+      "pid": 6044,
+      "proxy_busy": false,
+      "proxy_owned": false,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "release_finished": true,
+      "release_succeeded": true,
+      "release_while_runtime_alive": true,
+      "runtime_pid": 6044,
+      "runtime_stopped": true,
+      "rust_port": 60383,
+      "schema": 1,
+      "shutdown_coordinator_completed": true,
+      "shutdown_ms": 52,
+      "snapshot_restored_at_release": true,
+      "snapshot_restored_before_exit": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "manual-and-pac-ready.json": {
+      "close_requested": false,
+      "failure_code": "",
+      "fixture_failed": false,
+      "guard_acknowledged": true,
+      "native_backend": true,
+      "native_listener_matches_rust": true,
+      "phase": "ready",
+      "pid": 6044,
+      "proxy_enabled": true,
+      "proxy_owned": true,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "runtime_alive": true,
+      "runtime_healthy": true,
+      "runtime_pid": 6044,
+      "rust_port": 60383,
+      "saved_applied_policy_matches": true,
+      "schema": 1,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "manual-and-pac-result.json": {
+      "child_exit_code": 0,
+      "child_normal_exit": true,
+      "child_stopped": true,
+      "data_tag": "manual-and-pac",
+      "exact_exit_snapshot": true,
+      "external_edit": false,
+      "flags": 7,
+      "http_roundtrip": true,
+      "journal_and_guard_markers_removed": true,
+      "listener_probe": {
+        "connected": false,
+        "deadline_ms": 3000,
+        "elapsed_ms": 3015,
+        "error_observed": false,
+        "outcome": "deadline",
+        "refused": false,
+        "signal_error": -1,
+        "socket_error": -1,
+        "socket_state": 2,
+        "terminal_observed": false
+      },
+      "pid": 6044,
+      "runner_original_restored": true,
+      "runtime_port": 60383,
+      "schema": 1,
+      "socks5_roundtrip": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+      "success": false,
+      "winhttp_unchanged": true
+    },
+    "pac-only-external-edit-final.json": {
+      "close_requested": true,
+      "failure_code": "",
+      "fixture_failed": false,
+      "journal_absent": true,
+      "journal_absent_at_release": true,
+      "native_backend": true,
+      "native_snapshot_readable": true,
+      "phase": "final",
+      "pid": 2788,
+      "proxy_busy": false,
+      "proxy_owned": false,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "release_finished": true,
+      "release_succeeded": true,
+      "release_while_runtime_alive": true,
+      "runtime_pid": 2788,
+      "runtime_stopped": true,
+      "rust_port": 60396,
+      "schema": 1,
+      "shutdown_coordinator_completed": true,
+      "shutdown_ms": 67,
+      "snapshot_restored_at_release": false,
+      "snapshot_restored_before_exit": false,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "pac-only-external-edit-ready.json": {
+      "close_requested": false,
+      "failure_code": "",
+      "fixture_failed": false,
+      "guard_acknowledged": true,
+      "native_backend": true,
+      "native_listener_matches_rust": true,
+      "phase": "ready",
+      "pid": 2788,
+      "proxy_enabled": true,
+      "proxy_owned": true,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "runtime_alive": true,
+      "runtime_healthy": true,
+      "runtime_pid": 2788,
+      "rust_port": 60396,
+      "saved_applied_policy_matches": true,
+      "schema": 1,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "pac-only-external-edit-result.json": {
+      "child_exit_code": 0,
+      "child_normal_exit": true,
+      "child_stopped": true,
+      "data_tag": "pac-only-external-edit",
+      "exact_exit_snapshot": true,
+      "external_edit": true,
+      "flags": 5,
+      "http_roundtrip": true,
+      "journal_and_guard_markers_removed": true,
+      "listener_probe": {
+        "connected": false,
+        "deadline_ms": 3000,
+        "elapsed_ms": 3002,
+        "error_observed": false,
+        "outcome": "deadline",
+        "refused": false,
+        "signal_error": -1,
+        "socket_error": -1,
+        "socket_state": 2,
+        "terminal_observed": false
+      },
+      "pid": 2788,
+      "runner_original_restored": true,
+      "runtime_port": 60396,
+      "schema": 1,
+      "socks5_roundtrip": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+      "success": false,
+      "winhttp_unchanged": true
+    },
+    "pac-only-final.json": {
+      "close_requested": true,
+      "failure_code": "",
+      "fixture_failed": false,
+      "journal_absent": true,
+      "journal_absent_at_release": true,
+      "native_backend": true,
+      "native_snapshot_readable": true,
+      "phase": "final",
+      "pid": 4804,
+      "proxy_busy": false,
+      "proxy_owned": false,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "release_finished": true,
+      "release_succeeded": true,
+      "release_while_runtime_alive": true,
+      "runtime_pid": 4804,
+      "runtime_stopped": true,
+      "rust_port": 60371,
+      "schema": 1,
+      "shutdown_coordinator_completed": true,
+      "shutdown_ms": 51,
+      "snapshot_restored_at_release": true,
+      "snapshot_restored_before_exit": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "pac-only-ready.json": {
+      "close_requested": false,
+      "failure_code": "",
+      "fixture_failed": false,
+      "guard_acknowledged": true,
+      "native_backend": true,
+      "native_listener_matches_rust": true,
+      "phase": "ready",
+      "pid": 4804,
+      "proxy_enabled": true,
+      "proxy_owned": true,
+      "qt_version": "6.12.0",
+      "ready": true,
+      "runtime_alive": true,
+      "runtime_healthy": true,
+      "runtime_pid": 4804,
+      "rust_port": 60371,
+      "saved_applied_policy_matches": true,
+      "schema": 1,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249"
+    },
+    "pac-only-result.json": {
+      "child_exit_code": 0,
+      "child_normal_exit": true,
+      "child_stopped": true,
+      "data_tag": "pac-only",
+      "exact_exit_snapshot": true,
+      "external_edit": false,
+      "flags": 5,
+      "http_roundtrip": true,
+      "journal_and_guard_markers_removed": true,
+      "listener_probe": {
+        "connected": false,
+        "deadline_ms": 3000,
+        "elapsed_ms": 3001,
+        "error_observed": false,
+        "outcome": "deadline",
+        "refused": false,
+        "signal_error": -1,
+        "socket_error": -1,
+        "socket_state": 2,
+        "terminal_observed": false
+      },
+      "pid": 4804,
+      "runner_original_restored": true,
+      "runtime_port": 60371,
+      "schema": 1,
+      "socks5_roundtrip": true,
+      "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+      "success": false,
+      "winhttp_unchanged": true
+    }
+  },
+  "safe_receipts_sha256": {
+    "listener-probe-controls.json": "b72eb8f8d6743f0f1325235841d3924855970d015ec29d5b8cf8cb8b4a1046ea",
+    "manual-and-pac-external-edit-final.json": "e9f08ff2896770ae2a9dc045cf2b0566aaf59aa70857a60c06f1b1b2915da98c",
+    "manual-and-pac-external-edit-ready.json": "d3f051335ddd2336b5f6be6b588806a325e90f04d7e3faf8eb7580fbaab58400",
+    "manual-and-pac-external-edit-result.json": "78441a7a2dcffb08035b51c536fd75f784d8dd9bcbefc0c8c54f2917cab32fda",
+    "manual-and-pac-final.json": "646703fa8acae1b85db35d457596599190b5095e5412d097cd9a50f29ae58a69",
+    "manual-and-pac-ready.json": "da6f9835bec47937f41299fd346401235227a182cf02c766e232bbdd022a0fef",
+    "manual-and-pac-result.json": "82d3e838086a1ab963b426bc0d428af5ebe963bd0da14bf335e42d5ac577b0ec",
+    "pac-only-external-edit-final.json": "283c006cb776fd3b48ba47b5cd51b5986b9e428ed5ad04022e04877b25a06789",
+    "pac-only-external-edit-ready.json": "aa613bbf3a99eb78f856eaa1545afa65ddb21f110b9828e84468f7c1c09bf955",
+    "pac-only-external-edit-result.json": "da72417fb5eba6a4ce8e17509a0da8dd8e6cc0199ebd56a42652f85ce9ee91f0",
+    "pac-only-final.json": "2a0964a0a90a2bab0c750969f04c8fa1a2b376c6e9a3f58ac09a222c30e6a301",
+    "pac-only-ready.json": "e17b4b954fc2c32e9cd16f867476cc54a0f8ed107db3e45fb9381ae422a9116a",
+    "pac-only-result.json": "d01591f8e78cfda41e44d43ac5767e087551a2822ca204205c7e4e8dae9c34ce"
+  },
+  "policy_ui": {
+    "checks": 537,
+    "failures": 0,
+    "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+    "embedded_form_sha256": "875bd9b43c832e64c3ae66386a4cc2b62e4e42f7917b764531961cf9f0316eaf",
+    "scope": "CriticalJUnit independently proves original full policy pass; preserved JSON is later fallback because d061 predates first-run evidence copy."
+  },
+  "observed_failure": {
+    "known_closed_control": "Both legacy1500ms and current3000ms remained ConnectingState2 with UnknownSocketError\u22121, no connected/error signal; current elapsed3005ms. A live-listener leak is not demonstrated.",
+    "four_app_rows": "All current probes remained ConnectingState2 with UnknownSocketError\u22121 at3000\u20133015ms. Actual HTTP/SOCKS, normalexit0, exact native snapshot, journal/guard cleanup and WinHTTP invariant passed before probe.",
+    "scope": "FAILURE retained; adding a deadline did not prove native TCP refusal. Five failed incidents including known-closed control; live control was not reached."
+  },
+  "acceptance": "Historical superseded-source failure. New1c77 acceptance requires its own full Qt and actual package/install/uninstall. Production package and remaining full regression did not execute here.",
+  "physical_windows11_codex_desktop": "NOT_RUN"
+}

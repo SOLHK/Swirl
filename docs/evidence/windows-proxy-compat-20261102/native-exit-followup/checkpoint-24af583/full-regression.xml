@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="22"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="303"
+	timestamp="2026-11-02T16:21:24"
+	>
+	<testcase name="swirl-storage-paths" classname="swirl-storage-paths" time="0.215085" status="run">
+		<properties/>
+		<system-out>PASS production ignores a test root
+PASS test mode without an explicit root keeps existing Qt behavior
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS test write location stays in the root
+PASS temporary files use the explicit root
+PASS QML disk cache uses the explicit root
+PASS QML content and Qt version stay within the explicit test root
+PASS production and QA caches are separate without deleting rollback caches
+PASS a changed QML revision cannot reuse earlier bytecode
+PASS fresh process derives its own QML cache from the inherited isolated root
+PASS production respects an explicit QML disk cache override
+PASS pipeline cache uses the explicit root
+PASS settings persist ...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="swirl-window-shadow" classname="swirl-window-shadow" time="7.34429" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-node-view-model" classname="swirl-node-view-model" time="1.64114" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-node-section-model" classname="swirl-node-section-model" time="0.630425" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-connection-rows" classname="swirl-connection-rows" time="4.24279" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-policy-configuration" classname="swirl-policy-configuration" time="6.71069" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-catalog-transaction" classname="swirl-catalog-transaction" time="2.56329" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-font-selection" classname="swirl-font-selection" time="5.6702" status="run">
+		<properties>
+			<property name="cmake_labels" value="fonts"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-font-axis-policy" classname="swirl-font-axis-policy" time="0.0210241" status="run">
+		<properties>
+			<property name="cmake_labels" value="fonts"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-font-native-raster" classname="swirl-font-native-raster" time="1.79399" status="run">
+		<properties>
+			<property name="cmake_labels" value="fonts"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-rust-library-loader" classname="swirl-rust-library-loader" time="0.0433333" status="run">
+		<properties/>
+		<system-out>********* Start testing of RustCoreLibraryTests *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows server2022
+PASS   : RustCoreLibraryTests::initTestCase()
+PASS   : RustCoreLibraryTests::concurrentImportsAndRuntimeShareCheckedLibrary()
+PASS   : RustCoreLibraryTests::defaultPathDoesNotDependOnWorkingDirectory()
+PASS   : RustCoreLibraryTests::relativeLibraryPathIsRejected()
+PASS   : RustCoreLibraryTests::missingLibraryDoesNotSearchForAnotherCopy()
+PASS   : RustCoreLibraryTests::directoryCannotBeLoaded()
+PASS   : RustCoreLibraryTests::portableExecutableArchitectures(x64)
+PASS   : RustCoreLibraryTests::portableExecutableArchitectures(x86)
+PASS   : RustCoreLibraryTests::portableExecutableArchitectures(arm64)
+PASS   : RustCoreLibraryTests::truncatedPortableExecutableIsRejected()
+PASS   : RustCoreLibraryTests::maliciousPeOffsetCannotOverflowOrAllocate()
+PASS   : RustCoreLibraryTests::wrongImageTypeAndArchitectureFormatAreRejecte...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="swirl-rust-qt-integration" classname="swirl-rust-qt-integration" time="39.9723" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-codex-proxy-launcher" classname="swirl-codex-proxy-launcher" time="1.51562" status="run">
+		<properties/>
+		<system-out>Codex native launcher: 37 assertions passed; real child environment and live/closed listener verified.
+</system-out>
+	</testcase>
+	<testcase name="swirl-local-extensions" classname="swirl-local-extensions" time="5.49277" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-telemetry-accounting" classname="swirl-telemetry-accounting" time="14.5555" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-diagnostic-export" classname="swirl-diagnostic-export" time="3.67014" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-activity-layout" classname="swirl-activity-layout" time="16.2524" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-activity-details" classname="swirl-activity-details" time="44.4965" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-activity-perf-600" classname="swirl-activity-perf-600" time="40.7604" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-activity-perf-2000" classname="swirl-activity-perf-2000" time="41.2217" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-policy-ui" classname="swirl-policy-ui" time="59.1586" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-liquid-glass" classname="swirl-liquid-glass" time="5.22109" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

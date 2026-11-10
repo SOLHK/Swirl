@@ -1,0 +1,42 @@
+   Compiling swirl-core v0.1.0 (/workspace/scratch/a6f47dff1af2/Swirl/core/crates/swirl-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.12s
+     Running unittests src/lib.rs (/workspace/scratch/a6f47dff1af2/rust-verify-target/debug/deps/swirl_core-eee49aa26ccd2490)
+
+running 3 tests
+test v2::runtime_tests::socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy ... FAILED
+test v2::runtime_tests::socks5_unsupported_address_type_replies_before_routing_and_closes ... FAILED
+test v2::runtime_tests::socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry ... FAILED
+
+failures:
+
+---- v2::runtime_tests::socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy stdout ----
+
+thread 'v2::runtime_tests::socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy' (86247) panicked at crates/swirl-core/src/v2_runtime_tests.rs:523:5:
+assertion `left == right` failed
+  left: [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]
+ right: [5, 4, 0, 1, 0, 0, 0, 0, 0, 0]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- v2::runtime_tests::socks5_unsupported_address_type_replies_before_routing_and_closes stdout ----
+
+thread 'v2::runtime_tests::socks5_unsupported_address_type_replies_before_routing_and_closes' (86248) panicked at crates/swirl-core/src/v2_runtime_tests.rs:499:9:
+assertion `left == right` failed
+  left: []
+ right: [5, 8, 0, 1, 0, 0, 0, 0, 0, 0]
+
+---- v2::runtime_tests::socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry stdout ----
+
+thread 'v2::runtime_tests::socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry' (86249) panicked at crates/swirl-core/src/v2_runtime_tests.rs:583:9:
+assertion `left == right` failed
+  left: [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]
+ right: [5, 1, 0, 1, 0, 0, 0, 0, 0, 0]
+
+
+failures:
+    v2::runtime_tests::socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy
+    v2::runtime_tests::socks5_unsupported_address_type_replies_before_routing_and_closes
+    v2::runtime_tests::socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 51 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p swirl-core --lib`

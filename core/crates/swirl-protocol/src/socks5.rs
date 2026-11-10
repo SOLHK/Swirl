@@ -5,10 +5,10 @@ use crate::dial::{connect_tcp, within};
 use std::{io, net::SocketAddr, time::Duration};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound};
-use swirl_transport::bind_udp;
+use swirl_transport::{TcpConnection, bind_udp};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::{TcpStream, UdpSocket},
+    net::UdpSocket,
     time::Instant,
 };
 use zeroize::Zeroizing;
@@ -87,7 +87,7 @@ pub(super) async fn request<S: AsyncRead + AsyncWrite + Unpin>(
 }
 
 pub struct UdpAssociation {
-    control: TcpStream,
+    control: TcpConnection,
     socket: UdpSocket,
 }
 
@@ -160,8 +160,17 @@ impl UdpAssociation {
         if !valid_relay(address) {
             return Err("Socks5UdpRelayAddress");
         }
+        if !resolver.endpoint_allowed(address) {
+            return Err("Socks5UdpRelayForbidden");
+        }
         let socket = within(deadline, "UpstreamProtocolTimeout", async {
-            let socket = bind_udp(if address.is_ipv4() {
+            // The validated relay, not the TCP control peer, determines whether
+            // this UDP socket qualifies for the explicit loopback exemption.
+            let socket = bind_udp(if address.is_ipv4() && address.ip().is_loopback() {
+                SocketAddr::from(([127, 0, 0, 1], 0))
+            } else if address.ip().is_loopback() {
+                SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0))
+            } else if address.is_ipv4() {
                 SocketAddr::from(([0, 0, 0, 0], 0))
             } else {
                 SocketAddr::from(([0u16; 8], 0))

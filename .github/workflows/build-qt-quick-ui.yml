@@ -15,17 +15,23 @@ env:
   SWIRL_QT_VERSION: '6.12.0'
 
 concurrency:
-  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Finish the current verified stage so first-time Qt compilation can save its
-  # cache and installer evidence before the next stage starts.
-  cancel-in-progress: false
+  # Keep retries of older PR #61 heads separate from the candidate under test.
+  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.repository == 'SOLHK/Swirl' && github.event.pull_request.number == 61 && github.base_ref == 'test' && format('-{0}', github.event.pull_request.head.sha) || '' }}
+  # The isolated network development PRs replace only their own obsolete
+  # builds. An old icon-tool stall must not keep the corrected installer queued.
+  # Other product branches retain their cache and installer evidence unchanged.
+  cancel-in-progress: ${{ contains(fromJSON('["work/native-tun-windows-20261030-isolated", "work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031", "work/node-probe-render-20261105"]'), github.head_ref || github.ref_name) }}
 
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    timeout-minutes: 55
+    # Retain the original 120-minute build/install/regression envelope and
+    # allow 50 minutes for the independent private Qt build/deploy/tests.
+    # Product deadlines and checks inside that profile remain unchanged.
+    timeout-minutes: 170
     permissions:
       contents: read
+      actions: read # Read fixed Qt SDK evidence and the opted-in old installer.
     steps:
       - name: Checkout original repository and UI branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -60,22 +66,107 @@ jobs:
           else {
             Write-Host "Core, network, security, build, or mixed change set ($($changed.Count) files); require focused network/security tests and full regression."
           }
+      - name: Observe fixed Windows PowerShell startup environments
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: ./scripts/Measure-WindowsPowerShellStartup.ps1 -OutputPath build-evidence/powershell-startup.json
+      - name: Preserve early PowerShell startup observation
+        if: always() && env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-WindowsPowerShell-Startup-Observation
+          path: build-evidence/powershell-startup.json
+          if-no-files-found: error
+      - name: Parse diagnostic scripts and compile the read-only Windows interop
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: powershell
+        run: |
+          foreach ($path in @('scripts/tests/WindowsProxyDiagnostics.ps1','scripts/tests/Test-WindowsProxyQueryOnly.ps1',
+              'scripts/tests/Invoke-DisposableWindowsUser.ps1','scripts/tests/Test-WindowsNormalInstaller.ps1',
+              'scripts/tests/Test-WindowsFullMotionSmoke.ps1','scripts/tests/Get-WindowsResidualProfileOwners.ps1',
+              'scripts/tests/OwnedWindowsProfileCleanup.ps1','scripts/tests/Test-OwnedWindowsProfileCleanup.ps1',
+              'scripts/tests/Test-PrivateQtQuotaProfile.ps1','scripts/Select-Qt612ProductSdk.ps1',
+              'scripts/Stage-WindowsRustProduct.ps1','scripts/Copy-QtSdkShaderRuntime.ps1')) {
+            $tokens = $null; $errors = $null
+            $null = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$errors)
+            if ($errors.Count) { throw ('PowerShell parser rejected '+$path+': '+($errors.Message -join ' ')) }
+          }
+          # Compile only; no WinINET query or settings access in the host profile.
+          . ./scripts/tests/WindowsProxyDiagnostics.ps1
+      - name: Compile the actual residual-event filter and run its pure controls
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path -LiteralPath 'scripts/tests/Get-WindowsResidualProfileOwners.ps1').Path
+          $tokens = $null; $errors = $null
+          $ast = [Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if ($errors.Count) { throw 'The actual residual-owner collector did not parse in PowerShell 7.' }
+          $definitions = @($ast.FindAll({ param($node)
+            $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -ceq 'Add-Type'
+          },$true))
+          if ($definitions.Count -ne 1 -or $definitions[0].CommandElements.Count -ne 3 -or
+              $definitions[0].CommandElements[1] -isnot [Management.Automation.Language.CommandParameterAst] -or
+              $definitions[0].CommandElements[1].ParameterName -cne 'TypeDefinition' -or
+              $definitions[0].CommandElements[2] -isnot [Management.Automation.Language.StringConstantExpressionAst] -or
+              $definitions[0].CommandElements[2].StringConstantType -ne [Management.Automation.Language.StringConstantType]::SingleQuotedHereString) {
+            throw 'The collector native-source boundary changed; do not execute the collector as a fallback.'
+          }
+          # Compile the same literal used by the real worker. The called method
+          # parses synthetic XML only; it does not call Windows event-log APIs.
+          Add-Type -TypeDefinition $definitions[0].CommandElements[2].Value
+          $controls = [SwirlProfileOwners.Native]::RunEventFilterControls()
+          $size = [Runtime.InteropServices.Marshal]::SizeOf([type][SwirlProfileOwners.EventVariant])
+          $receipt = [ordered]@{schema=1; source_sha=$env:GITHUB_SHA
+            collector_sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            powershell_major=$PSVersionTable.PSVersion.Major; powershell_version=$PSVersionTable.PSVersion.ToString()
+            event_variant_size=$size; controls=$controls; native_event_apis_called=$false
+            scope='Actual collector C# compilation and synthetic XML controls only; no event log or profile access.'}
+          $null = New-Item -ItemType Directory -Path 'build-evidence/profile-event-controls' -Force
+          $output = 'build-evidence/profile-event-controls/receipt.json'
+          if (Test-Path -LiteralPath $output) { throw 'Refusing to replace an existing filter-control receipt.' }
+          $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $output -Encoding UTF8
+          if ($size -ne 16 -or -not $controls.success -or $controls.total -ne 24 -or $controls.passed -ne 24) {
+            throw 'The actual residual-event filter controls or ABI failed.'
+          }
+      - name: Prove fixed disposable-profile cleanup with actual Win32 controls
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: ./scripts/tests/Test-OwnedWindowsProfileCleanup.ps1 -EvidenceDirectory build-evidence/profile-residual-cleanup-controls
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
+      - name: Check cloud-knot path geometry from the production JavaScript
+        run: node scripts/tests/Test-CloudKnotGeometry.cjs
+      - name: Prepare supported native Windows display for UI checks
+        shell: pwsh
+        run: ./scripts/Set-CiDisplayResolution.ps1
       - name: Install Rust MSVC tools
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: profile_python
         with:
           python-version: '3.12'
+          architecture: x64
           cache: pip
           cache-dependency-path: |
             tools/requirements-qt-sdk.txt
             tools/requirements-network-fixtures.txt
             tools/requirements-font-tests.txt
+      - name: Bind the residual-owner launcher to the prepared Python interpreter
+        shell: pwsh
+        env:
+          SWIRL_PREPARED_PYTHON: ${{ steps.profile_python.outputs.python-path }}
+        run: |
+          if (-not [IO.Path]::IsPathRooted($env:SWIRL_PREPARED_PYTHON) -or
+              -not (Test-Path -LiteralPath $env:SWIRL_PREPARED_PYTHON -PathType Leaf)) {
+            throw 'The prepared residual-owner interpreter path is unavailable.'
+          }
+          "SWIRL_PROFILE_OWNER_PYTHON=$env:SWIRL_PREPARED_PYTHON" >> $env:GITHUB_ENV
+      - name: Check residual-owner diagnostic admission boundaries
+        run: python tools/tests/test_windows_profile_owner_diagnostics.py -v
       - name: Install SDK downloader and independent certificate fixtures
         run: python -m pip install -r tools/requirements-qt-sdk.txt -r tools/requirements-network-fixtures.txt -r tools/requirements-font-tests.txt
       - name: Verify canonical brand assets and all six variants
@@ -83,12 +174,36 @@ jobs:
       - name: Check SDK archive and metadata filesystem boundaries
         shell: pwsh
         run: python tools/tests/test_qt_sdk_installer.py --scratch-root "$env:RUNNER_TEMP/swirl-sdk-installer-tests"
+      - name: Check derived Qt SDK and corresponding source boundaries
+        shell: pwsh
+        run: |
+          python tools/tests/test_qt612_product_sdk.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Derived Qt SDK boundary checks failed.' }
+          python tools/tests/test_qt612_product_source.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Qt corresponding source boundary checks failed.' }
       - name: Check pinned TLS source and fixed package boundaries
         shell: pwsh
         run: |
           python tools/tests/test_openssl_runtime.py --scratch-root "$env:RUNNER_TEMP/swirl-openssl-boundary-tests"
           if ($LASTEXITCODE -ne 0) { throw 'TLS source/receipt boundary checks failed.' }
           ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Check package path policy with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          ./scripts/tests/Test-RustProductPackagePolicy.ps1
+          # Compile the actual PE reader under Windows PowerShell 5.1 before
+          # the expensive native build; product deployment is verified later.
+          . ./scripts/Copy-VerifiedMsvcRuntime.ps1
+      - name: Verify user integration transactions with an actual standard-user token
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsUserIntegration.ps1 -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/user-integration-policy
+          $policy = Get-Content -LiteralPath 'build-evidence/user-integration-policy/integration-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath 'build-evidence/user-integration-policy/standard-user-runner.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($policy.schema -ne 1 -or -not $policy.success -or $policy.source_sha -cne $env:GITHUB_SHA -or -not $policy.actual_non_admin_token -or -not $policy.actual_x86_powershell -or -not $policy.negative_control.required_assertion_failed) { throw 'Actual standard-user integration transaction evidence is incomplete.' }
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination) { throw 'The temporary standard-user account or its native resources were not cleanly released.' }
       - name: Restore isolated Qt 6.12 SDK archives
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -121,12 +236,23 @@ jobs:
           "SWIRL_FONT_METADATA_FIXTURES=$fontFixtures" >> $env:GITHUB_ENV
           New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
           Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
+      - name: Select the complete source-verified Qt 6.12 product SDK
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Select-Qt612ProductSdk.ps1 -OfficialReceipt build-evidence/qt-sdk.json -EvidenceDirectory build-evidence/qt-product-sdk
+      - name: Restore fixed Qt corresponding source archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0-source-cache
+          key: qt-corresponding-source-6.12.0-${{ hashFiles('tools/qt612-product-source.lock.json') }}
       - name: Record compiler cache identity
         id: compiler
         shell: pwsh
         run: |
           $tools = @('cl.exe','link.exe','cmake.exe') | ForEach-Object { (Get-FileHash -LiteralPath (Get-Command $_ -ErrorAction Stop).Source -Algorithm SHA256).Hash }
-          $identity = ([ordered]@{rust=(& rustc -vV | Out-String); tools=$tools; msvc=$env:VCToolsVersion; sdk=$env:WindowsSDKVersion; qt=$env:QT_ROOT_DIR; workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
+          $qtLock = (Get-FileHash -LiteralPath 'tools/qt612-product-sdk.lock.json' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $identity = ([ordered]@{rust=(& rustc -vV | Out-String); tools=$tools; msvc=$env:VCToolsVersion; sdk=$env:WindowsSDKVersion; qt=$env:QT_ROOT_DIR; qt_content=$env:SWIRL_QT_SELECTED_CONTENT_ID; qt_product_lock=$qtLock; workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
           $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
           "hash=$hash" >> $env:GITHUB_OUTPUT
           $identity | Set-Content -LiteralPath build-evidence/compiler.json -Encoding utf8
@@ -159,14 +285,28 @@ jobs:
             core/target
             build/swirl-quick
             build/swirl-product
-          key: apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          key: apec-qt612-product-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+            apec-qt612-product-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
       - name: Restore content-verified input timestamps
         shell: pwsh
         run: |
           . ./scripts/BuildInputTimes.ps1
           Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick') -Restore
+      - name: Discard restored test evidence before compiling this checkout
+        shell: pwsh
+        run: |
+          # Compiler caches can include captures and logs from their source run.
+          # Clear these before configure/build, so even a compiler failure cannot
+          # upload old tests as evidence for the current source identity.
+          Remove-Item -LiteralPath 'build-evidence/ctest-inventory.json' -Force -ErrorAction SilentlyContinue
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop','node-ui-evidence','node-ui-native-evidence')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','node-chain.xml','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-native-tun-recovery.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
+          }
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
       - name: Configure Qt UI independently
         shell: pwsh
         run: |
@@ -174,24 +314,38 @@ jobs:
             '-S', 'src/Swirl.Quick', '-B', 'build/swirl-quick',
             '-G', 'Visual Studio 17 2022', '-A', 'x64',
             '-DSWIRL_BUILD_UI_TESTS=ON',
+            '-DSWIRL_BUILD_CORE_TESTS=ON',
+            '-DSWIRL_PRIVATE_UI_QUOTA=OFF',
+            "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE",
             "-DSWIRL_RUST_TARGET=$env:GITHUB_WORKSPACE/core/target",
             "-DSWIRL_TEST_FONT_DIRECTORY=$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
           )
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
             # Enable CMake registration without leaking this opt-in into other
             # application tests, which exercise the proxy UI in an isolated fake.
-            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 cmake @configureArgs
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 SWIRL_NATIVE_TUN_ACCEPTANCE=1 cmake @configureArgs
           } else {
             cmake @configureArgs
           }
           if ($LASTEXITCODE -ne 0) { throw 'Qt UI configuration failed.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-configured"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual QA Qt target does not match the selected SDK.' }
       - name: Build UI
         id: ui_build
         shell: pwsh
-        run: cmake --build build/swirl-quick --config Release --parallel 4
+        run: |
+          cmake --build build/swirl-quick --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Qt QA build failed.' }
+          if (-not (Test-Path -LiteralPath 'build/swirl-quick/Release/SwirlPrivateSubscriptionAcceptance.exe' -PathType Leaf)) {
+            throw 'The offline NodeStore installer fixture was not built in the QA configuration.'
+          }
       - name: Bundle UI runtime
         shell: pwsh
         run: |
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase pre-deploy --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-pre-deploy"
+          if ($LASTEXITCODE -ne 0) { throw 'QA Qt source, linkage or SDK changed before deployment.' }
+          $windeployqt = Join-Path $env:QT_ROOT_DIR 'bin/windeployqt.exe'
+          $qtpaths = Join-Path $env:QT_ROOT_DIR 'bin/qtpaths.exe'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
             Copy-Item build/swirl-quick/Release/Swirl-brand-0217-optical.ico dist/
@@ -218,14 +372,180 @@ jobs:
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory dist -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
           # CTest executes these binaries in the build directory, not dist.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
+          & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory dist -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -EvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist-d3d" -Python $env:SWIRL_PROFILE_OWNER_PYTHON
+          ./scripts/Copy-QtSdkShaderRuntime.ps1 -QtRoot $env:QT_ROOT_DIR -ApplicationDirectory build/swirl-quick/Release -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -EvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest-d3d" -Python $env:SWIRL_PROFILE_OWNER_PYTHON
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-dist"
+          if ($LASTEXITCODE -ne 0) { throw 'Deployed QA Qt runtime differs from the selected SDK.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-quick" --phase post-deploy --runtime-dir "$env:GITHUB_WORKSPACE/build/swirl-quick/Release" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-ctest"
+          if ($LASTEXITCODE -ne 0) { throw 'CTest Qt runtime differs from the selected SDK.' }
+          # Validate only the clean deployment. The test build also contains
+          # intentionally invalid loader fixtures and is not a product payload.
+          . ./scripts/RustProductPackagePolicy.ps1
+          foreach ($deployment in @('dist','build/swirl-quick/Release')) {
+            Assert-SwirlPathWithoutLinks $deployment
+            $oldBootstrap = Join-Path $deployment 'vc_redist.x64.exe'
+            Assert-SwirlPathWithoutLinks $oldBootstrap
+            if (Test-Path -LiteralPath $oldBootstrap -PathType Leaf) { Remove-Item -LiteralPath $oldBootstrap -Force }
+          }
+          ./scripts/Copy-VerifiedMsvcRuntime.ps1 -BuildDirectory build/swirl-quick -ApplicationDirectory dist
+          if ((Get-FileHash -LiteralPath 'dist/Swirl.exe' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/Swirl.exe' -Algorithm SHA256).Hash) { throw 'Test runtime CRT deployment requires the exact verified application.' }
+          $msvc = Get-Content -LiteralPath 'dist/msvc-runtime.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          foreach ($entry in $msvc.files.PSObject.Properties) {
+            if ($entry.Name -cnotmatch '^(?:msvcp[0-9][a-z0-9_]*|vcruntime[0-9][a-z0-9_]*|concrt[0-9][a-z0-9_]*|vccorlib[0-9][a-z0-9_]*)\.dll$') { throw 'Invalid verified CRT file name.' }
+            $target = Join-Path 'build/swirl-quick/Release' $entry.Name
+            Assert-SwirlPathWithoutLinks $target
+            Copy-Item -LiteralPath (Join-Path 'dist' $entry.Name) -Destination $target -Force
+            if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.Value.sha256) { throw 'Test runtime CRT bytes differ from the verified deployment.' }
+          }
+          Assert-SwirlPathWithoutLinks 'build/swirl-quick/Release/msvc-runtime.json'
+          Copy-Item -LiteralPath 'dist/msvc-runtime.json' -Destination 'build/swirl-quick/Release/msvc-runtime.json' -Force
+          if ((Get-FileHash -LiteralPath 'dist/msvc-runtime.json' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/msvc-runtime.json' -Algorithm SHA256).Hash) { throw 'Test runtime CRT metadata differs from the verified deployment.' }
           & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
+      - name: Refuse legacy live QA entry before private paths or self-test dispatch
+        shell: pwsh
+        run: |
+          python tools/tests/test_runtime_acceptance_refusal.py --executable dist/Swirl.exe --expected-source $env:GITHUB_SHA --flavor qa --output build-evidence/runtime-refusal-qa --powershell (Get-Command powershell.exe -ErrorAction Stop).Source --powershell (Get-Command pwsh -ErrorAction Stop).Source
+          if ($LASTEXITCODE -ne 0) { throw 'The actual QA executable or legacy PowerShell launcher admitted an unguarded runtime entry.' }
+      - name: Verify bounded isolated UI node sessions against owned loopback fixtures
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/tests/test_controlled_node_acceptance.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Controlled UI admission and process retirement checks failed.' }
+          $exe = (Resolve-Path 'dist/Swirl.exe').Path
+          $exeHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $coreHash = (Get-FileHash -LiteralPath 'dist/swirl_api.dll' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $fixture = (Resolve-Path 'src/Swirl.Quick/tests/fixtures').Path
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/controlled-node-sessions'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          $admissionModes = @('missing-proof','missing-fixture','preexisting-store','wrong-proof')
+          foreach ($mode in (@('positive','wrong-ca','stall','native-watchdog-500ms') + $admissionModes)) {
+            $output = Join-Path $env:RUNNER_TEMP ('swirl-controlled-' + $mode + '-' + [guid]::NewGuid().ToString('N'))
+            $arguments = @('tools/RunControlledNodeAcceptance.py','--exe',$exe,'--exe-sha256',$exeHash,'--core-sha256',$coreHash,'--expected-source',$env:GITHUB_SHA,'--output-directory',$output,'--qt-root',$env:QT_ROOT_DIR,'--fixture-directory',$fixture)
+            if ($mode -eq 'wrong-ca') { $arguments += '--fixture-wrong-ca' }
+            if ($mode -in @('stall','native-watchdog-500ms')) { $arguments += '--fixture-stall' }
+            if ($mode -eq 'native-watchdog-500ms') { $arguments += '--fixture-native-watchdog-500ms' }
+            if ($mode -in $admissionModes) { $arguments += @('--fixture-admission-control',$mode) }
+            python @arguments
+            $exitCode = $LASTEXITCODE
+            $summaryPath = Join-Path $output 'summary.json'
+            if (!(Test-Path -LiteralPath $summaryPath -PathType Leaf)) { throw "Missing synthetic UI receipt: $mode" }
+            Copy-Item -LiteralPath $summaryPath -Destination (Join-Path $evidence ($mode + '.json'))
+            $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if ($summary.cases.Count -ne 1 -or $summary.liveReady -ne $false -or
+                !$summary.trafficAccountingRequiredForLive -or $summary.persistentBudgetGuardExercised -ne $false -or
+                $summary.uiSubscriptionImportExercised -ne $false -or $summary.uiPolicySelectionExercised -ne $false) {
+              throw "Synthetic UI scope was not preserved: $mode"
+            }
+            $case = $summary.cases[0]
+            if (!$summary.fixtureOnly -or !$summary.fixture.tasksReleased -or !$case.retirement.processSignaled -or !$case.retirement.ownedJobEmpty -or $case.retirement.error) { throw "Incomplete synthetic UI retirement: $mode" }
+            $expectedNativeControl = 0
+            if ($mode -eq 'native-watchdog-500ms') { $expectedNativeControl = 1 }
+            if ($case.retirement.nativeWatchdog.controlCode -ne $expectedNativeControl) { throw "Native watchdog contract mismatch: $mode" }
+            if ($mode -eq 'positive' -and ($exitCode -ne 0 -or !$summary.passed)) { throw 'Selected-node UI HTTP/HTTPS positive control failed.' }
+            if ($mode -eq 'wrong-ca' -and ($exitCode -ne 2 -or $summary.passed -or !@($case.result.proxyRequests | Where-Object tlsRejected).Count)) { throw 'Actual UI TLS rejection control failed.' }
+            if ($mode -eq 'stall' -and ($exitCode -ne 2 -or $summary.passed -or !$case.retirement.timedOut -or
+                !$case.retirement.requestPhaseObserved -or $case.retirement.exitCode -notin @(124,125))) { throw 'Actual UI hard-stop control failed.' }
+            if ($mode -eq 'stall') {
+              if (!$case.retirement.requestPhaseObserved) { throw 'Actual UI request phase was not observed before the hard stop.' }
+              if ($case.retirement.exitCode -eq 124) {
+                if (!$case.retirement.nativeWatchdog.triggered -or $case.retirement.nativeWatchdog.phase -ne 'requests' -or
+                    $case.retirement.nativeWatchdog.deadlineMs -ne 8000 -or
+                    $case.retirement.stopOrigin -notin @('native-watchdog','parent-and-native-watchdog')) {
+                  throw 'Native hard-stop exit has no identity-bound request-deadline proof.'
+                }
+              } elseif ($case.retirement.exitCode -eq 125) {
+                if (!$case.retirement.parentTimedOut -or
+                    $case.retirement.stopOrigin -notin @('parent-watchdog','parent-and-native-watchdog')) {
+                  throw 'Parent hard-stop exit has no independent deadline proof.'
+                }
+              } else { throw 'The hard-stop control exited without an identified watchdog.' }
+            }
+            if ($mode -eq 'native-watchdog-500ms' -and ($exitCode -ne 2 -or $summary.passed -or
+                $summary.nativeWatchdogControl -ne 'native-watchdog-500ms' -or !$case.retirement.timedOut -or
+                !$case.retirement.requestPhaseObserved -or $case.retirement.exitCode -ne 124 -or
+                $case.retirement.parentTimedOut -or $case.retirement.stopOrigin -ne 'native-watchdog' -or
+                !$case.retirement.nativeWatchdog.triggered -or !$case.retirement.nativeWatchdog.committed -or
+                $case.retirement.nativeWatchdog.phase -ne 'requests' -or $case.retirement.nativeWatchdog.deadlineMs -ne 500 -or
+                $case.retirement.nativeWatchdog.absoluteLimitMs -ne 28000 -or $summary.fixture.ownershipProofs -ne 1 -or
+                $summary.fixture.socksConnections -lt 1)) { throw 'Fixed native 500ms producer control has no committed request stop and retirement proof.' }
+            if ($mode -in $admissionModes -and ($exitCode -ne 2 -or $summary.passed -or !$summary.admissionRefused -or
+                $case.retirement.exitCode -ne 64 -or $case.retirement.timedOut -or
+                $case.result -isnot [pscustomobject] -or @($case.result.psobject.Properties).Count -ne 0 -or
+                $summary.fixture.socksConnections -ne 0 -or $summary.fixture.forwarded -ne 0)) {
+              throw "Synthetic UI admission control failed: $mode"
+            }
+          }
+          # The negative controls intentionally return 2. Only after every
+          # native exit and actual receipt above is checked is this step done.
+          exit 0
+      - name: Preserve controlled synthetic UI session receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Controlled-Node-Session-Evidence
+          path: build-evidence/controlled-node-sessions/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Verify authenticated product broker control without starting TUN
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: |
+          # This managed Windows runner must already have its administrator
+          # token. Never open a new UAC prompt or recover an existing owner.
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          try {
+            $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+            if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Broker control CI requires an already-elevated runner token.' }
+          } finally { $identity.Dispose() }
+          . ./scripts/RustProductPackagePolicy.ps1
+          $journal = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Swirl/NativeTun'
+          Assert-SwirlPathWithoutLinks $journal
+          if ((Test-Path -LiteralPath $journal) -and
+              (-not (Test-Path -LiteralPath $journal -PathType Container) -or @(Get-ChildItem -LiteralPath $journal -Force).Count -ne 0)) {
+            throw 'Existing Swirl TUN state must not enter this control-only CI fixture.'
+          }
+          $fixture = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/native-tun-broker-control'
+          $report = Join-Path $fixture 'report.json'
+          try {
+            # The separate test fixture truthfully retains UI hooks. Its files
+            # and manifest never replace the later production-hooks-OFF stage.
+            ./scripts/New-NativeTunBrokerControlFixture.ps1 -BuildDirectory build/swirl-quick -UiRuntimeDirectory dist -WintunArchivePath build/swirl-product/dependency-cache/wintun-0.14.1.zip
+            $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/native-tun-broker-control.xml'
+            ctest --test-dir build/swirl-quick -C Release -R '^swirl-native-tun-broker-control$' --output-on-failure --no-tests=error --output-junit $junit
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticated broker control checks failed.' }
+            $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+            if (-not $result.success -or $result.kind -cne 'native-tun-broker-control-test' -or
+                $result.source_sha -cne $env:GITHUB_SHA -or -not $result.ui_test_hooks -or $result.native_tun_start_invoked -ne $false) {
+              throw 'Broker control evidence is missing its exact source or test-only scope.'
+            }
+            Write-Host 'Authenticated broker and loopback Core control passed; adapter creation and TUN forwarding were not exercised.'
+          } finally {
+            if (Test-Path -LiteralPath $report -PathType Leaf) { Copy-Item -LiteralPath $report -Destination build-evidence/native-tun-broker-control.json }
+            $marker = Join-Path $fixture 'fixture.json'
+            if (Test-Path -LiteralPath $marker -PathType Leaf) { Copy-Item -LiteralPath $marker -Destination build-evidence/native-tun-broker-control-fixture.json }
+          }
+      - name: Prove normal proxy-stop ordering against the old production controller
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin 0a38491d2b87ba9790ebe4e9b797d30680c9e960
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the exact proxy-stop negative-control source.' }
+          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
+            # The control reconfigures CMake twice. Preserve the initial native
+            # test registration opt-ins in both subprocess configurations.
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 SWIRL_NATIVE_TUN_ACCEPTANCE=1 python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          } else {
+            python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Normal proxy-stop candidate or old-code negative control failed.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -249,30 +569,290 @@ jobs:
           New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
           Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
       - name: Critical UI startup, rendering and interaction checks
+        id: critical_ui
         shell: pwsh
         run: |
+          $criticalEvidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence'
+          New-Item -ItemType Directory -Force -Path $criticalEvidence | Out-Null
+          $criticalUiJunit = Join-Path $criticalEvidence 'critical-ui.xml'
+          $criticalNetworkJunit = Join-Path $criticalEvidence 'critical-network.xml'
+          # Preserve the actual configured test inventory so the staged runs
+          # can be audited for complete coverage without executing them twice.
+          $inventoryJson = ctest --test-dir build/swirl-quick -C Release --show-only=json-v1
+          if ($LASTEXITCODE -ne 0) { throw 'Configured CTest inventory could not be read.' }
+          $inventory = ($inventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($null -eq $inventory.tests -or @($inventory.tests).Count -eq 0) { throw 'Configured CTest inventory is empty.' }
+          [ordered]@{source_sha=$env:GITHUB_SHA; inventory=$inventory} | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath 'build-evidence/ctest-inventory.json' -Encoding utf8
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error
-          if ($LASTEXITCODE -ne 0) {
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|node-ui-native-scaled|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
+          $criticalUiExitCode = $LASTEXITCODE
+          # Failure diagnostics rerun policy with the same output directory.
+          # Preserve this first execution, including partial failure evidence,
+          # before any later checks can throw or that diagnostic can overwrite it.
+          $policyEvidence = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/policy-evidence'
+          $criticalPolicyEvidence = Join-Path $criticalEvidence 'critical-policy-evidence'
+          if (Test-Path -LiteralPath $criticalPolicyEvidence) { throw 'First-run policy evidence must have a fresh destination.' }
+          if (Test-Path -LiteralPath $policyEvidence -PathType Container) {
+            Copy-Item -LiteralPath $policyEvidence -Destination $criticalPolicyEvidence -Recurse -Force -ErrorAction Stop
+          }
+          if ($criticalUiExitCode -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
-            throw "Critical UI checks failed"
+            throw "Critical UI checks failed ($criticalUiExitCode)."
           }
+          # Keep the original full-application policy driver and its 120ms
+          # assertion before packaging; a standalone QML pass cannot replace it.
+          [xml]$criticalUiReport = Get-Content -LiteralPath $criticalUiJunit -Raw
+          foreach ($nodeCase in @('swirl-node-ui','swirl-node-ui-native-scaled')) {
+            $cases = @($criticalUiReport.SelectNodes("//testcase[@name='$nodeCase']"))
+            if ($cases.Count -ne 1 -or $cases[0].status -ne 'run' -or $cases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw "Required node rendering regression did not pass: $nodeCase" }
+          }
+          $policyCases = @($criticalUiReport.SelectNodes('//testcase[@name="swirl-policy-ui"]'))
+          if ($policyCases.Count -ne 1 -or $policyCases[0].status -ne 'run' -or $policyCases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw 'The full-application policy regression must actually pass before packaging.' }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
-            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(native-tun-recovery|system-proxy-state|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
+            [xml]$markerReport = Get-Content -LiteralPath 'build/swirl-quick/swirl-native-tun-recovery.xml' -Raw
+            if (@($markerReport.SelectNodes('//Incident') | Where-Object { $_.type -ne 'pass' }).Count) { throw 'TUN recovery markers contain skipped or failed native assertions.' }
+            foreach ($required in @('absentKeyAndValueAreClearWithoutCreatingAnything','pendingAndConfirmedClearHaveStrictDwordValues','malformedMarkerIsUnknownAndMaintenanceDoesNotProceed','accessDeniedIsUnknownAndMaintenanceDoesNotProceed','facadeReportsRecoveryStateImmediately','inheritedPendingMarkerRejectsOrdinaryWorkerWithoutClearingOrRecovering','trustedPhysicalWorkerRetainsTheOtherSessionsPendingMarker','unknownMarkerRejectsEvenTrustedPhysicalWorkerWithoutClearingOrRecovering')) {
+              if ($null -eq $markerReport.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required TUN recovery marker case did not pass: $required" }
+            }
+            if ($markerReport.SelectNodes('/TestCase/TestFunction[@name="malformedMarkerIsUnknownAndMaintenanceDoesNotProceed"]/Incident[@type="pass"]').Count -ne 8) { throw 'All eight malformed TUN marker cases must actually run.' }
+            if ($markerReport.SelectNodes('/TestCase/TestFunction[@name="facadeReportsRecoveryStateImmediately"]/Incident[@type="pass"]').Count -ne 3) { throw 'All three initial TUN marker states must actually run.' }
+            # A CTest suite-level pass must also have current native assertion
+            # evidence. Missing rows or platform skips do not meet this gate.
+            foreach ($suite in @('state','recovery','app-exit','normal-stop')) {
+              $path = "build/swirl-quick/swirl-system-proxy-$suite.xml"
+              if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing native proxy assertions: $suite" }
+              [xml]$report = Get-Content -LiteralPath $path -Raw
+              $functions = @($report.SelectNodes('/TestCase/TestFunction'))
+              $incidents = @($report.SelectNodes('//Incident'))
+              if ($functions.Count -eq 0 -or $incidents.Count -eq 0 -or @($incidents | Where-Object { $_.type -ne 'pass' }).Count -gt 0) { throw "Native proxy $suite contains missing, skipped or failed assertions." }
+              if ($suite -eq 'recovery') {
+                $pac = @($report.SelectNodes('/TestCase/TestFunction[@name="takeoverRestoresPacAndCustomBypass"]/Incident[@type="pass"]/DataTag'))
+                $tags = @($pac | ForEach-Object { $_.InnerText })
+                if ($tags.Count -ne 2 -or 'pac-only' -notin $tags -or 'manual-and-pac' -notin $tags) { throw 'Both PAC/bypass restore cases must actually run.' }
+                foreach ($required in @('abruptOwnerExit','abruptEngineExit','registryOnlyExternalEdit','restoreDistinctStoresAndAbsentValues','takeoverUsesActualRustCoreListenerAndRestoresExactly')) {
+                  if ($null -eq $report.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required native proxy recovery case did not pass: $required" }
+                }
+              }
+              if ($suite -eq 'app-exit') {
+                if ($null -eq $report.SelectSingleNode('/TestCase/TestFunction[@name="listenerProbeDistinguishesClosedAndLivePorts"]/Incident[@type="pass"]')) { throw 'The native closed/live listener probe controls did not pass.' }
+                function Assert-NativeTcpState($tcp, [bool]$expectedListener, [string]$label) {
+                  $observedListener = $false
+                  foreach ($entry in @(@{key='ipv4'; family=2}, @{key='ipv6'; family=23})) {
+                    $table = $tcp.($entry.key)
+                    if ($null -eq $table -or $table.family -ne $entry.family -or $table.win32_error -ne 0 -or $table.rows -isnot [array]) {
+                      throw "Native TCP state was not read successfully: $label/$($entry.key)"
+                    }
+                    foreach ($row in $table.rows) {
+                      if ($row.state -notin (1..12) -or $null -eq $row.pid -or $row.pid -lt 0) { throw "Invalid native TCP row: $label" }
+                      if ($row.state -eq 2) { $observedListener = $true } # MIB_TCP_STATE_LISTEN
+                    }
+                  }
+                  if ($observedListener -ne $expectedListener) { throw "Unexpected native listener state: $label" }
+                }
+                function Assert-ExclusivePortOccupied($probe, [string]$label) {
+                  if ($null -eq $probe -or $probe.exclusive_option -isnot [bool] -or -not $probe.exclusive_option -or
+                      $probe.bound -isnot [bool] -or $probe.bound -or $probe.listening -isnot [bool] -or $probe.listening -or
+                      $probe.stage -cne 'bind' -or $probe.win32_error -notin @(10048,10013)) {
+                    throw "The exclusive probe did not reject a live listener: $label"
+                  }
+                }
+                function Assert-NativeListenerReleased($connection, $tcp, $exclusive, [string]$label) {
+                  # A connect deadline is only an observation. A known-closed
+                  # native control also remained Connecting after 3000 ms.
+                  # Require positive kernel ownership evidence for this port.
+                  if ($null -eq $connection -or $connection.connected -isnot [bool] -or $connection.connected) {
+                    throw "The post-exit connection observation is missing or connected: $label"
+                  }
+                  Assert-NativeTcpState $tcp $false $label
+                  if ($null -eq $exclusive -or $exclusive.exclusive_option -isnot [bool] -or -not $exclusive.exclusive_option -or
+                      $exclusive.bound -isnot [bool] -or -not $exclusive.bound -or
+                      $exclusive.listening -isnot [bool] -or -not $exclusive.listening -or
+                      $exclusive.stage -cne 'listening' -or $exclusive.win32_error -ne 0) {
+                    throw "The released port was not exclusively bound and listened on: $label"
+                  }
+                }
+                $controlsPath = 'build/swirl-quick/system-proxy-exit/listener-probe-controls.json'
+                if (-not (Test-Path -LiteralPath $controlsPath -PathType Leaf)) { throw 'Missing native listener probe control evidence.' }
+                $controls = Get-Content -LiteralPath $controlsPath -Raw | ConvertFrom-Json
+                if ($controls.schema -ne 1 -or $controls.source_sha -cne $env:GITHUB_SHA -or $controls.success -isnot [bool] -or -not $controls.success) { throw 'The native listener probe controls have invalid source identity or outcome.' }
+                $legacy = $controls.legacy.closed
+                if ($null -eq $legacy -or $legacy.deadline_ms -ne 1500 -or $legacy.finished -isnot [bool] -or $legacy.predicate_result -isnot [bool]) { throw 'Missing the original listener-probe observation on a known-closed native port.' }
+                Assert-NativeListenerReleased $controls.current.closed $controls.current.closed_tcp_state $controls.current.closed_exclusive_rebind 'closed fixture'
+                $live = $controls.current.live
+                if ($null -eq $live -or $live.connected -isnot [bool] -or -not $live.connected -or
+                    $live.terminal_observed -isnot [bool] -or -not $live.terminal_observed -or
+                    $live.refused -isnot [bool] -or $live.refused -or $live.outcome -cne 'connected') { throw 'The native listener probe did not reject a genuinely live listener.' }
+                Assert-ExclusivePortOccupied $controls.current.live_exclusive_probe 'live fixture'
+                Assert-NativeTcpState $controls.current.live_tcp_state $true 'live fixture'
+                if ($controls.current.live_native_listener_observed -isnot [bool] -or -not $controls.current.live_native_listener_observed) { throw 'The TCP state query did not detect the live native control.' }
+                foreach ($required in @('ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry','exclusiveListenerProbeRequiresReleasedPortAfterTraffic')) {
+                  if ($null -eq $report.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required native exit control did not pass: $required" }
+                }
+                $rows = @($report.SelectNodes('/TestCase/TestFunction[@name="normalApplicationExitRestoresOwnedProxy"]/Incident[@type="pass"]/DataTag'))
+                $tags = @($rows | ForEach-Object { $_.InnerText })
+                $requiredTags = @('pac-only','manual-and-pac','pac-only-external-edit','manual-and-pac-external-edit','pac-only-lock-contention','pac-only-lock-contention-repeat-2','pac-only-lock-contention-repeat-3','pac-only-lock-contention-repeat-4','pac-only-lock-contention-repeat-5')
+                if ($tags.Count -ne $requiredTags.Count -or @($requiredTags | Where-Object { $_ -notin $tags }).Count -gt 0) { throw 'All native application exit, external-edit and release-contention data rows must actually run.' }
+                foreach ($tag in $requiredTags) {
+                  $requiredStages = @('ready','final','result')
+                  if ($tag.StartsWith('pac-only-lock-contention')) { $requiredStages += 'waiting' }
+                  foreach ($stage in $requiredStages) {
+                    $receipt = "build/swirl-quick/system-proxy-exit/$tag-$stage.json"
+                    if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native application exit receipt: $tag/$stage" }
+                    $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+                    if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native application exit receipt has the wrong source identity: $tag/$stage" }
+                    if ($stage -eq 'final') {
+                      foreach ($key in @('close_reply_write_succeeded','close_after_control_disconnect')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native close-control delivery evidence is incomplete: $tag/$key" }
+                      }
+                    }
+                    if ($stage -eq 'result' -and ($data.success -isnot [bool] -or -not $data.success)) { throw "Native application exit result did not pass: $tag" }
+                    if ($stage -eq 'result') {
+                      Assert-NativeListenerReleased $data.listener_probe $data.tcp_state_after_exit $data.exclusive_rebind_after_exit $tag
+                      Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
+                      foreach ($key in @('close_acknowledged','listener_closed','tcp_tables_readable','no_listening_socket')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native listener release evidence is incomplete: $tag/$key" }
+                      }
+                      if ($data.journal_absent_after_exit -isnot [bool] -or -not $data.journal_absent_after_exit -or
+                          $null -eq $data.guard_marker_count_after_exit -or $data.guard_marker_count_after_exit -ne 0) {
+                        throw "Native journal or guard marker cleanup is incomplete: $tag"
+                      }
+                    }
+                    if ($stage -eq 'waiting') {
+                      if ($data.phase -cne 'release-waiting') { throw 'Native release-contention evidence has the wrong phase.' }
+                      foreach ($key in @('native_backend','ready','close_requested','proxy_owned','proxy_busy','runtime_alive','runtime_healthy','journal_present')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native release-contention evidence is incomplete: $key" }
+                      }
+                      if ($data.fixture_failed -isnot [bool] -or $data.fixture_failed) { throw 'Native release-contention fixture failed.' }
+                    }
+                  }
+                }
+              }
+              if ($suite -eq 'normal-stop') {
+                $rows = @($report.SelectNodes('/TestCase/TestFunction[@name="normalStopRestoresOwnedProxyWhileApplicationRemainsAlive"]/Incident[@type="pass"]/DataTag'))
+                $tags = @($rows | ForEach-Object { $_.InnerText })
+                $requiredTags = @('pac-only','manual-and-pac','pac-only-external-edit','manual-and-pac-external-edit','pac-only-lock-contention','pac-only-lock-timeout-retry')
+                if ($tags.Count -ne $requiredTags.Count -or @($requiredTags | Where-Object { $_ -notin $tags }).Count -gt 0) { throw 'All six native normal-stop cases must actually pass with the application still alive.' }
+                foreach ($tag in $requiredTags) {
+                  $requiredStages = @('ready','stopped','final','result')
+                  if ($tag -in @('pac-only-lock-contention','pac-only-lock-timeout-retry')) { $requiredStages += 'waiting' }
+                  if ($tag -eq 'pac-only-lock-timeout-retry') { $requiredStages += 'failed' }
+                  foreach ($stage in $requiredStages) {
+                    $receipt = "build/swirl-quick/system-proxy-normal-stop/$tag-$stage.json"
+                    if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native normal-stop receipt: $tag/$stage" }
+                    $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+                    if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native normal-stop receipt has the wrong source identity: $tag/$stage" }
+                    if ($stage -eq 'final') {
+                      foreach ($key in @('close_reply_write_succeeded','close_after_control_disconnect')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native close-control delivery evidence is incomplete: $tag/$key" }
+                      }
+                    }
+                    if ($stage -eq 'result') {
+                      foreach ($key in @('success','http_roundtrip','socks5_roundtrip','child_normal_exit','close_acknowledged','exact_stop_snapshot','exact_exit_snapshot','winhttp_unchanged','runner_original_restored','app_alive_after_stop','app_alive_after_listener_checks','normal_stop_completed','journal_absent_after_stop','listener_closed','tcp_tables_readable','no_listening_socket')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native normal-stop result is incomplete: $tag/$key" }
+                      }
+                      if ($data.child_exit_code -ne 0 -or $null -eq $data.guard_marker_count_after_stop -or $data.guard_marker_count_after_stop -ne 0) { throw "Normal-stop process or guard cleanup failed: $tag" }
+                      Assert-NativeListenerReleased $data.listener_probe $data.tcp_state_after_stop $data.exclusive_rebind_after_stop $tag
+                      Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
+                      if ($tag -in @('pac-only-lock-contention','pac-only-lock-timeout-retry')) {
+                        foreach ($key in @('pending_http_roundtrip','pending_socks5_roundtrip','same_runtime_epoch_while_pending')) {
+                          if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The same Rust runtime did not serve real traffic while release was pending: $tag/$key" }
+                        }
+                      }
+                      if ($tag -eq 'pac-only-lock-timeout-retry') {
+                        foreach ($key in @('failed_http_roundtrip','failed_socks5_roundtrip','same_runtime_epoch_while_failed')) {
+                          if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The same Rust runtime did not survive an actual release timeout: $tag/$key" }
+                        }
+                        if ($null -eq $data.release_timeout_elapsed_ms -or $data.release_timeout_elapsed_ms -lt 2000) { throw 'The native normal-stop test did not observe the actual two-second release deadline.' }
+                      }
+                    }
+                    if ($stage -in @('waiting','failed','stopped')) {
+                      foreach ($key in @('native_backend','ready')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Normal-stop fixture identity is incomplete: $tag/$stage/$key" }
+                      }
+                      if ($data.close_requested -isnot [bool] -or $data.close_requested -or $data.fixture_failed -isnot [bool] -or $data.fixture_failed) { throw "The application closed or fixture failed before normal-stop verification: $tag/$stage" }
+                    }
+                    if ($stage -in @('waiting','failed')) {
+                      foreach ($key in @('proxy_owned','runtime_alive','runtime_healthy','journal_present')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The owned listener was not retained during normal-stop release: $tag/$stage/$key" }
+                      }
+                      $expectedPhase = if ($stage -eq 'waiting') { 'normal-stop-waiting' } else { 'normal-stop-failed' }
+                      if ($data.phase -cne $expectedPhase -or $data.proxy_busy -isnot [bool] -or $data.proxy_busy -ne ($stage -eq 'waiting')) { throw "Normal-stop release has the wrong pending/failure state: $tag/$stage" }
+                    }
+                    if ($stage -eq 'stopped') {
+                      if ($data.phase -cne 'normal-stopped') { throw "Missing ordinary stop completion: $tag" }
+                      foreach ($key in @('proxy_owned','proxy_busy','runtime_alive')) {
+                        if ($data.$key -isnot [bool] -or $data.$key) { throw "Normal-stop did not release proxy and Core: $tag/$key" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
+      - name: Preserve node probe regression after an early UI failure
+        if: ${{ !cancelled() && steps.critical_ui.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          # An early UI failure otherwise prevents the changed DNS/probe and
+          # section-model assertions from running. Keep the failed gate failed,
+          # but collect these independent results without repeating a suite
+          # that the normal critical-network stage has already executed.
+          if (Test-Path -LiteralPath 'build-evidence/critical-network.xml') {
+            Write-Host 'The normal critical-network stage already ran; retain its original results.'
+            exit 0
+          }
+          $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/node-diagnostic-regression.xml'
+          ctest --test-dir build/swirl-quick -C Release -R '^swirl-(node-real-chain|node-section-model|native-tun-recovery)$' --output-on-failure --no-tests=error --output-junit $junit
+          $testExit = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent node regression evidence is missing.' }
+          if ($testExit -ne 0) { throw "Independent node diagnostic regression failed ($testExit)." }
+          [xml]$report = Get-Content -LiteralPath $junit -Raw
+          foreach ($name in @('swirl-node-real-chain','swirl-node-section-model','swirl-native-tun-recovery')) {
+            $cases = @($report.SelectNodes("//testcase[@name='$name']"))
+            if ($cases.Count -ne 1 -or $cases[0].status -ne 'run' -or $cases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw "Independent node regression did not execute successfully: $name" }
+          }
+      - name: Upload current node regression evidence before production builds
+        if: ${{ !cancelled() && steps.critical_ui.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Node-Regression-Evidence
+          path: |
+            build-evidence/critical-ui.xml
+            build-evidence/critical-network.xml
+            build-evidence/node-diagnostic-regression.xml
+            build/swirl-quick/node-chain.txt
+            build/swirl-quick/node-chain.xml
+            build/swirl-quick/swirl-native-tun-recovery.xml
+            build/swirl-quick/node-ui-evidence/node-probe-*.json
+            build/swirl-quick/node-ui-evidence/*probe*.png
+            build/swirl-quick/node-ui-native-evidence/node-probe-*.json
+            build/swirl-quick/node-ui-native-evidence/*probe*.png
+          if-no-files-found: warn
+          retention-days: 14
       - name: Overview input checks against deployed Qt runtime
+        id: overview_input
+        if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
           $exe = (Resolve-Path "dist/Swirl.exe").Path
-          $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
-          if ($process.ExitCode -ne 0) {
-            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
-            throw "Overview input checks failed: $($process.ExitCode)"
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-input-diagnostics.txt'
+          if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic -Force }
+          try {
+            $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
+            if ($process.ExitCode -ne 0) {
+              Get-Content -LiteralPath $diagnostic -ErrorAction SilentlyContinue
+              throw "Overview input checks failed: $($process.ExitCode)"
+            }
+          } finally {
+            if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+              Copy-Item -LiteralPath $diagnostic -Destination 'build-evidence/overview-input.log' -Force
+            }
           }
       - name: Loopback HTTP capture checks against deployed Qt runtime
         shell: pwsh
@@ -297,12 +877,35 @@ jobs:
           # GUI-subsystem executables return immediately from PowerShell's '&' invocation.
           # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
           $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $diag = Join-Path (Resolve-Path "dist").Path 'Swirl-diagnostics.txt'
+          if (Test-Path -LiteralPath $diag) { Remove-Item -LiteralPath $diag -Force }
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
+          # The next preview launch rewrites this diagnostic file. Preserve the
+          # actual deployed smoke, including VME object/context diagnostics.
+          New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
+          $pagesObserved = $false
+          $diagnosticHash = $null
+          if (Test-Path -LiteralPath $diag) {
+            Copy-Item -LiteralPath $diag -Destination 'build-evidence/deployed-all-pages.log'
+            $diagnosticHash = (Get-FileHash -LiteralPath $diag -Algorithm SHA256).Hash.ToLowerInvariant()
+            $pagesObserved = [bool](Select-String -LiteralPath $diag -Pattern '^4: SMOKE_PAGES 61\s*$')
+          }
+          @{schema=1;source_sha=$env:GITHUB_SHA;exe_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant();diagnostics_sha256=$diagnosticHash;exit_code=$process.ExitCode;smoke_pages_61_observed=$pagesObserved} | ConvertTo-Json | Set-Content -LiteralPath 'build-evidence/deployed-all-pages.json' -Encoding utf8
           if ($process.ExitCode -ne 0) {
-            $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
             if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
             throw "Qt Quick startup failed: $($process.ExitCode)"
           }
+          if (-not $pagesObserved) { throw 'Deployed all-pages smoke did not record the required 61 routes.' }
+      - name: Exercise deployed QA routes with normal animation and VME context diagnostics
+        if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          ./scripts/tests/Test-WindowsFullMotionSmoke.ps1 `
+            -RepositoryRoot $env:GITHUB_WORKSPACE -RuntimeDirectory dist `
+            -ReferenceExecutable build/swirl-quick/Release/Swirl.exe `
+            -OutputDirectory build-evidence/full-motion-qa -ScratchRoot $env:RUNNER_TEMP `
+            -WorkflowSha $env:GITHUB_SHA -PullRequestHeadSha '${{ github.event.pull_request.head.sha }}' `
+            -ExpectedFlavor qa
       - name: Check Qt Quick UI previews at multiple sizes and scales
         shell: pwsh
         run: |
@@ -386,12 +989,192 @@ jobs:
         run: |
           . ./scripts/Assert-BuildSource.ps1
           Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
-          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_BUILD_CORE_TESTS=OFF -DSWIRL_PRIVATE_UI_QUOTA=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target" "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:SWIRL_QT_SELECTED_CMAKE"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
+          python tools/Compose-Qt612ProductSdk.py verify --receipt $env:SWIRL_QT_SELECTED_RECEIPT --build-dir "$env:GITHUB_WORKSPACE/build/swirl-product" --phase configured --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-release-configured"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Release Qt target does not match the selected SDK.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
-          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
-          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $productionBuild = (Resolve-Path -LiteralPath 'build/swirl-product').Path
+          $tlsReport = Join-Path $productionBuild ('tls-runtime-' + $env:GITHUB_SHA + '.json')
+          $runtimeEvidence = Join-Path $env:GITHUB_WORKSPACE 'out/package-evidence'
+          if (Test-Path -LiteralPath 'installer-bin') { throw 'Production staging requires a fresh destination.' }
+          # A restored compiler cache can contain this exact SHA's earlier report.
+          # Remove only this build's report before invoking the real self-tests.
+          if (Test-Path -LiteralPath $tlsReport) { Remove-Item -LiteralPath $tlsReport -Force }
+          New-Item -ItemType Directory -Force -Path $runtimeEvidence | Out-Null
+          $runtimeReports = @(
+            @{ source=$tlsReport; name='production-tls-runtime.json' },
+            @{ source=(Join-Path $env:GITHUB_WORKSPACE 'installer-bin/rust-self-test.json'); name='production-rust-self-test.json' }
+          )
+          foreach ($report in $runtimeReports) {
+            $saved = Join-Path $runtimeEvidence $report.name
+            if (Test-Path -LiteralPath $saved) { Remove-Item -LiteralPath $saved -Force }
+          }
+          try {
+            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -QtSdkReceipt $env:SWIRL_QT_SELECTED_RECEIPT -QtEvidenceDirectory "$env:GITHUB_WORKSPACE/build-evidence/qt-product-release-deployment" -QtSourceDirectory out/qt-corresponding-source -QtSourceCacheDirectory "$env:RUNNER_TEMP/swirl-qt-6.12.0-source-cache"
+            ./scripts/tests/Test-WindowsMsvcRuntimePackage.ps1 -ApplicationDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory out/package-evidence/msvc-runtime-policy
+            $crt = Get-Content -LiteralPath 'out/package-evidence/msvc-runtime-policy/msvc-runtime-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($crt.schema -ne 1 -or $crt.source_sha -cne $env:GITHUB_SHA -or -not $crt.success -or -not $crt.candidate_unchanged -or -not $crt.fixture_removed -or $crt.forced_termination -or @($crt.negative_controls).Count -ne 5 -or @($crt.negative_controls | Where-Object { -not $_.expected_assertion_failed }).Count) { throw 'The actual app-local CRT dependency and fallback rejection evidence is incomplete.' }
+          } finally {
+            # Preserve genuinely new diagnostics even when staging rejects them.
+            foreach ($report in $runtimeReports) {
+              if (Test-Path -LiteralPath $report.source -PathType Leaf) {
+                Copy-Item -LiteralPath $report.source -Destination (Join-Path $runtimeEvidence $report.name)
+              }
+            }
+          }
+      - name: Refuse legacy live parameters in the actual production Release
+        shell: pwsh
+        run: |
+          python tools/tests/test_runtime_acceptance_refusal.py --executable installer-bin/Swirl.exe --expected-source $env:GITHUB_SHA --flavor release --output out/package-evidence/runtime-refusal-release
+          if ($LASTEXITCODE -ne 0) { throw 'The actual production executable admitted a legacy runtime entry.' }
+      # Retain successful compiler work before downstream tests can time out.
+      # Restored test evidence is still discarded before every build above.
+      - name: Save reusable compiler outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          . ./scripts/BuildInputTimes.ps1
+          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
+      - name: Cache compiled Qt and Rust outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: ${{ steps.build_cache.outputs.cache-primary-key }}
+      - name: Start the production Release UI with cold and warm QML caches
+        shell: pwsh
+        env:
+          SWIRL_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          SWIRL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          # The production smoke/font-review combination waits for each actual
+          # route's Loader.Ready and transition settlement, rejects QML warnings
+          # and uses isolated storage. A
+          # plain launch does not honor SWIRL_TEST_ROOT, so do not claim this is
+          # a normal user-session or physical Windows 11 desktop acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCALE_FACTOR,Env:QT_SCREEN_SCALE_FACTORS -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'installer-bin/Swirl.exe').Path
+          $manifest = Get-Content -LiteralPath 'installer-bin/package-manifest.json' -Raw | ConvertFrom-Json
+          $source = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $source -cne $env:GITHUB_SHA -or $manifest.source_sha -cne $source) { throw 'Production UI source identity differs from the tested checkout.' }
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/production-ui'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-production-ui-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $qmlCacheRoot = [IO.Path]::GetFullPath((Join-Path $env:SWIRL_TEST_ROOT 'cache/qmlcache')).TrimEnd('\','/')
+          function Get-QmlCacheSnapshot {
+            $exists = Test-Path -LiteralPath $qmlCacheRoot -PathType Container
+            $files = @()
+            $directories = @()
+            [long]$totalBytes = 0
+            if ($exists) {
+              $directories = @(Get-ChildItem -LiteralPath $qmlCacheRoot -Directory -Recurse -Force | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/') })
+              $files = @(Get-ChildItem -LiteralPath $qmlCacheRoot -File -Recurse -Force | Sort-Object FullName | ForEach-Object {
+                $totalBytes += $_.Length
+                [ordered]@{ path=$_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/'); size=$_.Length; sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); lastWriteUtc=$_.LastWriteTimeUtc.ToString('o') }
+              })
+            }
+            return [ordered]@{ capturedUtc=[DateTime]::UtcNow.ToString('o'); root=$qmlCacheRoot; exists=$exists; directories=$directories; fileCount=$files.Count; totalBytes=$totalBytes; files=$files }
+          }
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $launches = @()
+          $previousCacheAfter = $null
+          $previousCacheIdentity = $null
+          try {
+            foreach ($phase in @('cold-qml-cache', 'warm-same-qml-cache')) {
+              $before = Get-QmlCacheSnapshot
+              $handoff = $null
+              if ($null -ne $previousCacheAfter) {
+                $previousFiles = ConvertTo-Json -InputObject @($previousCacheAfter.files) -Depth 5 -Compress
+                $currentFiles = ConvertTo-Json -InputObject @($before.files) -Depth 5 -Compress
+                $handoff = [ordered]@{ previousAfterUtc=$previousCacheAfter.capturedUtc; currentBeforeUtc=$before.capturedUtc; sameFileInventory=($previousFiles -ceq $currentFiles); sameRuntimeCachePath=$null }
+              }
+              $result = [ordered]@{ phase=$phase; startedUtc=$null; finishedUtc=$null; durationMs=$null; exited=$false; exitCode=$null; diagnosticsPresent=$false; warningsOrErrors=$false; completedPages=0; readyPages=0; cacheIdentity=$null; cacheBefore=$before; cacheAfter=$null; cacheHandoff=$handoff; cacheHitVerified=$false; cacheObservation='not-observed'; cacheEvidenceError=$null; passed=$false }
+              $process = $null
+              $duration = [Diagnostics.Stopwatch]::new()
+              try {
+                if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic }
+                $result.startedUtc = [DateTime]::UtcNow.ToString('o')
+                $duration.Start()
+                $process = Start-Process -FilePath $exe -ArgumentList @('--smoke-test', '--font-review') -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+                $result.exited = $process.WaitForExit(60000)
+                $duration.Stop()
+                $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                $result.durationMs = $duration.Elapsed.TotalMilliseconds
+                if (-not $result.exited) { throw "Production UI $phase exceeded the existing 60-second smoke deadline." }
+                $result.exitCode = $process.ExitCode
+                if ($process.ExitCode -ne 0) { throw "Production UI $phase failed: $($process.ExitCode)" }
+                $result.diagnosticsPresent = Test-Path -LiteralPath $diagnostic -PathType Leaf
+                if (-not $result.diagnosticsPresent) { throw "Production UI $phase did not emit its startup diagnostics." }
+                $result.warningsOrErrors = [bool](Select-String -LiteralPath $diagnostic -Pattern '^[123]:' -Quiet)
+                if ($result.warningsOrErrors) { throw "Production UI $phase emitted Qt warnings or errors." }
+                $cacheMarkers = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+QML_CACHE_EVIDENCE\s+(\{.*\})\s*$')
+                if ($cacheMarkers.Count -ne 1) { throw "Production UI $phase lacks its actual QML cache identity." }
+                $result.cacheIdentity = $cacheMarkers[0].Matches[0].Groups[1].Value | ConvertFrom-Json
+                $cachePath = [IO.Path]::GetFullPath([string]$result.cacheIdentity.path).TrimEnd('\','/')
+                if (-not $cachePath.StartsWith($qmlCacheRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'The observed QML cache escaped the isolated cache root.' }
+                if ($null -ne $handoff) { $handoff.sameRuntimeCachePath = $cachePath.Equals([IO.Path]::GetFullPath([string]$previousCacheIdentity.path).TrimEnd('\','/'), [StringComparison]::OrdinalIgnoreCase) }
+                $completed = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+SMOKE_PAGES\s+(\d+)\s*$')
+                $ready = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+FONT_SMOKE_ROUTE_READY\s+(\S+)\s+(\S+)\s*$')
+                if ($completed.Count -ne 1) { throw "Production UI $phase lacks an unambiguous all-pages completion marker." }
+                $result.completedPages = [int]$completed[0].Matches[0].Groups[1].Value
+                $result.readyPages = $ready.Count
+                if ($result.completedPages -le 0 -or $result.readyPages -ne $result.completedPages) { throw "Production UI $phase did not confirm every traversed route was ready." }
+                foreach ($route in $ready) {
+                  $requested = $route.Matches[0].Groups[1].Value.Trim('"')
+                  $actual = $route.Matches[0].Groups[2].Value.Trim('"')
+                  $expected = if ($requested -in @('requestlogs', 'dashboard')) { 'activity' } else { $requested }
+                  if ($actual -cne $expected) { throw "Production UI $phase confirmed a different route: $requested -> $actual" }
+                }
+                $result.passed = $true
+              } finally {
+                if ($null -ne $process) {
+                  if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                  $process.Dispose()
+                }
+                if ($duration.IsRunning) { $duration.Stop() }
+                if ($null -eq $result.finishedUtc) {
+                  $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                  $result.durationMs = $duration.Elapsed.TotalMilliseconds
+                }
+                try {
+                  $result.cacheAfter = Get-QmlCacheSnapshot
+                  $result.cacheObservation = if ($result.cacheAfter.fileCount -gt 0) { 'disk-cache-files-observed; cache-hits-not-measured' } else { 'no-runtime-disk-cache-files-observed; AOT-or-no-disk-write-not-distinguished' }
+                  $previousCacheAfter = $result.cacheAfter
+                  $previousCacheIdentity = $result.cacheIdentity
+                } catch {
+                  $result.cacheEvidenceError = $_.Exception.Message
+                  $result.passed = $false
+                  throw
+                } finally {
+                  if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+                    Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $evidence ($phase + '.log'))
+                  }
+                  $launches += $result
+                }
+              }
+            }
+          } finally {
+            [ordered]@{ source_sha=$source; pr_head_sha=$env:SWIRL_PR_HEAD_SHA; pr_base_sha=$env:SWIRL_PR_BASE_SHA; application_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(); ui_tests_compiled=$false; qpa='windows'; requested_rhi='d3d11'; launches=$launches; cacheEvidenceScope='Actual process-reported QML cache identity and before/after file inventories under its isolated root. Reusing a directory or observing files does not prove cache hits; QML AOT may produce no runtime disk-cache files. Startup duration excludes inventory hashing and is not a benchmark.'; ordinary_user_session_verified=$false; physical_windows11_dpi_gpu_acceptance='not-run' } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidence 'startup.json') -Encoding utf8
+          }
+      - name: Exercise the production Release routes with normal animation
+        shell: pwsh
+        run: |
+          ./scripts/tests/Test-WindowsFullMotionSmoke.ps1 `
+            -RepositoryRoot $env:GITHUB_WORKSPACE -RuntimeDirectory installer-bin `
+            -ReferenceExecutable build/swirl-product/Release/Swirl.exe `
+            -OutputDirectory build-evidence/full-motion-release -ScratchRoot $env:RUNNER_TEMP `
+            -WorkflowSha $env:GITHUB_SHA -PullRequestHeadSha '${{ github.event.pull_request.head.sha }}' `
+            -ExpectedFlavor release
       - name: Install NSIS packaging tools
         shell: pwsh
         run: |
@@ -421,7 +1204,246 @@ jobs:
           if ($manifest.source_sha -ne $env:GITHUB_SHA) { throw 'Package source identity differs from this workflow commit.' }
           $scope = if ($env:SWIRL_CI_UI_ONLY -eq 'true') { 'ui-only' } else { 'full' }
           $networkRegression = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { 'passed' } else { 'not-run-ui-only' }
-          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;critical_ui_tests='passed';network_regression=$networkRegression;scoped_full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $qtProduct = Get-Content -LiteralPath $env:SWIRL_QT_SELECTED_RECEIPT -Raw -Encoding UTF8 | ConvertFrom-Json
+          $qtSource = Get-Content -LiteralPath 'out/qt-corresponding-source/qt-source-bundle.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($qtProduct.consumer.source_sha -cne $env:GITHUB_SHA -or $qtSource.source_sha -cne $env:GITHUB_SHA -or
+              $qtSource.status -cne 'complete') { throw 'Qt binary/source bundle is not paired with this product source.' }
+          $qtDependency = [ordered]@{version=$qtProduct.qt_version;source_commit=$qtProduct.qt_source.commit;
+            upstream_patch_commit=$qtProduct.qt_patch.upstream_commit;patch_sha256=$qtProduct.qt_patch.sha256;
+            selected_content_id=$qtProduct.selected_content_id;derivation_id=$qtProduct.derivation_id;
+            qml_dll=$qtProduct.qml_files.'bin/Qt6Qml.dll';producer_run=$qtProduct.producer.run;
+            producer_artifact=$qtProduct.artifact.artifact;producer_workflow_conclusion=$qtProduct.original_workflow_conclusion}
+          [ordered]@{source_sha=$env:GITHUB_SHA;pr_head_sha=$qtProduct.consumer.pr_head_sha;source_tree_sha=$qtProduct.consumer.tree_sha;
+            version=$appVersion;qt=$env:SWIRL_QT_VERSION;qt_dependency=$qtDependency;qt_source_archive=$qtSource.archive;
+            qt_source_manifest_sha256=(Get-FileHash -LiteralPath 'out/qt-corresponding-source/qt-source-bundle.json' -Algorithm SHA256).Hash.ToLowerInvariant();
+            installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;
+            critical_ui_tests='passed';network_regression=$networkRegression;qa_full_motion_all_pages='passed-rapid-and-ready-61';
+            product_full_motion_all_pages='passed-rapid-and-ready-61';scoped_full_regression='pending';desktop_dpi_acceptance='manual';
+            physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          python tools/Prepare-Qt612ProductSource.py verify-package --bundle-dir out/qt-corresponding-source --package-manifest installer-bin/package-manifest.json --delivery out/delivery.json
+          if ($LASTEXITCODE -ne 0) { throw 'The actual installer, deployed Qt files and corresponding source bundle are not paired.' }
+      - name: Verify actual production installer lifecycle in an isolated runner directory
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          $env:SWIRL_NATIVE_TUN_ACCEPTANCE = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { '1' } else { '0' }
+          ./scripts/tests/Test-WindowsProductionInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/installer-lifecycle
+          $lifecycle = Get-Content -LiteralPath 'build-evidence/installer-lifecycle/lifecycle.json' -Raw | ConvertFrom-Json
+          if (-not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA) { throw 'Actual production installer lifecycle evidence is incomplete.' }
+          if ($env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1' -and
+              (-not $lifecycle.tun_pending_uninstall.verified -or -not $lifecycle.tun_pending_uninstall.marker_cleared_by_maintenance -or
+               -not $lifecycle.tun_pending_uninstall.journal_empty_after -or -not $lifecycle.tun_pending_uninstall.original_marker_restored)) {
+            throw 'Production TUN pending-marker uninstall did not prove its empty-journal maintenance boundary.'
+          }
+          $delivery = Get-Content -LiteralPath out/delivery.json -Raw | ConvertFrom-Json
+          $delivery | Add-Member -NotePropertyName isolated_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $maintenance = if ($env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1') { 'passed-empty-journal-only' } else { 'not-run-ui-only' }
+          $delivery | Add-Member -NotePropertyName native_tun_maintenance_uninstall -NotePropertyValue $maintenance -Force
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Verify normal installer ownership and cleanup as an actual standard user
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsNormalInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/normal-installer-lifecycle -NodeStoreHelper build/swirl-quick/Release/SwirlPrivateSubscriptionAcceptance.exe
+          $lifecycle = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/lifecycle.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/standard-user-runner.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($lifecycle.schema -ne 1 -or -not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA -or -not $lifecycle.normal_user_installation -or -not $lifecycle.non_admin_token_verified -or -not $lifecycle.negative_control.required_assertion_failed) { throw 'Actual normal standard-user installer lifecycle evidence is incomplete.' }
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination) { throw 'The installer left temporary standard-user processes, accounts or native resources behind.' }
+          $dpapi = $lifecycle.same_package_dpapi_store
+          $upgrade = @($lifecycle.cases | Where-Object { $_.case.scenario -ceq 'upgrade' -and -not $_.case.negative })
+          if ($null -eq $dpapi -or -not $dpapi.verified -or -not $dpapi.parent_host_scope_forwarded -or -not $dpapi.existing_store_create_refused -or
+              $dpapi.scope -cne 'same-package-reinstall-synthetic-v1-node-store' -or $dpapi.previous_release_migration -ne $false -or
+              $dpapi.helper_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $dpapi.rust_build_id -cnotmatch '^[0-9a-f]{64}$' -or
+              @($dpapi.stages).Count -ne 4 -or $upgrade.Count -ne 1) { throw 'Same-package synthetic DPAPI preservation evidence is missing or has the wrong scope.' }
+          $baseline = $dpapi.stages[0].receipt
+          foreach ($phase in @('before-reinstall','after-reinstall','after-normal-close','after-uninstall')) {
+            $stage = @($dpapi.stages | Where-Object { $_.stage -ceq $phase })
+            if ($stage.Count -ne 1) { throw "Missing exact DPAPI preservation phase: $phase" }
+            $receipt = $stage[0].receipt
+            if ($receipt.schema -ne 1 -or $receipt.kind -cne 'installer-node-store-fixture' -or $receipt.success -ne $true -or
+                $receipt.scope -cne $dpapi.scope -or $receipt.operation -cne 'verify' -or $receipt.source_sha -cne $env:GITHUB_SHA -or
+                $receipt.user_sid -cne $upgrade[0].case.user_sid -or $receipt.rust_build_id -cne $dpapi.rust_build_id -or
+                $receipt.ordinary_profile -ne $true -or $receipt.host_scope_verified -ne $true -or $receipt.store_format -cne 'SWIRLNODE1' -or $receipt.store_write_attempted -ne $false -or
+                $receipt.network_requests -ne 0 -or $receipt.engine_started -ne $false -or $receipt.dpapi_roundtrip_verified -ne $true -or
+                $receipt.node_count -ne 2 -or $receipt.subscription_count -ne 1 -or $receipt.node_parameters_match -ne $true -or
+                $receipt.selection_matches -ne $true -or $receipt.disabled_subscription_matches -ne $true -or
+                $receipt.network_configuration_matches -ne $true -or $receipt.plaintext_absent -ne $true -or $receipt.read_only_reload -ne $true -or
+                $receipt.ciphertext_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $receipt.selection_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+                $receipt.ciphertext_sha256 -cne $baseline.ciphertext_sha256 -or $receipt.selection_sha256 -cne $baseline.selection_sha256) {
+              throw "DPAPI semantics, identity or exact preservation failed: $phase"
+            }
+          }
+          $delivery = Get-Content -LiteralPath out/delivery.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $delivery | Add-Member -NotePropertyName normal_standard_user_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $delivery | Add-Member -NotePropertyName normal_standard_user_same_package_dpapi_preservation -NotePropertyValue 'passed-synthetic-v1-only' -Force
+          $delivery | Add-Member -NotePropertyName previous_release_configuration_upgrade -NotePropertyValue 'not-run' -Force
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Admit the explicitly requested previous-version installer
+        if: contains(github.event.pull_request.labels.*.name, 'qa-cross-version-upgrade')
+        shell: python
+        env:
+          SWIRL_ARTIFACT_READ_TOKEN: ${{ github.token }}
+        run: |
+          import datetime, hashlib, json, os, pathlib, re, ssl, subprocess, urllib.error, urllib.parse, urllib.request, zipfile
+
+          class Refused(Exception):
+              pass
+
+          def require(condition, code):
+              if not condition:
+                  raise Refused(code)
+
+          def validate_scope(plan, event, environment):
+              pr = event.get('pull_request', {})
+              require(environment.get('GITHUB_EVENT_NAME') == 'pull_request' and environment.get('GITHUB_REPOSITORY') == 'SOLHK/Swirl', 'EventScopeMismatch')
+              require(plan.get('schema') == 1 and plan.get('scope') == 'optional-pr61-synthetic-cross-version-installer-acceptance', 'InputScopeMismatch')
+              require(plan.get('repository') == 'SOLHK/Swirl' and plan.get('pull_request') == 61 and event.get('number') == 61, 'RepositoryOrPrMismatch')
+              require(plan.get('head_branch') == 'work/node-probe-render-20261105' and plan.get('base_branch') == 'test', 'InputBranchMismatch')
+              require(pr.get('head', {}).get('ref') == plan['head_branch'] and pr.get('base', {}).get('ref') == 'test', 'PrBranchMismatch')
+              require(pr.get('head', {}).get('repo', {}).get('full_name') == 'SOLHK/Swirl' and pr.get('base', {}).get('repo', {}).get('full_name') == 'SOLHK/Swirl', 'ForkOrBaseRepositoryRejected')
+              require(plan.get('opt_in_label') == 'qa-cross-version-upgrade' and plan['opt_in_label'] in [x.get('name') for x in pr.get('labels', [])], 'ExplicitQaOptInRequired')
+              old = plan.get('baseline', {})
+              require(plan.get('candidate_version') == '0.2.40' and old.get('version') == '0.2.39', 'VersionPairMismatch')
+              require(re.fullmatch('[0-9a-f]{40}', old.get('source_sha', '')) is not None, 'BaselineSourceInvalid')
+              for field in ('run_id', 'artifact_id', 'zip_bytes', 'exe_bytes'):
+                  require(type(old.get(field)) is int and 0 < old[field] < 100_000_000_000, 'BaselineNumericInputInvalid')
+              require(old['zip_bytes'] < 100_000_000 and old['exe_bytes'] < 100_000_000 and old.get('exe_name') == 'Swirl-Setup.exe' and old.get('artifact_name') == 'Swirl-Windows-Installer-EXE', 'BaselinePayloadInputInvalid')
+              for field in ('zip_sha256', 'exe_sha256', 'package_manifest_sha256', 'application_sha256', 'rust_build_id'):
+                  require(re.fullmatch('[0-9a-f]{64}', old.get(field, '')) is not None, 'BaselineDigestInvalid')
+              require(set(plan.get('identical_persistence_sources', {})) == {'src/Swirl.Quick/engine/NodeStore.cpp', 'src/Swirl.Quick/engine/NodeStore.h'}, 'PersistenceInputMismatch')
+
+          def validate_artifact(old, run, artifact):
+              require(run.get('id') == old['run_id'] and run.get('repository', {}).get('full_name') == 'SOLHK/Swirl', 'BaselineRunRepositoryMismatch')
+              require(run.get('status') == 'completed' and run.get('conclusion') == 'success' and run.get('event') == 'push' and run.get('head_branch') == 'test' and run.get('head_sha') == old['source_sha'], 'BaselineRunNotFinalSuccess')
+              require(run.get('path') == '.github/workflows/build-qt-quick-ui.yml', 'BaselineWorkflowMismatch')
+              owner = artifact.get('workflow_run', {})
+              require(artifact.get('id') == old['artifact_id'] and artifact.get('name') == old['artifact_name'] and owner.get('id') == old['run_id'] and owner.get('head_sha') == old['source_sha'] and owner.get('head_branch') == 'test', 'BaselineArtifactIdentityMismatch')
+              require(owner.get('repository_id') == run['repository']['id'] and owner.get('head_repository_id') == run['repository']['id'], 'BaselineArtifactRepositoryMismatch')
+              require(artifact.get('expired') is False and datetime.datetime.fromisoformat(artifact['expires_at'].replace('Z', '+00:00')) > datetime.datetime.now(datetime.timezone.utc), 'BaselineArtifactExpired')
+              require(artifact.get('size_in_bytes') == old['zip_bytes'] and artifact.get('digest') == 'sha256:' + old['zip_sha256'], 'BaselineArtifactDigestMismatch')
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, file, code, message, headers, new_url):
+                  return None
+
+          def safe_blob_location(location):
+              parsed = urllib.parse.urlsplit(location or '')
+              require(parsed.scheme == 'https' and parsed.username is None and parsed.password is None and parsed.port in (None, 443), 'ArtifactRedirectTlsRejected')
+              require(parsed.hostname is not None and (parsed.hostname.endswith('.blob.core.windows.net') or parsed.hostname.endswith('.actions.githubusercontent.com')), 'ArtifactRedirectHostRejected')
+              return location
+
+          def github_request(path):
+              # The credential is restricted to this exact API origin/path.
+              request = urllib.request.Request('https://api.github.com/repos/SOLHK/Swirl/' + path, headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'Swirl-offline-upgrade-QA', 'X-GitHub-Api-Version': '2022-11-28'})
+              request.add_unredirected_header('Authorization', 'Bearer ' + os.environ['SWIRL_ARTIFACT_READ_TOKEN'])
+              return request
+
+          def api_json(opener, path):
+              with opener.open(github_request(path), timeout=30) as response:
+                  raw = response.read(2_000_001)
+              require(len(raw) <= 2_000_000, 'GithubMetadataTooLarge')
+              return json.loads(raw)
+
+          def extract_exact_installer(archive, output, old):
+              with zipfile.ZipFile(archive) as package:
+                  entries = package.infolist()
+                  require(len(entries) == 1 and entries[0].filename == old['exe_name'] and not entries[0].is_dir() and entries[0].file_size == old['exe_bytes'], 'ArchiveInventoryMismatch')
+                  target = output / old['exe_name']
+                  digest = hashlib.sha256()
+                  count = 0
+                  with package.open(entries[0]) as incoming, target.open('xb') as destination:
+                      while block := incoming.read(1_048_576):
+                          count += len(block)
+                          require(count <= old['exe_bytes'], 'InstallerSizeExceeded')
+                          digest.update(block)
+                          destination.write(block)
+                  require(count == old['exe_bytes'] and digest.hexdigest() == old['exe_sha256'], 'InstallerDigestMismatch')
+              return target
+
+          def main():
+              input_path = pathlib.Path('docs/qa/upgrade-0239-to-0240-baseline.json').resolve()
+              input_bytes = input_path.read_bytes()
+              plan = json.loads(input_bytes)
+              event = json.loads(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
+              validate_scope(plan, event, os.environ)
+              old = plan['baseline']
+              source = subprocess.run(['git', 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True).stdout.strip()
+              require(source == os.environ['GITHUB_SHA'] and re.fullmatch('[0-9a-f]{40}', source) is not None, 'CandidateCheckoutMismatch')
+              require(pathlib.Path('src/Swirl.Quick/PRODUCT_VERSION.txt').read_text().strip() == plan['candidate_version'], 'CandidateVersionMismatch')
+              if subprocess.run(['git', 'cat-file', '-e', old['source_sha'] + '^{commit}'], capture_output=True).returncode:
+                  subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', old['source_sha']], check=True, capture_output=True)
+              require(subprocess.run(['git', 'show', old['source_sha'] + ':src/Swirl.Quick/PRODUCT_VERSION.txt'], check=True, capture_output=True, text=True).stdout.strip() == old['version'], 'BaselineSourceVersionMismatch')
+              for path, blob in plan['identical_persistence_sources'].items():
+                  require(re.fullmatch('[0-9a-f]{40}', blob) is not None, 'PersistenceBlobInvalid')
+                  for revision in (old['source_sha'], source):
+                      actual = subprocess.run(['git', 'rev-parse', revision + ':' + path], check=True, capture_output=True, text=True).stdout.strip()
+                      require(actual == blob, 'PersistenceSourceChanged')
+              opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context()))
+              run = api_json(opener, 'actions/runs/' + str(old['run_id']))
+              artifact = api_json(opener, 'actions/artifacts/' + str(old['artifact_id']))
+              validate_artifact(old, run, artifact)
+              try:
+                  opener.open(github_request('actions/artifacts/' + str(old['artifact_id']) + '/zip'), timeout=30).close()
+                  raise Refused('ArtifactRedirectRequired')
+              except urllib.error.HTTPError as redirect:
+                  require(redirect.code in (302, 303, 307, 308), 'ArtifactApiDownloadRejected')
+                  location = safe_blob_location(redirect.headers.get('Location'))
+                  redirect.close()
+              output = pathlib.Path(os.environ['RUNNER_TEMP']) / ('swirl-cross-version-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT'])
+              output.mkdir(exist_ok=False)
+              archive = output / 'baseline.zip'
+              digest = hashlib.sha256()
+              count = 0
+              # Fresh request, no Authorization header, no automatic redirect.
+              # Neither the signed URL nor exception URL enters public output.
+              with opener.open(urllib.request.Request(location), timeout=60) as response, archive.open('xb') as destination:
+                  require(response.status == 200, 'ArtifactBlobStatusRejected')
+                  while block := response.read(1_048_576):
+                      count += len(block)
+                      require(count <= old['zip_bytes'], 'ArtifactSizeExceeded')
+                      digest.update(block)
+                      destination.write(block)
+              require(count == old['zip_bytes'] and digest.hexdigest() == old['zip_sha256'], 'ArtifactZipDigestMismatch')
+              installer = extract_exact_installer(archive, output, old)
+              admission = {'schema': 1, 'success': True, 'input_sha256': hashlib.sha256(input_bytes).hexdigest(), 'candidate_source_sha': source, 'candidate_head_sha': event['pull_request']['head']['sha'], 'candidate_version': plan['candidate_version'], 'baseline_source_sha': old['source_sha'], 'baseline_version': old['version'], 'run_id': old['run_id'], 'artifact_id': old['artifact_id'], 'run_final_conclusion': run['conclusion'], 'artifact_expires_at': artifact['expires_at'], 'zip_sha256': digest.hexdigest(), 'zip_bytes': count, 'exe_sha256': old['exe_sha256'], 'exe_bytes': installer.stat().st_size, 'persistence_sources_verified': True, 'original_private_data_used': False, 'provider_requests': 0}
+              evidence = pathlib.Path('build-evidence/cross-version-baseline.json')
+              evidence.write_text(json.dumps(admission, indent=2) + '\n', encoding='utf-8')
+              with pathlib.Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as environment:
+                  environment.write('SWIRL_UPGRADE_BASELINE_EXE=' + str(installer.resolve()) + '\n')
+              print('Explicit baseline run/source/version, complete ZIP and EXE hashes admitted; no provider traffic.')
+
+          if __name__ == '__main__':
+              try:
+                  main()
+              except Exception as error:
+                  reason = str(error) if isinstance(error, Refused) else ('HttpStatus' + str(error.code) if isinstance(error, urllib.error.HTTPError) else type(error).__name__)
+                  print('Cross-version baseline refused: ' + reason)
+                  pathlib.Path('build-evidence/cross-version-baseline-failure.json').write_text(json.dumps({'success': False, 'source_sha': os.environ.get('GITHUB_SHA'), 'failure_code': reason}) + '\n', encoding='utf-8')
+                  raise SystemExit(1) from None
+      - name: Verify the opted-in actual 0.2.39 to 0.2.40 upgrade
+        if: contains(github.event.pull_request.labels.*.name, 'qa-cross-version-upgrade')
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsNormalInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/cross-version-installer-lifecycle -NodeStoreHelper build/swirl-quick/Release/SwirlPrivateSubscriptionAcceptance.exe -CrossVersionInput docs/qa/upgrade-0239-to-0240-baseline.json -BaselineInstaller $env:SWIRL_UPGRADE_BASELINE_EXE -BaselineAdmission build-evidence/cross-version-baseline.json
+          $upgrade = Get-Content -LiteralPath build-evidence/cross-version-installer-lifecycle/cross-version.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($upgrade.schema -ne 1 -or -not $upgrade.success -or $upgrade.source_sha -cne $env:GITHUB_SHA -or
+              $upgrade.scope -cne 'actual-0239-to-0240-installers-with-current-helper-synthetic-v1-data' -or $upgrade.original_private_profile_tested -ne $false -or
+              -not $upgrade.case.cross_version_upgrade.verified -or -not $upgrade.host_system_proxy_unchanged -or
+              -not $upgrade.standard_user.success -or $upgrade.standard_user.remaining_job_processes -ne 0 -or $upgrade.standard_user.forced_termination) { throw 'Explicit cross-version installer acceptance is incomplete.' }
+          foreach ($phase in @('before-old-start','after-old-close','after-cross-version-install','after-new-normal-close','after-uninstall')) {
+            $observed = @($upgrade.case.dpapi_store_preservation.stages | Where-Object { $_.stage -ceq $phase })
+            if ($observed.Count -ne 1 -or -not $observed[0].receipt.success -or $observed[0].receipt.source_sha -cne $env:GITHUB_SHA -or
+                $observed[0].receipt.network_requests -ne 0 -or $observed[0].receipt.engine_started -ne $false) { throw 'Cross-version offline phase identity is incomplete.' }
+          }
+          $delivery = Get-Content -LiteralPath out/delivery.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $delivery | Add-Member -NotePropertyName previous_release_configuration_upgrade -NotePropertyValue 'passed-0.2.39-to-0.2.40-current-helper-synthetic-v1-only' -Force
+          $delivery | Add-Member -NotePropertyName previous_release_baseline_source_sha -NotePropertyValue $upgrade.baseline.source_sha -Force
+          $delivery | Add-Member -NotePropertyName previous_release_baseline_installer_sha256 -NotePropertyValue $upgrade.baseline.exe_sha256 -Force
+          $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -429,32 +1451,153 @@ jobs:
           path: out/Swirl-Setup.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Upload corresponding Qt sources for the same installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Qt-Corresponding-Source
+          path: out/qt-corresponding-source/
+          if-no-files-found: error
+          retention-days: 14
       - name: Remaining in-scope regression suite after installer is available
         shell: pwsh
         run: |
           $regression = 'failed'
           try {
+            # Compiler caches may contain an older report. Only this run's
+            # layout result can be reused by the focused DPR matrix below.
+            Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
-            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|capture-network'
+            $excludedTests = 'appearance-ui|node-ui|node-ui-native-scaled|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration|capture-network|native-tun-broker-control'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.
-              $excludedTests += '|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|gateway-network'
+              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|gateway-network'
               Write-Host 'Deferred for this UI-only diff: node-real-chain, stream-regression, subscription-download, qt-network-policy, gateway-network.'
             } else {
               # These network/security checks already passed before packaging.
-              $excludedTests += '|system-proxy-recovery|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
+              $excludedTests += '|native-tun-recovery|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
             }
             $exclude = "^swirl-($excludedTests)$"
-            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit build-evidence/full-regression.xml
-            if ($LASTEXITCODE -ne 0) { throw "Full regression checks failed ($LASTEXITCODE)." }
+            # CTest changes directory for --test-dir. Keep the report in the
+            # workspace evidence directory that the artifact step uploads.
+            $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/full-regression.xml'
+            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit $junit
+            $testExit = $LASTEXITCODE
+            if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Full regression JUnit evidence is missing.' }
+            if ($testExit -ne 0) { throw "Full regression checks failed ($testExit)." }
             $regression = 'passed'
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName scoped_full_regression -NotePropertyValue $regression -Force
-            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+            $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
+      - name: Verify activity layout and ESC at five effective DPR values
+        shell: pwsh
+        run: |
+          # Reuse the current unscaled layout result, then run only this focused
+          # driver at missing DPR values. QT_SCALE_FACTOR multiplies native DPR.
+          # The existing test-only viewport permits a real HWND / swapchain to
+          # extend beyond this hosted desktop; the driver independently checks
+          # native client pixels and complete RHI readback dimensions. These are
+          # Qt rendering/input simulations, not physical display acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCREEN_SCALE_FACTORS,Env:QT_SCALE_FACTOR,Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'build/swirl-quick/Release/Swirl.exe').Path
+          $root = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/activity-layout'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $baselinePath = Join-Path $root 'activity-layout-report.json'
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $culture = [Globalization.CultureInfo]::InvariantCulture
+          function Invoke-ActivityLayout([string]$output, [string]$scaleFactor = '', [double]$expectedDpr = 0) {
+            New-Item -ItemType Directory -Force -Path $output | Out-Null
+            $reportPath = Join-Path $output 'activity-layout-report.json'
+            Remove-Item -LiteralPath $reportPath,$diagnostic -ErrorAction SilentlyContinue
+            $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-layout-dpr-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+            if ($scaleFactor) { $env:QT_SCALE_FACTOR = $scaleFactor } else { Remove-Item Env:QT_SCALE_FACTOR -ErrorAction SilentlyContinue }
+            if ($expectedDpr -gt 0) { $env:SWIRL_LAYOUT_EXPECTED_DPR = $expectedDpr.ToString('R', $culture) } else { Remove-Item Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue }
+            $process = $null
+            try {
+              $arguments = @('--activity-layout-test', '--preview-page=activity', '--preview-size=1013x672', ('--activity-layout-output="' + $output + '"'))
+              $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+              if (-not $process.WaitForExit(120000)) { throw 'Activity layout exceeded its existing 120-second CTest deadline.' }
+              if ($process.ExitCode -ne 0) { throw "Activity layout failed at scale factor $scaleFactor with exit code $($process.ExitCode)." }
+              if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw 'Activity layout did not produce a current report.' }
+              $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+              if ($report.success -ne $true -or $report.failures -ne 0) { throw 'Activity layout reported failed checks.' }
+              return $report
+            } finally {
+              if ($null -ne $process) {
+                if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                $process.Dispose()
+              }
+              if (Test-Path -LiteralPath $diagnostic -PathType Leaf) { Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $output 'qt-diagnostics.txt') }
+            }
+          }
+          $samples = @()
+          $matrixResult = 'failed'
+          $nativeDpr = 0.0
+          try {
+            if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
+              # Keep this gate active if a future UI-only scope omits the
+              # baseline from CTest; never interpret missing evidence as green.
+              $baseline = Invoke-ActivityLayout $root
+            } else { $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json }
+            $nativeDpr = [double]$baseline.devicePixelRatio
+            if ($baseline.success -ne $true -or $baseline.failures -ne 0 -or $baseline.nativeD3D11 -ne $true -or $baseline.scaleFactorEnvironment -or -not [double]::IsFinite($nativeDpr) -or $nativeDpr -le 0) { throw 'The current native-DPR baseline is missing, scaled or unsuccessful.' }
+            foreach ($percent in @(100, 125, 150, 175, 200)) {
+              $target = $percent / 100.0
+              if ([Math]::Abs($nativeDpr - $target) -le 0.01) {
+                $report = $baseline
+                $factor = ''
+                $relativeReport = 'activity-layout-report.json'
+              } else {
+                $factor = ($target / $nativeDpr).ToString('R', $culture)
+                $output = Join-Path $root ('dpi-' + $percent)
+                $report = Invoke-ActivityLayout $output $factor $target
+                $relativeReport = 'dpi-' + $percent + '/activity-layout-report.json'
+              }
+              if ([Math]::Abs([double]$report.devicePixelRatio - $target) -gt 0.01 -or $report.nativeD3D11 -ne $true) { throw "The $percent percent layout did not run at the requested DPR and renderer." }
+              $samples += [ordered]@{ percent=$percent; expectedDpr=$target; actualDpr=$report.devicePixelRatio; qtScaleFactor=$factor; reusedNativeBaseline=($factor -eq ''); report=$relativeReport; passed=$true }
+            }
+            if ($samples.Count -ne 5) { throw 'The activity DPR matrix is incomplete.' }
+            $matrixResult = 'passed'
+          } finally {
+            [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, Win32 client and full RHI readback; unchanged five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation. The test HWND may extend beyond the hosted desktop.'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
+            $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
+            $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
+            $delivery | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+          }
+      - name: Preserve independent activity regression after an early UI failure
+        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          # Diagnostic coverage only: the earlier failed UI check keeps this
+          # job failed. Successful runs retain their existing regression order.
+          # Run the registered drivers with their original environments and
+          # timeouts; do not repeat critical checks or write delivery success.
+          $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/activity-diagnostic-regression.xml'
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit $junit
+          $testExit = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent activity JUnit evidence is missing.' }
+          if ($testExit -ne 0) { throw "Independent activity diagnostic regression failed ($testExit)." }
+      - name: Verify isolated D3D11 frame-latency cases
+        if: ${{ !cancelled() && (steps.critical_ui.outcome == 'success' || steps.critical_ui.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          # Re-execute the two isolated cases that exposed the native pointer
+          # driver defect, including on a successful main path. Keep all original
+          # Appearance assertions and preserve their separate diagnostic scope.
+          ./scripts/Test-QtD3D11FrameLatency.ps1 `
+            -RepositoryRoot "$env:GITHUB_WORKSPACE" `
+            -RuntimeDirectory 'dist' `
+            -ReferenceExecutable 'build/swirl-quick/Release/Swirl.exe' `
+            -OutputDirectory 'build-evidence/d3d11-frame-latency' `
+            -ScratchRoot "$env:RUNNER_TEMP" `
+            -WorkflowSha "$env:GITHUB_SHA" `
+            -PullRequestHeadSha '${{ github.event.pull_request.head.sha }}'
       - name: Upload engine and scoped regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -463,6 +1606,37 @@ jobs:
           path: |
             build/swirl-quick/Testing/Temporary/LastTest.log
             build-evidence/full-regression.xml
+            build-evidence/critical-ui.xml
+            build-evidence/critical-policy-evidence/
+            build-evidence/critical-network.xml
+            build-evidence/node-diagnostic-regression.xml
+            build-evidence/runtime-refusal-qa/
+            build-evidence/native-tun-broker-control.xml
+            build-evidence/native-tun-broker-control.json
+            build-evidence/native-tun-broker-control-fixture.json
+            build-evidence/system-proxy-stop/
+            build-evidence/overview-input.log
+            build-evidence/deployed-all-pages.log
+            build-evidence/deployed-all-pages.json
+            build-evidence/full-motion-qa/
+            build-evidence/full-motion-release/
+            build-evidence/ctest-inventory.json
+            build-evidence/profile-event-controls/
+            build-evidence/profile-residual-cleanup-controls/
+            build-evidence/activity-diagnostic-regression.xml
+            build/swirl-quick/connection-rows.xml
+            build/swirl-quick/policy-configuration.xml
+            build/swirl-quick/policy-configuration.txt
+            build/swirl-quick/swirl-telemetry-accounting.xml
+            build/swirl-quick/swirl-system-proxy-state.xml
+            build/swirl-quick/swirl-native-tun-recovery.xml
+            build/swirl-quick/swirl-system-proxy-recovery.xml
+            build/swirl-quick/swirl-system-proxy-app-exit.xml
+            build/swirl-quick/swirl-system-proxy-normal-stop.xml
+            build/swirl-quick/swirl-rust-qt-integration.xml
+            build/swirl-quick/system-proxy-exit/
+            build/swirl-quick/system-proxy-normal-stop/
+            build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt
@@ -473,31 +1647,35 @@ jobs:
             build/swirl-quick/Release/Swirl-appearance.txt
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
+            build/swirl-quick/apec-*-report.json
+            build/swirl-quick/activity-details-report.json
+            build/swirl-quick/activity-perf-*-report.json
+            build/swirl-quick/activity-feather-*.png
+            build/swirl-quick/activity-data-*.png
+            build/swirl-quick/activity-layout/
+            build/swirl-quick/policy-evidence/
+            build/swirl-quick/liquid-glass-evidence/
+            build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/
+            build/swirl-quick/node-ui-evidence/
+            build/swirl-quick/node-ui-native-evidence/
             build/swirl-quick/settings-material-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-activity-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-apec-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-route-bench-diagnostics.txt
+            build/swirl-quick/Release/Swirl-u2-diagnostics.txt
+            build/swirl-quick/Release/Swirl-liquid-glass-diagnostics.txt
+            build/swirl-quick/Release/Swirl-6a-diagnostics.txt
+            build/swirl-quick/Release/Swirl-record-interactions-diagnostics.txt
+            build/swirl-quick/Release/Swirl-scroll-bench-diagnostics.txt
+            build/swirl-quick/Release/Swirl-policy-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-material-diagnostics.txt
           if-no-files-found: warn
-      - name: Save reusable compiler outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        shell: pwsh
-        run: |
-          . ./scripts/BuildInputTimes.ps1
-          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
-      - name: Cache compiled Qt and Rust outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-            build/swirl-quick
-            build/swirl-product
-          key: ${{ steps.build_cache.outputs.cache-primary-key }}
       - name: Preserve SDK and exact-package identity evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -505,11 +1683,32 @@ jobs:
           name: Swirl-Qt612-Package-Evidence
           path: |
             build-evidence/
+            dist/msvc-runtime.json
             build/swirl-quick/font-*.xml
+            build/swirl-quick/swirl-selected-qt-Release.txt
+            build/swirl-quick/CMakeCache.txt
+            build/swirl-quick/CMakeFiles/*/CMakeCXXCompiler.cmake
+            build/swirl-product/swirl-selected-qt-Release.txt
+            build/swirl-product/CMakeCache.txt
+            build/swirl-product/CMakeFiles/*/CMakeCXXCompiler.cmake
             out/package-evidence/
             out/delivery.json
+            out/qt-corresponding-source/qt-source-bundle.json
+            out/qt-corresponding-source/package-binding.json
             installer-bin/package-manifest.json
           if-no-files-found: warn
+          retention-days: 14
+      - name: Verify the same persistent ledger controls the actual quota Qt profile
+        shell: pwsh
+        timeout-minutes: 50
+        run: ./scripts/tests/Test-PrivateQtQuotaProfile.ps1
+      - name: Preserve independent private Qt quota originals
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Private-Qt-Quota-Evidence
+          path: build-evidence/private-ui-quota/
+          if-no-files-found: ignore
           retention-days: 14
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -518,3 +1717,58 @@ jobs:
           path: installer-bin/
           if-no-files-found: error
           retention-days: 14
+
+  observe-fresh-windows-proxy:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x86, x64]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the current diagnostic source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Prepare the bounded residual-owner collector launcher
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: profile_python
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Observe WinINET queries in a fresh actual standard-user profile
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+          SWIRL_QUERY_ARCHITECTURE: ${{ matrix.architecture }}
+          SWIRL_PROFILE_OWNER_PYTHON: ${{ steps.profile_python.outputs.python-path }}
+        run: |
+          $architecture = $env:SWIRL_QUERY_ARCHITECTURE
+          $evidence = Join-Path $env:GITHUB_WORKSPACE ('build-evidence/proxy-query-only/'+$architecture)
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $arguments = Join-Path $evidence 'child-arguments.json'
+          [ordered]@{ExpectedSourceSha=$env:GITHUB_SHA;EvidenceDirectory=$evidence;ExpectedPowerShellArchitecture=$architecture} |
+            ConvertTo-Json | Set-Content -LiteralPath $arguments -Encoding UTF8
+          ./scripts/tests/Invoke-DisposableWindowsUser.ps1 `
+            -Script scripts/tests/Test-WindowsProxyQueryOnly.ps1 `
+            -ArgumentsFile $arguments -EvidenceDirectory $evidence -TimeoutSeconds 180 -PowerShellArchitecture $architecture
+          $query = Get-Content -LiteralPath (Join-Path $evidence 'proxy-query-only.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath (Join-Path $evidence 'standard-user-runner.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($query.schema -ne 1 -or -not $query.success -or $query.source_sha -cne $env:GITHUB_SHA -or
+              -not $query.actual_non_admin_token -or -not $query.actual_standard_user_powershell -or
+              $query.architecture -cne $architecture -or -not $query.negative_controls.success) {
+            throw 'Fresh-profile query observation or its comparator controls are incomplete.'
+          }
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination -or
+              $runner.remaining_job_processes -ne 0 -or $runner.powershell_architecture -cne $architecture) {
+            throw 'The query-only standard-user process or its native resources were not cleanly released.'
+          }
+      - name: Preserve the fresh-profile WinINET observation and cleanup result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-WindowsProxy-Query-Observation-${{ matrix.architecture }}
+          path: build-evidence/proxy-query-only/
+          if-no-files-found: error

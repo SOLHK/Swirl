@@ -116,7 +116,7 @@ QVariantMap ProxyNode::publicInfo() const {
     const auto origin=origins.value(importSource,QStringLiteral("JSON 配置"));
     QStringList normalizationNotes;
     if(originalConfiguration.value("_swirl-default-client-fingerprint").toBool())normalizationNotes.append(QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"));
-    if(certificateVerificationEnforced)normalizationNotes.append(QStringLiteral("源订阅请求跳过 Trojan 证书验证；Swirl 已保持证书验证开启。证书不可信、过期或名称不匹配仍会连接失败，原始参数已加密保留。"));
+    if(certificateVerificationEnforced)normalizationNotes.append(QStringLiteral("源订阅请求跳过 %1 证书验证；Swirl 已保持证书验证开启。证书不可信、过期或名称不匹配仍会连接失败，原始参数已加密保留。").arg(protocol=="anytls"?QStringLiteral("AnyTLS"):QStringLiteral("Trojan")));
     if(executable&&parameters.value("tfo")==QJsonValue(true))normalizationNotes.append(QStringLiteral("TCP Fast Open 为可选加速项；当前使用普通 TCP，原始参数已保留，证书验证要求不变。"));
     return {{"id",id},{"name",name},{"protocol",protocol},{"host",host},{"port",port},
         {"protocolLabel",protocolLabels.value(protocol,protocol.toUpper())},

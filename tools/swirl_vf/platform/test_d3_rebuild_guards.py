@@ -47,14 +47,14 @@ def run(output, binary):
     assert [row['GPOS_adjustment'] for row in rows] == [5, 30]
     with contextlib.redirect_stderr(io.StringIO()):
         try:
-            rebuild.run(source, binary.resolve(strict=True), output/'Swirl-VF.ttc', output/'private-report.json')
+            rebuild.run(source, binary.resolve(strict=True), output/'SwirlVF.ttc', output/'private-report.json')
         except rebuild.ReconstructionError as error:
             assert str(error).startswith('GDEF variable layout'), str(error)
         else:
             raise AssertionError('production must refuse unremapped GDEF')
     report = json.loads((output/'private-report.json').read_text())
     assert report['native_observation_progress']['attempted_batches_this_run'] == 0
-    assert report['output_generated'] is False and not (output/'Swirl-VF.ttc').exists()
+    assert report['output_generated'] is False and not (output/'SwirlVF.ttc').exists()
     assert rebuild.sha256(source) == before
     assert len(report['oracle']['faces']) == 1
     assert report['oracle']['faces'][0]['status'] == 'identity_verified'

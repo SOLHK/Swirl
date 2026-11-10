@@ -79,7 +79,10 @@ async fn lookup_with_transport(
     let tcp = transport
         .connect(server.address)
         .await
-        .map_err(|_| "DnsTlsConnect")?;
+        .map_err(|error| match error {
+            "DnsEndpointForbidden" => "DnsEndpointForbidden",
+            _ => "DnsTlsConnect",
+        })?;
     let mut stream = secure(tcp, &server.tls).await.map_err(|e| match e {
         "TlsTrustAnchor" => "DnsTlsTrustAnchor",
         "TlsServerName" => "DnsTlsServerName",
@@ -110,6 +113,7 @@ pub(super) async fn resolve_with_transport(
         .unwrap_or(Err("DnsTlsTimeout"))
         {
             Ok(answer) => return Ok(answer),
+            Err("DnsEndpointForbidden") => return Err("DnsEndpointForbidden"),
             Err(code) => error = code,
         }
     }

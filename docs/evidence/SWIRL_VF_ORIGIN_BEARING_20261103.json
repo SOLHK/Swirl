@@ -1,0 +1,216 @@
+{
+  "scope": "CFF2 layout-origin encoding; authored native controls and aggregate private HVF reference checks",
+  "parent_commit": "9ad500d02391a8399eeaa4614a26a62b2ddc1823",
+  "limit": 0.03125,
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "original_font_native_acceptance": "NOT_RUN",
+  "production_accepted": false,
+  "source_reference_checks": [
+    {
+      "gid": 1166,
+      "checks": 59,
+      "max_error": 4.597299356435401e-13,
+      "failures": 0,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+      "scope": "portable_HVGL_vs_native_HVF_not_target_font"
+    },
+    {
+      "gid": 19177,
+      "checks": 59,
+      "max_error": 5.151434834260726e-13,
+      "failures": 0,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+      "scope": "portable_HVGL_vs_native_HVF_not_target_font"
+    }
+  ],
+  "previous_DirectWrite": {
+    "run": "https://github.com/SOLHK/Swirl/actions/runs/41490875576",
+    "job_id": 125433213854,
+    "merge_checkout": "55041297b71708b091761d94febd40fdb889d1b6",
+    "artifact_id": 13165025508,
+    "artifact_sha256": "0a312d4bf1dca1b80308f87be5b5145ddfae42bffdd868d6ea931cbc158789ea",
+    "Windows_build": 20348,
+    "source_observations": 156,
+    "candidate_observations": 156,
+    "raw_axis_echo_failures_per_font": 12,
+    "first_echo_difference": {
+      "axis": "HGHT",
+      "float32_input": 109.19831085205078,
+      "actual_face": 109.19831848144531
+    },
+    "vertical_origin_y_changes": 78,
+    "maximum_X_placement_error": 0.00261021803,
+    "maximum_Y_placement_error": 52.0,
+    "raw_and_XY_status": "FAIL_RETAINED"
+  },
+  "cause": "The Y-translated CFF2 alternate retained its old vmtx top bearing. DirectWrite derives verticalOriginY from changed yMax + unchanged top bearing; VORG explicitly permits this alternative. The old XY fixture is retained as a failed control.",
+  "fix": "Install explicit exact top-bearing defaults and VVAR.TsbMap rows while preserving existing advance/origin VarStore indices. Verify bbox + bearing against unchanged VORG. Independently test X-only translation, which leaves vertical bounds unchanged.",
+  "references": [
+    "https://learn.microsoft.com/en-us/typography/opentype/spec/vorg",
+    "https://learn.microsoft.com/en-us/typography/opentype/spec/vvar"
+  ],
+  "local_CoreText": {
+    "X": {
+      "scope": "authored_CFF2_vertical_alternate_layout_only",
+      "os": "macOS-26.5.1-arm64-arm-64bit",
+      "native": "coretext",
+      "limit": 0.03125,
+      "source_font_acceptance": "NOT_RUN",
+      "raw_geometry_and_side_bearing_equivalence": "FAIL_BY_CONSTRUCTION",
+      "raw_axis_echo_failures": 24,
+      "raw_axis_echo_samples": [],
+      "components": "x",
+      "repair_y_bearing": false,
+      "raw_metric_changes": [],
+      "unchanged_horizontal_outlines": true,
+      "serialized": {
+        "checks": 312,
+        "maximum_control_translation_error": 2.842170943040401e-14,
+        "unchanged_tables": [
+          "GSUB",
+          "HVAR",
+          "OS/2",
+          "VORG",
+          "VVAR",
+          "cmap",
+          "fvar",
+          "hhea",
+          "hmtx",
+          "maxp",
+          "name",
+          "post",
+          "vhea",
+          "vmtx"
+        ]
+      },
+      "layout": {
+        "horizontal/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0.0,
+          "maximum_Y_error": 0.0
+        },
+        "horizontal/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0.0,
+          "maximum_Y_error": 0.0
+        },
+        "vertical/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0
+        },
+        "vertical/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0
+        }
+      },
+      "visual_raster": "NOT_ESTABLISHED",
+      "processes": [
+        {
+          "variant": "source",
+          "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+          "exit_code": 0,
+          "observations": 156
+        },
+        {
+          "variant": "compensated",
+          "sha256": "8e42083adab90903a315e88cfff03da7042a5be919735f888f42a2e0882286f1",
+          "exit_code": 0,
+          "observations": 156
+        }
+      ],
+      "HarfBuzz_unchanged_positions_and_routes": 156,
+      "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+      "raw_axis_echo_status": "FAIL_RETAINED",
+      "raw_advance_origin_status": "NO_DIFFERENCE_OBSERVED"
+    },
+    "XY_with_bearings": {
+      "scope": "authored_CFF2_vertical_alternate_layout_only",
+      "os": "macOS-26.5.1-arm64-arm-64bit",
+      "native": "coretext",
+      "limit": 0.03125,
+      "source_font_acceptance": "NOT_RUN",
+      "raw_geometry_and_side_bearing_equivalence": "FAIL_BY_CONSTRUCTION",
+      "raw_axis_echo_failures": 24,
+      "raw_axis_echo_samples": [],
+      "components": "xy",
+      "repair_y_bearing": true,
+      "raw_metric_changes": [],
+      "unchanged_horizontal_outlines": true,
+      "serialized": {
+        "checks": 312,
+        "maximum_control_translation_error": 6.83608952730234e-14,
+        "unchanged_tables": [
+          "GSUB",
+          "HVAR",
+          "OS/2",
+          "VORG",
+          "cmap",
+          "fvar",
+          "hhea",
+          "hmtx",
+          "maxp",
+          "name",
+          "post"
+        ]
+      },
+      "layout": {
+        "horizontal/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0.0,
+          "maximum_Y_error": 0.0
+        },
+        "horizontal/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0.0,
+          "maximum_Y_error": 0.0
+        },
+        "vertical/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0006918769991486329
+        },
+        "vertical/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0006918769991486329
+        }
+      },
+      "visual_raster": "NOT_ESTABLISHED",
+      "processes": [
+        {
+          "variant": "source",
+          "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+          "exit_code": 0,
+          "observations": 156
+        },
+        {
+          "variant": "compensated",
+          "sha256": "f637c73b79f8c2cd672fd6ba0c55572333c4d60f0436017d22ea66ebbe07a750",
+          "exit_code": 0,
+          "observations": 156
+        }
+      ],
+      "HarfBuzz_unchanged_positions_and_routes": 156,
+      "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+      "raw_axis_echo_status": "FAIL_RETAINED",
+      "raw_advance_origin_status": "NO_DIFFERENCE_OBSERVED"
+    }
+  },
+  "new_Windows_tests": "NOT_RUN_PENDING_PUSH_AND_NATIVE_CI",
+  "regression": {
+    "layout_translation_tests_passed": 3,
+    "vertical_layout_protocol_and_model_tests_passed": 25,
+    "existing_strict_axis_tests": "UNCHANGED_DEFAULT",
+    "previous_failed_XY_control": "RETAINED_AND_REPORTS_ALL_METRIC_DIFFERENCES"
+  },
+  "mathematical_TSB_check": "39 positions x 2 dedicated alternates: serialized curve yMax + vmtx.tsb + VVAR.TsbMap equals VORG + VVAR.VOrgMap within 1e-9. Existing advance/origin maps evaluated before/after at every position for all 8 glyphs.",
+  "unresolved": [
+    "Both complete three-axis source models still fail 1/32 FUnit.",
+    "Raw native metrics, source axes and pixel-raster equivalence remain separate unsatisfied acceptance gates.",
+    "Source-derived fonts and model coefficients remain private; no Windows original-font result is claimed."
+  ]
+}

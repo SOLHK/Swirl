@@ -1,0 +1,90 @@
+name: Swirl VF Qt 6.12 joint CFF2 geometry
+
+on:
+  pull_request:
+    branches: [test]
+    paths:
+      - 'tools/swirl_vf/**'
+      - '.github/workflows/swirl-vf-qt-cff2.yml'
+      - 'tools/Install-QtSdk.py'
+      - 'tools/requirements-qt-sdk.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-qt-cff2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authored-joint-geometry:
+    # Explicit authorized research branch, standard public runner, no private
+    # source/candidate input and no product build or machine configuration.
+    if: >-
+      !github.event.repository.private &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'work/swirlvf-continuation-20261102'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_QPA_PLATFORM: windows
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record source and generate independent authored reference
+        run: |
+          New-Item -ItemType Directory -Force build/qt-cff2-evidence | Out-Null
+          $actual = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actual -ne $env:GITHUB_SHA) { throw 'Source identity mismatch' }
+          @{ commit = $actual; head = '${{ github.event.pull_request.head.sha }}'; runner = 'windows-2022';
+             os = [System.Environment]::OSVersion.VersionString; processArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();
+             scope = 'authored CFF2 geometry only'; finalSwirlVF = 'NOT_RUN'; physicalDisplay = 'NOT_RUN'
+          } | ConvertTo-Json | Set-Content build/qt-cff2-evidence/source.json
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture dependency installation failed' }
+          python tools/swirl_vf/platform/make_qt_cff2_manifest.py build/qt-cff2-evidence/fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Independent fixture generation failed' }
+      - name: Install and verify Qt 6.12.0 MSVC SDK
+        run: |
+          python -m pip install -r tools/requirements-qt-sdk.txt
+          if ($LASTEXITCODE -ne 0) { throw 'SDK installer dependencies failed' }
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-vf-qt-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK installation failed' }
+          $sdk = Get-Content (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Qt version/ABI mismatch' }
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          "QT_PLUGIN_PATH=$(Join-Path $qtRoot 'plugins')" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+          Copy-Item (Join-Path $sdkOutput 'sdk-install-result.json') build/qt-cff2-evidence/qt-sdk.json
+      - name: Build independent native Qt outline probe
+        run: |
+          cmake -S tools/swirl_vf/platform/qt_cff2 -B build/qt-cff2 -G 'Visual Studio 17 2022' -A x64 2>&1 | Tee-Object build/qt-cff2-evidence/configure.log
+          if ($LASTEXITCODE -ne 0) { throw 'Qt probe configuration failed' }
+          cmake --build build/qt-cff2 --config Release --target cff2_qt_joint --parallel 2 2>&1 | Tee-Object build/qt-cff2-evidence/build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Qt probe compilation failed' }
+      - name: Compare all simultaneous-axis controls at the unchanged limit
+        run: |
+          & build/qt-cff2/Release/cff2_qt_joint.exe build/qt-cff2-evidence/fixture/hierarchical.ttc build/qt-cff2-evidence/fixture/manifest.json build/qt-cff2-evidence/result.json 2>&1 | Tee-Object build/qt-cff2-evidence/native.log
+          if ($LASTEXITCODE -ne 0) { throw 'Qt joint outline verification failed' }
+          $result = Get-Content build/qt-cff2-evidence/result.json -Raw | ConvertFrom-Json
+          if ($result.qt -ne '6.12.0' -or $result.qpa -ne 'windows' -or $result.observations -ne 546 -or $result.failures -ne 0 -or $result.status -ne 'PASS_AUTHORED_QT_GEOMETRY') { throw 'Incomplete or mismatched Qt acceptance scope' }
+      - name: Retain actual source identity, failures and authored evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swirl-vf-qt-cff2-${{ github.sha }}
+          path: build/qt-cff2-evidence/
+          if-no-files-found: error
+          retention-days: 7

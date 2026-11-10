@@ -21,7 +21,8 @@ ComboBox {
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
         id: valueLabel
-        textRole:"input"
+        textRole:"label"
+        fitWidth: true; fitInFixedWidth: true
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
         font.family: control.font.family
@@ -32,10 +33,7 @@ ComboBox {
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
-    SwirlToolTip {
-        id: hint
-        parent:control;visible:(control.hovered||control.visualFocus)&&valueLabel.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
-    }
+
     indicator: SwirlIcon {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
         name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
@@ -81,7 +79,7 @@ ComboBox {
         function requestDismiss(){close()}
         parent:control.Overlay.overlay
         property point anchorPoint:Qt.point(0,0)
-        readonly property real edgeMargin:Theme.dp(8)
+        readonly property real edgeMargin:Theme.dp(20)
         readonly property real below:parent?Math.max(0,parent.height-anchorPoint.y-control.height-Theme.dp(4)-edgeMargin):0
         readonly property real above:Math.max(0,anchorPoint.y-Theme.dp(4)-edgeMargin)
         readonly property real desiredHeight:Math.min(Theme.dp(290),contentItem.implicitHeight+topPadding+bottomPadding)
@@ -110,8 +108,8 @@ ComboBox {
         margins:edgeMargin
         enter:reveal.enterTransition
         exit:reveal.exitTransition
-        background: Rectangle { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
-            radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
+        background: SwirlCardSurface { floating:true;transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+            cornerRadius:Theme.menuRadius }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             transform:Translate{x:reveal.xOffset;y:reveal.yOffset}

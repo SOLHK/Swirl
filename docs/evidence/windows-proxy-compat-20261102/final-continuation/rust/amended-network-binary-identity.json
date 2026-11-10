@@ -1,0 +1,19 @@
+{
+  "source_commit_sha": null,
+  "base_commit_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "source_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "binaries": {
+    "swirl-api": {
+      "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-api",
+      "sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+      "bytes": 11260968
+    },
+    "swirl-diagnose": {
+      "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-diagnose",
+      "sha256": "d6c8f101f63ed7299a853d78c3f0ff10f0d63de65085d39c7b3fa67502a4b6b8",
+      "bytes": 4493624
+    }
+  },
+  "platform": "linux",
+  "scope": "controlled local network fixtures; not Windows desktop acceptance"
+}

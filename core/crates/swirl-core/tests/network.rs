@@ -236,6 +236,96 @@ fn socks5_fragmented_ipv6_and_bad_command() {
     assert_eq!(&x, b"ipv6");
     peer.join().unwrap();
 }
+
+fn socks5_failed_request(core: &Core, host: &str) -> Vec<u8> {
+    let mut client = TcpStream::connect(core.address()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client.write_all(&[5, 1, 0]).unwrap();
+    let mut method = [0; 2];
+    client.read_exact(&mut method).unwrap();
+    assert_eq!(method, [5, 0]);
+    let mut request = vec![5, 1, 0, 3, u8::try_from(host.len()).unwrap()];
+    request.extend_from_slice(host.as_bytes());
+    request.extend_from_slice(&443u16.to_be_bytes());
+    client.write_all(&request).unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    response
+}
+
+fn completed_failure(core: &Core) -> swirl_core::Snapshot {
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        let snapshot = core.snapshot().unwrap();
+        if snapshot.active == 0
+            && snapshot.failed == 1
+            && snapshot.connections.len() == 1
+            && snapshot.connections[0].ended
+        {
+            return snapshot;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "failed session did not finish"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn legacy_socks5_reject_keeps_policy_denial_distinct_from_tcp_refusal() {
+    let mut candidate = config();
+    candidate.selected = "reject".into();
+    let mut core = Core::start(candidate).unwrap();
+    assert_eq!(
+        socks5_failed_request(&core, "127.0.0.1"),
+        [5, 2, 0, 1, 0, 0, 0, 0, 0, 0]
+    );
+    let snapshot = completed_failure(&core);
+    assert_eq!(snapshot.last_error, "RouteRejected");
+    assert_eq!(snapshot.connections[0].node, "reject");
+    assert_eq!(snapshot.connections[0].category, "reject");
+    assert_eq!((snapshot.upload, snapshot.download), (0, 0));
+    core.stop();
+}
+
+#[test]
+fn legacy_socks5_rule_dns_failure_reports_host_unreachable() {
+    let dns = UdpSocket::bind("127.0.0.1:0").unwrap();
+    dns.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
+    let mut candidate = config();
+    candidate.dns.servers = vec![dns.local_addr().unwrap()];
+    candidate.dns.use_system_hosts = false;
+    candidate.dns.query_family = swirl_subscription::DnsQueryFamily::Ipv4Only;
+    candidate.rules = serde_json::from_value(json!([
+        {"matcher":{"type":"cidr","value":"192.0.2.0/24","resolve":true},"outbound":"direct"}
+    ]))
+    .unwrap();
+    let peer = thread::spawn(move || {
+        let mut query = [0; 512];
+        let (size, client) = dns.recv_from(&mut query).unwrap();
+        assert_eq!(&query[size - 4..size], &[0, 1, 0, 1]);
+        let mut response = query[..size].to_vec();
+        response[2..4].copy_from_slice(&[0x81, 0x80]);
+        response[6..8].copy_from_slice(&[0, 0]);
+        dns.send_to(&response, client).unwrap();
+    });
+    let mut core = Core::start(candidate).unwrap();
+    let response = socks5_failed_request(&core, "missing.fixture.invalid");
+    peer.join().unwrap();
+    assert_eq!(response, [5, 4, 0, 1, 0, 0, 0, 0, 0, 0]);
+    let snapshot = completed_failure(&core);
+    assert_eq!(snapshot.last_error, "DnsEmpty");
+    assert_eq!(snapshot.connections[0].category, "route-error");
+    assert_eq!((snapshot.upload, snapshot.download), (0, 0));
+    core.stop();
+}
+
 #[test]
 fn udp_associate_preserves_boundaries_and_rejects_fragments() {
     let peer = UdpSocket::bind("127.0.0.1:0").unwrap();

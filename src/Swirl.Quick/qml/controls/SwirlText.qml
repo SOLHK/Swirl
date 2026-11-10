@@ -10,10 +10,17 @@ Text {
     property bool tabularFigures: false
     // Only constrained, eliding single-line labels participate. Body copy,
     // editors, rich text and numeric data retain their natural typography.
-    property bool fitWidth: textRole === "button" || textRole === "navigation" || textRole === "pageTitle"
-    readonly property bool widthFitting: fitWidth && wrapMode === Text.NoWrap
-        && parent && (parent instanceof RowLayout || parent instanceof ColumnLayout || parent instanceof GridLayout)
-        && elide !== Text.ElideNone && textFormat !== Text.RichText && textFormat !== Text.StyledText
+    property bool fitWidth: textRole === "button" || textRole === "navigation"
+        || textRole === "pageTitle" || textRole === "largeTitle" || textRole === "label"
+    // Non-Layout content must opt in only when its control owns the available
+    // width independently of this Text's compressed implicit size.
+    property bool fitInFixedWidth: false
+    readonly property bool inTextLayout: parent && (parent instanceof RowLayout
+        || parent instanceof ColumnLayout || parent instanceof GridLayout)
+    readonly property bool widthFitting: fitWidth && wrapMode === Text.NoWrap && renderType === Text.NativeRendering
+        && (inTextLayout || fitInFixedWidth) && elide !== Text.ElideNone
+        && (textFormat === Text.PlainText || (textFormat === Text.AutoText && text.indexOf("<") < 0))
+        && !/[\n\r\u2028\u2029\u009c]/.test(text)
     font.family: Theme.fontFamily
     font.weight: Theme.bodyFontWeight
     font.pixelSize: Theme.fontSize(13)
@@ -21,9 +28,10 @@ Text {
     font.contextFontMerging: true
     font.preferTypoLineMetrics: true
     font.features: tabularFigures ? {"tnum": 1} : ({})
-    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { id:fontBinding; target: control; textRole: control.textRole; fitWidth: control.widthFitting }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { id:fontBinding; target: control; textRole: control.textRole; fitWidth: control.widthFitting; availableWidth: Math.max(0, control.width - control.leftPadding - control.rightPadding) }
     // Layouts always see the natural advance. Compressing the rendered label
     // therefore cannot shrink its parent's implicit size and feed back into fit.
-    Layout.preferredWidth: control.widthFitting && fontBinding.naturalWidth > 0 ? fontBinding.naturalWidth : -1
+    Layout.preferredWidth: control.widthFitting && fontBinding.naturalWidth > 0
+        ? fontBinding.naturalWidth + control.leftPadding + control.rightPadding : -1
     renderType: Text.NativeRendering
 }

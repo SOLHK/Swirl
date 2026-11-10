@@ -1,0 +1,183 @@
+{
+  "checked_at_utc": "2026-11-02T15:42:10.735300+00:00",
+  "scope": "Linux local candidate; no Windows desktop acceptance",
+  "source": {
+    "source_commit_sha": null,
+    "base_commit_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+    "source_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "binaries": {
+      "swirl-api": {
+        "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-api",
+        "sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+        "bytes": 11260968
+      },
+      "swirl-diagnose": {
+        "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-diagnose",
+        "sha256": "d6c8f101f63ed7299a853d78c3f0ff10f0d63de65085d39c7b3fa67502a4b6b8",
+        "bytes": 4493624
+      }
+    },
+    "platform": "linux",
+    "scope": "controlled local network fixtures; not Windows desktop acceptance"
+  },
+  "rust_workspace": {
+    "passed": 822,
+    "failed": 0,
+    "ignored": 0,
+    "summaries": 40
+  },
+  "commands": [
+    {
+      "check": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.843
+    },
+    {
+      "check": "workspace-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 49.168
+    },
+    {
+      "check": "release-build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--release",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 113.985
+    },
+    {
+      "check": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.898
+    }
+  ],
+  "independent_v2_network_tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "connectivity_diagnostic_tests": {
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0
+  },
+  "negative_controls": {
+    "v2_original_production_failed_tests": 4,
+    "v1_original_production_failed_tests": 2,
+    "host_network_original_production_failed_tests": 3,
+    "python_closed_allowlist_failed_subtests": 1,
+    "expected_failure": true
+  },
+  "soak_1800_seconds": {
+    "status": "PASS",
+    "verified_at_utc": "2026-11-02T15:42:10.735300+00:00",
+    "started_at_utc": "2026-11-02T15:12:05.616086+00:00",
+    "finished_at_utc": "2026-11-02T15:42:06.039493+00:00",
+    "runner_exit_code": 0,
+    "source_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "source_core_files_still_match_frozen_build": true,
+    "current_head": "40485650ef72a41967b81cde72cb0600ce5b2538",
+    "current_head_core_matches_frozen_build": false,
+    "binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+    "raw_result_sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875",
+    "harness_identity_file": "amended-soak-harness-identity.json",
+    "harness_files_still_match_run_start_base": true,
+    "observed_stream_seconds": 1800.004075,
+    "connections": 8,
+    "events_per_connection": 1801,
+    "total_events": 14408,
+    "all_peer_and_expected_event_hashes_match": true,
+    "all_peers_tls_close_notify_and_tcp_eof": true,
+    "listener_closed": true,
+    "final_core": {
+      "active": 0,
+      "accepted": 8,
+      "failed": 0,
+      "upload": 13800,
+      "download": 1198958,
+      "ended_records": 8
+    },
+    "resource_samples": 1800,
+    "observed_rss_kib_min_max": [
+      6888,
+      6912
+    ],
+    "observed_fd_min_max": [
+      23,
+      23
+    ],
+    "resource_observation_limit": "RSS and FD observations do not prove absence of leaks",
+    "scope": "Linux controlled local V2 HTTP CONNECT, authenticated upstream SOCKS5, verified TLS and SSE; no Windows desktop or provider acceptance",
+    "platform": "linux"
+  },
+  "superseded_soak": "4048565 source interrupted after122s because the HostUnreachable issue required a source change; not counted as passed",
+  "historical_soak_recheck": {
+    "summary_sha256": "6c9e4a62bda34e054027b0df98b1bed6cc642ed2ca0b2069c1ce7333e75825c6",
+    "recorded_raw_sha256": "c47df0a47a24fbfc4cc6e251d67cffc87468dc5b2a1b31ec3e875a72ba964dda",
+    "raw_file_found": false,
+    "summary_only": true,
+    "scope": "controlled_local_network_no_desktop_acceptance",
+    "duration": 1800.026379,
+    "connections": 8,
+    "matching_peer_and_expected_hashes": true,
+    "expected_events": 14408,
+    "final_core": {
+      "active": 0,
+      "accepted": 8,
+      "failed": 0,
+      "upload": 13800,
+      "download": 1198970,
+      "ended_records": 8
+    },
+    "listener_closed": true,
+    "resource_samples": 1798,
+    "source_scope": "Local portable Rust revision built before commit 86b73d3; exact executable hash recorded separately. Not a Windows desktop acceptance."
+  },
+  "log_sha256": {
+    "baseline-socks5-wire.log": "71dfa82acc0cfcb3b17df9fc141d7c3c826a5b064bbc25b09ea5433e3d3ec475",
+    "baseline-socks5-route-denial.log": "2d7aba85011990b4c87f1d6bfd16f504d0b6cca595002708eaa360b0d48e60df",
+    "baseline-legacy-socks5-fresh.log": "5788c5e41053f63da23da32755d4574e1e0508d8df2a0b3f26678aa18515f399",
+    "baseline-host-unreachable-complete.log": "3aaef65fd280bf6d4a81a759876783d3663be1eb15ebfdb25239223a6aabee65",
+    "baseline-host-diagnostic-allowlist.log": "badecc89886afb6fbda9528ec4682881df1c6572143d8e5754d2048fb324641a",
+    "amended-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "amended-workspace-tests.log": "1861ff8f09a94115712bf925a05c11fb1fde489a095fb3dba5e041bc9c5c781f",
+    "amended-release-build.log": "88895d9a283dabc07f2641f55d02fb79370d6e94790f513bca0a06ffc9083abc",
+    "amended-clippy.log": "73ad3402e687841128041b7d54b38af20d305f870c2358383251dcb39b0b930b",
+    "amended-v2-network.log": "5dcec88151eca54b11622f3404653ef37c7b6200d26dc45f79dcf3184728d274",
+    "amended-connectivity-diagnostics-full.log": "0a54270977d19a41c5f56fdc9a9ad26709af0ec59cdb4e0ce46afb40ddc8106a"
+  },
+  "unrun": [
+    "Windows11 logged-in Codex Desktop same-node Clash/Swirl A/B",
+    "NAT idle/sleep/network handoff endurance"
+  ]
+}
