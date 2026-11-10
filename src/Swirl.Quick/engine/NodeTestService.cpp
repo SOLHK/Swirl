@@ -2,6 +2,9 @@
 #include "RustCoreEngine.h"
 #include "ThreadedEngine.h"
 #include <QSet>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QTimer>
 #include <QDateTime>
 #include <QPointer>
 #include <QCryptographicHash>
@@ -100,6 +103,10 @@ ProxyEngine *NodeTestService::createWorker(){
  return runner;
 }
 void NodeTestService::next(){
+ if(m_batchRunner||m_batchAwaitingStart)return;
+ // Prefer one concurrent sweep inside a single engine. Engines without batch
+ // support (test doubles) keep the isolated per-node path below.
+ if(m_queue.size()>=2&&m_running.isEmpty()&&m_idle.isEmpty()&&tryBatch())return;
  while(!m_queue.isEmpty()&&(!m_idle.isEmpty()||m_running.size()+m_retiring.size()<3)){
   const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;
   // Validate imported data before reserving a runtime. Unsupported nodes stay
@@ -150,12 +157,107 @@ void NodeTestService::retire(ProxyEngine *runner){
  connect(runner,&ProxyEngine::statusChanged,this,release);runner->stop();release();
 }
 void NodeTestService::cancel(){
+ if(m_batchRunner)m_batchRunner->cancelProbeNodes();
+ endBatch();
  m_queue.clear();m_options={};const auto runners=m_running;m_running.clear();
  for(auto runner:runners)retire(runner);
  while(!m_idle.isEmpty())retire(m_idle.dequeue());
  if(!runners.isEmpty())m_message=QString("已取消 · 正在释放测试内核 · 完成 %1/%2").arg(m_completed).arg(m_total);
  emit changed();
 }
+bool NodeTestService::tryBatch(){
+ // Validate each node's configuration without starting an engine, then hand
+ // the whole batch to one concurrent sweep. Unsupported nodes keep an explicit
+ // per-node failure instead of blocking the sweep.
+ QStringList valid;
+ while(!m_queue.isEmpty()){
+  const auto id=m_queue.dequeue();
+  auto opts=m_options;opts.selectedNodeId=id;
+  QJsonObject configuration;
+  const auto reason=RustCoreEngine::configuration(opts,&configuration);
+  if(!reason.isEmpty()){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode","NodeConfigurationRejected"},{"error",reason}});continue;}
+  valid.append(id);
+ }
+ if(valid.isEmpty())return false;
+ m_batchRunner=createWorker();
+ m_batchSwept.clear();for(const auto &id:valid)m_batchSwept.insert(id);
+ m_batchRecorded.clear();
+ connect(m_batchRunner,&ProxyEngine::statusChanged,this,&NodeTestService::batchStatusChanged);
+ auto opts=m_options;opts.selectedNodeId=valid.first();
+ m_batchAwaitingStart=true;
+ m_batchRunner->start(opts);
+ return true;
+}
+
+void NodeTestService::batchStatusChanged(){
+ if(!m_batchAwaitingStart||!m_batchRunner)return;
+ const auto status=m_batchRunner->status();
+ if(status.state==ProxyEngine::State::Failed||status.state==ProxyEngine::State::Stopped){
+  const auto pending=m_batchSwept;
+  m_batchAwaitingStart=false;
+  endBatch();
+  for(const auto &id:pending)if(!m_batchRecorded.contains(id))m_queue.enqueue(id);
+  next();
+  return;
+ }
+ if(!status.apiHealthy||status.state!=ProxyEngine::State::Running)return;
+ QStringList ids;for(const auto &id:m_batchSwept)ids.append(id);
+ QString error;
+ if(!m_batchRunner->probeNodes(ids,m_url,&error)){
+  const auto pending=m_batchSwept;
+  m_batchAwaitingStart=false;
+  endBatch();
+  for(const auto &id:pending)if(!m_batchRecorded.contains(id))m_queue.enqueue(id);
+  next();
+  return;
+ }
+ m_batchAwaitingStart=false;
+ if(!m_batchPoll){
+  m_batchPoll=new QTimer(this);m_batchPoll->setInterval(50);
+  connect(m_batchPoll,&QTimer::timeout,this,&NodeTestService::pollBatch);
+ }
+ m_batchPoll->start();
+ m_message=QStringLiteral("并行测速中 · %1 个节点").arg(ids.size());emit changed();
+}
+
+void NodeTestService::pollBatch(){
+ if(!m_batchRunner)return;
+ const auto sweep=m_batchRunner->probeNodesStatus().value("sweep").toObject();
+ if(sweep.isEmpty())return;
+ const auto rows=sweep.value("rows").toArray();
+ for(const auto &value:rows){
+  const auto row=value.toObject();
+  const auto id=row.value("node").toString();
+  if(id.isEmpty()||m_batchRecorded.contains(id))continue;
+  const auto state=row.value("state").toString();
+  if(state=="running")continue;
+  m_batchRecorded.insert(id);
+  const bool ok=state=="ok";
+  QVariantMap result;
+  result["success"]=ok;
+  result["latency"]=ok?row.value("latency_ms").toInteger(-1):qint64(-1);
+  result["http"]=row.value("http_status").toInteger(0);
+  result["phase"]=ok?QStringLiteral("measured"):row.value("failure_stage").toString("probe");
+  result["failureCode"]=row.value("failure_code").toString();
+  result["error"]=ok?QString():row.value("failure_code").toString();
+  result["outboundConnectMs"]=row.value("outbound_connect_ms").toInteger(-1);
+  result["originTlsMs"]=qint64(-1);
+  record(id,result);
+ }
+ if(sweep.value("done").toBool()){
+  endBatch();
+  next();
+ }
+}
+
+void NodeTestService::endBatch(){
+ if(m_batchPoll)m_batchPoll->stop();
+ if(m_batchRunner){retire(m_batchRunner);m_batchRunner=nullptr;}
+ m_batchAwaitingStart=false;
+ m_batchSwept.clear();
+ emit changed();
+}
+
 void NodeTestService::invalidateResults(){
  const bool hadWork=busy()||!m_results.isEmpty();
  if(!hadWork)return;

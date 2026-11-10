@@ -88,6 +88,28 @@ public:
         });
     }
     void setRoutingMode(const QString &mode) override {post([this,mode](auto *engine){m_workerProbeTag=0;engine->setRoutingMode(mode);});}
+    // The sweep start and its incremental snapshot must be synchronous for the
+    // caller's poll loop, so they use a blocking hop into the worker. Both calls
+    // are short (spawn or mutex read) and never run while the worker is blocked
+    // on the GUI thread.
+    bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override {
+        std::atomic<bool> started{false};
+        std::atomic<bool> accepted{false};
+        QMetaObject::invokeMethod(m_context,[this,ids,url,&accepted]{
+            accepted.store(m_engine&&m_engine->probeNodes(ids,url,nullptr));
+        },Qt::BlockingQueuedConnection);
+        started.store(accepted.load());
+        if(!started.load()&&error)*error=QStringLiteral("probe-batch-unavailable");
+        return started.load();
+    }
+    QJsonObject probeNodesStatus() override {
+        QJsonObject snapshot;
+        QMetaObject::invokeMethod(m_context,[this,&snapshot]{
+            if(m_engine)snapshot=m_engine->probeNodesStatus();
+        },Qt::BlockingQueuedConnection);
+        return snapshot;
+    }
+    void cancelProbeNodes() override {post([](auto *engine){engine->cancelProbeNodes();});}
     void configurationCommand(const QJsonObject &command) override {post([command](auto *engine){engine->configurationCommand(command);});}
     void lanCommand(const QJsonObject &command) override {post([command](auto *engine){engine->lanCommand(command);});}
     Status status() const override{return m_status;}

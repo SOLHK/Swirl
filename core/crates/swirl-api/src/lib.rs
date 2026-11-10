@@ -76,6 +76,22 @@ enum Command {
     ProbeCancel {
         handle: u64,
     },
+    /// Start one concurrent sweep of per-node latency probes. Each row probes
+    /// only its own node; the current selection and policy are not touched.
+    ProbeNodes {
+        handle: u64,
+        nodes: Vec<String>,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        concurrency: Option<u32>,
+    },
+    ProbeNodesStatus {
+        handle: u64,
+    },
+    ProbeNodesCancel {
+        handle: u64,
+    },
     Stop {
         handle: u64,
     },
@@ -245,6 +261,46 @@ impl Controller {
                     "ok": true,
                     "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_cancel()?
                 }))
+            }
+            Command::ProbeNodes {
+                handle,
+                nodes,
+                url,
+                timeout_ms,
+                expected_status,
+                concurrency,
+            } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
+            }
+            Command::ProbeNodesStatus { handle } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes_status()?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes_status()?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
+            }
+            Command::ProbeNodesCancel { handle } => {
+                let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    core.probe_nodes_cancel()?
+                } else {
+                    self.cores
+                        .get(&handle)
+                        .ok_or("UnknownHandle")?
+                        .probe_nodes_cancel()?
+                };
+                Ok(json!({"ok":true,"sweep":sweep}))
             }
             Command::SelectGroup { handle, id, member } => {
                 if self.cores_v2.contains_key(&handle) {

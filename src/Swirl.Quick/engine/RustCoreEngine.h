@@ -21,6 +21,9 @@ public:
  void configurationCommand(const QJsonObject &) override;
  void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
+ bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override;
+ QJsonObject probeNodesStatus() override;
+ void cancelProbeNodes() override;
  Status status() const override {auto value=m_status;value.tunCapturePossible=m_brokerSession||m_tunBroker.running()||m_tunRecoveryRequired;value.tunRecoveryRequired=m_tunRecoveryRequired;return value;}
  QString probeFailureStage() const override {return m_probeFailureStage;}
  qint64 probeOutboundConnectMs() const override {return m_probeOutboundConnectMs;}

@@ -903,3 +903,30 @@ void RustCoreEngine::probeNode(const QUrl &url){
  m_probeRequestId=requestId;m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;
  m_status.nodeHealth=NodeHealth::Checking;emit statusChanged();
 }
+
+bool RustCoreEngine::probeNodes(const QStringList &ids,const QUrl &url,QString *error){
+ if(!m_handle){if(error)*error=QStringLiteral("CoreStopped");return false;}
+ const auto text=url.toString(QUrl::FullyEncoded);
+ if(text.size()>2048||!url.isValid()||!QStringList{"http","https"}.contains(url.scheme())||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()){
+  if(error)*error=QStringLiteral("ProbeUrlInvalid");return false;
+ }
+ QJsonArray nodes;for(const auto &id:ids){const auto trimmed=id.trimmed();if(!trimmed.isEmpty())nodes.append(trimmed);}
+ if(nodes.isEmpty()){if(error)*error=QStringLiteral("ProbeNodesEmpty");return false;}
+ // One bounded concurrent sweep inside the already-running core. Nothing is
+ // selected and no per-node engine is created.
+ const auto response=call({{"op","probe_nodes"},{"handle",qint64(m_handle)},{"nodes",nodes},
+   {"url",text},{"timeout_ms",5000},{"concurrency",16}});
+ if(!response.value("ok").toBool()){
+  if(error)*error=response.value("error").toString("ProbeNodesFailed");return false;
+ }
+ return true;
+}
+
+QJsonObject RustCoreEngine::probeNodesStatus(){
+ if(!m_handle)return {};
+ return call({{"op","probe_nodes_status"},{"handle",qint64(m_handle)}});
+}
+
+void RustCoreEngine::cancelProbeNodes(){
+ if(m_handle)call({{"op","probe_nodes_cancel"},{"handle",qint64(m_handle)}});
+}

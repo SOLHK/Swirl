@@ -141,6 +141,15 @@ public:
         emit probeRequestRejected(tag,QStringLiteral("probe-unavailable"));
     }
     virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
+    // Concurrent per-node latency sweep. Engines that cannot batch return
+    // false and the caller keeps its isolated-engine path.
+    virtual bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) {
+        Q_UNUSED(ids);Q_UNUSED(url);
+        if(error)*error=QStringLiteral("probe-batch-unavailable");
+        return false;
+    }
+    virtual QJsonObject probeNodesStatus() { return {}; }
+    virtual void cancelProbeNodes() {}
     virtual void configurationCommand(const QJsonObject &command) {
         emit configurationCommandFinished(command.value("request_id").toString(),QJsonObject{{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"}});
     }
