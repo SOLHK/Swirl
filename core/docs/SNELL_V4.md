@@ -42,8 +42,9 @@ implementation; it is not a claim of indefinite replay retention.
   `tools/tests/snell-peer-lock.json`. `fetch_snell_peer.py` downloads it only for
   testing; `test_snell_official.py` starts and retires an owned-loopback server.
   The client example exercises the generic native outbound entry point, a
-  37,000-byte stream in both directions and its clean EOF, empty/1,200/16,000-byte UDP datagrams,
-  oversized UDP rejection and a wrong-PSK origin that must receive no connection.
+  37,000-byte stream in both directions and its clean EOF, and 1,200/16,000-byte UDP
+  datagrams. The UDP carrier must remain usable after Swirl rejects empty and
+  oversized outgoing datagrams locally. A wrong PSK must never reach the origin.
   Vendor binaries are test fixtures and are not redistributed in product packages.
 - RustCrypto Argon2 and its transitive dependency license notices are recorded in
   `core/DEPENDENCIES.json` and collected by the existing packaging notice pipeline.

@@ -532,6 +532,15 @@ impl UdpAssociation {
                 .await
                 .map_err(|_| "SnellHandshakeWrite")?;
             stream.flush().await.map_err(|_| "SnellHandshakeWrite")?;
+            // The UDP command has an immediate authenticated reply. Wait for
+            // it before sending the first datagram, unlike a TCP CONNECT
+            // whose status may be deferred until the origin writes data.
+            let accepted = std::future::poll_fn(|cx| stream.reader.frame(cx))
+                .await
+                .map_err(|_| "SnellUdpHandshakeRead")?;
+            if !accepted || stream.reader.data != [0] {
+                return Err("SnellUdpHandshakeReply");
+            }
             Ok(Self {
                 reader: stream.reader,
                 writer: stream.writer,
@@ -543,6 +552,11 @@ impl UdpAssociation {
     pub async fn send(&mut self, target: &Target, payload: &[u8]) -> Result<()> {
         if self.failed {
             return Err("SnellUdpClosed");
+        }
+        if payload.is_empty() {
+            // Empty datagrams are incompatible with the official v4 peer.
+            // Refuse them before writing anything to the carrier.
+            return Err("SnellUdpEmptyPayloadUnsupported");
         }
         if !swirl_subscription::valid_host(&target.host) || target.port == 0 {
             return Err("SnellUdpTarget");
@@ -617,7 +631,12 @@ fn parse_udp(data: &[u8]) -> Result<(Target, Vec<u8>)> {
         ),
         Some(6) if data.len() >= 19 => {
             let bytes = <[u8; 16]>::try_from(&data[1..17]).map_err(|_| "SnellUdpAddress")?;
-            (std::net::Ipv6Addr::from(bytes).to_string(), 17)
+            (
+                std::net::IpAddr::V6(std::net::Ipv6Addr::from(bytes))
+                    .to_canonical()
+                    .to_string(),
+                17,
+            )
         }
         _ => return Err("SnellUdpAddress"),
     };

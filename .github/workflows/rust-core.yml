@@ -203,7 +203,8 @@ jobs:
           if not report['server_sha256'] == provenance['server_sha256'] == hashlib.sha256(peer.read_bytes()).hexdigest():
               raise SystemExit('Official Snell peer identity changed.')
           expected = {'success': True, 'native_tcp_entry': True, 'tcp_bytes_each_direction': 37000,
-                      'udp_datagrams': [0, 1200, 16000], 'oversized_udp_rejected': True,
+                      'clean_tcp_eof': True, 'udp_datagrams': [1200, 16000], 'oversized_udp_rejected': True,
+                      'empty_udp_rejected_locally': True, 'udp_carrier_survived_refusals': True,
                       'wrong_psk_origin_connections': 0, 'public_network_tested': False, 'qt_product_acceptance': False}
           if any(type(observed.get(key)) is not type(value) or observed.get(key) != value for key, value in expected.items()):
               raise SystemExit('Official Snell evidence omitted a required TCP, UDP or rejection case.')

@@ -93,9 +93,10 @@ async fn verify(port: u16) -> serde_json::Value {
     let origin = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let address = origin.local_addr().unwrap();
     let echo = tokio::spawn(async move {
-        for _ in 0..3 {
+        for expected in [1200, 16000, 1200] {
             let mut data = vec![0; 65535];
             let (count, peer) = origin.recv_from(&mut data).await.unwrap();
+            assert_eq!(count, expected, "unexpected origin datagram size");
             origin.send_to(&data[..count], peer).await.unwrap();
         }
     });
@@ -107,7 +108,7 @@ async fn verify(port: u16) -> serde_json::Value {
         host: address.ip().to_string(),
         port: address.port(),
     };
-    for length in [0, 1200, 16000] {
+    for length in [1200, 16000] {
         let data = vec![61; length];
         udp.send(&target, &data).await.unwrap();
         let (reply, received) = udp.recv().await.unwrap();
@@ -115,13 +116,25 @@ async fn verify(port: u16) -> serde_json::Value {
         assert_eq!(reply.port, target.port);
         assert_eq!(data, received);
     }
-    echo.await.unwrap();
     assert_eq!(
         udp.send(&target, &vec![0; 16383]).await.unwrap_err(),
         "SnellUdpPayloadTooLarge"
     );
+    // Both refusals must occur locally without disturbing the live carrier.
+    assert_eq!(
+        udp.send(&target, &[]).await.unwrap_err(),
+        "SnellUdpEmptyPayloadUnsupported"
+    );
+    let data = vec![62; 1200];
+    udp.send(&target, &data).await.unwrap();
+    let (reply, received) = udp.recv().await.unwrap();
+    assert_eq!(reply.host, target.host);
+    assert_eq!(reply.port, target.port);
+    assert_eq!(data, received);
+    echo.await.unwrap();
     json!({"success": true, "native_tcp_entry": true, "tcp_bytes_each_direction": 37000, "clean_tcp_eof": true,
-        "udp_datagrams": [0, 1200, 16000], "oversized_udp_rejected": true,
+        "udp_datagrams": [1200, 16000], "oversized_udp_rejected": true,
+        "empty_udp_rejected_locally": true, "udp_carrier_survived_refusals": true,
         "wrong_psk_origin_connections": 0, "wrong_psk_outcome": rejection,
         "public_network_tested": false, "qt_product_acceptance": false})
 }

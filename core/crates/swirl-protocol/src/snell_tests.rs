@@ -150,6 +150,15 @@ fn udp_reply_requires_complete_address_port_and_bounded_frame() {
     assert_eq!(target.host, "127.0.0.1");
     assert_eq!(target.port, 53);
     assert_eq!(data, [7, 8]);
+    let (_, empty) = parse_udp(&[4, 127, 0, 0, 1, 0, 53]).unwrap();
+    assert!(empty.is_empty());
+    let mapped = [
+        6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 127, 0, 0, 1, 0, 53, 7, 8,
+    ];
+    let (target, data) = parse_udp(&mapped).unwrap();
+    assert_eq!(target.host, "127.0.0.1");
+    assert_eq!(target.port, 53);
+    assert_eq!(data, [7, 8]);
     for bytes in [
         vec![],
         vec![4; 6],

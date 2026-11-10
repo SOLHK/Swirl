@@ -310,6 +310,7 @@ private slots:
         SystemProxySession proxy(nullptr,journal);
         QVERIFY2(proxy.enable(server.serverPort(),QCoreApplication::applicationPid()),qPrintable(proxy.error()));
         QVERIFY(proxy.enabled());QVERIFY(proxy.owned());
+        QVERIFY2(proxy.error().isEmpty(),qPrintable(proxy.error()));
         // Verify both WinINET options and the registry view read by native
         // clients. Windows may reflect a registry edit in WinINET immediately.
         QSettings internet(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"),QSettings::NativeFormat);
@@ -319,11 +320,27 @@ private slots:
         QVERIFY2(internet.value("ProxyOverride").toString()==SystemProxySession::snapshot().value("bypass").toString(),"Registry and WinINET bypass values differ; raw values are intentionally omitted.");
         QFile encrypted(journal);QVERIFY(encrypted.open(QIODevice::ReadOnly));
         QVERIFY(!encrypted.readAll().contains("127.0.0.1"));encrypted.close();
-        QVERIFY(proxy.disable());QVERIFY2(SystemProxySession::snapshot()==original,"Proxy snapshot differs; raw proxy/PAC/bypass values are intentionally omitted.");
-        QVERIFY(proxy.enable(server.serverPort(),QCoreApplication::applicationPid()));
+        proxy.disable();
+        QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&!proxy.owned(),5000);
+        QVERIFY2(proxy.error().isEmpty(),qPrintable(proxy.error()));
+        QVERIFY2(SystemProxySession::snapshot()==original,"Proxy snapshot differs; raw proxy/PAC/bypass values are intentionally omitted.");
+        QVERIFY(!QFile::exists(journal));
+        QVERIFY2(proxy.enable(server.serverPort(),QCoreApplication::applicationPid()),qPrintable(proxy.error()));
+        QVERIFY2(proxy.error().isEmpty(),qPrintable(proxy.error()));
         const auto external=configuredProxy(original,3,"127.0.0.1:65001");
         QString error;QVERIFY2(SystemProxySession::apply(external,&error),qPrintable(error));
-        QVERIFY(proxy.disable());QVERIFY2(SystemProxySession::snapshot()==external,"Proxy snapshot differs; raw proxy/PAC/bypass values are intentionally omitted.");
+        QLockFile releaseLock(journal+".lock");
+        QVERIFY(releaseLock.tryLock(1000));
+        QSignalSpy released(&proxy,&SystemProxySession::releaseFinished);
+        QVERIFY(!proxy.disable());
+        QVERIFY(proxy.busy());
+        QCOMPARE(released.count(),0);
+        releaseLock.unlock();
+        QTRY_COMPARE_WITH_TIMEOUT(released.count(),1,5000);
+        QVERIFY2(released.first().at(0).toBool(),qPrintable(proxy.error()));
+        QVERIFY(!proxy.busy());QVERIFY(!proxy.owned());
+        QVERIFY2(SystemProxySession::snapshot()==external,"Proxy snapshot differs; raw proxy/PAC/bypass values are intentionally omitted.");
+        QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(temp.path()).entryList({"*.ready"},QDir::Files).isEmpty(),5000);
         QVERIFY(SystemProxySession::apply(original));
         QVERIFY(!proxy.enable(0,0));QVERIFY2(SystemProxySession::snapshot()==original,"Proxy snapshot differs; raw proxy/PAC/bypass values are intentionally omitted.");
     }
