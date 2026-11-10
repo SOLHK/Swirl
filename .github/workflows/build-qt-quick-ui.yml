@@ -15,7 +15,7 @@ env:
   SWIRL_QT_VERSION: '6.12.0'
 
 concurrency:
-  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-release-replay
   # The isolated network development PRs replace only their own obsolete
   # builds. An old icon-tool stall must not keep the corrected installer queued.
   # Other product branches retain their cache and installer evidence unchanged.
@@ -1724,7 +1724,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'work/node-probe-render-20261105' && github.base_ref == 'test' &&
       github.event.pull_request.base.sha == 'acd7005c99a99c4f81b62d328fcc15883d51b62a' &&
-      github.event.before == '3d0b2b4593bc83a6372f0a0628cb06e6aa55b327' }}
+      github.event.before == 'b80748aee9bc143735c9f98c041134c3723789b7' }}
     runs-on: windows-2022
     timeout-minutes: 45
     permissions:
