@@ -279,6 +279,28 @@ impl Driver {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         }
+        if self.tcp.len() >= self.config.max_tcp_flows {
+            // Saturated: reclaim slots held by TIME-WAIT sockets first. Those
+            // connections have exchanged FINs in both directions and carry no
+            // application data; smoltcp keeps them for 10 seconds to absorb
+            // late segments. Under capacity pressure that wait must not turn
+            // into silent SYN drops for new connections.
+            let mut reclaim = Vec::new();
+            for (&candidate, entry) in &self.tcp {
+                let socket = self.sockets.get::<tcp::Socket>(entry.handle);
+                if socket.state() == tcp::State::TimeWait {
+                    reclaim.push(candidate);
+                }
+            }
+            for candidate in reclaim {
+                if let Some(entry) = self.tcp.remove(&candidate) {
+                    self.sockets.remove(entry.handle);
+                    self.counters
+                        .timewait_reclaimed
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
         if self.tcp.len() >= self.config.max_tcp_flows || self.tcp_tx.capacity() == 0 {
             self.counters
                 .rejected_tcp_flows
