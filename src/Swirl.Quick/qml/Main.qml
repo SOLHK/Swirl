@@ -179,6 +179,8 @@ ApplicationWindow {
             }
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
+                // Finish creating policies in one turn so its QML members stay live through initialization.
+                incubateRoutes: routeKey !== "policies"
                 id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:0; x:Theme.dp(0); y:AppState.currentPage==="activity"?Theme.dp(12):Theme.dp(48); width:parent.width; height:parent.height-y-Theme.dp(12)
                 onRouteFailed:(failedRoute,fallbackRoute)=>{
                     if(AppState.currentPage===failedRoute){if(AppState.canGoBack)AppState.goBack();else if(fallbackRoute.length)AppState.navigate(fallbackRoute)}
