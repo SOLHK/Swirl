@@ -25,13 +25,16 @@ SwirlDialog {
     property bool latencySort:false
     property bool availableOnly:false
     property bool ownsProbe:false
+    property bool autoProbePending:false
     readonly property var nodeOptions:options.filter(option=>option.kind==="node")
     readonly property var nodeIds:nodeOptions.map(option=>option.id)
     readonly property var nodeById:{const result={};for(const option of nodeOptions)result[option.id]=option;return result}
     NodeViewModel {id:pickerNodes;controller:picker.visible?engineController:null;query:picker.query;filters:({sort:picker.latencySort?"exitLatency":"name",available:picker.availableOnly})}
-    Timer {id:autoProbe;interval:75;onTriggered:if(picker.opened&&!picker.pending)picker.ownsProbe=engineController.testNodesIfStale(picker.nodeIds,engineController.defaultProbeUrl)||picker.ownsProbe}
-    onOpened:autoProbe.restart()
-    onNodeIdsChanged:if(opened)autoProbe.restart()
+    Timer {id:autoProbe;interval:75;onTriggered:if(picker.opened&&!picker.pending&&picker.autoProbePending&&!engineController.tests.busy){picker.autoProbePending=false;picker.ownsProbe=engineController.testNodesIfStale(picker.nodeIds,engineController.defaultProbeUrl)||picker.ownsProbe}}
+    Connections {target:engineController.tests;function onChanged(){if(picker.opened&&picker.autoProbePending&&!engineController.tests.busy)autoProbe.restart()}}
+    onOpened:{autoProbePending=true;autoProbe.restart()}
+    onNodeIdsChanged:if(opened){autoProbePending=true;autoProbe.restart()}
+    onPendingChanged:if(opened&&!pending&&autoProbePending)autoProbe.restart()
     function optionAt(index){if(targetKind!==0)return visibleOptions[index];const row=pickerNodes.get(index);return nodeById[row.id]}
     readonly property var visibleOptions:options.filter(option=>option.kind===(targetKind===0?"node":"group")&&!(option.kind==="group"&&option.id===excludedGroupId)&&String(option.name).toLowerCase().indexOf(query.toLowerCase())>=0)
     readonly property bool selectionAvailable:Policy.targetAvailable(selectedTarget,options)&&!(selectedTarget.kind==="group"&&selectedTarget.id===excludedGroupId)&&(allowDirect||selectedTarget.kind!=="direct")
@@ -42,7 +45,7 @@ SwirlDialog {
         targetKind=currentTarget.kind==="group"?1:0;targetTabs.currentIndex=targetKind;query="";search.text="";pending=false;pendingRequestId="";message="";heroSource=source;open()
     }
     function showError(text) {message=String(text);errorSummary.forceActiveFocus()}
-    onClosed:{search.clear();autoProbe.stop();if(ownsProbe)engineController.tests.cancel();ownsProbe=false}
+    onClosed:{autoProbePending=false;search.clear();autoProbe.stop();if(ownsProbe)engineController.tests.cancel();ownsProbe=false}
     stateFingerprint:Qt.md5(JSON.stringify(selectedTarget))
     dismissBlocked:pending
     width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-2*margins:Theme.dp(600)))
@@ -95,7 +98,7 @@ SwirlDialog {
             SubscriptionAction {objectName:"policySortLatency";text:qsTr("延迟");selected:picker.latencySort;onClicked:picker.latencySort=true}
             SubscriptionAction {objectName:"policyAvailableOnly";text:qsTr("仅可用");selected:picker.availableOnly;onClicked:picker.availableOnly=!picker.availableOnly}
             Item {Layout.fillWidth:true}
-            SubscriptionAction {objectName:"policyRetest";text:engineController.tests.busy?qsTr("取消检测"):qsTr("重新检测");enabled:!picker.pending;onClicked:{if(engineController.tests.busy){engineController.tests.cancel();picker.ownsProbe=false}else{picker.ownsProbe=true;engineController.testNodes(picker.nodeIds,engineController.defaultProbeUrl)}}}
+            SubscriptionAction {objectName:"policyRetest";text:engineController.tests.busy?qsTr("取消检测"):qsTr("重新检测");enabled:!picker.pending;onClicked:{picker.autoProbePending=false;if(engineController.tests.busy){engineController.tests.cancel();picker.ownsProbe=false}else{picker.ownsProbe=true;engineController.testNodes(picker.nodeIds,engineController.defaultProbeUrl)}}}
         }
         SwirlText {Layout.fillWidth:true;visible:picker.targetKind===0;text:qsTr("HTTPS 出口响应时间 · 含 DNS、节点握手及目标 TLS");color:Theme.muted;font.pixelSize:Theme.fontSize(10);wrapMode:Text.Wrap}
         Item {
