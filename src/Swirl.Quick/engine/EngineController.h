@@ -14,11 +14,13 @@
 #include <QJsonArray>
 #include <optional>
 class QTcpSocket;
+class QQuickWindow;
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
+    Q_PROPERTY(QUrl defaultProbeUrl READ defaultProbeUrl CONSTANT)
     Q_PROPERTY(QString stateText READ stateText NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(QString errorCode READ errorCode NOTIFY statusChanged)
@@ -164,6 +166,7 @@ public:
     Q_INVOKABLE void testNode(const QUrl &url);
     Q_INVOKABLE void disconnectNode();
     SystemProxySession *systemProxy() { return &m_systemProxy; }
+    QUrl defaultProbeUrl() const { return m_proxyProbeUrl; }
     QString routingMode() const { return processAlive()?m_engine->status().mode:m_options.routingMode; }
     QString routingError() const { return m_routingError; }
     bool routingBusy() const { return m_policyBusy||m_engine->status().routingBusy; }
@@ -172,6 +175,7 @@ public:
     NodeTestService *tests() { return &m_tests; }
     Q_INVOKABLE void testAllNodes(const QUrl &url);
     Q_INVOKABLE void testNodes(const QStringList &ids,const QUrl &url);
+    Q_INVOKABLE bool testNodesIfStale(const QStringList &ids,const QUrl &url);
     Q_INVOKABLE void testSelectedNode(const QString &id,const QUrl &url);
     QVariantList routingRules() const;
     QVariantMap dnsConfiguration() const { return m_options.dnsConfig; }
@@ -267,6 +271,7 @@ signals:
     void nodesChanged();
 private:
     friend class PolicyConfigurationTests;
+    friend int runPolicyUiChecks(QQuickWindow *,EngineController *,const QString &);
 #ifdef SWIRL_PRIVATE_UI_QUOTA
     friend class PrivateUiQuotaSession;
 #endif
@@ -310,9 +315,11 @@ private:
     int m_captureProxyPort=0;
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
+    QByteArray m_networkIdentity;
     quint64 m_proxyCheckGeneration=0;
     quint64 m_proxyEnableRequest=0;
     QPointer<QTcpSocket> m_proxyCheckSocket;
+    QUrl m_proxyProbeUrl{QStringLiteral("https://cp.cloudflare.com/generate_204")};
     QString m_nodeError;
     QString m_pendingSelection,m_previousSelection;
     void rollbackPendingSelection(const QString &reason);

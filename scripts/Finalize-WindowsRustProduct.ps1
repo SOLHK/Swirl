@@ -38,7 +38,7 @@ foreach ($directory in (Get-ChildItem -LiteralPath $root -Directory -Recurse -Fo
         throw 'Package contains empty directories; use fresh product staging before packaging.'
     }
 }
-$tun=Assert-SwirlTunPayload -ApplicationDirectory $root -ExpectedSourceSha $sha -ExpectedBuildId $manifest.rust.build_id
+$tun=Assert-SwirlTunPayload -ApplicationDirectory $root -ExpectedSourceSha $sha -ExpectedBuildId $manifest.rust.build_id -ExpectedTarget $manifest.rust.target
 if (Test-Path -LiteralPath $list) { throw 'Uninstall include already exists.' }
 # Runtime cleanup uses the embedded manifest and hash-aware maintenance helper.
 # Never generate unconditional Delete instructions for potentially modified files.

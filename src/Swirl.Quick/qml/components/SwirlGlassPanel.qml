@@ -33,11 +33,12 @@ SwirlContinuousSurface {
         x: -padding; y: -padding; z: -1
         width: panel.width + 2 * padding; height: panel.height + 2 * padding
         visible: !panel.surfaceHidden && panel.independentCard && Theme.effectsSupported
-        property real padding: Theme.dp(10)
+        property real padding: Math.ceil(4 * softness + Math.abs(shadowOffset.y))
         property vector2d surfaceSize: Qt.vector2d(panel.width, panel.height)
         property real cornerRadius: panel.radius
         property vector2d shadowOffset: Qt.vector2d(0, Theme.dp(2))
         property real softness: Theme.dp(3)
+        property real floatingShadow: 0
         property color shadowColor: Theme.withAlpha(Theme.shadowColor, (Theme.dark ? 0.10 : 0.025) * (panel.pressed ? 0.65 : panel.interactive && panel.hovered ? 1.15 : 1))
         fragmentShader: "qrc:/swirl/shaders/card-shadow.frag.qsb"
         Behavior on shadowColor { ColorAnimation { duration: SwirlMotion.hoverDuration } }

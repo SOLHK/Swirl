@@ -104,10 +104,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         auto *card=find(cardNames[i]),*flight=find("cloudKnotCardFlight-"+QString::number(i));
         auto *layer=card?card->property("decorationLayer").value<QQuickItem *>():nullptr;
         auto *body=card?activityVisual(card,"activityCardContent"):nullptr;
-        cardLayers=cardLayers&&card&&flight&&layer&&body&&flight->parentItem()==layer&&layer->parentItem()==card
-            &&layer->clip()&&!layer->isEnabled()&&behindItem(layer,body);
+        cardLayers=cardLayers&&card&&!flight&&layer&&body&&layer->parentItem()==card
+            &&behindItem(back,card)&&!layer->isEnabled()&&behindItem(layer,body);
     }
-    check("weave-all-five-cards-reveal-artwork-below-content-without-input-handlers",cardLayers);
+    check("weave-all-five-cards-occlude-one-window-background-without-clipped-copies",cardLayers);
     const QList<QPointF> corners={QPointF(),QPointF(target->width(),0),QPointF(0,target->height()),QPointF(target->width(),target->height())};
     bool sameClip=front->clip()&&front->size()==target->size();
     for(const auto &point:corners)sameClip=sameClip&&QLineF(front->mapToScene(point),target->mapToScene(point)).length()<0.01;
@@ -138,11 +138,9 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
     bool cardPoses=true;
     for(int i=0;i<cardNames.size();++i)for(const auto &key:keys){
         auto *piece=find("cloudFeather-"+key),*copy=find("cloudFeatherCard-"+QString::number(i)+"-"+key);
-        cardPoses=cardPoses&&piece&&copy&&copy->acceptedMouseButtons()==Qt::NoButton&&!copy->acceptHoverEvents();
-        if(piece&&copy)for(const auto &point:probes)
-            cardPoses=cardPoses&&QLineF(piece->mapToScene(point),copy->mapToScene(point)).length()<0.01;
+        cardPoses=cardPoses&&piece&&!copy&&piece->parentItem()==back&&piece->acceptedMouseButtons()==Qt::NoButton&&!piece->acceptHoverEvents();
     }
-    check("weave-card-feathers-share-one-global-pose-and-do-not-capture-input",cardPoses);
+    check("weave-feathers-have-one-background-instance-and-no-card-copies",cardPoses);
     window->update();activityWait(80);
     const QImage withFlight=window->grabWindow();
     QQmlComponent opacityComponent(qmlEngine(window));
@@ -201,7 +199,9 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         }
         samples.append(QJsonObject{{"kind","weave-control-occlusion"},{"observedProgress",sampledProgress},
             {"devicePixelRatio",window->devicePixelRatio()},{"controls",controls}});
-        int visibleCardPixels=0;
+        int visibleCardPixels=0,opaqueCardPixels=0,visibleScenePixels=0;
+        for(int y=0;y<withFlight.height();++y)for(int x=0;x<withFlight.width();++x)
+            if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y))++visibleScenePixels;
         for(const auto &cardName:cardNames){
             auto *card=find(cardName);
             auto *layer=card?card->property("decorationLayer").value<QQuickItem *>():nullptr;
@@ -210,10 +210,12 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
             const double sx=double(withFlight.width())/window->width(),sy=double(withFlight.height())/window->height();
             const QRect pixels=QRectF(logical.x()*sx,logical.y()*sy,logical.width()*sx,logical.height()*sy).toAlignedRect().intersected(withFlight.rect());
             for(int y=pixels.top();y<=pixels.bottom();++y)for(int x=pixels.left();x<=pixels.right();++x)
-                if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y))++visibleCardPixels;
+                if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y)){
+                    ++visibleCardPixels;if(card->property("color").value<QColor>().alpha()==255)++opaqueCardPixels;
+                }
         }
-        check("weave-travelling-feathers-are-visible-on-card-surfaces",visibleCardPixels>0);
-        samples.append(QJsonObject{{"kind","weave-card-artwork"},{"changedPixels",visibleCardPixels}});
+        check("weave-background-remains-visible-outside-opaque-cards",visibleScenePixels>0&&opaqueCardPixels==0);
+        samples.append(QJsonObject{{"kind","weave-window-background"},{"changedPixels",visibleScenePixels},{"cardPixels",visibleCardPixels},{"opaqueCardPixels",opaqueCardPixels}});
         if(!output.isEmpty()){
             const auto directory=QFileInfo(output).absolutePath();
             check("weave-render-evidence-directory-created",QDir().mkpath(directory));

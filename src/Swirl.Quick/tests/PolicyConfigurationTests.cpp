@@ -1,6 +1,7 @@
 #include "engine/EngineController.h"
 #include "engine/RustCoreEngine.h"
 #include "PolicySystemProxyBackend.h"
+#include "ControlledNetwork.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
@@ -12,6 +13,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTcpServer>
+#include <QTimer>
 #include <QTest>
 #include <QUuid>
 #include <functional>
@@ -30,6 +32,7 @@ public:
     QJsonObject prepared,base;
     quint64 generation=1;
     bool rejectPrepare=false,rejectFinishOnce=false,rolledBack=false,gate=false;
+    bool probeSucceeds=true;
     int activations=0,starts=0,stops=0;
     std::function<void()> beforeActivate,beforeRollback,beforeFinish;
     static QString digest(const QJsonObject &candidate) {
@@ -48,6 +51,17 @@ public:
     void refresh() override {}
     void selectNode(const QString &) override {QFAIL("V2 coordinator used legacy selection");}
     void probeNode(const QUrl &) override {}
+    void probeNodeTagged(const QUrl &,quint64 tag) override {
+        // Coordinator fixture only: real TLS/exit behavior is tested by the
+        // Rust and socket integration suites, never inferred from this peer.
+        current.probeRequestTag=tag;current.nodeBusy=true;current.requestState=RequestState::InProgress;emit statusChanged();
+        QTimer::singleShot(0,this,[this,tag]{
+            current.probeRequestTag=tag;current.nodeBusy=false;
+            current.requestState=probeSucceeds?RequestState::Succeeded:RequestState::Failed;
+            current.nodeHealth=probeSucceeds?NodeHealth::Available:NodeHealth::Unknown;
+            current.nodeMessage=probeSucceeds?QString():QString("Controlled origin TLS failure");emit statusChanged();
+        });
+    }
     Status status() const override {return current;}
     QString configurationSummary() const override {return "controlled configuration peer";}
     void configurationCommand(const QJsonObject &request) override {
@@ -263,12 +277,15 @@ private slots:
         const auto saved=envelope(path).value("committed").toObject().value("snapshot").toObject();
         QCOMPARE(saved.value("networkConfiguration").toObject().value("activeSubscriptionId").toString(),pool.b);QCOMPARE(saved.value("nodes").toArray().size(),4);
     }
-    void tunRequiresExplicitEncryptedDnsAndNeverEnablesGatewayAsASideEffect(){
+    void tunPreparesSecureDefaultsPreservesExplicitDnsAndNeverEnablesGateway(){
         QTemporaryDir dir;const auto path=dir.filePath("tun-configuration.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         NodeStore store(path);EngineStartOptions options;options.nodes=store.nodes();options.proxyPort=1080;options.tunEnabled=true;
         const auto policy=sourcePolicy(pool);QJsonObject runtime;
 #ifdef Q_OS_WIN
-        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        QVERIFY(RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        const auto defaults=runtime.value("dns").toObject().value("tls_servers").toArray();QCOMPARE(defaults.size(),2);
+        QCOMPARE(defaults.first().toObject().value("tls").toObject().value("server_name").toString(),QString("dns.alidns.com"));
+        QVERIFY(runtime.value("dns").toObject().value("servers").toArray().isEmpty());QVERIFY(options.dnsConfig.isEmpty());
         options.dnsConfig={{"mode",2},{"servers","1.1.1.1"}};
         QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
         options.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
@@ -678,9 +695,11 @@ private slots:
         QVERIFY(first.sourceDigest!=second.sourceDigest);
     }
     void activityProxySwitchStartsSavedRustAndRestoresTheExternalProxy(){
+        ControlledNetwork network;QVERIFY(network.start());
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();
         auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
         EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,dir.filePath("master.dpapi"),false,std::move(backend));
+        controller.m_proxyProbeUrl=network.url();
         controller.setProxyPort(port);QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));const auto revision=controller.savedRevision();reserved.close();
         QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(!controller.systemProxy()->owned());
@@ -690,6 +709,16 @@ private slots:
         controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());
         QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
         QVERIFY(!controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->systemEnabled());QCOMPARE(proxy->restoreCalls,1);QCOMPARE(controller.savedRevision(),revision);
+    }
+    void aListeningCoreWithAFailedExitDoesNotTakeSystemProxyOwnership(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        auto peer=std::make_unique<ConfigurationPeer>();peer->probeSucceeds=false;
+        EngineController controller(std::move(peer),nullptr,dir.filePath("failed-exit.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(!controller.proxyRequested()&&!controller.processAlive(),5000);
+        QCOMPARE(proxy->enableCalls,0);QVERIFY(!controller.systemProxy()->owned());QVERIFY(proxy->current().systemEnabled);
+        QVERIFY(controller.routingError().contains("Controlled origin TLS failure"));
     }
     void closingDuringTheListenerProbeCannotReacquireFromALateCallback(){
         QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));

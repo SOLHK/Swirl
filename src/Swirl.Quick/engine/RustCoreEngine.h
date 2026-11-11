@@ -21,6 +21,7 @@ public:
  void configurationCommand(const QJsonObject &) override;
  void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
+ void probeNodeTagged(const QUrl &,quint64 tag) override;
  bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override;
  QJsonObject probeNodesStatus() override;
  void cancelProbeNodes() override;

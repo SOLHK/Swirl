@@ -376,6 +376,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   target_compile_definitions(SwirlPolicyConfigurationTests PRIVATE SWIRL_PROXY_STOP_NEGATIVE_CONTROL)
  endif()
  target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
+ target_compile_definitions(SwirlPolicyConfigurationTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests
   -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.xml,xml"

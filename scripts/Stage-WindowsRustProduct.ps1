@@ -7,7 +7,8 @@ param(
     [string]$QtSdkReceipt = $env:SWIRL_QT_SELECTED_RECEIPT,
     [string]$QtEvidenceDirectory,
     [string]$QtSourceDirectory,
-    [string]$QtSourceCacheDirectory
+    [string]$QtSourceCacheDirectory,
+    [string]$QtBackportSourceBundle
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -52,6 +53,11 @@ $qtRoot = (Resolve-Path -LiteralPath (Join-Path $qtConfig '../../..')).Path
 $windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
 $qtpaths = Join-Path $qtRoot 'bin/qtpaths.exe'
 foreach ($path in @($qtRoot,$windeployqt,$qtpaths)) { Assert-SwirlPathWithoutLinks $path }
+if ($QtBackportSourceBundle) {
+    if ($QtSdkReceipt) { throw 'Select one exact Qt derivation recipe.' }
+    & $Python (Join-Path $repo 'tools/Verify-Qt612Backports.py') --kit $qtRoot
+    if ($LASTEXITCODE -ne 0) { throw 'The local Qt backport kit does not match its reviewed lock.' }
+}
 if (-not (Test-Path -LiteralPath $windeployqt -PathType Leaf) -or
     -not (Test-Path -LiteralPath $qtpaths -PathType Leaf)) { throw 'Configured Qt deployment tools are unavailable.' }
 if ($QtSdkReceipt) {
@@ -68,9 +74,13 @@ if ($QtSdkReceipt) {
     if ($LASTEXITCODE -ne 0) { throw 'Selected Qt SDK or actual product linkage changed before deployment.' }
 }
 $expected = Get-Content -LiteralPath (Join-Path $bin 'swirl-rust-build.json') -Raw | ConvertFrom-Json
-if ($expected.source_sha -ne $sourceSha -or $expected.target -ne 'x86_64-pc-windows-msvc' -or
+$qtModule=Get-Content -LiteralPath (Join-Path $qtRoot 'modules/Core.json') -Raw | ConvertFrom-Json
+$compilerId=$qtModule.platforms[0].compiler_id
+$compilerTarget=switch($compilerId){'MSVC'{'x86_64-pc-windows-msvc'} 'GNU'{'x86_64-pc-windows-gnu'} default{throw 'Unsupported Windows Qt compiler.'}}
+$opensslTarget=if($compilerId -eq 'MSVC'){'VC-WIN64A'}else{'mingw64'}
+if ($expected.source_sha -ne $sourceSha -or $expected.target -ne $compilerTarget -or
     $expected.build_id -ne $buildId) {
-    throw 'Release packaging requires current source and Windows x64 MSVC.'
+    throw 'Release packaging requires current source and matching Qt/Rust Windows x64 targets.'
 }
 if ((Get-FileHash -LiteralPath $rustLibrary -Algorithm SHA256).Hash -ne
     (Get-FileHash -LiteralPath (Join-Path $bin 'swirl_api.dll') -Algorithm SHA256).Hash) { throw 'Deployed Rust DLL is stale.' }
@@ -108,7 +118,7 @@ foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
 }
 if (-not $OpenSslRoot) { throw 'An explicitly verified OpenSSL runtime root is required.' }
 & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $OpenSslRoot `
-    -ApplicationDirectory $stage -Target VC-WIN64A -Python $Python
+    -ApplicationDirectory $stage -Target $opensslTarget -Python $Python
 & $windeployqt --qtpaths $qtpaths --release --no-compiler-runtime --no-system-d3d-compiler --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
 $shaderArguments = @{QtRoot=$qtRoot; ApplicationDirectory=$stage}
@@ -124,13 +134,21 @@ if ($QtSdkReceipt) {
     $shaderArguments.Python = $shaderPython
 }
 & (Join-Path $PSScriptRoot 'Copy-QtSdkShaderRuntime.ps1') @shaderArguments
+if ($QtBackportSourceBundle) {
+    & $Python (Join-Path $repo 'tools/Verify-Qt612Backports.py') --kit $qtRoot --runtime $stage --source-bundle $QtBackportSourceBundle
+    if ($LASTEXITCODE -ne 0) { throw 'Deployed Qt backports or corresponding source failed verification.' }
+}
 if ($QtSdkReceipt) {
     & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify --receipt $QtSdkReceipt `
         --build-dir $build --phase post-deploy --runtime-dir $stage `
         --evidence (Join-Path $QtEvidenceDirectory 'post-deploy')
     if ($LASTEXITCODE -ne 0) { throw 'Deployed Qt files differ from the selected SDK.' }
 }
-& (Join-Path $PSScriptRoot 'Copy-VerifiedMsvcRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
+if($compilerId -eq 'MSVC'){
+    & (Join-Path $PSScriptRoot 'Copy-VerifiedMsvcRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
+}else{
+    & (Join-Path $PSScriptRoot 'Copy-VerifiedMingwRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
+}
 # windeployqt creates empty QML directories that NSIS File /r would own only
 # implicitly. Prune this freshly created stage before any real runtime checks;
 # installed-product maintenance must preserve unknown user directories.
@@ -204,7 +222,7 @@ foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Objec
         sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding utf8
-$null=Assert-SwirlTunPayload -ApplicationDirectory $stage -ExpectedSourceSha $sourceSha -ExpectedBuildId $buildId
+$null=Assert-SwirlTunPayload -ApplicationDirectory $stage -ExpectedSourceSha $sourceSha -ExpectedBuildId $buildId -ExpectedTarget $compilerTarget
 $tlsLock=Get-Content -LiteralPath (Join-Path $repo 'tools/openssl-runtime.lock.json') -Raw | ConvertFrom-Json
 $null=Assert-SwirlTlsPayload -ApplicationDirectory $stage -ExpectedVersion $tlsLock.version -ExpectedSourceSha256 $tlsLock.source.sha256
 $tlsReport=Join-Path $build ('tls-runtime-'+$sourceSha+'.json')

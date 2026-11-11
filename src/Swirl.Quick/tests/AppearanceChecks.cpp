@@ -155,7 +155,10 @@ Item {
         if(fixture){
             fixture->setParentItem(window->contentItem());
             struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
-            window->requestActivate();
+            // The desktop runner can retain a foreground window above an
+            // exposed Qt window. Native cursor tests require actual z-order,
+            // not merely Qt's cached active-window state.
+            window->raise();window->requestActivate();
             check(QTest::qWaitFor([&]{return window->isExposed()&&window->isActive();},1000),
                 "native review window is exposed and active before pointer input");
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};

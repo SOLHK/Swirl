@@ -25,11 +25,43 @@
 #include "RustCoreLibrary.h"
 #include "RustDnsConfiguration.h"
 #ifdef Q_OS_WIN
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
 #include <wincrypt.h>
 #endif
 
 namespace {
+QByteArray networkIdentity(const QList<QNetworkInterface> &interfaces) {
+    QStringList entries;
+    for(const auto &iface:interfaces)if(iface.flags().testFlag(QNetworkInterface::IsUp)){
+        entries.append(iface.name()+':'+QString::number(iface.flags().toInt()));
+        for(const auto &address:iface.addressEntries())entries.append(iface.name()+':'+address.ip().toString()+':'+QString::number(address.prefixLength()));
+    }
+#ifdef Q_OS_WIN
+    ULONG size=16384;QByteArray storage(size,0);
+    auto result=GetAdaptersAddresses(AF_UNSPEC,GAA_FLAG_INCLUDE_GATEWAYS,nullptr,reinterpret_cast<IP_ADAPTER_ADDRESSES *>(storage.data()),&size);
+    if(result==ERROR_BUFFER_OVERFLOW){storage.resize(size);result=GetAdaptersAddresses(AF_UNSPEC,GAA_FLAG_INCLUDE_GATEWAYS,nullptr,reinterpret_cast<IP_ADAPTER_ADDRESSES *>(storage.data()),&size);}
+    if(result!=NO_ERROR)return {};
+    for(auto *adapter=reinterpret_cast<IP_ADAPTER_ADDRESSES *>(storage.data());adapter;adapter=adapter->Next){
+        if(adapter->OperStatus!=IfOperStatusUp)continue;
+        const auto name=QString::fromLatin1(adapter->AdapterName);
+        entries.append(name+':'+QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(&adapter->NetworkGuid),sizeof(GUID)).toHex()));
+        entries.append(name+':'+QString::number(adapter->Ipv4Metric)+':'+QString::number(adapter->Ipv6Metric));
+        for(auto *dns=adapter->FirstDnsServerAddress;dns;dns=dns->Next)entries.append(name+":dns:"+QHostAddress(dns->Address.lpSockaddr).toString());
+        for(auto *gateway=adapter->FirstGatewayAddress;gateway;gateway=gateway->Next)entries.append(name+":gateway:"+QHostAddress(gateway->Address.lpSockaddr).toString());
+    }
+    PMIB_IPFORWARD_TABLE2 routes=nullptr;
+    if(GetIpForwardTable2(AF_UNSPEC,&routes)!=NO_ERROR)return {};
+    for(ULONG index=0;index<routes->NumEntries;++index){const auto &route=routes->Table[index];
+        if(route.DestinationPrefix.PrefixLength==0)entries.append(QString::number(route.InterfaceIndex)+":default:"+QString::number(route.Metric)+':'+QHostAddress(reinterpret_cast<const sockaddr *>(&route.NextHop)).toString());
+    }
+    FreeMibTable(routes);
+#endif
+    entries.sort();return QCryptographicHash::hash(entries.join('\n').toUtf8(),QCryptographicHash::Sha256);
+}
 QJsonObject legacyMatcher(const QString &type,const QString &pattern,bool resolve=true);
 bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &format,QVariantMap *projected,QString *error,bool *safeNodeFallback=nullptr,bool *hasSemantics=nullptr) {
     if(safeNodeFallback)*safeNodeFallback=false;
@@ -587,6 +619,10 @@ QVariantList EngineController::nodes() const {
         row.insert("statusDetail",connection==QStringLiteral("未连接")&&!m_tests.testing(id)&&!measured.isEmpty()&&!measured.value("success").toBool()
             ?NodeTestService::failureStatusText(measured):nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
+        row.insert("testPending",m_tests.testing(id));
+        row.insert("exitLatency",!m_tests.testing(id)&&measured.value("success").toBool()?measured.value("latency").toLongLong():qint64(-1));
+        row.insert("probeStatusText",m_tests.testing(id)?QStringLiteral("检测中"):measured.isEmpty()?QStringLiteral("—"):
+            measured.value("success").toBool()?QString::number(measured.value("latency").toLongLong())+QStringLiteral(" ms"):NodeTestService::failureStatusText(measured));
         // Never substitute a connection-state RTT for an HTTP node-probe measurement.
         row.insert("latency",QStringLiteral("—"));
         if(!measured.isEmpty()){
@@ -861,6 +897,10 @@ bool EngineController::nodeProbeReady(){
 }
 void EngineController::testAllNodes(const QUrl &url) { if(!nodeProbeReady())return;const auto options=nodeProbeOptions();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
 void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),ids,url); }
+bool EngineController::testNodesIfStale(const QStringList &ids,const QUrl &url) {
+    if(ids.isEmpty()||m_tests.busy()||m_tests.hasFreshResults(ids,url)||!nodeProbeReady())return false;
+    m_tests.start(nodeProbeOptions(),ids,url);return true;
+}
 void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
@@ -941,32 +981,49 @@ void EngineController::setSystemProxy(bool enabled) {
     auto *timer=new QTimer(socket);timer->setSingleShot(true);timer->start(1500);
     connect(socket,&QTcpSocket::connected,this,[this,socket,timer,s,generation] {
         if(generation!=m_proxyCheckGeneration){socket->deleteLater();return;}
-        timer->stop();m_proxyCheckSocket=nullptr;socket->deleteLater();
+        socket->disconnect(this);socket->abort();timer->start(12000);
+        const quint64 tag=(quint64(1)<<63)|generation;
+        connect(m_engine.get(),&ProxyEngine::probeRequestRejected,socket,[this,generation,tag](quint64 rejected,const QString &code){
+            if(generation==m_proxyCheckGeneration&&rejected==tag)
+                failSystemProxyRequest(QStringLiteral("出口验证未能启动，未修改 Windows 系统代理：")+code);
+        });
+        connect(m_engine.get(),&ProxyEngine::statusChanged,socket,[this,socket,timer,s,generation,tag]{
+        if(generation!=m_proxyCheckGeneration)return;
         const auto now=m_engine->status();
-        if(!m_proxyRequested){m_proxyChecking=false;return;}
+        if(!m_proxyRequested)return;
         const auto error=systemProxySessionError(now);
-        if(!error.isEmpty()||now.processId!=s.processId||now.proxyPort!=s.proxyPort){
+        if(!error.isEmpty()||now.processId!=s.processId||now.proxyPort!=s.proxyPort||now.sessionId!=s.sessionId||
+           now.configurationReceipt.value("generation")!=s.configurationReceipt.value("generation")){
             failSystemProxyRequest(error.isEmpty()?QStringLiteral("内核会话已变化，未使用旧端口检查结果接管系统代理。"):error);return;
+        }
+        if(now.probeRequestTag!=tag||now.nodeBusy||now.requestState==ProxyEngine::RequestState::InProgress||now.requestState==ProxyEngine::RequestState::NotTested)return;
+        timer->stop();m_proxyCheckSocket=nullptr;socket->disconnect();socket->deleteLater();
+        if(now.requestState!=ProxyEngine::RequestState::Succeeded){
+            failSystemProxyRequest(QStringLiteral("真实 HTTPS 出口验证失败，未修改 Windows 系统代理：")+now.nodeMessage);return;
         }
         const auto port=m_captureProxyPort>0?m_captureProxyPort:s.proxyPort;
         // The capture relay is also a Swirl-owned loopback endpoint. Do
         // not rediscover it as an external proxy after the core stops.
         m_imports.rememberOwnedProxyPort(port);
-        m_proxyEnableRequest=m_systemProxy.requestEnable(port,s.processId,[this,s,generation,port] {
+        m_proxyEnableRequest=m_systemProxy.requestEnable(port,s.processId,[this,s,generation,port,tag] {
             const auto current=m_engine->status();
             return !m_shuttingDown&&m_proxyRequested&&generation==m_proxyCheckGeneration&&
-                current.processId==s.processId&&current.proxyPort==s.proxyPort&&
+                current.processId==s.processId&&current.proxyPort==s.proxyPort&&current.sessionId==s.sessionId&&
+                current.configurationReceipt.value("generation")==s.configurationReceipt.value("generation")&&
+                current.probeRequestTag==tag&&current.requestState==ProxyEngine::RequestState::Succeeded&&
                 port==(m_captureProxyPort>0?m_captureProxyPort:current.proxyPort)&&systemProxySessionError(current).isEmpty();
         });
         if(!m_proxyEnableRequest){
             failSystemProxyRequest(m_systemProxy.error().isEmpty()?QStringLiteral("系统代理接管失败，已停止本次开启。"):m_systemProxy.error());return;
         }
         emit statusChanged();
+        });
+        m_engine->probeNodeTagged(m_proxyProbeUrl,tag);
     });
     const auto failed=[this,socket,timer,generation] {
         if(generation!=m_proxyCheckGeneration||!m_proxyChecking||m_proxyCheckSocket!=socket)return;
         timer->stop();socket->deleteLater();m_proxyCheckSocket=nullptr;
-        failSystemProxyRequest(QStringLiteral("本机代理端口未监听，未修改 Windows 系统代理。"));
+        failSystemProxyRequest(QStringLiteral("本机代理或真实出口验证超时，未修改 Windows 系统代理。"));
     };
     connect(timer,&QTimer::timeout,this,failed);
     connect(socket,&QTcpSocket::errorOccurred,this,[failed](QAbstractSocket::SocketError){failed();});
@@ -1333,17 +1390,22 @@ void EngineController::refreshLanAddresses(){
     // GetAdaptersAddresses was running inside a QML text binding on every
     // status tick, including while its LAN dialog was closed (profiled ~9ms).
     if(m_lanScanPending||m_shuttingDown)return;m_lanScanPending=true;
-    auto promise=std::make_shared<QPromise<QList<QNetworkInterface>>>();
-    auto *watcher=new QFutureWatcher<QList<QNetworkInterface>>(this);
-    connect(watcher,&QFutureWatcher<QList<QNetworkInterface>>::finished,this,[this,watcher]{
-        m_interfaces=watcher->result();watcher->deleteLater();m_lanScanPending=false;
+    using Scan=QPair<QList<QNetworkInterface>,QByteArray>;
+    auto promise=std::make_shared<QPromise<Scan>>();
+    auto *watcher=new QFutureWatcher<Scan>(this);
+    connect(watcher,&QFutureWatcher<Scan>::finished,this,[this,watcher]{
+        const auto scan=watcher->result();m_interfaces=scan.first;watcher->deleteLater();m_lanScanPending=false;
+        if(!scan.second.isEmpty()){
+            if(!m_networkIdentity.isEmpty()&&m_networkIdentity!=scan.second)m_tests.invalidateResults();
+            m_networkIdentity=scan.second;
+        }
         QStringList addresses;for(const auto &iface:m_interfaces)for(const auto &entry:iface.addressEntries()){const auto address=entry.ip();if(address.protocol()==QAbstractSocket::IPv4Protocol&&!address.isLoopback()&&!address.isNull())addresses.append(address.toString());}
         m_lanAddresses=addresses;emit lanAddressesChanged();
         emit interfacesChanged();
     });
     watcher->setFuture(promise->future());
     QThreadPool::globalInstance()->start([promise]{
-        promise->start();promise->addResult(QNetworkInterface::allInterfaces());promise->finish();
+        promise->start();const auto interfaces=QNetworkInterface::allInterfaces();promise->addResult(Scan{interfaces,networkIdentity(interfaces)});promise->finish();
     });
 }
 bool EngineController::lanSupported() const {

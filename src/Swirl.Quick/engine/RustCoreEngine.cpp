@@ -65,6 +65,9 @@ const QStringList &privateSubnets(){
 }
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
  const auto error=SwirlRustDns::configuration(o.dnsConfig,output);if(!error.isEmpty())return error;
+ if(o.internalProbePhysicalEgress&&output->value("servers").toArray().isEmpty()){
+  const auto secure=SwirlRustDns::requireEncrypted(output);if(!secure.isEmpty())return secure;
+ }
 #ifdef SWIRL_PRIVATE_UI_QUOTA
  if(o.privateUiDnsTrust)return o.privateUiDnsTrust->apply(output);
 #endif
@@ -398,8 +401,10 @@ QString RustCoreEngine::configurationV2(const EngineStartOptions &options,const 
  auto base=options;base.policyDocument={};base.routingMode="global";base.directSession=true;base.smartRouting=false;base.tunEnabled=false;
  base.customGroups.clear();base.customRules.clear();QJsonObject config;
  const auto baseError=configuration(base,&config);if(!baseError.isEmpty())return baseError;
- if(options.tunEnabled&&config.value("dns").toObject().value("tls_servers").toArray().isEmpty())
-  return QStringLiteral("原生 TUN 需要加密 DNS。请先在 DNS 页面填写 DoH 或 DoT，并保存端点所需的精确 IP 映射。");
+ if(options.tunEnabled){
+  auto dns=config.value("dns").toObject();const auto error=SwirlRustDns::requireEncrypted(&dns);
+  if(!error.isEmpty())return error;config["dns"]=dns;
+ }
  QJsonArray nodes;QJsonObject sources;
  auto ordered=referenced.values();std::sort(ordered.begin(),ordered.end());
  for(const auto &id:ordered){
@@ -700,6 +705,7 @@ void RustCoreEngine::configurationCommand(const QJsonObject &input){
  }
  const auto result=call(request);
  if(result.value("ok").toBool()){
+  if(op=="activate_configuration_v2"||op=="rollback_configuration_v2")resetProbeState();
   if(op=="prepare_configuration_v2"){
    m_previousPolicy=m_options.policyDocument;m_preparedPolicy=request.value("candidate").toObject().value("policy").toObject();m_configurationRollback=false;
   }else if(op=="rollback_configuration_v2")m_configurationRollback=true;
@@ -891,6 +897,10 @@ void RustCoreEngine::setRoutingMode(const QString &mode){
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","RoutingFailed",result["error"].toString());emit statusChanged();return;}
  m_options=options;m_status.mode=mode;m_status.directSession=options.directSession||mode=="direct";refresh();
 }
+void RustCoreEngine::probeNodeTagged(const QUrl &url,quint64 tag){
+ if(!m_status.apiHealthy||m_status.nodeBusy){emit probeRequestRejected(tag,m_status.nodeBusy?QStringLiteral("probe-busy"):QStringLiteral("core-unavailable"));return;}
+ m_status.probeRequestTag=tag;probeNode(url);
+}
 void RustCoreEngine::probeNode(const QUrl &url){
  if(!m_handle||m_probeRequestId)return;
  const auto text=url.toString(QUrl::FullyEncoded);
@@ -923,7 +933,7 @@ bool RustCoreEngine::probeNodes(const QStringList &ids,const QUrl &url,QString *
  // One bounded concurrent sweep inside the already-running core. Nothing is
  // selected and no per-node engine is created.
  const auto response=call({{"op","probe_nodes"},{"handle",qint64(m_handle)},{"nodes",nodes},
-   {"url",text},{"timeout_ms",5000},{"concurrency",16}});
+   {"url",text},{"timeout_ms",8000},{"concurrency",32},{"physical_egress",m_options.internalProbePhysicalEgress}});
  if(!response.value("ok").toBool()){
   if(error)*error=response.value("error").toString("ProbeNodesFailed");return false;
  }

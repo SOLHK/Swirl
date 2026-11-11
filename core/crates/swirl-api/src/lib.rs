@@ -85,6 +85,8 @@ enum Command {
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
         concurrency: Option<u32>,
+        #[serde(default)]
+        physical_egress: bool,
     },
     ProbeNodesStatus {
         handle: u64,
@@ -269,14 +271,25 @@ impl Controller {
                 timeout_ms,
                 expected_status,
                 concurrency,
+                physical_egress,
             } => {
                 let sweep = if let Some(core) = self.cores_v2.get(&handle) {
+                    if physical_egress {
+                        return Err("ProbePhysicalWorkerRequired");
+                    }
                     core.probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
                 } else {
                     self.cores
                         .get(&handle)
                         .ok_or("UnknownHandle")?
-                        .probe_nodes(nodes, url, timeout_ms, expected_status, concurrency)?
+                        .probe_nodes_with_egress(
+                            nodes,
+                            url,
+                            timeout_ms,
+                            expected_status,
+                            concurrency,
+                            physical_egress,
+                        )?
                 };
                 Ok(json!({"ok":true,"sweep":sweep}))
             }

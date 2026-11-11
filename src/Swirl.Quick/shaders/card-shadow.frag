@@ -12,6 +12,7 @@ layout(std140,binding=0) uniform buf {
     vec2 shadowOffset;
     float softness;
     vec4 shadowColor;
+    float floatingShadow;
 };
 float distanceToSurface(vec2 p) { return swirlSurfaceDistance(p, surfaceSize, cornerRadius); }
 void main() {
@@ -23,5 +24,7 @@ void main() {
     // There is no rectangular shadow patch in the card's cut-out corners.
     float bottom=smoothstep(surfaceSize.y*0.5-softness,surfaceSize.y*0.5+softness,p.y);
     float side=1.0-smoothstep(max(0.0,surfaceSize.x*0.5-cornerRadius),surfaceSize.x*0.5,abs(p.x));
-    fragColor=shadowColor*(exp(-0.5*d*d)*outside*bottom*side*qt_Opacity);
+    float falloff=exp(-0.5*d*d)*(1.0-smoothstep(3.0,4.0,d));
+    float contour=mix(bottom*side,1.0,floatingShadow);
+    fragColor=shadowColor*(falloff*outside*contour*qt_Opacity);
 }

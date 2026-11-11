@@ -232,43 +232,8 @@ Item {
             visible:weave.cardItems.length===0
         }
     }
-    // Each card reveals the same travelling bodies above its fill and below
-    // its content. The shared scene clock never covers labels or hit targets.
-    Repeater {
-        model:weave.cardItems
-        delegate:Item {
-            id:cardEntry
-            required property var modelData
-            required property int index
-            Accessible.ignored:true
-            Item {
-                objectName:"cloudKnotCardFlight-"+cardEntry.index
-                parent:cardEntry.modelData.decorationLayer
-                anchors.fill:parent
-                visible:weave.visible && weave.freeFlight
-                opacity:weave.opacity*weave.releaseOpacity
-                enabled:false;Accessible.ignored:true
-                Item {
-                    id:cardGeometry
-                    width:weave.frontLayer.width;height:weave.frontLayer.height
-                    readonly property matrix4x4 sceneTransform:{
-                        weave.geometryRevision;cardEntry.modelData.lift;
-                        return weave.layerTransform(weave.frontLayer,cardEntry.modelData.decorationLayer);
-                    }
-                    transform:Matrix4x4 {matrix:cardGeometry.sceneTransform}
-                    Repeater {
-                        model:weave.materials
-                        delegate:FeatherBody {
-                            required property var modelData
-                            material:modelData
-                            objectName:"cloudFeatherCard-"+cardEntry.index+"-"+modelData.key
-                            z:modelData.index
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Travelling feathers are drawn once in the window background. Card fills
+    // occlude that continuous scene naturally; no clipped foreground copies.
     // Local copies change only depth where completed feather bodies cross.
     // They share the complete outlines; no independent stroke ends are created.
     Repeater {

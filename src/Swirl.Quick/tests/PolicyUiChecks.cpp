@@ -4,6 +4,7 @@
 #include "PolicySystemProxyBackend.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
+#include "app/NodeViewModel.h"
 #include <QColor>
 #include <QCryptographicHash>
 #include <QDir>
@@ -124,6 +125,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     ControlledNetwork net;if(!check(net.start(),QStringLiteral("Controlled real proxy peers and HTTP origin start")))return finish();
     const QString defaultDomain=QStringLiteral("default.policy.fixture.invalid"),serviceDomain=QStringLiteral("service.policy.fixture.invalid"),childDomain="sub."+serviceDomain;net.a.aliases={defaultDomain,serviceDomain,childDomain};net.b.aliases=net.a.aliases;
     auto defaultUrl=net.url();defaultUrl.setHost(defaultDomain);auto serviceUrl=net.url();serviceUrl.setHost(serviceDomain);auto childUrl=net.url();childUrl.setHost(childDomain);
+    controller->m_proxyProbeUrl=defaultUrl;
     check(controller->saveNode({{"name","Policy fixture A"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.a.serverPort()}}),QStringLiteral("Setup stores isolated node A"));
     check(controller->saveNode({{"name","Policy fixture B"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}}),QStringLiteral("Setup stores isolated authenticated node B"));
     const auto nodes=controller->nodes();if(!check(nodes.size()==2,QStringLiteral("Exactly two isolated nodes exist")))return finish();const auto nodeA=nodes[0].toMap().value("id").toString(),nodeB=nodes[1].toMap().value("id").toString();
@@ -187,6 +189,46 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!awaitSaved(QStringLiteral("Default node A is durably saved through real input")))return finish();
     check(controller->defaultPolicy().value("id")=="policy:default"&&controller->defaultPolicy().value("target").toMap().value("id")==nodeA,QStringLiteral("Permanent default policy holds stable identity and selected node"));
     targetPresentation("defaultPolicyTargetText","defaultPolicySource",nodeA,QStringLiteral("Default routing shows the configured node and its real configuration source"));
+    {
+        controller->tests()->invalidateResults();
+        const auto saved=controller->defaultPolicy();const auto revision=controller->savedRevision();
+        click("defaultPolicyTarget");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()
+            &&controller->tests()->result(nodeA).value("success").toBool()
+            &&controller->tests()->result(nodeB).value("success").toBool();},12000),
+            QStringLiteral("Opening the exit picker automatically completes real authenticated proxy requests for every candidate"));
+        for(const auto &id:{nodeA,nodeB}){
+            auto *row=item("policyNode-"+id);auto *label=row?find(row,"policyNodeLatency"):nullptr;
+            const auto latency=controller->tests()->result(id).value("latency").toLongLong();
+            check(label&&label->property("text").toString()==QString::number(latency)+" ms"&&latency>=0,
+                QStringLiteral("Each visible exit row displays its own complete request latency"));
+        }
+        auto *list=item("policyTargetList");
+        auto *model=list?qobject_cast<NodeViewModel *>(list->property("model").value<QObject *>()):nullptr;
+        click("policySortLatency");
+        check(model&&model->rowCount()==2&&model->get(0).value("exitLatency").toLongLong()<=model->get(1).value("exitLatency").toLongLong(),
+            QStringLiteral("Exit latency sorting orders actual measured results"));
+        click("policyAvailableOnly");
+        check(model&&model->rowCount()==2&&model->get(0).value("testAvailable").toBool()&&model->get(1).value("testAvailable").toBool(),
+            QStringLiteral("Available-only filtering retains only successful authenticated candidates"));
+        click("policySortName");
+        check(model&&model->get(0).value("name")=="Policy fixture A"&&model->get(1).value("name")=="Policy fixture B",
+            QStringLiteral("Name sorting remains available after live measurements"));
+        auto *dialog=popup("policyTargetPicker");
+        QQmlExpression selected(dialog?qmlContext(dialog):nullptr,dialog,"selectedTarget.id===currentTarget.id");
+        check(dialog&&selected.evaluate().toBool()&&!selected.hasError()&&controller->defaultPolicy()==saved
+            &&controller->savedRevision()==revision,
+            QStringLiteral("Measurement, filtering and reordering preserve the selected exit and saved policy"));
+        const auto measured=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        click("policyRetest");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()
+            &&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>measured
+            &&controller->tests()->succeeded()==2;},12000),QStringLiteral("Manual retry obtains fresh real request results"));
+        capture("automatic-exit-latencies");
+        click("policyAvailableOnly");click("cancelPolicyTarget");
+        check(QTest::qWaitFor([&]{return !popup("policyTargetPicker")&&!controller->tests()->busy();},3000),
+            QStringLiteral("Closing the exit picker retires its probe ownership"));
+    }
     {
         const auto priorSize=window->size();const auto priorPolicy=controller->defaultPolicy();const auto priorRevision=controller->savedRevision();
         window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(150);

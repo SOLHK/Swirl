@@ -137,14 +137,23 @@ void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVarian
  if(status.apiHealthy&&status.processAlive&&result.value("phase")!="timeout")m_idle.enqueue(runner);else retire(runner);
  record(id,result);QTimer::singleShot(0,this,&NodeTestService::next);
 }
-void NodeTestService::record(const QString &id,QVariantMap row){
+void NodeTestService::record(const QString &id,QVariantMap row,bool notify){
  row["nodeReference"]=nodeReference(id);
  row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");
  row["resolverPolicy"]=m_options.dnsConfig.isEmpty()?QStringLiteral("isolated_default_dns"):QStringLiteral("isolated_configured_dns");
  row["egressPolicy"]=m_options.internalProbePhysicalEgress?QStringLiteral("isolated_physical_egress"):QStringLiteral("system_routes");
- row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;
+ row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);++m_completed;
+ row["measuredAtMs"]=QDateTime::currentMSecsSinceEpoch();row["probeUrl"]=m_url.toString();m_results[id]=row;
  if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",QStringLiteral("节点 #%1 · %2 · %3 · %4").arg(row.value("nodeReference").toString(),row.value("phase").toString(),row.value("failureCode").toString(),row.value("error").toString()));}
- m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();
+ m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);if(notify)emit changed();
+}
+bool NodeTestService::hasFreshResults(const QStringList &ids,const QUrl &url) const{
+ if(ids.isEmpty())return false;
+ const auto now=QDateTime::currentMSecsSinceEpoch();
+ for(const auto &id:ids){const auto row=result(id);const auto age=now-row.value("measuredAtMs").toLongLong();
+  if(row.isEmpty()||row.value("probeUrl").toString()!=url.toString()||age<0||age>30000)return false;
+ }
+ return true;
 }
 void NodeTestService::retire(ProxyEngine *runner){
  runner->setProperty("probeNodeId",QString());runner->findChild<QTimer *>("probeDeadline")->stop();
@@ -182,6 +191,7 @@ bool NodeTestService::tryBatch(){
  m_batchRunner=createWorker();
  m_batchSwept.clear();for(const auto &id:valid)m_batchSwept.insert(id);
  m_batchRecorded.clear();
+ m_batchRequestId=0;
  connect(m_batchRunner,&ProxyEngine::statusChanged,this,&NodeTestService::batchStatusChanged);
  auto opts=m_options;opts.selectedNodeId=valid.first();opts.probeAllNodes=true;
  m_batchAwaitingStart=true;
@@ -224,15 +234,27 @@ void NodeTestService::pollBatch(){
   m_batchAwaitingStart=false;
   m_message=QStringLiteral("并行测速中 · %1 个节点").arg(ids.size());emit changed();
  }
- const auto sweep=m_batchRunner->probeNodesStatus().value("sweep").toObject();
- if(sweep.isEmpty())return;
+ const auto status=m_batchRunner->status();
+ if(status.state==ProxyEngine::State::Failed||status.state==ProxyEngine::State::Stopped){failBatch("ProbeCoreStopped");return;}
+ // Eight seconds per bounded wave, plus startup and cancellation headroom.
+ // The one-second UI goal is never a node failure deadline.
+ if(m_batchStartClock.elapsed()>20000+((m_batchSwept.size()+31)/32)*8000){failBatch("ProbeDeadlineExceeded");return;}
+ const auto response=m_batchRunner->probeNodesStatus();
+ if(response.value("pending").toBool())return;
+ if(!response.value("ok").toBool()){failBatch(response.value("error").toString("ProbeStatusFailed"));return;}
+ const auto sweep=response.value("sweep").toObject();
+ const auto requestId=sweep.value("request_id").toInteger();
+ if(requestId<=0||(m_batchRequestId&&m_batchRequestId!=requestId)){failBatch("ProbeStateInvalid");return;}
+ m_batchRequestId=requestId;
  const auto rows=sweep.value("rows").toArray();
+ bool changedRows=false;
  for(const auto &value:rows){
   const auto row=value.toObject();
   const auto id=row.value("node").toString();
-  if(id.isEmpty()||m_batchRecorded.contains(id))continue;
+  if(!m_batchSwept.contains(id)||m_batchRecorded.contains(id))continue;
   const auto state=row.value("state").toString();
   if(state=="running")continue;
+  if(state!="ok"&&state!="failed"){failBatch("ProbeStateInvalid");return;}
   m_batchRecorded.insert(id);
   const bool ok=state=="ok";
   QVariantMap result;
@@ -243,13 +265,26 @@ void NodeTestService::pollBatch(){
   result["failureCode"]=ok?QString():row.value("failure_code").toString();
   result["error"]=ok?QString():row.value("failure_code").toString();
   result["outboundConnectMs"]=row.value("outbound_connect_ms").toInteger(-1);
-  result["originTlsMs"]=qint64(-1);
-  record(id,result);
+  result["originTlsMs"]=row.value("origin_tls_ms").toInteger(-1);
+  result["outboundTiming"]=row.value("outbound_timing").toObject().toVariantMap();
+  record(id,result,false);changedRows=true;
  }
+ if(changedRows)emit changed();
  if(sweep.value("done").toBool()){
+  if(m_batchRecorded.size()!=m_batchSwept.size()){failBatch("ProbeStateInvalid");return;}
   endBatch();
   next();
  }
+}
+
+void NodeTestService::failBatch(const QString &code){
+ const auto pending=m_batchSwept;
+ for(const auto &id:pending)if(!m_batchRecorded.contains(id)){
+  m_batchRecorded.insert(id);
+  record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","probe_status"},{"failureCode",code},{"error",code}},false);
+ }
+ if(m_batchRunner)m_batchRunner->cancelProbeNodes();
+ endBatch();next();
 }
 
 void NodeTestService::batchFallback(const QString &reason,const QString &detail){
@@ -276,6 +311,6 @@ void NodeTestService::invalidateResults(){
  const bool hadWork=busy()||!m_results.isEmpty();
  if(!hadWork)return;
  cancel();m_results.clear();m_completed=0;m_total=0;m_succeeded=0;m_failed=0;
- m_message=QStringLiteral("节点库已更新，旧测试结果已清除；请对当前参数重新发起请求。");
+ m_message=QStringLiteral("网络或节点配置已变化，旧测试结果已清除；请重新检测。");
  emit changed();
 }

@@ -6,7 +6,7 @@
 #include <QSet>
 #include <QTimer>
 
-// At most three isolated Rust workers are reused within a batch. FFI and
+// One bounded Rust sweep, or at most three isolated compatibility workers. FFI and
 // lifecycle work run off the UI thread; no probe changes the live session.
 class NodeTestService final : public QObject {
  Q_OBJECT
@@ -35,7 +35,8 @@ public:
  QString message() const { return m_message; }
  QVariantMap results() const { return m_results; }
  QVariantMap result(const QString &id) const { return m_results.value(id).toMap(); }
- bool testing(const QString &id) const { return m_running.contains(id)||m_queue.contains(id); }
+ bool hasFreshResults(const QStringList &ids,const QUrl &url) const;
+ bool testing(const QString &id) const { return m_running.contains(id)||m_queue.contains(id)||(m_batchSwept.contains(id)&&!m_batchRecorded.contains(id)); }
 signals:
  void changed();
  void diagnostic(const QString &code,const QString &message);
@@ -44,7 +45,7 @@ private:
  ProxyEngine *createWorker();
  void retire(ProxyEngine *runner);
  void finish(const QString &,ProxyEngine *,const QVariantMap &);
- void record(const QString &,QVariantMap);
+ void record(const QString &,QVariantMap,bool notify=true);
  // One concurrent sweep inside a single engine replaces the former engine per
  // node when the engine supports it. The isolated path remains the fallback.
  bool tryBatch();
@@ -53,6 +54,7 @@ private:
  void endBatch();
  // Latch the per-node fallback and return the unrecorded batch rows to the queue.
  void batchFallback(const QString &reason,const QString &detail);
+ void failBatch(const QString &code);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
@@ -70,6 +72,7 @@ private:
  // batch start re-queues its nodes into the same batch forever.
  bool m_batchDisabled=false;
  QElapsedTimer m_batchStartClock;
+ qint64 m_batchRequestId=0;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;
  QString m_message;
 };

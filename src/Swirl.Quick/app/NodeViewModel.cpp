@@ -96,8 +96,9 @@ bool NodeViewModel::lessThan(const QModelIndex &left,const QModelIndex &right) c
     const auto &a=m_rows.rows[left.row()],&b=m_rows.rows[right.row()];
     const auto key=m_filters.value("sort","name").toString();
     if(m_filters.value("group")==QStringLiteral("recent")&&a.value("recentIndex")!=b.value("recentIndex"))return a.value("recentIndex").toInt()<b.value("recentIndex").toInt();
-    if(key=="latency"){
+    if(key=="latency"||key=="exitLatency"){
         bool av=false,bv=false;const int x=a.value(key).toString().toInt(&av),y=b.value(key).toString().toInt(&bv);
+        av=av&&x>=0;bv=bv&&y>=0;
         if(av!=bv)return sortOrder()==Qt::AscendingOrder?av:!av;
         if(av&&x!=y)return x<y;
     }else{const int order=QString::localeAwareCompare(a.value(key).toString(),b.value(key).toString());if(order)return order<0;}

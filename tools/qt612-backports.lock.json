@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "qt_version": "6.12.0",
+  "compiler": "GNU 15.1.0",
+  "sources": {
+    "qtbase": "025bdad181de241e81bf853c8a2d7bf3d19261a9",
+    "qtdeclarative": "4332fbbb4c340463dc8cee36dda0c85d932122d8"
+  },
+  "patches": [
+    {
+      "path": "tools/patches/CVE-2026-116337-qtbase-6.12-0002.diff",
+      "sha256": "83abc89d507dbd9a94dc5718b0125492c1c37b0609a8f404a1f164925940faec",
+      "upstream_commit": "aac1d303c0329241ac59c0c23cb5e4b82251fcfa",
+      "module": "qtbase"
+    },
+    {
+      "path": "tools/patches/CVE-2026-116337-qtbase-6.12-0001.diff",
+      "sha256": "74c5028985dcc0455255909de4dc80f50cf5472dbf465ce46ebc791a7b080f12",
+      "upstream_commit": "f78a3740281d26af7116517a2b20df36f8deffd7",
+      "module": "qtbase"
+    },
+    {
+      "path": "tools/patches/qt612-qv4-sweep-8c92fe0.patch",
+      "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac",
+      "upstream_commit": "8c92fe01338c76885f412a68fd39238147e21a81",
+      "module": "qtdeclarative"
+    }
+  ],
+  "source_bundle": {
+    "filename": "Swirl-Qt-6.12.0-Backports-Corresponding-Source.zip",
+    "bytes": 152115787,
+    "sha256": "70c25a0f033df625b858bf03e7a093751d8787f97707286de27c1a3a4ac8f139"
+  },
+  "kit_files": {
+    "bin/Qt6Core.dll": "6adc4c9cfdf7a5bc56b35750c990c32473f697776fccc30ff3c08910f1514961",
+    "bin/Qt6Gui.dll": "e13833669112a9b3f7409c8f232838daf8f8cae546e979f43b0377e315eeab29",
+    "bin/Qt6Network.dll": "a4bb9f138b4d6f53aa14328344c3db3468a894505d5b6a16ba69e6528062b8dd",
+    "bin/Qt6Qml.dll": "ff3a8c2fa954e40021e992f124bbb7df85d8d0153d97694fc3e220c74a43f081",
+    "bin/Qt6Quick.dll": "4adff86be8f43814828cc88589c6cdb1f476a7b8b149656f0d62eb9d8fe305bc",
+    "lib/libQt6Network.a": "e6a64fd47425002d780b63eaf4ac074e49a6473bd8a38ca616a52725f2f9e3fe",
+    "lib/libQt6Qml.a": "865fd41e6a1cbbecb93adec548bdc827fce44e99427df4900b361300095d4c28",
+    "qml/builtins.qmltypes": "156e5981000f67e9521aa38bc05cc2cc2ff10f7c7205e54907855b94ae0a83c1",
+    "include/QtNetwork/6.12.0/QtNetwork/private/qhttpnetworkreply_p.h": "dec97dd6f9753e1bd45717e0a11056fb84deae55fb739c99fb73084939c87d47",
+    "bin/qtpaths.exe": "aecf9d09f315cfcc641a34b7c06098309fba183fc4b4c8c056c4d7fd871aceae",
+    "bin/windeployqt.exe": "a84756cbb59931dc1232f9bbb0d5367197c3308b6cf02ee65095494053833f8c",
+    "plugins/platforms/qwindows.dll": "fe1a2405d400664d53faaa8eb1575db4630ea08a9b529ad0efd482f14c9d58f6"
+  }
+}

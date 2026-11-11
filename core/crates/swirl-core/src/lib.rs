@@ -502,6 +502,18 @@ impl Core {
         expected_status: Option<u16>,
         concurrency: Option<u32>,
     ) -> Result<batch_probe::BatchSnapshot> {
+        self.probe_nodes_with_egress(nodes, url, timeout_ms, expected_status, concurrency, false)
+    }
+
+    pub fn probe_nodes_with_egress(
+        &self,
+        nodes: Vec<String>,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+        concurrency: Option<u32>,
+        physical_egress: bool,
+    ) -> Result<batch_probe::BatchSnapshot> {
         if self.runtime.is_none() {
             return Err("CoreStopped");
         }
@@ -518,6 +530,15 @@ impl Core {
         };
         options.target()?;
         let plan = self.plan.read().map_err(|_| "ConfigState")?.clone();
+        if physical_egress
+            && (!plan.config.listen.ip().is_loopback()
+                || plan.config.listen.port() != 0
+                || !plan.config.rules.is_empty()
+                || !plan.config.selectors.is_empty()
+                || plan.config.smart_routing)
+        {
+            return Err("ProbePhysicalWorkerRequired");
+        }
         let mut targets = std::collections::BTreeMap::new();
         for id in &nodes {
             if let Some(node) = plan.config.nodes.iter().find(|node| &node.id == id)
@@ -532,6 +553,8 @@ impl Core {
         let inputs = batch_probe::BatchInputs {
             targets,
             resolver: plan.resolver.clone(),
+            physical_egress,
+            expected_status,
         };
         self.batch_probe.start(
             inputs,

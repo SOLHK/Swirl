@@ -1273,6 +1273,8 @@ impl Core {
         let inputs = super::batch_probe::BatchInputs {
             targets,
             resolver: plan.prepared_resolver(),
+            physical_egress: false,
+            expected_status,
         };
         self.batch_probe.start(
             inputs,

@@ -31,6 +31,8 @@ const DEFAULT_CONCURRENCY: usize = 16;
 pub(super) struct BatchInputs {
     pub targets: BTreeMap<String, (Outbound, Option<Transport>)>,
     pub resolver: Arc<Resolver>,
+    pub physical_egress: bool,
+    pub expected_status: Option<u16>,
 }
 
 /// Validate one sweep request without touching any network state.
@@ -69,6 +71,8 @@ pub struct BatchRow {
     /// Time to response headers, the value the UI shows as latency.
     pub latency_ms: Option<u64>,
     pub outbound_connect_ms: Option<u64>,
+    pub origin_tls_ms: Option<u64>,
+    pub outbound_timing: Option<swirl_protocol::ConnectTimings>,
     pub http_status: Option<u16>,
     pub failure_code: Option<&'static str>,
     pub failure_stage: Option<&'static str>,
@@ -186,6 +190,8 @@ impl BatchProbeRuntime {
                 state: BatchState::Running,
                 latency_ms: None,
                 outbound_connect_ms: None,
+                origin_tls_ms: None,
+                outbound_timing: None,
                 http_status: None,
                 failure_code: None,
                 failure_stage: None,
@@ -204,7 +210,33 @@ impl BatchProbeRuntime {
         let active = ActiveProbe(self.in_flight.clone());
         slot.task = Some(self.runtime.spawn(async move {
             let _active = active;
-            drive(shared_slot, generation, inputs, nodes, options, concurrency).await;
+            if inputs.physical_egress {
+                let run = drive(
+                    shared_slot.clone(),
+                    generation,
+                    inputs,
+                    nodes,
+                    options,
+                    concurrency,
+                );
+                if let Err(error) = swirl_transport::egress::with_physical_probe(run).await
+                    && let Ok(mut slot) = shared_slot.lock()
+                    && slot.generation == generation
+                {
+                    let code = match error.kind() {
+                        std::io::ErrorKind::AlreadyExists => "ProbeEgressNetworkConflict",
+                        std::io::ErrorKind::Unsupported => "ProbeEgressUnsupported",
+                        _ => "ProbeEgressUnavailable",
+                    };
+                    for row in &mut slot.rows {
+                        *row = finish_failure(row.node.clone(), code, "outbound_connect");
+                    }
+                    slot.done = true;
+                    slot.task = None;
+                }
+            } else {
+                drive(shared_slot, generation, inputs, nodes, options, concurrency).await;
+            }
         }));
         drop(slot);
         self.snapshot()
@@ -227,10 +259,12 @@ async fn drive(
             let Some(id) = pending.next() else { break };
             let inputs = inputs.clone();
             let options = options.clone();
-            set.spawn(async move {
-                let row = probe_one(inputs, id.clone(), options).await;
-                (id, row)
-            });
+            set.spawn(swirl_transport::egress::inherit_physical_probe_scope(
+                async move {
+                    let row = probe_one(inputs, id.clone(), options).await;
+                    (id, row)
+                },
+            ));
             running += 1;
         }
         if running == 0 {
@@ -281,10 +315,7 @@ async fn probe_one(inputs: Arc<BatchInputs>, id: String, options: HealthProbe) -
     let Some((outbound, transport)) = inputs.targets.get(&id) else {
         return finish_failure(id, "ProbeNodeUnknown", "input");
     };
-    // Match probe_start's unset-expected path: a latency sweep accepts any 2xx
-    // instead of pinning the policy editor's default 204. The HealthProbe value
-    // stays for display only.
-    let expected = None;
+    let expected = inputs.expected_status;
     let outcome: Result<UrlTestMetrics, UrlTestFailure> = match transport {
         Some(transport) => {
             swirl_protocol::url_test_head_with_transport(
@@ -304,6 +335,8 @@ async fn probe_one(inputs: Arc<BatchInputs>, id: String, options: HealthProbe) -
             state: BatchState::Ok,
             latency_ms: Some(metrics.response_headers_ms),
             outbound_connect_ms: Some(metrics.outbound_connect_ms),
+            origin_tls_ms: metrics.origin_tls_ms,
+            outbound_timing: metrics.outbound_timing,
             http_status: Some(metrics.http_status),
             failure_code: None,
             failure_stage: None,
@@ -336,6 +369,8 @@ fn row_from_failure(node: String, error: &UrlTestFailure) -> BatchRow {
             .as_ref()
             .and_then(|timing| timing.tcp_connected_attempt_us)
             .map(|micros| micros / 1000),
+        origin_tls_ms: None,
+        outbound_timing: error.outbound_timing.as_deref().copied(),
         http_status: error.http_status,
         failure_code: Some(error.code),
         failure_stage: Some(stage_name(error.stage)),
@@ -348,6 +383,8 @@ fn finish_failure(node: String, code: &'static str, stage: &'static str) -> Batc
         state: BatchState::Failed,
         latency_ms: None,
         outbound_connect_ms: None,
+        origin_tls_ms: None,
+        outbound_timing: None,
         http_status: None,
         failure_code: Some(code),
         failure_stage: Some(stage),
