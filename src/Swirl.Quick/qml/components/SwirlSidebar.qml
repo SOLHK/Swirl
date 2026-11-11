@@ -10,6 +10,7 @@ Item {
  property int geometryRevision:0
  property var entries:({})
  property Item backdropSource:null
+ property bool previewProfile:false
  readonly property Item glassSurface:floatingBackground
  readonly property bool glassSampled:liquidGlass.sampled
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
@@ -86,7 +87,7 @@ Item {
  SwirlText {
   objectName:"engineIdentityLabel"
   x:Theme.dp(26);y:Theme.dp(62);width:sidebar.width-Theme.dp(52)
-  text:engineController.engineIdentityLabel
+  text:sidebar.previewProfile?qsTr("独立预览 · v%1").arg(Qt.application.version):engineController.engineIdentityLabel
   visible:sidebar.expansion>0.6;opacity:Math.max(0,(sidebar.expansion-0.6)/0.4)
   color:Theme.muted;font.pixelSize:Theme.fontSize(11)
   elide:Text.ElideRight

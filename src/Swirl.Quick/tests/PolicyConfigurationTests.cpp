@@ -33,6 +33,7 @@ public:
     quint64 generation=1;
     bool rejectPrepare=false,rejectValidate=false,rejectFinishOnce=false,rolledBack=false,gate=false;
     bool probeSucceeds=true;
+    QString probeFailureCode;
     bool rejectTunStart=false,holdTunStart=false,degradeTunStart=false,rejectStop=false;
     int activations=0,starts=0,stops=0;
     std::function<void()> beforeActivate,beforeRollback,beforeFinish;
@@ -64,8 +65,8 @@ public:
         QTimer::singleShot(0,this,[this,tag]{
             current.probeRequestTag=tag;current.nodeBusy=false;
             current.requestState=probeSucceeds?RequestState::Succeeded:RequestState::Failed;
-            current.nodeHealth=probeSucceeds?NodeHealth::Available:NodeHealth::Unknown;
-            current.nodeMessage=probeSucceeds?QString():QString("Controlled origin TLS failure");emit statusChanged();
+            current.nodeHealth=probeSucceeds?NodeHealth::Available:probeFailureCode.isEmpty()?NodeHealth::Unknown:NodeHealth::Unavailable;
+            current.nodeMessage=probeSucceeds?QString():probeFailureCode.isEmpty()?QString("Controlled origin TLS failure"):probeFailureCode;emit statusChanged();
         });
     }
     Status status() const override {return current;}
@@ -217,6 +218,46 @@ private slots:
     }
 #ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
     // The pinned controller predates these APIs; its six stop cases stay intact.
+    void versionAndWorkingDirectoryChangesKeepSavedSubscriptionAndExit(){
+        QTemporaryDir dir;const auto path=dir.filePath("retained.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        const auto version=QCoreApplication::applicationVersion(),cwd=QDir::currentPath();
+        const auto restore=qScopeGuard([&]{QCoreApplication::setApplicationVersion(version);QDir::setCurrent(cwd);});
+        QCoreApplication::setApplicationVersion("0.2.42");QJsonObject saved;QByteArray encrypted;
+        {
+            EngineController first(std::make_unique<RustCoreEngine>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+            first.imports()->shutdown();QVERIFY(first.selectSubscription(pool.a));QTRY_VERIFY(!first.policyBusy());
+            QVERIFY(first.chooseNode(pool.otherA));QTRY_VERIFY(!first.policyBusy());QVERIFY(first.policyError().isEmpty());
+            saved=first.m_store.networkConfiguration();encrypted=bytes(path);
+        }
+        QCoreApplication::setApplicationVersion("0.2.43");QVERIFY(QDir().mkpath(dir.filePath("new-install")));QVERIFY(QDir::setCurrent(dir.filePath("new-install")));
+        auto peer=std::make_unique<RustCoreEngine>();auto *runtime=peer.get();
+        EngineController next(std::move(peer),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());next.imports()->shutdown();
+        QCOMPARE(next.activeSubscriptionId(),pool.a);QCOMPARE(next.selectedNodeId(),pool.otherA);QCOMPARE(next.m_store.nodes().size(),4);
+        QCOMPARE(next.m_store.networkConfiguration(),saved);QCOMPARE(bytes(path),encrypted);
+        QJsonObject config;QVERIFY(RustCoreEngine::configurationV2(next.m_options,next.m_policyDocument,&config).isEmpty());
+        QSignalSpy response(runtime,&ProxyEngine::configurationCommandFinished);
+        runtime->configurationCommand({{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"candidate",config}});
+        QTRY_COMPARE(response.size(),1);const auto result=response.first().at(1).value<QJsonObject>();QVERIFY(result.value("ok").toBool());
+        QCOMPARE(result.value("plan_digest"),next.m_store.configurationReceipt().value("plan_digest"));QVERIFY(!next.processAlive());
+    }
+    void copiedExistingProfileRevalidatesOffline(){
+        const auto input=qEnvironmentVariable("SWIRL_TEST_EXISTING_STORE");if(input.isEmpty())QSKIP("Optional owner-provided encrypted store audit");
+        QTemporaryDir dir;const auto path=dir.filePath("copy.dpapi");QVERIFY(QFile::copy(input,path));const auto before=bytes(path);
+        auto peer=std::make_unique<RustCoreEngine>();auto *runtime=peer.get();
+        EngineController controller(std::move(peer),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());controller.imports()->shutdown();
+        QVERIFY(controller.policyV2Active());QVERIFY(controller.m_store.error().isEmpty());QVERIFY(!controller.availableNodes().isEmpty());
+        // Match the original product's rules resource path. An explicit fixture
+        // store otherwise intentionally disables production routing resources.
+        const auto rules=QDir::fromNativeSeparators(qEnvironmentVariable("SWIRL_TEST_EXISTING_RULES"));
+        QVERIFY(QDir::isAbsolutePath(rules)&&QDir(rules).exists());controller.m_options.rulesDirectory=rules;
+        QJsonObject config;QVERIFY(RustCoreEngine::configurationV2(controller.m_options,controller.m_policyDocument,&config).isEmpty());
+        QSignalSpy response(runtime,&ProxyEngine::configurationCommandFinished);
+        runtime->configurationCommand({{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"candidate",config}});
+        QTRY_COMPARE(response.size(),1);const auto result=response.first().at(1).value<QJsonObject>();QVERIFY(result.value("ok").toBool());
+        QCOMPARE(result.value("plan_digest"),controller.m_store.configurationReceipt().value("plan_digest"));
+        QCOMPARE(bytes(path),before);QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxy()->owned());
+        qInfo()<<"OFFLINE_SAVED_PROFILE_AUDIT"<<"scoped_nodes"<<controller.availableNodes().size()<<"digest_matches"<<true<<"file_unchanged"<<true;
+    }
     void subscriptionCanBeChosenBeforeOpeningOrConfirmingPolicy(){
         QTemporaryDir dir;const auto path=dir.filePath("source-first.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         {
@@ -1013,6 +1054,17 @@ private slots:
         QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxyBusy());QCOMPARE(engine->stops,1);
         QCOMPARE(released.size(),0);QCOMPARE(proxy->memory.disableCalls,0);QCOMPARE(proxy->memory.enableCalls,0);
         QVERIFY(proxy->memory.current().systemEnabled);
+    }
+    void failedNodeReportsItsTlsReasonAndCanBeRetriedWithoutReimport(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *runtime=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tls-retry.dpapi"),false,std::move(backend));
+        controller.m_options.proxyPort=listener.serverPort();QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        runtime->probeSucceeds=false;runtime->probeFailureCode="TlsCertificateUnknownIssuer";controller.setSystemProxy(true);
+        QTRY_VERIFY(!controller.proxyRequested()&&!controller.processAlive());
+        QVERIFY(controller.routingError().contains("TlsCertificateUnknownIssuer"));QVERIFY(!controller.routingError().contains(QStringLiteral("端口尚未健康")));QCOMPARE(proxy->enableCalls,0);
+        runtime->probeSucceeds=true;controller.setSystemProxy(true);QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->enableCalls,1);
     }
     void unavailableListenerRollsBackTheMasterIntentAndStopsTheCore(){
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();reserved.close();

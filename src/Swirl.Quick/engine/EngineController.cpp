@@ -951,8 +951,9 @@ void EngineController::cancelSystemProxyCheck() {
     if(m_proxyCheckSocket){auto *socket=m_proxyCheckSocket.data();m_proxyCheckSocket=nullptr;socket->disconnect(this);socket->abort();socket->deleteLater();}
 }
 QString EngineController::systemProxySessionError(const ProxyEngine::Status &status) const {
-    if(status.state!=ProxyEngine::State::Running||!status.processAlive||!status.apiHealthy||status.proxyPort<1||
-       status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)
+    // A failed outbound is not a dead listener. Keep this check structural so
+    // the tagged probe can report its actual DNS/TLS failure (and be retried).
+    if(status.state!=ProxyEngine::State::Running||!status.processAlive||!status.apiHealthy||status.proxyPort<1)
         return QStringLiteral("内核与代理端口尚未健康，未接管系统代理。");
     if(m_store.configurationV2()){
         const auto saved=m_store.configurationReceipt(),actual=status.configurationReceipt;
@@ -1037,7 +1038,7 @@ void EngineController::setSystemProxy(bool enabled) {
             return !m_shuttingDown&&m_proxyRequested&&generation==m_proxyCheckGeneration&&
                 current.processId==s.processId&&current.proxyPort==s.proxyPort&&current.sessionId==s.sessionId&&
                 current.configurationReceipt.value("generation")==s.configurationReceipt.value("generation")&&
-                current.probeRequestTag==tag&&current.requestState==ProxyEngine::RequestState::Succeeded&&
+                current.probeRequestTag==tag&&current.requestState==ProxyEngine::RequestState::Succeeded&&current.nodeHealth!=ProxyEngine::NodeHealth::Unavailable&&
                 port==(m_captureProxyPort>0?m_captureProxyPort:current.proxyPort)&&systemProxySessionError(current).isEmpty();
         });
         if(!m_proxyEnableRequest){

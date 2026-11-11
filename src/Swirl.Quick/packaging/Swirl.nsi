@@ -244,7 +244,7 @@ Section "安装 Swirl"
     Goto ready_to_copy
     blocked:
     IfSilent installation_failed
-    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先退出 Swirl，再点击重试。安装程序会覆盖更新，保留您的配置和数据。" IDRETRY check_running IDCANCEL installation_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先完全退出 Swirl，再点击重试。支持托盘的版本请在右下角图标菜单选择「退出 Swirl」。安装程序会覆盖更新，保留您的配置和数据。" IDRETRY check_running IDCANCEL installation_failed
     ready_to_copy:
     !insertmacro PreparePackageMaintenance
     !insertmacro MaintainPackage Upgrade '-PrepareOnly -PreviousManifest "$PLUGINSDIR\previous-package-manifest.json"' installation_failed
@@ -292,7 +292,7 @@ Section "Uninstall"
     Goto uninstall_gui_stopped
     uninstall_running:
     IfSilent uninstall_failed
-    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先退出 Swirl 并等待网络恢复，再点击重试。" IDRETRY uninstall_check_running IDCANCEL uninstall_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先完全退出 Swirl 并等待网络恢复，再点击重试。支持托盘的版本请在右下角图标菜单选择「退出 Swirl」。" IDRETRY uninstall_check_running IDCANCEL uninstall_failed
     uninstall_gui_stopped:
     !insertmacro PreparePackageMaintenance
     !insertmacro RequireNativeTunRecovery uninstall_failed

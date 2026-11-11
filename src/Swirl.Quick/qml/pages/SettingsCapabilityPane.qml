@@ -24,9 +24,9 @@ ColumnLayout {
             {name: qsTr("SOCKS 端口"), detail: qsTr("与 HTTP 共用本地监听。"), kind: "socks"},
             {name: qsTr("API 端口"), detail: qsTr("Rust Core 通过进程内接口通信。"), kind: "api"},
             {name: qsTr("端口冲突提醒"), detail: qsTr("独立提醒选项尚未接入；启动失败会保留真实错误。"), kind: "toggle"}]},
-        "系统集成": {summary: qsTr("系统代理接管由活动页管理。以下桌面集成选项尚未接入。"), rows: [
-            {name: qsTr("显示托盘图标"), detail: qsTr("尚未提供托盘开关。"), kind: "toggle"},
-            {name: qsTr("关闭窗口后保留托盘"), detail: qsTr("尚未提供后台驻留选项。"), kind: "toggle"},
+        "系统集成": {summary: qsTr("关闭窗口后继续在系统托盘运行，通过托盘菜单退出。"), rows: [
+            {name: qsTr("显示托盘图标"), detail: qsTr("运行时显示在 Windows 右下角通知区域。"), kind: "toggle", builtIn:true},
+            {name: qsTr("关闭窗口后保留托盘"), detail: qsTr("点击 × 隐藏窗口，托盘菜单中的“退出 Swirl”才结束程序。"), kind: "toggle", builtIn:true},
             {name: qsTr("桌面通知"), detail: qsTr("尚未接入 Windows 桌面通知。"), kind: "toggle"}]},
         "启动": {summary: qsTr("当前不提供开机自启或启动窗口偏好。以下选项不会更改 Windows 启动项。"), rows: [
             {name: qsTr("开机启动"), detail: qsTr("尚未接入 Windows 启动项。"), kind: "toggle"},

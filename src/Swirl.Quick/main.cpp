@@ -1,9 +1,10 @@
-#include <QGuiApplication>
+#include <QApplication>
 #include "engine/RustCoreSelfTest.h"
 #include "network/TlsRuntimeSelfTest.h"
 #include "app/SingleInstance.h"
 #include "app/NativeTunRecovery.h"
 #include "app/ShutdownCoordinator.h"
+#include "app/TrayController.h"
 #include "app/FontManager.h"
 #include "app/StoragePaths.h"
 #include "app/FontRendering.h"
@@ -117,12 +118,12 @@
 #include "engine/EngineController.h"
 
 #ifdef SWIRL_UI_TESTS
-class SwirlTestApplication final : public QGuiApplication {
+class SwirlTestApplication final : public QApplication {
 public:
-    using QGuiApplication::QGuiApplication;
+    using QApplication::QApplication;
     bool notify(QObject *receiver,QEvent *event) override {
         ActivityPerfTrace::DispatchScope dispatch(int(event->type()));
-        return QGuiApplication::notify(receiver,event);
+        return QApplication::notify(receiver,event);
     }
 };
 #endif
@@ -540,7 +541,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     SwirlTestApplication app(argc, argv);
 #else
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 #endif
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
@@ -707,15 +708,18 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedNodes(xrayUiTest?SwirlPaths::testRoot()+QStringLiteral("/xray-ui-nodes-XXXXXX")
                                         :QDir::tempPath()+QStringLiteral("/Swirl-XXXXXX"));
     if(isolatedRun&&!realAcceptance&&!isolatedNodes.isValid())return 2;
+    const bool persistentPreview=interactivePreview&&app.arguments().contains("--preview-preserve-settings");
+    const auto isolatedProfile=persistentPreview?SwirlPaths::persistentPreviewDirectory():isolatedNodes.path();
+    const auto nodeStorePath=realAcceptance?runtimeStore:isolatedRun?isolatedProfile+"/nodes.dpapi":QString();
     auto runtimeEngine=std::make_unique<ThreadedEngine>();
 #ifdef SWIRL_UI_TESTS
     // Native node/policy acceptance uses the actual controller and listener,
     // with only host system-proxy I/O replaced by an owned in-memory adapter.
     std::unique_ptr<SystemProxySession::Backend> policyProxyBackend;
     if(policyTest||nodeTest||controlledNodeSession)policyProxyBackend=std::make_unique<PolicySystemProxyBackend>();
-    EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance,std::move(policyProxyBackend));
+    EngineController engineController(std::move(runtimeEngine),nullptr,nodeStorePath,realAcceptance,std::move(policyProxyBackend));
 #else
-    EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
+    EngineController engineController(std::move(runtimeEngine),nullptr,nodeStorePath,realAcceptance);
 #endif
 #ifdef SWIRL_PRIVATE_UI_QUOTA
     if(controlledNodeSession&&controlledSession.uiImportPolicy){
@@ -724,9 +728,9 @@ int main(int argc, char *argv[])
     }else
 #endif
     if(controlledNodeSession)engineController.imports()->shutdown();
-    ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
-    GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
-    DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());
+    ExtensionService extensions(&engineController,isolatedRun?isolatedProfile+"/extensions.dpapi":QString());
+    GatewayService gateway(&engineController,isolatedRun?isolatedProfile+"/gateway.json":QString());
+    DiagnosticService diagnostics(isolatedRun?isolatedProfile+"/diagnostics":QString());
     diagnostics.installQtHandler();
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
@@ -862,6 +866,7 @@ int main(int argc, char *argv[])
     }
 #endif
     if(rootWindow){
+        rootWindow->setProperty("previewProfile",interactivePreview);
         // Keep animated and antialiased damage inside this HWND. The native
         // outer shadow remains in its own window.
         rootWindow->contentItem()->setClip(true);
@@ -904,15 +909,19 @@ int main(int argc, char *argv[])
     }
     if(rootWindow)rootWindow->show();
     std::unique_ptr<ShutdownCoordinator> shutdown;
+    std::unique_ptr<TrayController> tray;
     if(rootWindow && (lifecycleTest || (!isolatedRun && !appearanceTest))) {
         app.setQuitOnLastWindowClosed(false);
         shutdown=std::make_unique<ShutdownCoordinator>(rootWindow,[&]{
+            if(tray)tray->beginExit();
             QMetaObject::invokeMethod(rootWindow,"persistExitDrafts");
             engineController.shutdown();extensions.shutdown();capture.stop();gateway.shutdown();
             QSettings().sync();
-        },[&]{return engineController.processAlive()||engineController.busy()||engineController.systemProxyBusy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();});
+        },[&]{return engineController.processAlive()||engineController.busy()||engineController.systemProxyBusy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();},[&]{return tray&&tray->hideWindows();});
+        if(!lifecycleTest)tray=std::make_unique<TrayController>(rootWindow,icon,[&]{shutdown->request();});
         instance.activate=[&]{
             if(shutdown->started())return;
+            if(tray){tray->restore();return;}
             const auto states=rootWindow->windowStates();
             if(states.testFlag(Qt::WindowMinimized))
                 rootWindow->setWindowStates(states & ~Qt::WindowMinimized);

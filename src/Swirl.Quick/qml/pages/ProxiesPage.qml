@@ -136,7 +136,7 @@ Item {
                     sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
                     rowActionsWidth:Theme.dp(88)
                     latencyCell:Component {Item {
-                        NodeLatencyButton {anchors.verticalCenter:parent.verticalCenter;width:parent.width;record:parent.parent.record;onClicked:engineController.testSelectedNode(record.id,testUrl.text.trim())}
+                        NodeLatencyButton {anchors.verticalCenter:parent.verticalCenter;width:Math.min(parent.width,implicitWidth);record:parent.parent.record;onClicked:engineController.testSelectedNode(record.id,testUrl.text.trim())}
                     }}
                     rowActions:Component {
                         NodeRowActions {

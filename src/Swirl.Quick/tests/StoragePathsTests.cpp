@@ -1,5 +1,6 @@
 #include "../app/StoragePaths.h"
 #include <QCoreApplication>
+#include <QFile>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSettings>
@@ -12,6 +13,12 @@ int main(int argc, char **argv) {
     app.setOrganizationName("SwirlStorageTests");
     app.setApplicationName("SwirlStorageTests");
     const auto arguments = app.arguments();
+    if(arguments.contains("--preview-profile")){
+        QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();
+        app.setApplicationVersion("next-version");SwirlPaths::initializeQmlCache("next-revision","release");
+        QFile file(SwirlPaths::persistentPreviewDirectory()+"/retained.dat");
+        return file.open(QIODevice::ReadOnly)&&file.readAll()=="retained-subscription-fixture"?0:5;
+    }
     if (arguments.contains("--probe")) {
         QStandardPaths::setTestModeEnabled(true);
         SwirlPaths::initializeTestStorage();
@@ -52,6 +59,15 @@ int main(int argc, char **argv) {
           "test mode without an explicit root keeps existing Qt behavior");
     qputenv("SWIRL_TEST_ROOT", root.toUtf8());
     SwirlPaths::initializeTestStorage();
+    const auto previewProfile=SwirlPaths::persistentPreviewDirectory();
+    check(previewProfile.startsWith(root+"/data/")&&!previewProfile.startsWith(root+"/tmp/"),"preserved preview data is outside the disposable directory");
+    {
+        QFile fixture(previewProfile+"/retained.dat");
+        const bool opened=fixture.open(QIODevice::WriteOnly);
+        check(opened&&fixture.write("retained-subscription-fixture")==29,"write persistent preview fixture");
+    }
+    QProcess previewRestart;previewRestart.start(QCoreApplication::applicationFilePath(),{"--preview-profile"});
+    check(previewRestart.waitForFinished(5000)&&previewRestart.exitCode()==0,"new process/version/cache revision keeps preview profile");
     for (auto type : {QStandardPaths::AppLocalDataLocation, QStandardPaths::AppDataLocation,
                       QStandardPaths::AppConfigLocation, QStandardPaths::GenericConfigLocation,
                       QStandardPaths::GenericDataLocation, QStandardPaths::CacheLocation,

@@ -8,6 +8,7 @@ import "components"
 import "controls"
 import "pages"
 ApplicationWindow {
+    property bool previewProfile:false
     id:window
     readonly property var engineControllerContext: engineController
     readonly property var systemProviderContext: systemProvider
@@ -116,7 +117,7 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource;previewProfile:window.previewProfile }
         SwirlWindowControls {
             id:windowControls;objectName:"windowControls";z:90
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
