@@ -116,6 +116,8 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     Goto ${FailureLabel}
 !macroend
 !macro RequireNativeTunRecovery FailureLabel
+    ; The path-validated isolated installer never owns the host's TUN session.
+    StrCmp $IsolatedInstall "1" native_tun_checked
     ; Query the exact REG_DWORD in the same explicit 32-bit view as the GUI.
     ; A missing marker does not launch anything or request elevation.
     StrCpy $FailurePhase "native-tun-marker-open"
@@ -167,6 +169,13 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     StrCpy $FailureCode $0
     DetailPrint "$1"
     StrCmp $0 "0" 0 ${FailureLabel}
+    ; Restoring host network state requires the user's explicit action.
+    ; A silent upgrade cannot consent on the user's behalf.
+    StrCpy $FailurePhase "native-tun-consent"
+    StrCpy $FailureCode "required"
+    IfSilent ${FailureLabel}
+    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "上次 Swirl TUN 网络恢复尚未确认。继续前需要管理员授权，恢复 Swirl 自己接管的网络设置；发生冲突时会保留恢复记录并停止更新。是否现在恢复？" IDOK +2 IDCANCEL ${FailureLabel}
+    Goto ${FailureLabel}
     ClearErrors
     StrCpy $FailurePhase "native-tun-maintenance"
     StrCpy $FailureCode "unavailable"

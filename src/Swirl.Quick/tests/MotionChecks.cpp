@@ -104,10 +104,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         auto *card=find(cardNames[i]),*flight=find("cloudKnotCardFlight-"+QString::number(i));
         auto *layer=card?card->property("decorationLayer").value<QQuickItem *>():nullptr;
         auto *body=card?activityVisual(card,"activityCardContent"):nullptr;
-        cardLayers=cardLayers&&card&&!flight&&layer&&body&&layer->parentItem()==card
+        cardLayers=cardLayers&&card&&flight&&layer&&body&&flight->parentItem()==layer&&layer->parentItem()==card
             &&behindItem(back,card)&&!layer->isEnabled()&&behindItem(layer,body);
     }
-    check("weave-all-five-cards-occlude-one-window-background-without-clipped-copies",cardLayers);
+    check("weave-all-five-cards-reveal-feathers-below-text-and-controls",cardLayers);
     const QList<QPointF> corners={QPointF(),QPointF(target->width(),0),QPointF(0,target->height()),QPointF(target->width(),target->height())};
     bool sameClip=front->clip()&&front->size()==target->size();
     for(const auto &point:corners)sameClip=sameClip&&QLineF(front->mapToScene(point),target->mapToScene(point)).length()<0.01;
@@ -138,9 +138,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
     bool cardPoses=true;
     for(int i=0;i<cardNames.size();++i)for(const auto &key:keys){
         auto *piece=find("cloudFeather-"+key),*copy=find("cloudFeatherCard-"+QString::number(i)+"-"+key);
-        cardPoses=cardPoses&&piece&&!copy&&piece->parentItem()==back&&piece->acceptedMouseButtons()==Qt::NoButton&&!piece->acceptHoverEvents();
+        cardPoses=cardPoses&&piece&&copy&&piece->parentItem()==back&&piece->acceptedMouseButtons()==Qt::NoButton&&!piece->acceptHoverEvents();
+        if(piece&&copy)for(const auto &point:probes)cardPoses=cardPoses&&QLineF(piece->mapToScene(point),copy->mapToScene(point)).length()<0.01;
     }
-    check("weave-feathers-have-one-background-instance-and-no-card-copies",cardPoses);
+    check("weave-card-views-share-the-exact-background-feather-pose",cardPoses);
     window->update();activityWait(80);
     const QImage withFlight=window->grabWindow();
     QQmlComponent opacityComponent(qmlEngine(window));
@@ -184,7 +185,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
                 const QRect pixels=QRectF(logical.x()*sx,logical.y()*sy,logical.width()*sx,logical.height()*sy).toAlignedRect().intersected(withFlight.rect());
                 const auto a=withFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
                 const auto b=withoutFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
-                const bool textRegion=region->property("text").isValid()&&region->property("color").isValid();
+                // The opaque toolbar protects the complete label rectangle,
+                // including disabled/antialiased glyphs which never equal the
+                // raw ink color. Card labels protect glyphs above their artwork.
+                const bool textRegion=name!="proxyCapsule"&&region->property("text").isValid()&&region->property("color").isValid();
                 const auto ink=region->property("color").value<QColor>().rgba();
                 int changed=0,compared=0;
                 for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x){
@@ -214,7 +218,7 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
                     ++visibleCardPixels;if(card->property("color").value<QColor>().alpha()==255)++opaqueCardPixels;
                 }
         }
-        check("weave-background-remains-visible-outside-opaque-cards",visibleScenePixels>0&&opaqueCardPixels==0);
+        check("weave-flight-remains-visible-on-opaque-card-surfaces",visibleScenePixels>0&&opaqueCardPixels>0);
         samples.append(QJsonObject{{"kind","weave-window-background"},{"changedPixels",visibleScenePixels},{"cardPixels",visibleCardPixels},{"opaqueCardPixels",opaqueCardPixels}});
         if(!output.isEmpty()){
             const auto directory=QFileInfo(output).absolutePath();

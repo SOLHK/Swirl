@@ -277,6 +277,17 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit diagnostic(QStringLiteral("NodeTestService"),code,message);
     });
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
+    connect(m_engine.get(),&ProxyEngine::tunRecoveryFinished,this,[this](bool success,const QString &message){
+        if(!m_tunRecovering)return;
+        m_tunRecovering=false;
+        if(success&&!m_shuttingDown&&m_options.tunEnabled){
+            if(beginTunTransition(false)&&m_tunTransition){m_tunTransition->recovery=true;emit statusChanged();return;}
+            m_routingError=QStringLiteral("网络已恢复，但关闭 TUN 的设置未保存：")+m_routingError;
+            emit statusChanged();emit tunRecoveryFinished(false,m_routingError);return;
+        }
+        m_routingError=success?QString():message;
+        emit statusChanged();emit tunRecoveryFinished(success,message);
+    });
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
         if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
         if(module=="SwirlRust"&&(code=="RoutingUnsupported"||code=="RoutingFailed")){
@@ -525,7 +536,7 @@ QString EngineController::errorCode() const {
 }
 bool EngineController::busy() const {
     const auto state = m_engine->status().state;
-    return m_tunTransition.has_value()||m_startAfterProbes||m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+    return m_tunTransition.has_value()||m_tunRecovering||m_startAfterProbes||m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
         ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
         ||state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
@@ -1402,6 +1413,7 @@ bool EngineController::setTunEnabled(bool enabled) {
     emit statusChanged();return true;
 }
 bool EngineController::beginTunTransition(bool enabled){
+        if(m_engine->status().tunRecoveryRequired){m_routingError=QStringLiteral("上次 TUN 恢复尚未确认，请先使用“恢复网络”完成恢复。");emit statusChanged();return false;}
         auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
         if(enabled==m_options.tunEnabled&&((processAlive()&&tunEnabled()==enabled)||(!processAlive()&&!enabled)))return true;
         QJsonObject runtime;const auto error=RustCoreEngine::configurationV2(candidate,m_policyDocument,&runtime);
@@ -1455,7 +1467,7 @@ void EngineController::advanceTunTransition(){
         const bool proxy=transition.proxyIntent&&!transition.cancelled;
         const auto error=transition.error+(transition.rollback?QStringLiteral("；已恢复原模式。"):QString());finishTunTransition(error);
         if(proxy){m_proxyRequested=true;QTimer::singleShot(0,this,[this,error]{if(m_proxyRequested&&!m_shuttingDown){setSystemProxy(true);if(!error.isEmpty()){m_routingError=error;emit statusChanged();}}});}
-    }else if(current.state==ProxyEngine::State::Failed||current.state==ProxyEngine::State::Degraded||(current.state==ProxyEngine::State::Running&&current.apiHealthy&&current.tunEnabled!=desired)){
+    }else if(current.state==ProxyEngine::State::Failed||current.state==ProxyEngine::State::Degraded||(current.state==ProxyEngine::State::Stopped&&!m_startAfterProbes)||(current.state==ProxyEngine::State::Running&&current.apiHealthy&&current.tunEnabled!=desired)){
         if(transition.rollback){finishTunTransition(transition.error+QStringLiteral("；原模式重新启动失败：")+current.message);return;}
         transition.error=QStringLiteral("TUN 切换未完成：")+current.message;
         transition.rollback=true;transition.phase=TunPhase::StoppingCore;m_engine->stop();
@@ -1478,8 +1490,18 @@ void EngineController::tunPolicyCompleted(bool success,const QString &error){
     QTimer::singleShot(0,this,&EngineController::advanceTunTransition);
 }
 void EngineController::finishTunTransition(const QString &error){
+    const bool recovery=m_tunTransition&&m_tunTransition->recovery;
     const auto message=error;m_tunTransition.reset();m_routingError=message;
     emit optionsChanged();emit statusChanged();
+    if(recovery)emit tunRecoveryFinished(message.isEmpty(),message.isEmpty()?QStringLiteral("Swirl 的网络设置已恢复，TUN 已关闭，可以重新开启系统代理。"):message);
+}
+bool EngineController::recoverTunNetwork(){
+    if(m_shuttingDown||busy()||m_policyBusy||processAlive()||m_systemProxy.owned()||m_systemProxy.busy()){
+        m_routingError=QStringLiteral("请等待当前 Swirl 会话停止，再恢复网络。");emit statusChanged();return false;
+    }
+    if(!tunRecoveryRequired())return false;
+    m_tunRecovering=true;m_routingError.clear();emit statusChanged();
+    m_engine->recoverTunNetwork();return true;
 }
 
 void EngineController::setCaptureProxyPort(int port) {

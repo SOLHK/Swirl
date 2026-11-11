@@ -15,7 +15,7 @@ public:
         m_status.tunCapturePossible=m_status.tunRecoveryRequired;
         if(m_status.tunRecoveryRequired){
             m_status.state=State::Failed;m_status.error=Error::OwnershipFailed;
-            m_status.message=QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+            m_status.message=QStringLiteral("上次 TUN 网络恢复尚未确认。请点击“恢复网络”，授权恢复 Swirl 的网络设置后再连接。");
         }
         m_context=new QObject;
         m_context->moveToThread(&m_thread);
@@ -46,6 +46,9 @@ public:
                 const auto epoch=m_workerEpoch;
                 QMetaObject::invokeMethod(this,[this,requestId,response,epoch]{if(epoch==m_epoch)emit configurationCommandFinished(requestId,response);},Qt::QueuedConnection);
             });
+            connect(m_engine,&ProxyEngine::tunRecoveryFinished,m_context,[this](bool success,const QString &message){
+                QMetaObject::invokeMethod(this,[this,success,message]{emit tunRecoveryFinished(success,message);},Qt::QueuedConnection);
+            });
             const auto initial=m_engine->status();const auto epoch=m_workerEpoch;
             QMetaObject::invokeMethod(this,[this,initial,epoch]{if(epoch==m_epoch){m_status=initial;emit statusChanged();}},Qt::QueuedConnection);
         });
@@ -73,6 +76,10 @@ public:
             QMetaObject::invokeMethod(this,[this,status,epoch]{if(epoch==m_epoch){m_status=status;emit statusChanged();}},Qt::QueuedConnection);},Qt::QueuedConnection);
     }
     void refresh() override {post([](auto *engine){engine->refresh();});}
+    void recoverTunNetwork() override {
+        const auto epoch=++m_epoch;
+        QMetaObject::invokeMethod(m_context,[this,epoch]{m_workerEpoch=epoch;m_engine->recoverTunNetwork();},Qt::QueuedConnection);
+    }
     void selectNode(const QString &id) override {post([this,id](auto *engine){m_workerProbeTag=0;engine->selectNode(id);});}
     void probeNode(const QUrl &url) override {probeNodeTagged(url,0);}
     void probeNodeTagged(const QUrl &url,quint64 tag) override {

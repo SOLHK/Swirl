@@ -2,6 +2,7 @@
 #include "engine/RustCoreEngine.h"
 #include "PolicySystemProxyBackend.h"
 #include "ControlledNetwork.h"
+#include "IsolatedUserRegistry.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
@@ -34,14 +35,15 @@ public:
     bool rejectPrepare=false,rejectValidate=false,rejectFinishOnce=false,rolledBack=false,gate=false;
     bool probeSucceeds=true;
     QString probeFailureCode;
-    bool rejectTunStart=false,holdTunStart=false,degradeTunStart=false,rejectStop=false;
-    int activations=0,starts=0,stops=0;
+    bool rejectTunStart=false,holdTunStart=false,degradeTunStart=false,rejectStop=false,stopTunStart=false,recoverySucceeds=true;
+    int activations=0,starts=0,stops=0,recoveries=0;
     std::function<void()> beforeActivate,beforeRollback,beforeFinish;
     static QString digest(const QJsonObject &candidate) {
         return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(candidate).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
     }
     void start(const EngineStartOptions &options) override {
         ++starts;current.processId=QCoreApplication::applicationPid();
+        if(options.tunEnabled&&stopTunStart){current.state=State::Stopped;current.processAlive=false;current.message="Controlled start declined";emit statusChanged();return;}
         if(options.tunEnabled&&(rejectTunStart||holdTunStart||degradeTunStart)){
             current.state=holdTunStart?State::Starting:degradeTunStart?State::Degraded:State::Failed;current.processAlive=degradeTunStart;current.apiHealthy=false;
             current.message="Controlled administrator denial";current.tunEnabled=false;emit statusChanged();return;
@@ -56,6 +58,13 @@ public:
     }
     void stop() override {++stops;if(rejectStop){current.state=State::Degraded;current.apiHealthy=false;current.message="Controlled stop unconfirmed";emit statusChanged();return;}current.state=State::Stopped;current.processAlive=false;current.apiHealthy=false;current.tunEnabled=false;current.tunCapturePossible=false;current.configurationReceipt={};gate=false;emit statusChanged();}
     void refresh() override {}
+    void recoverTunNetwork() override {
+        ++recoveries;
+        QTimer::singleShot(0,this,[this]{
+            if(recoverySucceeds){current={};emit statusChanged();}
+            emit tunRecoveryFinished(recoverySucceeds,recoverySucceeds?QStringLiteral("Controlled recovery confirmed"):QStringLiteral("Controlled recovery unconfirmed"));
+        });
+    }
     void selectNode(const QString &) override {QFAIL("V2 coordinator used legacy selection");}
     void probeNode(const QUrl &) override {}
     void probeNodeTagged(const QUrl &,quint64 tag) override {
@@ -438,6 +447,36 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&!controller.policyBusy(),8000);
         QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());QVERIFY(!controller.proxyRequested());
         QCOMPARE(engine->starts,1);QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+    }
+    void stoppedTunStartupDoesNotRemainInTransition(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-declined.dpapi"));
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        engine->stopTunStart=true;QVERIFY(controller.beginTunTransition(true));
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&!controller.policyBusy(),5000);
+        QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());
+        QVERIFY(controller.routingError().contains("Controlled start declined"));
+    }
+    void explicitTunRecoveryKeepsUnconfirmedStateAndClosesFailedSavedPreference(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-recover.dpapi"),false,std::move(backend));
+        auto options=controller.m_options;options.tunEnabled=true;
+        QVERIFY(controller.applyPolicyConfiguration(document(),options));QTRY_VERIFY(!controller.policyBusy());
+        const auto revision=controller.savedRevision();
+        engine->current.state=ProxyEngine::State::Failed;engine->current.tunRecoveryRequired=true;engine->current.tunCapturePossible=true;
+        emit engine->statusChanged();QVERIFY(controller.tunRecoveryRequired());
+        QVERIFY(!controller.beginTunTransition(true));QVERIFY(!controller.tunBusy());
+        QCOMPARE(engine->starts,0);QCOMPARE(engine->stops,0);QCOMPARE(engine->recoveries,0);
+        QSignalSpy completed(&controller,&EngineController::tunRecoveryFinished);
+        engine->recoverySucceeds=false;QVERIFY(controller.recoverTunNetwork());QVERIFY(controller.tunRecoveryBusy());
+        QTRY_COMPARE(completed.size(),1);QVERIFY(!completed.first().first().toBool());
+        QVERIFY(controller.tunRecoveryRequired());QVERIFY(controller.tunRequested());QCOMPARE(controller.savedRevision(),revision);
+        engine->recoverySucceeds=true;QVERIFY(controller.recoverTunNetwork());
+        QTRY_COMPARE_WITH_TIMEOUT(completed.size(),2,5000);QVERIFY(completed.last().first().toBool());
+        QVERIFY(!controller.tunRecoveryRequired());QVERIFY(!controller.tunRecoveryBusy());QVERIFY(!controller.tunRequested());
+        QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+        QCOMPARE(engine->starts,0);QCOMPARE(proxy->enableCalls,0);QCOMPARE(engine->recoveries,2);
     }
     void probeEgressUsesActualCaptureOwnershipInsteadOfTheSavedPreference(){
         QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
@@ -1214,5 +1253,11 @@ private slots:
         QTest::qWait(80);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(finished.size(),1);
     }
 };
-QTEST_GUILESS_MAIN(PolicyConfigurationTests)
+int main(int argc,char **argv){
+    IsolatedUserRegistry registry;
+    if(!registry.initialize())return 64;
+    QCoreApplication app(argc,argv);
+    PolicyConfigurationTests tests;
+    return QTest::qExec(&tests,argc,argv);
+}
 #include "PolicyConfigurationTests.moc"

@@ -9,7 +9,7 @@ ColumnLayout {
     required property var settingsPage
     readonly property string section: settingsPage.section
     readonly property var definitions: ({
-        "TUN": {summary: qsTr("可在系统代理运行时直接开启 TUN；首次启动将请求管理员授权。"), rows: [
+        "TUN": {summary: qsTr("可在系统代理运行时开启 TUN；开启前确认管理员授权，切换期间连接可能短暂中断。"), rows: [
             {name: qsTr("TUN 入口"), detail: qsTr("开关独立控制 TUN；关闭后恢复 Swirl 接管的网卡、路由和 DNS。"), kind: "toggle", runtime: "tun"},
             {name: qsTr("网卡选择"), detail: qsTr("由 Swirl 创建和管理独立虚拟网卡。"), kind: "choice", values: ["Swirl Native TUN"]},
             {name: qsTr("路由排除"), detail: qsTr("尚未提供系统路由排除设置。"), kind: "toggle"},
@@ -58,6 +58,13 @@ ColumnLayout {
     SwirlText { Layout.fillWidth: true; text: pane.configuration.summary; color: Theme.muted; font.pixelSize: Theme.fontSize(13); wrapMode: Text.Wrap }
     SettingsRowPane {
         Layout.fillWidth: true
+        visible: pane.section === "TUN" && engineController.tunRecoveryRequired
+        title: qsTr("上次 TUN 网络需要恢复")
+        description: qsTr("恢复 Swirl 接管的网络设置并关闭 TUN，保留订阅和出口选择。")
+        SwirlButton { text: engineController.tunRecoveryBusy ? qsTr("恢复中") : qsTr("恢复 TUN 网络"); enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy; onClicked: AppState.requestTunEnabled(true) }
+    }
+    SettingsRowPane {
+        Layout.fillWidth: true
         visible: pane.section === "DNS"
         title: qsTr("已保存的解析配置")
         description: [engineController.dnsConfiguration.mode === 2 ? qsTr("自定义服务器") : engineController.dnsConfiguration.mode === 1 ? qsTr("系统与额外服务器") : qsTr("系统 DNS"), qsTr("本地映射 %1 条").arg((engineController.dnsConfiguration.hosts || []).length)].join("　")
@@ -76,10 +83,10 @@ ColumnLayout {
             description: modelData.detail
             SwirlToggle {
                 visible: setting.modelData.kind === "toggle"
-                enabled: setting.modelData.runtime === "tun" && engineController.tunSupported && !engineController.processAlive && !engineController.policyBusy
+                enabled: setting.modelData.runtime === "tun" && engineController.tunSupported && !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryRequired && !engineController.tunRecoveryBusy
                 checked: setting.modelData.runtime === "tun" ? engineController.tunEnabled : setting.modelData.builtIn === true
                 onToggled: {
-                    if (!engineController.setTunEnabled(checked)) AppState.notice(engineController.routingError || engineController.policyError)
+                    AppState.requestTunEnabled(checked)
                     checked = Qt.binding(function() { return engineController.tunEnabled })
                 }
                 Accessible.name: setting.modelData.name

@@ -149,15 +149,12 @@ ApplicationWindow {
                 SwirlStatusCapsule {
                     id: tunCapsule; objectName: "tunCapsule"
                     Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
-                    label: engineController.tunBusy ? qsTr("TUN · 切换中") : engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 待启用") : qsTr("TUN · 未开启")
+                    label: engineController.tunRecoveryBusy ? qsTr("TUN · 恢复中") : engineController.tunRecoveryRequired ? qsTr("TUN · 需恢复") : engineController.tunBusy ? qsTr("TUN · 切换中") : engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 待启用") : qsTr("TUN · 未开启")
                     detail: engineController.routingError || (engineController.tunEnabled
-                        ? qsTr("TUN 模式已开启，点击关闭；系统代理保持原选择。") : engineController.tunSupported ? qsTr("点击开启 TUN，首次启动将请求管理员授权。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
+                        ? qsTr("TUN 模式已开启，点击关闭；系统代理保持原选择。") : engineController.tunSupported ? qsTr("点击查看 TUN 管理员授权说明。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
                     tone: engineController.tunEnabled ? "success" : "neutral"
-                    enabled: !engineController.busy
-                    onClicked: {
-                        if (!engineController.setTunEnabled(!engineController.tunEnabled))
-                            AppState.notice(engineController.routingError || engineController.networkConfigurationError)
-                    }
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: AppState.requestTunEnabled(engineController.tunRecoveryRequired || !engineController.tunEnabled)
                 }
                 OutboundModeControl {
                     id: outboundModeControl
@@ -253,6 +250,51 @@ ApplicationWindow {
     function persistExitDrafts(){
         const loader=pageLoader.pages["dns"]
         if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
+    }
+    Connections {
+        target: AppState
+        function onTunAuthorizationRequested(recovery) {
+            tunAuthorization.recovery = recovery
+            tunAuthorization.open()
+        }
+    }
+    Connections {
+        target: engineController
+        function onTunRecoveryFinished(success, message) { AppState.notice(message) }
+    }
+    SwirlDialog {
+        id: tunAuthorization
+        objectName: "tunAuthorizationDialog"
+        ownerItem: window.contentItem
+        property bool recovery: false
+        title: recovery ? qsTr("恢复 TUN 网络") : qsTr("开启 TUN 模式")
+        guardChanges: false
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(16)
+            SwirlText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: tunAuthorization.recovery
+                    ? qsTr("继续后将请求 Windows 管理员授权，恢复 Swirl 接管的网卡、路由和 DNS，并关闭已保存的 TUN 开关。订阅和出口选择会保留；无法确认的资源会保留恢复记录并报告原因。")
+                    : qsTr("TUN 会使用虚拟网卡接管流量。继续后 Windows 将请求管理员授权；切换期间连接可能短暂中断，授权失败会尝试恢复原模式。取消此对话会保留当前连接。")
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: Theme.compactGap
+                SwirlButton { objectName: "cancelTunAuthorization"; text: qsTr("取消"); onClicked: tunAuthorization.close() }
+                SwirlButton {
+                    objectName: "confirmTunAuthorization"
+                    text: tunAuthorization.recovery ? qsTr("授权并恢复") : qsTr("授权并开启")
+                    primary: true
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: {
+                        tunAuthorization.close()
+                        const accepted = tunAuthorization.recovery ? engineController.recoverTunNetwork() : engineController.setTunEnabled(true)
+                        if (!accepted) AppState.notice(engineController.routingError || engineController.policyError || engineController.error)
+                    }
+                }
+            }
+        }
     }
     function openRewriteEditor(kind,title){
         rewriteRulesLoader.requestedKind=kind

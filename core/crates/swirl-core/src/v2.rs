@@ -239,6 +239,7 @@ pub(crate) struct Shared {
     notify: Notify,
     waiting: AtomicUsize,
     native_tun_leases: AtomicUsize,
+    native_tun_startup: AtomicBool,
     stopped: AtomicBool,
     sessions: Mutex<BTreeMap<u64, SessionControl>>,
     connection_slots: Arc<Semaphore>,
@@ -293,6 +294,9 @@ impl Shared {
         if self.stopped.load(Ordering::Acquire) {
             return Err("CoreStopped");
         }
+        if self.native_tun_startup.load(Ordering::Acquire) {
+            return Err("TunStartupPending");
+        }
         let id = self.accepted.fetch_add(1, Ordering::Relaxed) + 1;
         let (cancel, cancellation) = watch::channel(false);
         sessions.insert(
@@ -338,6 +342,9 @@ impl Shared {
                 if self.stopped.load(Ordering::Acquire) {
                     return Err("CoreStopped");
                 };
+                if self.native_tun_startup.load(Ordering::Acquire) {
+                    return Err("TunStartupPending");
+                }
                 if !live.closed {
                     return Ok((live.plan.clone(), live.generation));
                 }
@@ -547,11 +554,35 @@ impl Core {
         revision: u64,
         request_id: String,
     ) -> Result<Self> {
+        Self::start_inner(candidate, store_id, revision, request_id, false)
+    }
+
+    /// Bind the local listener without admitting traffic or starting health
+    /// jobs until the native controller has established its first DNS lease.
+    pub fn start_for_native_tun(
+        candidate: RuntimeConfig,
+        store_id: String,
+        revision: u64,
+        request_id: String,
+    ) -> Result<Self> {
+        Self::start_inner(candidate, store_id, revision, request_id, true)
+    }
+
+    fn start_inner(
+        candidate: RuntimeConfig,
+        store_id: String,
+        revision: u64,
+        request_id: String,
+        native_tun_startup: bool,
+    ) -> Result<Self> {
         identity_uuid(&store_id)?;
         identity_uuid(&request_id)?;
         let epoch = random_number()?;
         let prepared = candidate.prepare()?;
         prepared.runtime.policy.validate_start()?;
+        if native_tun_startup {
+            native_flow::validate_tun_dns(&prepared.runtime)?;
+        }
         swirl_transport::egress::check_private_listener(prepared.runtime.listen)
             .map_err(|_| "PrivateQuotaListenerDenied")?;
         let runtime = Builder::new_multi_thread()
@@ -567,7 +598,9 @@ impl Core {
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = prepared.runtime.limits.max_connections;
         let plan = Plan::new(prepared, &runtime, revision, request_id)?;
-        plan.policies.start()?;
+        if !native_tun_startup {
+            plan.policies.start()?;
+        }
         let shared = Arc::new(Shared {
             live: Mutex::new(Live {
                 plan,
@@ -578,6 +611,7 @@ impl Core {
             notify: Notify::new(),
             waiting: AtomicUsize::new(0),
             native_tun_leases: AtomicUsize::new(0),
+            native_tun_startup: AtomicBool::new(native_tun_startup),
             stopped: AtomicBool::new(false),
             sessions: Mutex::new(BTreeMap::new()),
             connection_slots: Arc::new(Semaphore::new(capacity)),
@@ -605,7 +639,7 @@ impl Core {
                             let Ok((socket, peer)) = accepted else { break };
                             let registered = match shared.register() {
                                 Ok(registered) => registered,
-                                Err("ConnectionLimit") => continue,
+                                Err("ConnectionLimit" | "TunStartupPending") => continue,
                                 Err(_) => break,
                             };
                             let shared = shared.clone();
@@ -671,6 +705,26 @@ impl Core {
 
     pub fn prepare_native_tun(&self) -> Result<NativeTunLease> {
         self.flow_dispatcher()?.prepare_native_tun()
+    }
+
+    /// The helper calls this only after native capture is ready. An acquired
+    /// lease keeps encrypted DNS mandatory before any new socket can be made.
+    pub fn finish_native_tun_start(&self) -> Result<()> {
+        let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
+        if !self.shared.native_tun_startup.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        if self.shared.native_tun_leases.load(Ordering::Acquire) == 0 {
+            return Err("TunStartupLeaseRequired");
+        }
+        if self.shared.stopped.load(Ordering::Acquire) {
+            return Err("CoreStopped");
+        }
+        live.plan.policies.start()?;
+        self.shared
+            .native_tun_startup
+            .store(false, Ordering::Release);
+        Ok(())
     }
 
     pub fn lan_start(&mut self, config: crate::lan::LanConfig) -> Result<Value> {
@@ -757,6 +811,9 @@ impl Core {
         candidate: RuntimeConfig,
         revoked_node_ids: Vec<String>,
     ) -> Result<Value> {
+        if self.shared.native_tun_startup.load(Ordering::Acquire) {
+            return Err("TunStartupPending");
+        }
         identity_uuid(&request_id)?;
         if store_id != self.store_id {
             return Err("StoreIdentityMismatch");
@@ -1176,6 +1233,9 @@ impl Core {
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
     ) -> Result<ProbeStatus> {
+        if self.shared.native_tun_startup.load(Ordering::Acquire) {
+            return Err("TunStartupPending");
+        }
         let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
         if live.closed {
             return Err("Reconfiguring");
@@ -1245,6 +1305,9 @@ impl Core {
         expected_status: Option<u16>,
         concurrency: Option<u32>,
     ) -> Result<super::batch_probe::BatchSnapshot> {
+        if self.shared.native_tun_startup.load(Ordering::Acquire) {
+            return Err("TunStartupPending");
+        }
         if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
             return Err("UrlTestExpectedStatus");
         }

@@ -15,6 +15,7 @@ public:
  ~RustCoreEngine() override;
  void start(const EngineStartOptions &) override;
  void stop() override;
+ void recoverTunNetwork() override;
  void refresh() override;
  void selectNode(const QString &) override;
  void setRoutingMode(const QString &) override;

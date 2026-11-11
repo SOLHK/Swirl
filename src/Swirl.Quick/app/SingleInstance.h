@@ -3,6 +3,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QTimer>
+#include <QDeadlineTimer>
 #include <QCryptographicHash>
 #include <functional>
 #ifdef Q_OS_WIN
@@ -15,7 +16,7 @@
 class SingleInstance final : public QObject {
 public:
     enum Result { Primary, Activated, Unavailable };
-    std::function<void()> activate;
+    std::function<bool()> activate;
     Result acquire(const QString &scope = QStringLiteral("production")) {
 #ifdef Q_OS_WIN
         HANDLE token=nullptr;
@@ -40,14 +41,25 @@ public:
         m_owned=lock==WAIT_OBJECT_0 || lock==WAIT_ABANDONED;
         m_endpoint="SOLHK.Swirl."+key;
         if(!m_owned){
-            QLocalSocket socket;socket.connectToServer(m_endpoint);
-            if(!socket.waitForConnected(1200))return Unavailable;
-            if(!socket.bytesAvailable())socket.waitForReadyRead(500);
-            const auto pid=socket.readLine(32).trimmed().toULong();
-            if(pid)AllowSetForegroundWindow(pid);
-            socket.write("ACTIVATE\n");socket.flush();
-            if(socket.bytesToWrite())socket.waitForBytesWritten(500);
-            return Activated;
+            QDeadlineTimer deadline(3000);
+            QLocalSocket socket;socket.setReadBufferSize(32);socket.connectToServer(m_endpoint);
+            if(!socket.waitForConnected(int(deadline.remainingTime())))return Unavailable;
+            const auto readLine=[&]() -> QByteArray {
+                while(!socket.canReadLine()){
+                    if(socket.bytesAvailable()>=32||deadline.hasExpired()||
+                       !socket.waitForReadyRead(int(deadline.remainingTime())))return {};
+                }
+                return socket.readLine(33);
+            };
+            bool validPid=false;const auto pid=readLine().trimmed().toULong(&validPid);
+            if(!validPid||pid==0)return Unavailable;
+            AllowSetForegroundWindow(pid);
+            if(socket.write("ACTIVATE\n")!=9)return Unavailable;
+            while(socket.bytesToWrite()){
+                if(deadline.hasExpired()||!socket.waitForBytesWritten(int(deadline.remainingTime())))return Unavailable;
+            }
+            // A queued write is not proof that the existing window was restored.
+            return readLine()=="ACTIVATED\n"?Activated:Unavailable;
         }
         m_server.setSocketOptions(QLocalServer::UserAccessOption);
         if(!m_server.listen(m_endpoint))return Unavailable;
@@ -55,15 +67,23 @@ public:
             while(auto *socket=m_server.nextPendingConnection()){
                 socket->setReadBufferSize(32);
                 socket->write(QByteArray::number(QCoreApplication::applicationPid())+'\n');
-                connect(socket,&QLocalSocket::readyRead,socket,[this,socket]{
+                const auto receive=[this,socket]{
+                    if(socket->property("activationHandled").toBool())return;
                     auto data=socket->property("activationBytes").toByteArray()+socket->readAll();
                     if(data.size()>16){socket->abort();return;}
                     socket->setProperty("activationBytes",data);
-                    if(data=="ACTIVATE\n") {if(activate)activate();socket->disconnectFromServer();}
+                    if(data=="ACTIVATE\n") {
+                        socket->setProperty("activationHandled",true);
+                        const bool restored=activate&&activate();
+                        socket->write(restored?"ACTIVATED\n":"BUSY\n");
+                        socket->disconnectFromServer();
+                    }
                     else if(data.contains('\n'))socket->abort();
-                });
+                };
+                connect(socket,&QLocalSocket::readyRead,socket,receive);
                 connect(socket,&QLocalSocket::disconnected,socket,&QObject::deleteLater);
-                QTimer::singleShot(1500,socket,[socket]{socket->abort();socket->deleteLater();});
+                QTimer::singleShot(3000,socket,[socket]{socket->abort();socket->deleteLater();});
+                receive();
             }
         });
         return Primary;

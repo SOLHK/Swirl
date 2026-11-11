@@ -741,9 +741,29 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     setTab(1);if(auto *list=item("policyGroupList")){QMetaObject::invokeMethod(list,"positionViewAtIndex",Q_ARG(int,3),Q_ARG(int,0));QTest::qWait(100);}
     const auto unusedGroup=recordNamed(controller->strategyGroups(),"Automatic fixture 2").value("id").toString();click("policyGroupMore-"+unusedGroup);click("swirlContextOption-1");click("confirmDeletePolicy");awaitSaved(QStringLiteral("Unused strategy group deletion is committed"));check(controller->strategyGroups().size()==4,QStringLiteral("Deleting an unused group retains all unrelated references"));
     check(applied.count()>=14,QStringLiteral("Real policy completion signals accompany accepted transactions"));
-    check(!controller->setTunEnabled(true)&&!controller->tunEnabled(),QStringLiteral("Unsupported TUN is rejected before any platform mutation"));
     eval("AppState.navigate('activity')");
     if(!check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity mode is reachable after policy edits")))return finish();
+    // The real confirmation is exercised against the production controller's
+    // unsupported-component guard, never against the host's privileged helper.
+    if(!check(!controller->tunSupported(),QStringLiteral("TUN confirmation fixture has no privileged platform components")))return finish();
+    const auto beforeTunError=controller->routingError(),beforeTunRevision=controller->savedRevision();
+    const auto beforeTunProxy=controller->systemProxy()->diagnosticState();
+    const bool beforeTunAlive=controller->processAlive(),beforeTunRequested=controller->tunRequested();
+    const int beforeTunTakeovers=proxyBackend->takeoverCalls,beforeTunRestores=proxyBackend->restoreCalls;
+    click("tunCapsule");
+    check(popup("tunAuthorizationDialog")!=nullptr,QStringLiteral("TUN enable first opens an explicit administrator authorization explanation"));
+    capture("tun-authorization");click("cancelTunAuthorization");
+    check(QTest::qWaitFor([&]{return !popup("tunAuthorizationDialog");},2000)
+          &&controller->routingError()==beforeTunError&&controller->savedRevision()==beforeTunRevision
+          &&controller->processAlive()==beforeTunAlive&&controller->tunRequested()==beforeTunRequested
+          &&controller->systemProxy()->diagnosticState()==beforeTunProxy
+          &&proxyBackend->takeoverCalls==beforeTunTakeovers&&proxyBackend->restoreCalls==beforeTunRestores,
+          QStringLiteral("Cancelling TUN authorization invokes no transition and preserves current connection, receipt and proxy state"));
+    click("tunCapsule");click("confirmTunAuthorization");
+    check(QTest::qWaitFor([&]{return !popup("tunAuthorizationDialog");},2000)
+          &&controller->routingError().contains(QStringLiteral("组件或驱动缺失"))&&!controller->tunEnabled()
+          &&controller->systemProxy()->diagnosticState()==beforeTunProxy,
+          QStringLiteral("Explicit TUN confirmation reaches the real controller and unsupported components fail before platform mutation"));
     auto *activityMode=item("activityOutboundMode");
     auto *modeText=item("activityOutboundModeText");
     auto *modeContent=activityMode->property("contentItem").value<QQuickItem *>();

@@ -57,7 +57,7 @@ QString PrivateUiDnsTrust::apply(QJsonObject *dns) const {
 
 namespace {
 QString recoveryRequiredMessage(){
- return QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+ return QStringLiteral("上次 TUN 网络恢复尚未确认。请点击“恢复网络”，授权恢复 Swirl 的网络设置后再连接。");
 }
 const QStringList &privateSubnets(){
  static const QStringList values{"127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","100.64.0.0/10","::1/128","fc00::/7","fe80::/10"};
@@ -647,7 +647,8 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   m_brokerSession=true;
  }
  auto request=QJsonObject{{"control_schema",2},{"op","start_v2"},{"request_id",options.configurationRequestId},
-  {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate}};
+  {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate},
+  {"native_tun_startup",options.tunEnabled}};
  if(!options.configurationDigest.isEmpty())request.insert("plan_digest",options.configurationDigest);
  const auto response=call(request);
  if(!response.value("ok").toBool()){if(m_tunBroker.close())m_brokerSession=false;fail(Error::ConfigurationFailed,response.value("error").toString(response.value("code").toString("ConfigurationRejected")));return;}
@@ -679,7 +680,11 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   const auto result=call(request);
   if(!result.value("ok").toBool()){
    const auto error=result.value("error").toString("TunStartRejected");
-   stop();fail(Error::ConfigurationFailed,QStringLiteral("原生 TUN 启动未完成：")+error);return;
+   stop();
+   const bool unconfirmed=m_handle||m_brokerSession||m_tunRecoveryRequired;
+   if(unconfirmed)m_tunRecoveryRequired=true;
+   const auto recovery=unconfirmed?QStringLiteral("；网络恢复未确认：")+m_status.message:QString();
+   fail(unconfirmed?Error::OwnershipFailed:Error::ConfigurationFailed,QStringLiteral("原生 TUN 启动未完成：")+error+recovery);return;
   }
  }
  const auto target=options.policyDocument.value("default_policy").toObject().value("target").toObject();
@@ -788,6 +793,21 @@ void RustCoreEngine::stop(){
  }
  m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
  m_status.state=m_tunRecoveryRequired?State::Failed:State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
+}
+void RustCoreEngine::recoverTunNetwork(){
+ if(m_handle||m_brokerSession||m_tunBroker.running()){
+  emit tunRecoveryFinished(false,QStringLiteral("请先停止当前 Swirl 会话，再恢复网络。"));return;
+ }
+ QString error;
+ const bool recovered=recoverNativeTunForMaintenance(&error)==0;
+ m_tunRecoveryState=nativeTunRecoveryState();
+ m_tunRecoveryRequired=!recovered||m_tunRecoveryState!=NativeTunRecoveryState::Clear;
+ if(m_tunRecoveryRequired){
+  fail(Error::OwnershipFailed,QStringLiteral("TUN 网络恢复仍未确认：")+error);
+  emit tunRecoveryFinished(false,m_status.message);return;
+ }
+ m_status={};m_status.message=QStringLiteral("Swirl 的 TUN 网络状态已恢复，可以重新连接。");
+ emit statusChanged();emit tunRecoveryFinished(true,m_status.message);
 }
 void RustCoreEngine::refresh(){
  if(!m_handle)return;

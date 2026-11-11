@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QMessageBox>
 #include "engine/RustCoreSelfTest.h"
 #include "network/TlsRuntimeSelfTest.h"
 #include "app/SingleInstance.h"
@@ -28,6 +29,7 @@
 #include <QSet>
 #ifdef SWIRL_UI_TESTS
 #include <QQmlDebuggingEnabler>
+#include "tests/IsolatedUserRegistry.h"
 #include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
 #endif
 #include <QQmlContext>
@@ -532,6 +534,19 @@ int main(int argc, char *argv[])
     if (!qEnvironmentVariableIsSet("QT_D3D_MAX_FRAME_LATENCY"))
         qputenv("QT_D3D_MAX_FRAME_LATENCY", "1");
 #endif
+#ifdef SWIRL_UI_TESTS
+    // Outlive QApplication and every engine. Explicit automated profiles must
+    // never read, acknowledge or clear the user's real TUN recovery marker.
+    IsolatedUserRegistry automatedRegistry;
+    bool registryFixture=false,interactiveProfile=!controlledSessionRoot.isEmpty();
+    for(int i=1;i<argc;++i){
+        const QByteArray argument(argv[i]);
+        registryFixture=registryFixture||argument=="--policy-self-test"||argument=="--motion-test"||argument=="--window-test"
+            ||argument=="--node-self-test"||argument=="--engine-self-test"||argument=="--navigation-test"||argument=="--activity-layout-test";
+        interactiveProfile=interactiveProfile||argument=="--ui-preview"||argument.startsWith("--runtime-")||argument=="--lifecycle-test";
+    }
+    if(registryFixture&&(interactiveProfile||!automatedRegistry.initialize()))return 64;
+#endif
     configureSwirlFontRendering();
     // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;
     // Qt then exposes logical geometry and raster DPR per screen.
@@ -664,7 +679,12 @@ int main(int argc, char *argv[])
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
-        if(ownership!=SingleInstance::Primary)return ownership==SingleInstance::Activated?0:10;
+        if(ownership==SingleInstance::Activated)return 0;
+        if(ownership==SingleInstance::Unavailable){
+            if(!lifecycleTest)QMessageBox::warning(nullptr,QStringLiteral("Swirl 暂未响应"),
+                QStringLiteral("未能确认现有 Swirl 窗口已恢复。若正在启动、退出或等待管理员授权，请完成该操作后重试。没有启动第二个代理内核。"));
+            return 10;
+        }
     }
     if(isolatedRun||appearanceTest) {
         QStandardPaths::setTestModeEnabled(true);
@@ -920,14 +940,15 @@ int main(int argc, char *argv[])
         },[&]{return engineController.processAlive()||engineController.busy()||engineController.systemProxyBusy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();},[&]{return tray&&tray->hideWindows();});
         if(!lifecycleTest)tray=std::make_unique<TrayController>(rootWindow,icon,[&]{shutdown->request();});
         instance.activate=[&]{
-            if(shutdown->started())return;
-            if(tray){tray->restore();return;}
+            if(shutdown->started())return false;
+            if(tray){tray->restore();return rootWindow->isVisible();}
             const auto states=rootWindow->windowStates();
             if(states.testFlag(Qt::WindowMinimized))
                 rootWindow->setWindowStates(states & ~Qt::WindowMinimized);
             if(!rootWindow->isVisible())rootWindow->setVisible(true);
             rootWindow->raise();
             rootWindow->requestActivate();
+            return rootWindow->isVisible();
         };
     }
 #ifdef SWIRL_UI_TESTS

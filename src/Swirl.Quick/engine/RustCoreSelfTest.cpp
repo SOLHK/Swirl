@@ -1,6 +1,7 @@
 #include "RustCoreSelfTest.h"
 #include "RustCoreEngine.h"
 #include "RustCoreLibrary.h"
+#include "../tests/IsolatedUserRegistry.h"
 #include "../network/HttpRequestPolicy.h"
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -31,6 +32,7 @@ bool awaitCondition(const std::function<bool()> &condition, int timeoutMs = 4000
 
 int runRustCoreSelfTest(const QString &reportPath)
 {
+    IsolatedUserRegistry registry;
     QJsonObject report{{"schema", 1}, {"success", false},
                        {"scope", "packaged-executable-loopback"},
                        {"private_subscription_tested", false}};
@@ -43,6 +45,7 @@ int runRustCoreSelfTest(const QString &reportPath)
             || !output.commit()) return 74;
         return code;
     };
+    if(!registry.initialize())return finish("RegistryIsolationFailed", 24);
     RustCoreLibrary library;
     const bool loaded = library.load();
     report["library"] = library.diagnostics();

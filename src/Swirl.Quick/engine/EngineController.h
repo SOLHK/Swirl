@@ -80,6 +80,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
     Q_PROPERTY(bool tunBusy READ tunBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool tunRecoveryRequired READ tunRecoveryRequired NOTIFY statusChanged)
+    Q_PROPERTY(bool tunRecoveryBusy READ tunRecoveryBusy NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
     Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
@@ -186,7 +188,10 @@ public:
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
     bool tunSupported() const;
-    bool tunBusy() const {return m_tunTransition.has_value();}
+    bool tunBusy() const {return m_tunTransition.has_value()||m_tunRecovering;}
+    bool tunRecoveryRequired() const {return m_engine->status().tunRecoveryRequired;}
+    bool tunRecoveryBusy() const {return m_tunRecovering||(m_tunTransition&&m_tunTransition->recovery);}
+    Q_INVOKABLE bool recoverTunNetwork();
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
@@ -261,6 +266,7 @@ public:
     Q_INVOKABLE bool recoverPolicyConfiguration();
     bool applyCatalogTransaction(const NodeStore::ImportPlan &,const QJsonObject &,NodeImportService::ApplyCompletion,QString *error);
 signals:
+    void tunRecoveryFinished(bool success,const QString &message);
     void policyChanged();
     void policyApplyFinished(const QString &requestId,bool success);
     void lanAddressesChanged();
@@ -293,10 +299,11 @@ private:
     struct TunTransition {
         TunPhase phase=TunPhase::ReleasingProxy;
         EngineStartOptions previous;
-        bool target=false,wasRunning=false,proxyIntent=false,saved=false,rollback=false,cancelled=false;
+        bool target=false,wasRunning=false,proxyIntent=false,saved=false,rollback=false,cancelled=false,recovery=false;
         QString error;
     };
     std::optional<TunTransition> m_tunTransition;
+    bool m_tunRecovering=false;
     bool beginTunTransition(bool enabled);
     void advanceTunTransition();
     void tunPolicyCompleted(bool success,const QString &error);

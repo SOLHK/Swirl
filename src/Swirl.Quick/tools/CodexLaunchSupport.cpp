@@ -48,7 +48,7 @@ Proxy parseProxy(const std::wstring &server) {
     return {host,L"http://"+(host.find(L':')!=std::wstring::npos?L"["+host+L"]":host)+L":"+std::to_wstring(value),static_cast<unsigned short>(value)};
 }
 Proxy validateSettings(const Settings &settings) {
-    if(!(settings.flags&PROXY_TYPE_PROXY) || !settings.registryEnabled)fail(L"请先在 Swirl 中连接节点并启用系统代理。纯 TUN 模式请直接启动 Codex。");
+    if(!(settings.flags&PROXY_TYPE_PROXY) || !settings.registryEnabled)fail(L"请先在当前代理软件中启用系统代理。纯 TUN 模式请直接启动 Codex。");
     if((settings.flags&(PROXY_TYPE_AUTO_PROXY_URL|PROXY_TYPE_AUTO_DETECT)) || !settings.pac.empty() || !settings.registryPac.empty())fail(L"存在 PAC 或自动代理；代理路径不明确，未启动 Codex。");
     const auto proxy=parseProxy(settings.server);
     if(proxy.endpoint!=parseProxy(settings.registryServer).endpoint)fail(L"WinINET 与注册表代理不一致，未启动 Codex。");
@@ -148,7 +148,7 @@ void requireListener(const Proxy &proxy) {
         }
         closesocket(socket);
     }
-    WSACleanup();if(!ok)fail(L"系统代理端口未监听；请先连接 Swirl 节点，再启动 Codex。");
+    WSACleanup();if(!ok)fail(L"当前系统代理端口未监听；请先启动对应代理软件，再启动 Codex。");
 }
 std::vector<std::wstring> currentEnvironment() {
     auto block=GetEnvironmentStringsW();if(!block)fail(L"无法读取当前进程环境。");

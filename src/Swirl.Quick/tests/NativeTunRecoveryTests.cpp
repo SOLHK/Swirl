@@ -39,7 +39,7 @@ class NativeTunRecoveryTests final : public QObject {
 
     LSTATUS createMarker(HKEY *key) {
         return RegCreateKeyExW(HKEY_CURRENT_USER, MarkerKey, 0, nullptr,
-            REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS | KEY_WOW64_32KEY, nullptr, key, nullptr);
+            REG_OPTION_VOLATILE, KEY_ALL_ACCESS | KEY_WOW64_32KEY, nullptr, key, nullptr);
     }
 
 private slots:
@@ -50,7 +50,7 @@ private slots:
         m_fixturePath = QStringLiteral("Software\\SwirlNativeTunRecoveryTests-") +
             QUuid::createUuid().toString(QUuid::WithoutBraces);
         QCOMPARE(RegCreateKeyExW(m_userRoot, reinterpret_cast<LPCWSTR>(m_fixturePath.utf16()),
-            0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS | KEY_WOW64_32KEY,
+            0, nullptr, REG_OPTION_VOLATILE, KEY_ALL_ACCESS | KEY_WOW64_32KEY,
             nullptr, &m_fixtureRoot, nullptr), LSTATUS(ERROR_SUCCESS));
         const auto result = RegOverridePredefKey(HKEY_CURRENT_USER, m_fixtureRoot);
         m_overridden = result == ERROR_SUCCESS;
@@ -91,15 +91,17 @@ private slots:
     }
 
     void pendingAndConfirmedClearHaveStrictDwordValues() {
+        // Production writes keep their durable policy. A volatile test parent
+        // needs an explicitly volatile fixture key before writing its values.
+        HKEY key = nullptr;
+        QCOMPARE(createMarker(&key), LSTATUS(ERROR_SUCCESS));
+        const auto close = qScopeGuard([&] { RegCloseKey(key); });
         QString error;
         QVERIFY(setNativeTunRecoveryPending(true, &error));
         QVERIFY(error.isEmpty());
         QCOMPARE(nativeTunRecoveryState(&error), NativeTunRecoveryState::Pending);
         // Repeated observation does not clear or acknowledge an old owner.
         QCOMPARE(nativeTunRecoveryState(), NativeTunRecoveryState::Pending);
-        HKEY key = nullptr;
-        QCOMPARE(createMarker(&key), LSTATUS(ERROR_SUCCESS));
-        const auto close = qScopeGuard([&] { RegCloseKey(key); });
         DWORD type = 0, value = 0, bytes = sizeof(value);
         QCOMPARE(RegQueryValueExW(key, MarkerValue, nullptr, &type,
             reinterpret_cast<BYTE *>(&value), &bytes), LSTATUS(ERROR_SUCCESS));
@@ -219,6 +221,7 @@ private slots:
     }
 
     void inheritedPendingMarkerRejectsOrdinaryWorkerWithoutClearingOrRecovering() {
+        HKEY key = nullptr;QCOMPARE(createMarker(&key), LSTATUS(ERROR_SUCCESS));RegCloseKey(key);
         QVERIFY(setNativeTunRecoveryPending(true));
         {
             RustCoreEngine worker;
@@ -234,6 +237,7 @@ private slots:
     }
 
     void trustedPhysicalWorkerRetainsTheOtherSessionsPendingMarker() {
+        HKEY key = nullptr;QCOMPARE(createMarker(&key), LSTATUS(ERROR_SUCCESS));RegCloseKey(key);
         QVERIFY(setNativeTunRecoveryPending(true));
         {
             RustCoreEngine worker;
