@@ -79,6 +79,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
+    Q_PROPERTY(bool tunBusy READ tunBusy NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
     Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
@@ -185,6 +186,7 @@ public:
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
     bool tunSupported() const;
+    bool tunBusy() const {return m_tunTransition.has_value();}
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
@@ -287,6 +289,18 @@ private:
     enum class StopPhase { Idle, ReleasingProxy, ReleaseFailed, StoppingCore };
     StopPhase m_stopPhase=StopPhase::Idle;
     void finishStopAfterProxyRelease();
+    enum class TunPhase { ReleasingProxy, StoppingCore, Saving, Starting };
+    struct TunTransition {
+        TunPhase phase=TunPhase::ReleasingProxy;
+        EngineStartOptions previous;
+        bool target=false,wasRunning=false,proxyIntent=false,saved=false,rollback=false,cancelled=false;
+        QString error;
+    };
+    std::optional<TunTransition> m_tunTransition;
+    bool beginTunTransition(bool enabled);
+    void advanceTunTransition();
+    void tunPolicyCompleted(bool success,const QString &error);
+    void finishTunTransition(const QString &error={});
     bool m_ingestingEngineStatus=false;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
@@ -349,7 +363,7 @@ private:
     };
     std::optional<SubscriptionReviewTicket> m_subscriptionReview;
     QString m_reviewSession,m_policyReviewDigest;
-    bool applyPolicyConfiguration(const QJsonObject &,const EngineStartOptions &);
+    bool applyPolicyConfiguration(const QJsonObject &,const EngineStartOptions &,bool tunTransition=false);
     void policyCommandCompleted(const QString &,const QJsonObject &);
     void finishPolicyMutation(bool success,const QString &error={});
     void finishPolicyDiskCommit();

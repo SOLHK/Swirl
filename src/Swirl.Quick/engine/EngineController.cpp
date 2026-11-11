@@ -332,6 +332,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit statusChanged();
     });
     connect(&m_systemProxy,&SystemProxySession::releaseFinished,this,[this](bool success) {
+        if(m_tunTransition){QTimer::singleShot(0,this,&EngineController::advanceTunTransition);return;}
         if(m_shuttingDown) {
             // All release observers must see the live listener before stop.
             // A failed/timed-out attempt also completes this bounded wait;
@@ -361,6 +362,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     if(m_options.meteredNetwork)m_options.routingMode="rule";
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
         const auto s=m_engine->status();
+        if(m_tunTransition)QTimer::singleShot(0,this,&EngineController::advanceTunTransition);
         if(!m_pendingSelection.isEmpty()) {
             if(s.processAlive&&s.apiHealthy&&s.selectedNodeId==m_pendingSelection) {
                 m_options.selectedNodeId=m_pendingSelection;m_options.directSession=false;
@@ -523,13 +525,19 @@ QString EngineController::errorCode() const {
 }
 bool EngineController::busy() const {
     const auto state = m_engine->status().state;
-    return m_startAfterProbes||m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+    return m_tunTransition.has_value()||m_startAfterProbes||m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
         ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
         ||state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() {
     if(m_shuttingDown||m_stopPhase==StopPhase::StoppingCore)return;
+    if(m_tunTransition){
+        m_tunTransition->cancelled=true;m_tunTransition->proxyIntent=false;m_connectionRequested=false;
+        ++m_probeStartGeneration;m_startAfterProbes=false;m_probeStartPosted=false;
+        if(m_tunTransition->phase==TunPhase::Starting){m_tunTransition->rollback=true;m_tunTransition->phase=TunPhase::StoppingCore;m_engine->stop();}
+        QTimer::singleShot(0,this,&EngineController::advanceTunTransition);emit statusChanged();return;
+    }
     ++m_probeStartGeneration;m_startAfterProbes=false;m_probeStartPosted=false;
     if(m_stopPhase==StopPhase::ReleasingProxy) {
         // changed/status observers can re-enter while disable() is still
@@ -580,6 +588,7 @@ void EngineController::finishStopAfterProxyRelease() {
 }
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
+    m_tunTransition.reset();
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
     m_shuttingDown=true;m_stopPhase=StopPhase::Idle;m_connectionRequested=false;m_restartPending=false;
     ++m_probeStartGeneration;m_startAfterProbes=false;m_probeStartPosted=false;m_proxyRequested=false;
@@ -626,7 +635,7 @@ QVariantList EngineController::nodes() const {
         // Never substitute a connection-state RTT for an HTTP node-probe measurement.
         row.insert("latency",QStringLiteral("—"));
         if(!measured.isEmpty()){
-            const auto timing=measured.value(measured.value("metricType")==QStringLiteral("http_headers")?"outboundConnectMs":"latency");
+            const auto timing=measured.value("latency");
             bool valid=false;const auto elapsed=timing.toLongLong(&valid);
             row.insert("latency",measured.value("success").toBool()&&valid&&elapsed>=0?QString::number(elapsed):QStringLiteral("失败"));
             row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));
@@ -648,10 +657,17 @@ QVariantList EngineController::nodeCatalog() const {
 }
 bool EngineController::selectSubscription(const QString &id) {
     if(subscriptionScopeEnabled()&&activeSubscriptionId()==id)return true;
-    if(!m_store.configurationV2()) {m_policyError=QStringLiteral("请先确认并保存策略配置，再选择当前订阅。");emit policyChanged();return false;}
+    if(!m_store.configurationV2()&&!m_policyMigrationError.isEmpty()){m_policyError=m_policyMigrationError;emit policyChanged();return false;}
     NodeStore::ImportPlan plan;
     if(!m_store.prepareSelectSubscription(id,&plan)){m_policyError=m_store.error();emit policyChanged();return false;}
-    auto network=plan.retainedNetworkConfiguration();QSet<QString> allowed;
+    auto network=plan.retainedNetworkConfiguration();
+    if(!m_store.configurationV2()){
+        auto initial=serializedNetworkConfiguration();
+        if(initial.isEmpty()){m_policyError=m_networkError;emit policyChanged();return false;}
+        for(auto it=network.constBegin();it!=network.constEnd();++it)initial.insert(it.key(),it.value());
+        network=initial;
+    }
+    QSet<QString> allowed;
     for(const auto &node:scopedNodes(plan.nodes(),network))allowed.insert(node.id);
     auto snapshots=network.value("subscriptionPolicySnapshots").toObject();
     if(!snapshots.contains("base"))snapshots.insert("base",m_policyDocument);
@@ -696,10 +712,14 @@ bool EngineController::selectSubscription(const QString &id) {
     }
     document.insert("missing_targets",QJsonArray{});
     network.insert("policyDocumentV2",document);
+    // Choosing a source is sufficient intent to adopt the losslessly converted
+    // policy. Validate and commit the source and policy in the same transaction.
+    if(!m_store.configurationV2())m_policyMigrationConfirmed=true;
     const bool accepted=applyCatalogTransaction(plan,network,[this](bool ok,const QString &error){
         m_nodeError=ok?QString():error;emit nodesChanged();emit nodeCatalogChanged();emit optionsChanged();
     },&m_policyError);
     if(accepted)m_tests.cancel();
+    else m_policyMigrationConfirmed=false;
     return accepted;
 }
 QVariantList EngineController::nodeDiagnosticRows() const {
@@ -901,7 +921,7 @@ bool EngineController::testNodesIfStale(const QStringList &ids,const QUrl &url) 
     if(ids.isEmpty()||m_tests.busy()||m_tests.hasFreshResults(ids,url)||!nodeProbeReady())return false;
     m_tests.start(nodeProbeOptions(),ids,url);return true;
 }
-void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),{id},url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(!nodeProbeReady())return;m_tests.refreshNode(nodeProbeOptions(),id,url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {
@@ -944,11 +964,18 @@ QString EngineController::systemProxySessionError(const ProxyEngine::Status &sta
     return {};
 }
 void EngineController::failSystemProxyRequest(const QString &error) {
-    m_routingError=error;m_proxyRequested=false;cancelSystemProxyCheck();stop();
+    m_routingError=error;m_proxyRequested=false;cancelSystemProxyCheck();
+    const auto status=m_engine->status();
+    if(status.tunEnabled||status.tunCapturePossible){m_systemProxy.disable();emit statusChanged();}else stop();
 }
 void EngineController::setSystemProxy(bool enabled) {
     if(m_shuttingDown)return;
     if(!enabled){
+        if(m_tunTransition){m_tunTransition->proxyIntent=false;m_proxyRequested=false;cancelSystemProxyCheck();emit statusChanged();return;}
+        const auto status=m_engine->status();
+        if(status.tunEnabled||status.tunCapturePossible){
+            m_proxyRequested=false;cancelSystemProxyCheck();m_systemProxy.disable();emit statusChanged();return;
+        }
         m_routingError.clear();m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户请求关闭 Swirl 代理，恢复已接管的系统设置并停止内核。"));stop();return;
     }
     if(m_systemProxy.owned()||m_systemProxy.busy()||m_proxyChecking)return;
@@ -1031,7 +1058,7 @@ void EngineController::setSystemProxy(bool enabled) {
 }
 void EngineController::toggleSystemProxy() {
     if(m_shuttingDown)return;
-    setSystemProxy(!(m_proxyRequested||m_systemProxy.owned()||processAlive()||busy()));
+    setSystemProxy(!(m_proxyRequested||m_systemProxy.owned()||m_proxyChecking||m_systemProxy.busy()));
 }
 QString EngineController::proxyEnvironmentAdvice() const {
     return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
@@ -1362,17 +1389,96 @@ bool EngineController::setTunEnabled(bool enabled) {
     m_routingError.clear();
     if(enabled&&!tunSupported()){m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。");emit statusChanged();return false;}
     if(!enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("计费网络模式正在使用增强模式，请先关闭计费网络模式。");emit statusChanged();return false;}
-    if(processAlive()||m_systemProxy.owned()||m_systemProxy.busy()||busy()||nodeBusy()||routingBusy()){
-        m_routingError=QStringLiteral("请先在活动页关闭代理，等待网络恢复完成后再切换 TUN。");emit statusChanged();return false;
+    if(m_systemProxy.busy()||busy()||nodeBusy()||routingBusy()||m_store.saving()){
+        m_routingError=QStringLiteral("正在处理网络配置，请稍后切换 TUN。");emit statusChanged();return false;
     }
     if(enabled&&!m_store.configurationV2()){m_routingError=QStringLiteral("请先在策略页确认并保存出口配置。");emit statusChanged();return false;}
     if(m_store.configurationV2()){
-        auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
-        return applyPolicyConfiguration(m_policyDocument,candidate);
+        return beginTunTransition(enabled);
     }
     const bool previous=m_options.tunEnabled;m_options.tunEnabled=enabled;
     if(!saveNetworkConfiguration()){m_options.tunEnabled=previous;return false;}
     emit statusChanged();return true;
+}
+bool EngineController::beginTunTransition(bool enabled){
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
+        if(enabled==m_options.tunEnabled&&((processAlive()&&tunEnabled()==enabled)||(!processAlive()&&!enabled)))return true;
+        QJsonObject runtime;const auto error=RustCoreEngine::configurationV2(candidate,m_policyDocument,&runtime);
+        if(!error.isEmpty()){m_routingError=error;emit statusChanged();return false;}
+        TunTransition transition;transition.previous=m_options;transition.target=enabled;
+        transition.wasRunning=processAlive();transition.proxyIntent=m_proxyRequested||m_systemProxy.owned();
+        m_tunTransition=std::move(transition);
+        m_proxyRequested=false;cancelSystemProxyCheck();m_tests.cancel();
+        if(m_lanSession)m_lanSession->stop();
+        m_systemProxy.disable();
+        QTimer::singleShot(0,this,&EngineController::advanceTunTransition);emit statusChanged();return true;
+}
+
+void EngineController::advanceTunTransition(){
+    if(!m_tunTransition||m_shuttingDown)return;
+    auto &transition=*m_tunTransition;
+    if(transition.phase==TunPhase::ReleasingProxy){
+        if(m_systemProxy.busy())return;
+        if(m_systemProxy.owned()){
+            m_proxyRequested=transition.proxyIntent;
+            finishTunTransition(QStringLiteral("系统代理恢复失败，保留原内核运行：")+m_systemProxy.error());return;
+        }
+        transition.phase=TunPhase::StoppingCore;
+        if(m_engine->status().state!=ProxyEngine::State::Stopped){m_engine->stop();return;}
+    }
+    const auto status=m_engine->status();
+    if(transition.phase==TunPhase::StoppingCore){
+        if(status.tunRecoveryRequired){finishTunTransition(QStringLiteral("TUN 网络恢复尚未完成，已停止切换：")+status.message);return;}
+        if(status.state==ProxyEngine::State::Degraded||status.state==ProxyEngine::State::Failed){
+            finishTunTransition(QStringLiteral("内核停止未确认，已停止切换；请重试停止以完成恢复：")+status.message);return;
+        }
+        if(status.processAlive||status.state!=ProxyEngine::State::Stopped)return;
+        if(transition.cancelled&&!transition.saved){finishTunTransition();return;}
+        if(transition.cancelled)transition.rollback=true;
+        if(transition.rollback&&!transition.saved){
+            transition.phase=TunPhase::Starting;
+            if(transition.wasRunning&&!transition.cancelled)startConfiguredSession();
+            else {finishTunTransition(transition.error);return;}
+        }else{
+            auto candidate=transition.rollback?transition.previous:m_options;
+            candidate.nodes=availableNodes();candidate.tunEnabled=transition.rollback?transition.previous.tunEnabled:transition.target;
+            transition.phase=TunPhase::Saving;
+            if(!applyPolicyConfiguration(m_policyDocument,candidate,true))tunPolicyCompleted(false,m_policyError);
+            return;
+        }
+    }
+    if(!m_tunTransition||transition.phase!=TunPhase::Starting)return;
+    const auto current=m_engine->status();
+    const bool desired=transition.rollback?transition.previous.tunEnabled:transition.target;
+    if(current.state==ProxyEngine::State::Running&&current.apiHealthy&&current.tunEnabled==desired){
+        const bool proxy=transition.proxyIntent&&!transition.cancelled;
+        const auto error=transition.error+(transition.rollback?QStringLiteral("；已恢复原模式。"):QString());finishTunTransition(error);
+        if(proxy){m_proxyRequested=true;QTimer::singleShot(0,this,[this,error]{if(m_proxyRequested&&!m_shuttingDown){setSystemProxy(true);if(!error.isEmpty()){m_routingError=error;emit statusChanged();}}});}
+    }else if(current.state==ProxyEngine::State::Failed||current.state==ProxyEngine::State::Degraded||(current.state==ProxyEngine::State::Running&&current.apiHealthy&&current.tunEnabled!=desired)){
+        if(transition.rollback){finishTunTransition(transition.error+QStringLiteral("；原模式重新启动失败：")+current.message);return;}
+        transition.error=QStringLiteral("TUN 切换未完成：")+current.message;
+        transition.rollback=true;transition.phase=TunPhase::StoppingCore;m_engine->stop();
+        QTimer::singleShot(0,this,&EngineController::advanceTunTransition);
+    }
+}
+void EngineController::tunPolicyCompleted(bool success,const QString &error){
+    if(!m_tunTransition||m_tunTransition->phase!=TunPhase::Saving)return;
+    auto &transition=*m_tunTransition;
+    if(!success){
+        if(transition.rollback){finishTunTransition(transition.error+QStringLiteral("；恢复配置失败：")+error);return;}
+        transition.error=QStringLiteral("TUN 配置未保存，保留原设置：")+error;
+        transition.rollback=true;transition.phase=TunPhase::StoppingCore;
+        QTimer::singleShot(0,this,&EngineController::advanceTunTransition);return;
+    }
+    transition.saved=!transition.rollback;
+    if(transition.cancelled&&transition.saved){transition.rollback=true;transition.phase=TunPhase::StoppingCore;QTimer::singleShot(0,this,&EngineController::advanceTunTransition);return;}
+    if(transition.cancelled||(!transition.wasRunning&&(!transition.target||transition.rollback))){finishTunTransition(transition.error);return;}
+    transition.phase=TunPhase::Starting;startConfiguredSession();
+    QTimer::singleShot(0,this,&EngineController::advanceTunTransition);
+}
+void EngineController::finishTunTransition(const QString &error){
+    const auto message=error;m_tunTransition.reset();m_routingError=message;
+    emit optionsChanged();emit statusChanged();
 }
 
 void EngineController::setCaptureProxyPort(int port) {
@@ -1816,7 +1922,7 @@ bool EngineController::applyPolicyDocument(const QVariantMap &input) {
 }
 bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan,const QJsonObject &retained,
                                               NodeImportService::ApplyCompletion completion,QString *error) {
-    if(!m_store.configurationV2()||m_policyBusy||!completion){if(error)*error=QStringLiteral("目录事务不可用或已有配置修改。");return false;}
+    if((!m_store.configurationV2()&&!m_policyMigrationConfirmed)||m_policyBusy||!completion){if(error)*error=QStringLiteral("目录事务不可用或已有配置修改。");return false;}
     auto network=retained.isEmpty()?m_store.networkConfiguration():retained;
     auto document=network.value("policyDocumentV2").toObject();if(document.isEmpty())document=m_policyDocument;
     QSet<QString> referenced,known;const auto removedIds=plan.removedNodeIds();const QSet<QString> removed(removedIds.cbegin(),removedIds.cend());
@@ -1843,9 +1949,9 @@ bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan
     else if(!removedIds.isEmpty())m_tests.cancel();
     return accepted;
 }
-bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &inputOptions) {
+bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &inputOptions,bool tunTransition) {
     const auto reject=[this](const QString &error){m_policyError=error;emit policyChanged();return false;};
-    if(m_shuttingDown||m_policyBusy||busy()||(!m_policyCatalog&&m_imports.busy())||m_store.saving())return reject(QStringLiteral("配置正在处理另一项修改，请等待完成后重试。"));
+    if(m_shuttingDown||m_policyBusy||(!tunTransition&&busy())||(!m_policyCatalog&&m_imports.busy())||m_store.saving())return reject(QStringLiteral("配置正在处理另一项修改，请等待完成后重试。"));
     if(m_moduleOverlayActive)return reject(QStringLiteral("请先停用配置模块，再编辑基础策略。"));
     if(m_store.configurationRecoveryRequired())return reject(QStringLiteral("配置库需要恢复，未受理新的策略修改。"));
     if(m_policyMigrationRequired&&!m_policyMigrationConfirmed)return reject(QStringLiteral("请先检查并确认旧配置迁移。"));
@@ -1933,6 +2039,7 @@ void EngineController::finishPolicyMutation(bool success,const QString &error) {
     const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;
     emit policyChanged();emit optionsChanged();emit selectionChanged();emit statusChanged();
     emit policyApplyFinished(requestId,success);
+    if(m_tunTransition&&m_tunTransition->phase==TunPhase::Saving)QTimer::singleShot(0,this,[this,success,error]{tunPolicyCompleted(success,error);});
     if(catalogCompletion)catalogCompletion(success,error);
     m_stopAfterPolicy=false;
     // A failed restore remains explicitly retryable; finishing a transaction

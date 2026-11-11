@@ -481,6 +481,7 @@ bool RustCoreEngine::recoverTunConnection(QString *error){
  m_handle=0;m_status.tunEnabled=false;return true;
 }
 void RustCoreEngine::resetProbeState(){
+ m_status.probeRequestRttMs=-1;
  m_probeRequestId=0;m_probeFailureStage.clear();m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
  m_status.probeFailureCode.clear();
  m_status.nodeBusy=false;m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
@@ -491,6 +492,7 @@ void RustCoreEngine::cancelProbe(){
  resetProbeState();
 }
 void RustCoreEngine::failProbe(const QString &stage,const QString &code,int httpStatus){
+ m_status.probeRequestRttMs=-1;
  m_probeRequestId=0;m_probeFailureStage=stage;m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
  m_status.probeFailureCode=code;
  m_status.nodeBusy=false;m_status.requestState=RequestState::Failed;
@@ -514,16 +516,18 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
  if(state=="succeeded"){
   const auto metrics=probe.value("metrics").toObject();
   const auto elapsed=metrics.value("response_headers_ms").toInteger(-1);
+  const auto rtt=metrics.value("request_rtt_ms").toInteger(-1);
   const auto outbound=metrics.value("outbound_connect_ms").toInteger(-1);
   const auto tlsValue=metrics.value("origin_tls_ms");
   const auto originTls=tlsValue.isNull()?-1:tlsValue.toInteger(-1);
   const auto code=metrics.value("http_status").toInt();
-  if(elapsed<0||elapsed>std::numeric_limits<int>::max()||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
+  if(elapsed<0||elapsed>std::numeric_limits<int>::max()||rtt<0||rtt>elapsed||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
   m_probeRequestId=0;m_probeFailureStage.clear();m_status.nodeBusy=false;
   m_status.probeFailureCode.clear();
   m_probeOutboundConnectMs=outbound;m_probeOriginTlsMs=originTls;
   m_status.requestState=RequestState::Succeeded;m_status.nodeHealth=NodeHealth::Available;
   m_status.latencyMs=int(elapsed);m_status.responseCode=code;
+  m_status.probeRequestRttMs=rtt;
   m_status.nodeMessage=QStringLiteral("Rust HEAD 响应首部已接收");return;
  }
  if(state=="failed"){
@@ -933,7 +937,7 @@ bool RustCoreEngine::probeNodes(const QStringList &ids,const QUrl &url,QString *
  // One bounded concurrent sweep inside the already-running core. Nothing is
  // selected and no per-node engine is created.
  const auto response=call({{"op","probe_nodes"},{"handle",qint64(m_handle)},{"nodes",nodes},
-   {"url",text},{"timeout_ms",8000},{"concurrency",32},{"physical_egress",m_options.internalProbePhysicalEgress}});
+   {"url",text},{"timeout_ms",8000},{"concurrency",64},{"physical_egress",m_options.internalProbePhysicalEgress}});
  if(!response.value("ok").toBool()){
   if(error)*error=response.value("error").toString("ProbeNodesFailed");return false;
  }

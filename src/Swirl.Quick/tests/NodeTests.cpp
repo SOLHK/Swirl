@@ -26,6 +26,7 @@
 #include <QSaveFile>
 #include <QFileInfo>
 #include <QUdpSocket>
+#include <QThreadPool>
 #include <algorithm>
 
 static quint16 freePort(){
@@ -441,8 +442,8 @@ private slots:
         tests.start(opts,ids,network.url());
         // One engine owns the sweep. The stalled listener therefore sees a
         // bounded number of simultaneous dials (the sweep concurrency, default
-        // 16, capped at 32) instead of exactly three per-node engines.
-        QTRY_VERIFY_WITH_TIMEOUT(!pending.isEmpty()&&pending.size()<=32,15000);
+        // 16, UI requests 64) instead of exactly three per-node engines.
+        QTRY_VERIFY_WITH_TIMEOUT(!pending.isEmpty()&&pending.size()<=64,15000);
         QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->bytesAvailable()>0;}),5000);
         QCOMPARE(tests.completed(),0);QCOMPARE(tests.total(),count);
         for(const auto &id:ids)QVERIFY(tests.testing(id));
@@ -451,7 +452,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),10000);
         QTRY_VERIFY_WITH_TIMEOUT(std::all_of(pending.begin(),pending.end(),[](const auto &socket){return socket&&socket->state()==QAbstractSocket::UnconnectedState;}),5000);
         QTRY_VERIFY_WITH_TIMEOUT(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty(),5000);
-        QVERIFY(pending.size()<=32);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
+        QVERIFY(pending.size()<=64);QCOMPARE(tests.completed(),0);QCOMPARE(network.httpRequests,0);
 
         for(auto &n:opts.nodes)n.port=network.a.serverPort();
         QSet<ProxyEngine *> workers;int peak=0;
@@ -484,6 +485,40 @@ private slots:
         QVERIFY(tests.hasFreshResults(ids,network.url()));
         QVERIFY(!tests.hasFreshResults(ids,QUrl("https://different.invalid/")));
         QTest::qWait(50);QCOMPARE(tests.completed(),count);QCOMPARE(network.httpRequests,count);
+    }
+    void cancelledBackgroundPreparationCannotStartWorkersOrPublishOldResults(){
+        QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));auto opts=options();QStringList ids;
+        for(int i=0;i<104;++i){auto n=node(QString("Prepared %1").arg(i),listener.serverPort());opts.nodes.append(n);ids.append(n.id);}
+        const QUrl url("http://127.0.0.1:9/headers");NodeTestService service;
+        service.start(opts,ids,url);service.cancel();QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QCOMPARE(service.completed(),0);QVERIFY(service.results().isEmpty());QVERIFY(!listener.hasPendingConnections());
+        auto *deleted=new NodeTestService;deleted->start(opts,ids,url);delete deleted;
+        QVERIFY(QThreadPool::globalInstance()->waitForDone(5000));QCoreApplication::sendPostedEvents();
+        QVERIFY(!listener.hasPendingConnections());
+    }
+    void pointRefreshRunsBesideMixedBatchWithoutRetestingOtherRows(){
+        ControlledNetwork network;QVERIFY(network.start());QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));
+        auto opts=options();const auto first=node("First",network.a.serverPort()),other=node("Other",network.a.serverPort()),slow=node("Slow",stalled.serverPort());
+        auto unsupported=node("Unsupported",9);unsupported.protocol="unsupported-fixture";
+        opts.nodes={first,other,slow,unsupported};NodeTestService tests;
+        tests.start(opts,{first.id,other.id,slow.id,unsupported.id},network.url());
+        QTRY_VERIFY_WITH_TIMEOUT(tests.completed()==3&&tests.testing(slow.id),10000);
+        QCOMPARE(tests.succeeded(),2);QCOMPARE(tests.failed(),1);
+        QCOMPARE(tests.result(unsupported.id).value("failureCode").toString(),QString("NodeConfigurationRejected"));
+        QCOMPARE(tests.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).size(),1);
+        const auto firstResult=tests.result(first.id),otherResult=tests.result(other.id);
+        tests.refreshNode(opts,first.id,network.url());
+        for(int i=0;i<20;++i)tests.refreshNode(opts,first.id,network.url());
+        QTRY_VERIFY_WITH_TIMEOUT(tests.result(first.id).value("measuredAtMs").toLongLong()>firstResult.value("measuredAtMs").toLongLong(),5000);
+        QCOMPARE(tests.result(other.id),otherResult);QCOMPARE(network.httpRequests,3);
+        QVERIFY(tests.testing(slow.id));QVERIFY(tests.busy());QCOMPARE(tests.completed(),3);
+        tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);
+        QTRY_VERIFY(tests.findChildren<ProxyEngine *>().isEmpty());
+        tests.invalidateResults();QVERIFY(tests.results().isEmpty());
+        tests.start(opts,{slow.id},network.url());QTRY_VERIFY(tests.testing(slow.id));
+        tests.refreshNode(opts,first.id,QUrl("invalid-url"));
+        QVERIFY(tests.result(first.id).isEmpty());QVERIFY(tests.testing(slow.id));
+        tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);QVERIFY(tests.result(first.id).isEmpty());
     }
     void stoppedBatchWorkerReleasesBusyAndPermitsRetry(){
         ControlledNetwork network;QVERIFY(network.start());QTcpServer stalled;QVERIFY(stalled.listen(QHostAddress::LocalHost,0));

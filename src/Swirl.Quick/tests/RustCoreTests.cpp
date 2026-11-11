@@ -2661,7 +2661,7 @@ private slots:
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
   QCOMPARE(probes.succeeded(),1);QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
-  QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_headers"));
+  QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_request_rtt"));
   QCOMPARE(probes.result(o.selectedNodeId).value("resolverPolicy").toString(),QString("isolated_default_dns"));
   o.nodes.first().protocol="ss";o.nodes.first().password="synthetic";o.nodes.first().cipher="2022-blake3-aes-128-gcm";
   probes.start(o,{o.selectedNodeId},net.url());QVERIFY(!probes.result(o.selectedNodeId).value("success").toBool());
@@ -2687,7 +2687,7 @@ private slots:
   QVERIFY(controller.tests()->result(a).isEmpty());QCOMPARE(net.a.forwarded,beforeA);QVERIFY(net.b.forwarded>beforeB);
   QCOMPARE(controller.selectedNodeId(),saved);QVERIFY(!controller.processAlive());
  }
- void nodeListShowsValidatedOutboundSetupTime(){
+ void nodeListAndPickerShowSameValidatedRequestRtt(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;
   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"),true);
   const auto body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{QJsonObject{{"name","fixture"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}}}}}).toJson();
@@ -2702,8 +2702,11 @@ private slots:
   QVERIFY(result.contains("outboundConnectMs"));
   const auto outbound=result.value("outboundConnectMs").toInt();
   QVERIFY(outbound>=0);
-  QVERIFY(result.value("latency").toInt()>=outbound);
-  QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QString::number(outbound));
+  QVERIFY(result.value("totalMs").toInt()>=outbound);QVERIFY(result.value("latency").toInt()>=0);
+  QVERIFY(result.value("totalMs").toInt()>=result.value("latency").toInt());
+  const auto row=controller.nodes().first().toMap();
+  QCOMPARE(row.value("latency").toString(),result.value("latency").toString());
+  QCOMPARE(row.value("exitLatency").toLongLong(),result.value("latency").toLongLong());
  }
  void nodeBatchReusesBoundedRustWorkersAndReleasesListeners(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.clear();

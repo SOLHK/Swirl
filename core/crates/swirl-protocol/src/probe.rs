@@ -99,6 +99,9 @@ pub struct UrlTestMetrics {
     pub outbound_connect_ms: u64,
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
+    /// Actual HEAD write-to-final-headers interval, after outbound setup and
+    /// verified origin TLS. This is not the cold connection's total duration.
+    pub request_rtt_ms: u64,
     pub http_status: u16,
     /// Additive connector phase observations. The existing cumulative fields
     /// keep their meaning; request-write timing is not authentication proof.
@@ -210,6 +213,7 @@ async fn url_test_head_selected(
         "HEAD {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nUser-Agent: Swirl-Core-URLTest/1\r\nAccept: */*\r\n\r\n",
         target.path, target.authority
     );
+    let request_started = Instant::now();
     timeout_at(deadline, async {
         stream.write_all(request.as_bytes()).await?;
         stream.flush().await
@@ -237,7 +241,15 @@ async fn url_test_head_selected(
             ))
         })?
         .map_err(|code| observed_failure(UrlTestFailure::response(code)))?;
-    let response_headers_ms = elapsed_ms(started);
+    let completed = Instant::now();
+    let response_headers_ms = completed
+        .duration_since(started)
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
+    let request_rtt_ms = completed
+        .duration_since(request_started)
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
     if !expected_status.map_or((200..=299).contains(&status), |expected| status == expected) {
         return Err(UrlTestFailure {
             stage: UrlTestStage::HttpStatus,
@@ -253,6 +265,7 @@ async fn url_test_head_selected(
         outbound_connect_ms,
         origin_tls_ms,
         response_headers_ms,
+        request_rtt_ms,
         http_status: status,
         outbound_timing: Some(outbound_timing),
     })

@@ -73,7 +73,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         if(name.startsWith("servicePolicyMore-")||name.startsWith("policyGroupMore-"))for(auto *menu:namedObjects("swirlContextMenu"))qInfo()<<"Fixture menu state"<<menu->property("visible")<<menu->property("count")<<menu->property("popupType");
         return true;
     };
-    const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
+    const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);if(text.isEmpty())QTest::keyClick(window,Qt::Key_Backspace);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"minimum_advanced_focus",minimumAdvancedFocus},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
@@ -198,10 +198,14 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
             &&controller->tests()->result(nodeB).value("success").toBool();},12000),
             QStringLiteral("Opening the exit picker automatically completes real authenticated proxy requests for every candidate"));
         for(const auto &id:{nodeA,nodeB}){
-            auto *row=item("policyNode-"+id);auto *label=row?find(row,"policyNodeLatency"):nullptr;
-            const auto latency=controller->tests()->result(id).value("latency").toLongLong();
-            check(label&&label->property("text").toString()==QString::number(latency)+" ms"&&latency>=0,
-                QStringLiteral("Each visible exit row displays its own complete request latency"));
+            // A fresh result may already be cached before this popup's deferred
+            // model/delegates are created. Observe the presented value itself.
+            check(QTest::qWaitFor([&]{
+                auto *row=item("policyNode-"+id);auto *label=row?find(row,"policyNodeLatency"):nullptr;
+                const auto latency=controller->tests()->result(id).value("latency").toLongLong();
+                return label&&label->property("text").toString()==QString::number(latency)+" ms"&&latency>=0;
+            },1000),
+                QStringLiteral("Each visible exit row displays its measured request RTT button"));
         }
         auto *list=item("policyTargetList");
         auto *model=list?qobject_cast<NodeViewModel *>(list->property("model").value<QObject *>()):nullptr;
@@ -220,14 +224,54 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
             &&controller->savedRevision()==revision,
             QStringLiteral("Measurement, filtering and reordering preserve the selected exit and saved policy"));
         const auto measured=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        const auto untouched=controller->tests()->result(nodeB);
+        auto *nodeRow=item("policyNode-"+nodeA);auto *latencyButton=nodeRow?find(nodeRow,"policyNodeLatency"):nullptr;
+        if(check(latencyButton&&latencyButton->isEnabled(),QStringLiteral("Per-node liquid glass latency control is actionable"))){
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,latencyButton->mapToScene(QPointF(latencyButton->width()/2,latencyButton->height()/2)).toPoint());
+            check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>measured;},12000),QStringLiteral("Clicking a latency button refreshes that node's real request"));
+            check(controller->tests()->result(nodeB)==untouched&&selected.evaluate().toBool()&&controller->defaultPolicy()==saved&&controller->savedRevision()==revision,
+                QStringLiteral("Single-node refresh preserves other results and the selected policy"));
+        }
+        const auto singleMeasured=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
         click("policyRetest");
         check(QTest::qWaitFor([&]{return !controller->tests()->busy()
-            &&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>measured
+            &&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>singleMeasured
             &&controller->tests()->succeeded()==2;},12000),QStringLiteral("Manual retry obtains fresh real request results"));
         capture("automatic-exit-latencies");
         click("policyAvailableOnly");click("cancelPolicyTarget");
         check(QTest::qWaitFor([&]{return !popup("policyTargetPicker")&&!controller->tests()->busy();},3000),
             QStringLiteral("Closing the exit picker retires its probe ownership"));
+    }
+    {
+        QTcpServer stalled;check(stalled.listen(QHostAddress::LocalHost,0),QStringLiteral("External batch uses an isolated stalled peer"));
+        auto probeOptions=controller->nodeProbeOptions();for(auto &node:probeOptions.nodes)if(node.id==nodeB)node.port=stalled.serverPort();
+        controller->tests()->start(probeOptions,{nodeA,nodeB},defaultUrl);
+        check(QTest::qWaitFor([&]{return controller->tests()->result(nodeA).value("success").toBool()&&controller->tests()->testing(nodeB);},5000),QStringLiteral("External batch has one completed and one pending node"));
+        click("defaultPolicyTarget");auto *row=item("policyNode-"+nodeA);auto *button=row?find(row,"policyNodeLatency"):nullptr;
+        const auto stamp=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        if(check(button&&button->isEnabled(),QStringLiteral("Completed node can refresh beside an external batch")))
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());
+        check(QTest::qWaitFor([&]{return controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>stamp;},4000),QStringLiteral("Interactive refresh completes without waiting for stalled batch rows"));
+        click("cancelPolicyTarget");
+        check(controller->tests()->busy()&&controller->tests()->testing(nodeB),QStringLiteral("Closing the picker preserves the external batch's pending work"));
+        controller->tests()->cancel();check(QTest::qWaitFor([&]{return !controller->tests()->busy();},5000),QStringLiteral("External test owner cancels and retires its batch"));
+    }
+    {
+        if(!navigate("proxies"))return finish();fill("nodeSearchField","Policy fixture A");
+        auto *model=window->findChild<NodeViewModel *>("nodeViewModel");
+        check(model&&QTest::qWaitFor([&]{return model->rowCount()==1;},3000),QStringLiteral("Node library search narrows the visible rows"));
+        const auto before=net.httpRequests;
+        click("allNodesTestButton");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->total()==2&&controller->tests()->succeeded()==2;},10000)
+            &&net.httpRequests==before+2,QStringLiteral("Test all button immediately probes both nodes despite the visible filter"));
+        fill("nodeSearchField","");check(model&&QTest::qWaitFor([&]{return model->rowCount()==2;},3000),QStringLiteral("Node library restores both measured rows"));
+        const auto untouched=controller->tests()->result(nodeB);const auto selectedRow=eval("pageLoader.item.focusedId");
+        const auto stamp=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        click("nodeLatency-"+nodeA);
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>stamp;},10000)
+            &&controller->tests()->result(nodeB)==untouched&&eval("pageLoader.item.focusedId")==selectedRow,
+            QStringLiteral("Library glass button refreshes one node without selecting its table row"));
+        capture("node-library-latency-buttons");if(!navigate("policies"))return finish();
     }
     {
         const auto priorSize=window->size();const auto priorPolicy=controller->defaultPolicy();const auto priorRevision=controller->savedRevision();

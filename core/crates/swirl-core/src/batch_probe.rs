@@ -23,7 +23,7 @@ use tokio::task::{JoinHandle, JoinSet};
 pub const MAX_BATCH_NODES: usize = 512;
 /// Bounded simultaneous probes. Short independent connects finish a large
 /// library in a few rounds of completions without exhausting sockets or CPU.
-pub const MAX_CONCURRENCY: usize = 32;
+pub const MAX_CONCURRENCY: usize = 64;
 const DEFAULT_CONCURRENCY: usize = 16;
 
 /// Immutable inputs for one sweep, captured under the enclosing plan lock so a
@@ -68,8 +68,9 @@ pub enum BatchState {
 pub struct BatchRow {
     pub node: String,
     pub state: BatchState,
-    /// Time to response headers, the value the UI shows as latency.
+    /// Cold request total, retained for existing control clients.
     pub latency_ms: Option<u64>,
+    pub request_rtt_ms: Option<u64>,
     pub outbound_connect_ms: Option<u64>,
     pub origin_tls_ms: Option<u64>,
     pub outbound_timing: Option<swirl_protocol::ConnectTimings>,
@@ -191,6 +192,7 @@ impl BatchProbeRuntime {
                 latency_ms: None,
                 outbound_connect_ms: None,
                 origin_tls_ms: None,
+                request_rtt_ms: None,
                 outbound_timing: None,
                 http_status: None,
                 failure_code: None,
@@ -334,6 +336,7 @@ async fn probe_one(inputs: Arc<BatchInputs>, id: String, options: HealthProbe) -
             node: id,
             state: BatchState::Ok,
             latency_ms: Some(metrics.response_headers_ms),
+            request_rtt_ms: Some(metrics.request_rtt_ms),
             outbound_connect_ms: Some(metrics.outbound_connect_ms),
             origin_tls_ms: metrics.origin_tls_ms,
             outbound_timing: metrics.outbound_timing,
@@ -364,6 +367,7 @@ fn row_from_failure(node: String, error: &UrlTestFailure) -> BatchRow {
         node,
         state: BatchState::Failed,
         latency_ms: None,
+        request_rtt_ms: None,
         outbound_connect_ms: error
             .outbound_timing
             .as_ref()
@@ -382,6 +386,7 @@ fn finish_failure(node: String, code: &'static str, stage: &'static str) -> Batc
         node,
         state: BatchState::Failed,
         latency_ms: None,
+        request_rtt_ms: None,
         outbound_connect_ms: None,
         origin_tls_ms: None,
         outbound_timing: None,

@@ -1082,7 +1082,9 @@ bool NodeStore::beginConfigurationIntent(const QJsonObject &network,const QStrin
 }
 bool NodeStore::saveCatalogOffline(const ImportPlan &catalog,const QJsonObject &network,const QString &requestId,
                                   const QString &revision,const QString &digest,SaveCompletion completion) {
-    if((!m_configurationLease&&!allowMutation())||!configurationV2()||catalog.m_owner!=this||catalog.m_revision!=m_revision||
+    // Like saveConfigurationOffline, this can create the first V2 envelope.
+    // Source choice and its validated policy must migrate in one atomic write.
+    if((!m_configurationLease&&!allowMutation())||catalog.m_owner!=this||catalog.m_revision!=m_revision||
        !validConfigurationIdentity(requestId,revision,digest,m_lastIssuedRevision)||revision.toULongLong()<=configurationRevision().toULongLong()||
        requestId==configurationReceipt().value("request_id").toString()||!m_configurationEnvelope.value("pending").toObject().isEmpty()||!acquireConfigurationLock())return false;
     return persistConfigurationState(network,configurationEnvelope(requestId,revision,digest),true,false,std::move(completion),&catalog);

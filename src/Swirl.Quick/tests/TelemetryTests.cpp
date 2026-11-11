@@ -364,9 +364,9 @@ private slots:
   pending->write("HTTP/1.1 200 OK\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n");
   QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);const auto result=probes.result(node.id);
   QVERIFY2(result.value("success").toBool(),qPrintable(result.value("error").toString()));
-  QCOMPARE(result.value("metricType").toString(),QString("http_headers"));
+  QCOMPARE(result.value("metricType").toString(),QString("http_request_rtt"));
   const auto outbound=result.value("outboundConnectMs").toLongLong(),headers=result.value("latency").toLongLong();
-  QVERIFY(outbound>=0);QVERIFY(headers>outbound);QVERIFY(headers>=withheldMs);
+  QVERIFY(outbound>=0);QVERIFY(result.value("totalMs").toLongLong()>=outbound+headers-1);QVERIFY(headers>=withheldMs);
   QCOMPARE(result.value("originTlsMs").toLongLong(),qint64(-1));QCOMPARE(net.a.forwarded,1);
   request.clear();probes.start(options,{node.id},url);QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),5000);
   pending->write("HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");pending->disconnectFromHost();

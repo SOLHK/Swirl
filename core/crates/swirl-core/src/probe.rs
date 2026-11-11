@@ -28,6 +28,7 @@ pub struct ProbeMetrics {
     pub outbound_connect_ms: u64,
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
+    pub request_rtt_ms: u64,
     pub http_status: u16,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outbound_timing: Option<ConnectTimings>,
@@ -158,6 +159,7 @@ impl ProbeRuntime {
                     outbound_connect_ms: metrics.outbound_connect_ms,
                     origin_tls_ms: metrics.origin_tls_ms,
                     response_headers_ms: metrics.response_headers_ms,
+                    request_rtt_ms: metrics.request_rtt_ms,
                     http_status: metrics.http_status,
                     outbound_timing: metrics.outbound_timing,
                 }),

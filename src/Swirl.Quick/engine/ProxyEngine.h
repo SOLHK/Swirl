@@ -107,7 +107,7 @@ public:
         QString nodeMessage;
         QString probeFailureStage;
         QString probeFailureCode;
-        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1;
+        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1,probeRequestRttMs=-1;
         quint64 probeRequestTag=0;
         QVariantList connections;
         qint64 connectionsAt = 0;

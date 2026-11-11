@@ -15,6 +15,7 @@ Item {
     property real sectionHeight:Theme.dp(32)
     property Component sectionDelegate:null
     property Component rowActions:null
+    property Component latencyCell:null
     property real rowActionsWidth:0
     property bool activateOnSingleClick:true
     property bool followTail:false
@@ -419,13 +420,22 @@ Item {
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
                     Rectangle {anchors.fill:parent;radius:parent.radius;color:Theme.withAlpha(Theme.text,0.05);opacity:rowFeedback.focusAmount;visible:opacity>0;Accessible.ignored:true}
                     Row {
+                        z:1
                         anchors.fill:parent
                         visible:!recordRow.sectionRow
                         Repeater {
                             model:recordRow.sectionRow?[]:table.columns
                             delegate:Item {
                                 width:table.columnWidth(modelData); height:table.itemHeight
+                                Loader {
+                                    anchors.fill:parent;anchors.leftMargin:table.cellPadding;anchors.rightMargin:Theme.dp(8)
+                                    active:modelData.key==="latency"&&table.latencyCell!==null
+                                    sourceComponent:table.latencyCell
+                                    readonly property var record:recordRow.record
+                                    enabled:table.currentPresentation(recordRow)
+                                }
                                 SwirlText {renderType:Text.NativeRendering;
+                                    visible:modelData.key!=="latency"||table.latencyCell===null
                                     anchors.fill:parent
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
                                     id:cell

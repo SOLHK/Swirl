@@ -63,9 +63,9 @@ Item {
             }
             AccessRow {
                 title: qsTr("增强模式")
-                description: qsTr("先配置加密 DNS，并在关闭代理后选择 TUN；开启代理时将请求管理员授权。")
-                status: page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待开启代理") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
-                active: page.engineController.tunRequested; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy
+                description: qsTr("可在系统代理运行时直接切换；首次开启将请求管理员授权。")
+                status: page.engineController.tunBusy ? qsTr("切换中") : page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待启用") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+                active: page.engineController.tunEnabled; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy
                 onToggled: on => { if (!page.engineController.setTunEnabled(on)) AppState.notice(page.engineController.routingError || page.engineController.policyError) }
             }
             SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("局域网与设备"); description: qsTr("地址、认证与客户端配置可以保留；当前未支持的接管能力无法开启。") }
