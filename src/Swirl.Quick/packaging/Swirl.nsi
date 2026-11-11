@@ -116,8 +116,6 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     Goto ${FailureLabel}
 !macroend
 !macro RequireNativeTunRecovery FailureLabel
-    ; The path-validated isolated installer never owns the host's TUN session.
-    StrCmp $IsolatedInstall "1" native_tun_checked
     ; Query the exact REG_DWORD in the same explicit 32-bit view as the GUI.
     ; A missing marker does not launch anything or request elevation.
     StrCpy $FailurePhase "native-tun-marker-open"
