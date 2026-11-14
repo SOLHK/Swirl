@@ -448,6 +448,29 @@ private slots:
         QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());QVERIFY(!controller.proxyRequested());
         QCOMPARE(engine->starts,1);QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
     }
+    void failedSavedTunCanBeCancelledBeforeCatalogEditAndOrdinaryProxyStart(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-pending.dpapi"),false,std::move(backend));
+        auto options=controller.m_options;options.tunEnabled=true;options.proxyPort=listener.serverPort();
+        QVERIFY(controller.applyPolicyConfiguration(document(),options));QTRY_VERIFY(!controller.policyBusy());
+        engine->holdTunStart=true;controller.connectConfiguredPolicy();
+        QVERIFY(controller.busy());QVERIFY(controller.tunRequested());QVERIFY(!controller.tunEnabled());
+        QVERIFY(!controller.setTunEnabled(false));
+        QVERIFY(!controller.saveNode({{"name","blocked pending fixture"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",9}}));
+        engine->current.state=ProxyEngine::State::Failed;engine->current.message="TunBrokerIoTimeout";emit engine->statusChanged();
+        QVERIFY(!controller.busy());QVERIFY(!controller.tunRecoveryRequired());
+        QVERIFY(controller.setTunEnabled(false));QTRY_VERIFY(!controller.busy()&&!controller.policyBusy());
+        QVERIFY(!controller.tunRequested());QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+        QCOMPARE(engine->starts,1);QCOMPARE(proxy->enableCalls,0);QVERIFY(!controller.processAlive());
+        QVERIFY(controller.saveNode({{"name","saved after TUN failure"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",9}}));
+        QTRY_VERIFY(!controller.policyBusy());QVERIFY(controller.policyError().isEmpty());
+        QCOMPARE(controller.m_store.nodes().size(),1);
+        controller.setSystemProxy(true);QTRY_VERIFY(controller.systemProxy()->owned());
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QVERIFY(!controller.tunEnabled());
+        QCOMPARE(engine->starts,2);QCOMPARE(proxy->enableCalls,1);
+    }
     void stoppedTunStartupDoesNotRemainInTransition(){
         QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
         EngineController controller(std::move(peer),nullptr,dir.filePath("tun-declined.dpapi"));

@@ -67,10 +67,10 @@ Item {
                 description: qsTr("开启前确认管理员授权；切换期间连接可能短暂中断。")
                 status: page.engineController.tunRecoveryBusy ? qsTr("恢复中") : page.engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : page.engineController.tunBusy ? qsTr("切换中") : page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待启用") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
                 active: page.engineController.tunEnabled; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy && !page.engineController.tunRecoveryBusy
-                toggleVisible: !page.engineController.tunRecoveryRequired
-                configurable: page.engineController.tunRecoveryRequired
-                configureLabel: qsTr("恢复 TUN 网络")
-                onConfigure: AppState.requestTunEnabled(true)
+                toggleVisible: !page.engineController.tunRecoveryRequired && !(page.engineController.tunRequested && !page.engineController.tunEnabled)
+                configurable: page.engineController.tunRecoveryRequired || (page.engineController.tunRequested && !page.engineController.tunEnabled)
+                configureLabel: page.engineController.tunRecoveryRequired ? qsTr("恢复 TUN 网络") : qsTr("取消待启用")
+                onConfigure: AppState.requestTunEnabled(page.engineController.tunRecoveryRequired)
                 onToggled: on => AppState.requestTunEnabled(on)
             }
             SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("局域网与设备"); description: qsTr("地址、认证与客户端配置可以保留；当前未支持的接管能力无法开启。") }

@@ -94,10 +94,9 @@ Item {
     }
     function selectSource(id) {
         if (!editable || (sourceSelected && activeSourceId === id)) return
-        const v2 = engineController.policyV2Active
         beginMutation("select", id, null)
         mutationMessage = qsTr("正在切换来源并撤销原来源的连接…")
-        trackMutation(engineController.selectSubscription(id), v2)
+        trackMutation(engineController.selectSubscription(id), true)
     }
     function removeLegacy() {
         const v2 = engineController.policyV2Active

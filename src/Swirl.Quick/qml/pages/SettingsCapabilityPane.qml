@@ -82,7 +82,7 @@ ColumnLayout {
             title: modelData.name
             description: modelData.detail
             SwirlToggle {
-                visible: setting.modelData.kind === "toggle"
+                visible: setting.modelData.kind === "toggle" && !(setting.modelData.runtime === "tun" && engineController.tunRequested && !engineController.tunEnabled && !engineController.tunRecoveryRequired)
                 enabled: setting.modelData.runtime === "tun" && engineController.tunSupported && !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryRequired && !engineController.tunRecoveryBusy
                 checked: setting.modelData.runtime === "tun" ? engineController.tunEnabled : setting.modelData.builtIn === true
                 onToggled: {
@@ -90,6 +90,12 @@ ColumnLayout {
                     checked = Qt.binding(function() { return engineController.tunEnabled })
                 }
                 Accessible.name: setting.modelData.name
+            }
+            SwirlButton {
+                visible: setting.modelData.runtime === "tun" && engineController.tunRequested && !engineController.tunEnabled && !engineController.tunRecoveryRequired
+                text: qsTr("取消待启用")
+                enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                onClicked: AppState.requestTunEnabled(false)
             }
             SwirlComboBox { visible: setting.modelData.kind === "choice"; enabled: false; model: setting.modelData.values || []; Accessible.name: setting.modelData.name }
             SwirlTextField { visible: ["http", "socks", "api"].indexOf(setting.modelData.kind) >= 0; Layout.preferredWidth: Theme.dp(156); readOnly: true; text: setting.modelData.kind === "api" ? qsTr("无需端口") : String(engineController.proxyPort); Accessible.name: setting.modelData.name }

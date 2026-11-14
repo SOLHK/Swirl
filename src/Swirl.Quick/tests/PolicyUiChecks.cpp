@@ -4,6 +4,7 @@
 #include "PolicySystemProxyBackend.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
+#include "engine/RustCoreEngine.h"
 #include "app/NodeViewModel.h"
 #include <QColor>
 #include <QCryptographicHash>
@@ -24,6 +25,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
 #include <algorithm>
@@ -77,6 +79,53 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"minimum_advanced_focus",minimumAdvancedFocus},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
+    {
+        QTemporaryDir fixture;
+        const auto path=fixture.filePath("source-first.dpapi"),backup=fixture.filePath("source-first.backup");
+        EngineController sourceController(std::make_unique<RustCoreEngine>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+        sourceController.imports()->shutdown();
+        check(fixture.isValid()&&sourceController.m_store.saveSubscription({},"Receipt fixture",QUrl("https://source.fixture.invalid/config"),1440,false),
+              QStringLiteral("First-source UI fixture stores a disabled synthetic subscription without downloading"));
+        const auto sources=sourceController.m_store.subscriptions();
+        if(sources.isEmpty())return finish();
+        const auto sourceId=sources.first().id;
+        QQmlContext context(qmlContext(window));context.setContextProperty("engineController",&sourceController);
+        QQmlComponent component(qmlEngine(window),QUrl("qrc:/qt/qml/SwirlQuick/pages/SubscriptionsPage.qml"));
+        std::unique_ptr<QObject> page(component.create(&context));
+        if(!check(page!=nullptr,QStringLiteral("First-source regression instantiates the production subscription page"))){qWarning()<<component.errorString();return finish();}
+        const auto sourceAction=[&](const QString &script){QQmlExpression expression(&context,page.get(),script);const auto result=expression.evaluate();check(!expression.hasError(),QStringLiteral("Subscription receipt action is valid"));return result;};
+        const auto selectScript=QString("selectSource('%1')").arg(sourceId);
+        const bool blocked=QFile::rename(path,backup)&&QDir().mkdir(path);
+        if(!check(blocked,QStringLiteral("A temporary directory blocks the first source's real atomic save")))return finish();
+        sourceAction(selectScript);
+        const auto failedRequest=sourceController.policyRequestId();
+        check(!sourceController.policyV2Active()&&sourceController.policyBusy()&&page->property("mutationPending").toBool()
+              &&page->property("mutationRequestId").toString()==failedRequest&&!failedRequest.isEmpty()
+              &&!page->property("mutationMessage").toString().contains(QStringLiteral("已使用")),
+              QStringLiteral("First-source selection remains pending before native validation and encrypted save complete"));
+        sourceAction(selectScript);
+        sourceAction("completeMutation('unrelated-receipt', true)");
+        check(sourceController.policyRequestId()==failedRequest&&page->property("mutationPending").toBool(),
+              QStringLiteral("Repeated source clicks and unrelated receipts cannot complete or replace a pending selection"));
+        check(QTest::qWaitFor([&]{return !sourceController.policyBusy()&&!page->property("mutationPending").toBool();},12000)
+              &&!sourceController.policyV2Active()&&!sourceController.subscriptionScopeEnabled()&&!sourceController.policyError().isEmpty()
+              &&page->property("mutationMessage").toString()==sourceController.policyError(),
+              QStringLiteral("Failed first-source persistence reports failure and retains the previous source scope"));
+        if(!check(QDir().rmdir(path)&&QFile::rename(backup,path),QStringLiteral("First-source failure fixture restores its original encrypted file")))return finish();
+        sourceAction(selectScript);
+        const auto savedRequest=sourceController.policyRequestId();
+        check(page->property("mutationPending").toBool()&&savedRequest!=failedRequest,
+              QStringLiteral("Retry receives a fresh pending request instead of reusing the failed selection"));
+        check(QTest::qWaitFor([&]{return !sourceController.policyBusy()&&!page->property("mutationPending").toBool();},12000)
+              &&sourceController.policyError().isEmpty()&&sourceController.policyV2Active()
+              &&sourceController.activeSubscriptionId()==sourceId&&sourceController.policyReceipt().value("request_id")==savedRequest
+              &&page->property("mutationMessage").toString().contains(QStringLiteral("已使用")),
+              QStringLiteral("First-source success is shown only after its matching durable configuration receipt"));
+        sourceAction(selectScript);
+        check(sourceController.policyRequestId()==savedRequest&&!page->property("mutationPending").toBool()
+              &&!sourceController.processAlive()&&!sourceController.systemProxy()->owned(),
+              QStringLiteral("Selecting the committed source again is a no-op and never starts a proxy"));
+    }
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
     check(eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0").toBool(),QStringLiteral("An external host proxy never displays Swirl's small wing"));
@@ -764,6 +813,20 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
           &&controller->routingError().contains(QStringLiteral("组件或驱动缺失"))&&!controller->tunEnabled()
           &&controller->systemProxy()->diagnosticState()==beforeTunProxy,
           QStringLiteral("Explicit TUN confirmation reaches the real controller and unsupported components fail before platform mutation"));
+    auto pendingTunOptions=controller->m_options;pendingTunOptions.tunEnabled=true;
+    check(!controller->processAlive()&&controller->applyPolicyConfiguration(QJsonObject::fromVariantMap(controller->policyDocument()),pendingTunOptions)
+          &&QTest::qWaitFor([&]{return !controller->policyBusy();},5000)&&controller->policyError().isEmpty(),
+          QStringLiteral("An isolated durable TUN preference can be pending while the actual capture is stopped"));
+    check(controller->tunRequested()&&!controller->tunEnabled()
+          &&item("tunCapsule")->property("label").toString().contains(QStringLiteral("取消待启用"))
+          &&item("tunCapsule")->property("tone").toString()==QStringLiteral("neutral"),
+          QStringLiteral("The pending TUN action is explicit and never claims actual capture is enabled"));
+    click("tunCapsule");
+    check(QTest::qWaitFor([&]{return !controller->busy()&&!controller->policyBusy();},5000)
+          &&!controller->tunRequested()&&!controller->tunEnabled()&&!controller->processAlive()
+          &&!popup("tunAuthorizationDialog")&&controller->systemProxy()->diagnosticState()==beforeTunProxy
+          &&proxyBackend->takeoverCalls==beforeTunTakeovers&&proxyBackend->restoreCalls==beforeTunRestores,
+          QStringLiteral("Cancelling the pending TUN preference saves the change without elevation, core start or proxy takeover"));
     auto *activityMode=item("activityOutboundMode");
     auto *modeText=item("activityOutboundModeText");
     auto *modeContent=activityMode->property("contentItem").value<QQuickItem *>();
