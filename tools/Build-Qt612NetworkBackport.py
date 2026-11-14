@@ -124,6 +124,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--official-receipt", type=Path, required=True)
     parser.add_argument("--openssl-root", type=Path, required=True)
+    parser.add_argument("--compiler-preflight", type=Path, required=True)
     parser.add_argument("--work-root", type=Path, required=True)
     parser.add_argument("--evidence-directory", type=Path, required=True)
     args = parser.parse_args()
@@ -155,12 +156,16 @@ def main():
         sdk.write_json(evidence / "stock-sdk-receipt.json", official)
         report["stock_files"] = {name: stock_inventory[name] for name in OVERLAY}
         tools = {name: sdk.plain_path(Path(shutil.which(name) or ""))
-                 for name in ("cmake.exe", "ninja.exe", "cl.exe", "dumpbin.exe", "git.exe")}
-        compiler_binary = {"path": str(tools["cl.exe"]), **sdk.file_identity(tools["cl.exe"])}
-        require({key: compiler_binary[key] for key in ("bytes", "sha256")}
-                == {key: product["content"]["producer_compiler_binary"][key] for key in ("bytes", "sha256")},
-                "CompilerDoesNotMatchSelectedQmlProducer")
+                 for name in ("cmake.exe", "ninja.exe", "cl.exe", "link.exe", "dumpbin.exe", "git.exe")}
         report["tools"] = {name: {"path": str(path), **sdk.file_identity(path)} for name, path in tools.items()}
+        preflight = sdk.read_json(args.compiler_preflight)
+        report["compiler_preflight"] = preflight
+        require(preflight["success"] is True and preflight["errors"] == []
+                and preflight["source_sha"] == report["source_sha"], "CompilerPreflightRejected")
+        report["compiler"] = preflight["compiler"]
+        for name, field in (("cl.exe", "binary"), ("link.exe", "linker")):
+            require({key: report["compiler"][field][key] for key in ("bytes", "sha256")}
+                    == sdk.file_identity(tools[name]), "CompilerChangedAfterPreflight")
         _, source_lock = sources.source_lock()
         item = next(value for value in source_lock["official_sources"] if value["module"] == "qtbase")
         require(item["commit"] == backports["sources"]["qtbase"], "BackportSourceMismatch")
@@ -187,6 +192,8 @@ def main():
                   "tools/Build-Qt612QmlDiagnosticSdk.py", "tools/Prepare-Qt612ProductSource.py",
                   "tools/Install-QtSdk.py", "tools/requirements-qt-sdk.txt",
                   "scripts/Build-CiOpenSslRuntime.ps1", "scripts/Prepare-Nasm.ps1",
+                  "scripts/Test-Qt612NetworkCompiler.ps1",
+                  "scripts/Copy-VerifiedMsvcRuntime.ps1",
                   "scripts/RustProductPackagePolicy.ps1",
                   "tools/openssl-runtime.lock.json", *[patch["path"] for patch in patches],
                   "tools/repros/qt612-http-bounds/main.cpp", "tools/repros/qt612-http-bounds/CMakeLists.txt"]
@@ -203,6 +210,7 @@ def main():
         configure = [tools["cmake.exe"], "-S", source, "-B", build, "-G", "Ninja", "-C", initial_cache,
                      "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
                      "-DCMAKE_C_COMPILER=" + str(tools["cl.exe"]), "-DCMAKE_CXX_COMPILER=" + str(tools["cl.exe"]),
+                     "-DCMAKE_LINKER=" + str(tools["link.exe"]), "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF", "-DFEATURE_ltcg=OFF",
                      "-DCMAKE_MAKE_PROGRAM=" + str(tools["ninja.exe"]), "-DQT_BUILD_TESTS=OFF",
                      "-DQT_BUILD_EXAMPLES=OFF", "-DQT_BUILD_TOOLS_BY_DEFAULT=OFF", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                      "-DFEATURE_openssl=ON", "-DFEATURE_openssl_runtime=ON", "-DFEATURE_openssl_linked=OFF",
@@ -210,17 +218,21 @@ def main():
                      "-DOPENSSL_SSL_LIBRARY=" + str(ssl_build / "libssl.lib"),
                      "-DOPENSSL_CRYPTO_LIBRARY=" + str(ssl_build / "libcrypto.lib")]
         run(configure, work, commands, "configure-network", 600, env=env)
-        run([tools["cmake.exe"], "--build", build, "--target", "Network", "--parallel", "4"],
-            work, commands, "build-network", 2400, env=env)
         compiler_files = list((build / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"))
         require(len(compiler_files) == 1, "AmbiguousCompilerMetadata")
         compiler = sdk.compiler_values(compiler_files[0].read_text(encoding="utf-8"))
         expected_compiler = product["content"]["producer_compiler"]
-        require(all(compiler[key] == expected_compiler[key] for key in (
-            "CMAKE_CXX_COMPILER_ID", "CMAKE_CXX_COMPILER_VERSION", "MSVC_CXX_ARCHITECTURE_ID")), "CompilerMetadataMismatch")
-        report["compiler"] = {"binary": compiler_binary, "metadata": {
-            "compiler_id": compiler["CMAKE_CXX_COMPILER_ID"], "compiler_version": compiler["CMAKE_CXX_COMPILER_VERSION"],
-            "msvc_tools_version": os.environ.get("VCToolsVersion"), "windows_sdk_version": os.environ.get("WindowsSDKVersion")}}
+        actual_version = sdk.version_tuple(compiler["CMAKE_CXX_COMPILER_VERSION"])
+        require(compiler["CMAKE_CXX_COMPILER_ID"] == "MSVC" and compiler["MSVC_CXX_ARCHITECTURE_ID"] == "x64"
+                and actual_version[:2] == (19, 44)
+                and actual_version >= sdk.version_tuple(expected_compiler["CMAKE_CXX_COMPILER_VERSION"])
+                and compiler["CMAKE_CXX_COMPILER_VERSION"] == report["compiler"]["metadata"]["compiler_version"],
+                "CompilerMetadataMismatch")
+        run([tools["cmake.exe"], "--build", build, "--target", "Network", "--parallel", "4"],
+            work, commands, "build-network", 2400, env=env)
+        for name, field in (("cl.exe", "binary"), ("link.exe", "linker")):
+            require({key: report["compiler"][field][key] for key in ("bytes", "sha256")}
+                    == sdk.file_identity(tools[name]), "CompilerChangedDuringBuild")
         shutil.copyfile(compiler_files[0], evidence / "CMakeCXXCompiler.cmake")
         shutil.copyfile(build / "CMakeCache.txt", evidence / "CMakeCache.txt")
         stage = sdk.fresh_directory(evidence / "module-install-output", root=evidence)
@@ -283,6 +295,15 @@ def main():
             for name in ("Qt6Core.dll", "Qt6Test.dll"):
                 shutil.copyfile(stock / "bin" / name, runtime / name)
             shutil.copyfile(root / "bin/Qt6Network.dll", runtime / "Qt6Network.dll")
+            crt = report["compiler"]["crt"]
+            for name, identity in crt["files"].items():
+                require(re.fullmatch(r"(?:msvcp[0-9][a-z0-9_]*|vcruntime[0-9][a-z0-9_]*|concrt[0-9][a-z0-9_]*|vccorlib[0-9][a-z0-9_]*)\.dll", name),
+                        "UnrecognizedCrtModule")
+                original = sdk.plain_path(Path(crt["directory"]) / name)
+                expected = {key: identity[key] for key in ("bytes", "sha256")}
+                require(sdk.file_identity(original) == expected, "CrtChangedAfterPreflight")
+                shutil.copyfile(original, runtime / name)
+                require(sdk.file_identity(runtime / name) == expected, "FixtureCrtCopyChanged")
             before = sdk.inventory(runtime)
             runtime_env = sdk.tool_environment()
             runtime_env["PATH"] = str(runtime) + os.pathsep + str(Path(os.environ["SYSTEMROOT"]) / "System32")

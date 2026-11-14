@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/build-qt612-network-backport.yml'
       - 'tools/Build-Qt612NetworkBackport.py'
+      - 'scripts/Test-Qt612NetworkCompiler.ps1'
       - 'tools/qt612-backports.lock.json'
       - 'tools/qt612-product-sdk.lock.json'
       - 'tools/qt612-product-source.lock.json'
@@ -47,6 +48,9 @@ jobs:
           architecture: x64
           cache: pip
           cache-dependency-path: tools/requirements-qt-sdk.txt
+      - name: Admit and record the current MSVC maintenance toolchain
+        shell: pwsh
+        run: ./scripts/Test-Qt612NetworkCompiler.ps1 -Output "$env:RUNNER_TEMP/qt-network-compiler.json"
       - name: Prepare SDK tools
         shell: pwsh
         run: |
@@ -67,8 +71,16 @@ jobs:
         shell: pwsh
         timeout-minutes: 45
         run: |
-          python tools/Build-Qt612NetworkBackport.py --official-receipt "$env:RUNNER_TEMP/qt-network-official/sdk-install-result.json" --openssl-root "$env:RUNNER_TEMP/qt-network-openssl" --work-root "$env:RUNNER_TEMP/qt-network-backport" --evidence-directory "$env:GITHUB_WORKSPACE/build-evidence/network-sdk"
+          python tools/Build-Qt612NetworkBackport.py --official-receipt "$env:RUNNER_TEMP/qt-network-official/sdk-install-result.json" --openssl-root "$env:RUNNER_TEMP/qt-network-openssl" --compiler-preflight "$env:RUNNER_TEMP/qt-network-compiler.json" --work-root "$env:RUNNER_TEMP/qt-network-backport" --evidence-directory "$env:GITHUB_WORKSPACE/build-evidence/network-sdk"
           if ($LASTEXITCODE -ne 0) { throw 'Pinned Network backport verification failed.' }
+      - name: Preserve the observed compiler even if admission failed
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build-evidence/network-sdk | Out-Null
+          if (Test-Path -LiteralPath "$env:RUNNER_TEMP/qt-network-compiler.json") {
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/qt-network-compiler.json" -Destination build-evidence/network-sdk/compiler-preflight.json
+          }
       - name: Preserve exact binaries, corresponding source and original evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
