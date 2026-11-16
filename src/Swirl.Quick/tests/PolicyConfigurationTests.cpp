@@ -891,7 +891,9 @@ private slots:
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();
         auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
         EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,dir.filePath("master.dpapi"),false,std::move(backend));
+#ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
         controller.m_proxyProbeUrl=network.url();
+#endif
         controller.setProxyPort(port);QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));const auto revision=controller.savedRevision();reserved.close();
         QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(!controller.systemProxy()->owned());
