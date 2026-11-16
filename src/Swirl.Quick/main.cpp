@@ -27,6 +27,7 @@
 #include <QScopedValueRollback>
 #include <QJsonArray>
 #include <QSet>
+#include <QRegularExpression>
 #ifdef SWIRL_UI_TESTS
 #include <QQmlDebuggingEnabler>
 #include "tests/IsolatedUserRegistry.h"
@@ -298,6 +299,31 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
         if(capture.firstMatch.elapsed()>firstClusterMs
             ||capture.capturedWarnings>=maximumWarnings)return;
         auto *object=warning.object();
+        QString objectSource=object?QStringLiteral("QQmlError::object"):QString();
+        // Missing-method exceptions carry an address but no QQmlError object
+        // or column. Match it against live trees, never dereference log text.
+        int scannedObjects=0;
+        if(!object){
+            const auto address=QRegularExpression(QStringLiteral("\\(0x([0-9a-fA-F]+)(?:,|\\))")).match(description);
+            if(address.hasMatch()){
+                const auto expected=address.captured(1).toULongLong(nullptr,16);
+                QList<QObject *> pending=engine.rootObjects();
+                QSet<QObject *> visited;
+                while(!pending.isEmpty() && scannedObjects<8192){
+                    auto *candidate=pending.takeLast();
+                    if(!candidate || visited.contains(candidate))continue;
+                    visited.insert(candidate);++scannedObjects;
+                    if(reinterpret_cast<quintptr>(candidate)==expected){
+                        object=candidate;objectSource=QStringLiteral("warning address matched in live QObject/visual tree");break;
+                    }
+                    const auto *state=QObjectPrivate::get(candidate);
+                    if(state->wasDeleted || state->isDeletingChildren)continue;
+                    for(auto *child:candidate->children())pending.append(child);
+                    if(auto *item=qobject_cast<QQuickItem *>(candidate))
+                        for(auto *child:item->childItems())pending.append(child);
+                }
+            }
+        }
         if(object&&capture.observedObjects.contains(object))continue;
         if(object)capture.observedObjects.insert(object);
         ++capture.capturedWarnings;
@@ -331,6 +357,7 @@ static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
             {"description",description},{"url",url.scheme()==QStringLiteral("qrc")?url.toString():url.fileName()},
             {"line",warning.line()},{"column",warning.column()},
             {"object",qmlWarningObjectState(object)},
+            {"objectSource",objectSource},{"scannedObjects",scannedObjects},
             {"parents",parents},{"parentsTruncated",parent!=nullptr},
             {"context",qmlWarningContextChain(data?data->context:nullptr)},
             {"outerContext",qmlWarningContextChain(data?data->outerContext:nullptr)},
