@@ -78,6 +78,22 @@ def pe_machine(path):
     return "AMD64"
 
 
+def verify_network_pe_interface(stock_pe, patched_pe):
+    require(stock_pe["machine"] == patched_pe["machine"] == "AMD64"
+            and stock_pe["dependencies"] == patched_pe["dependencies"],
+            "NetworkPeInterfaceChanged")
+    stock_exports, patched_exports = stock_pe["exports"], patched_pe["exports"]
+    added = "?maxRawHeaderSize@QHttpHeaderParser@@QEBA_JXZ"
+    require(set(patched_exports) - set(stock_exports) == {added}
+            and not (set(stock_exports) - set(patched_exports)),
+            "NetworkPeInterfaceChanged")
+    added_ordinal = patched_exports[added]
+    require(all(patched_exports[name] == (ordinal if ordinal < added_ordinal else ordinal + 1)
+                for name, ordinal in stock_exports.items()),
+            "NetworkPeInterfaceChanged")
+
+
+
 def corresponding_source(source, evidence, source_item, patches):
     snapshot = sdk.inventory(source)
     sdk.write_json(evidence / "source-snapshot-files.json", snapshot)
@@ -268,7 +284,7 @@ def main():
                 "dependencies": sdk.parse_dependents(sdk.output_text(commands, flavor + "-dependents"))}
         report["interface"] = interfaces
         sdk.write_json(evidence / "interface.json", interfaces)
-        require(interfaces["stock"] == interfaces["patched"], "NetworkPeInterfaceChanged")
+        verify_network_pe_interface(interfaces["stock"], interfaces["patched"])
         fixture_source = sdk.fresh_directory(work / "fixture-source", root=work)
         original_fixture = (HERE / "repros/qt612-http-bounds/main.cpp").read_text(encoding="utf-8")
         needle = "QFETCH(QByteArray,response);QFETCH(bool,valid);"
