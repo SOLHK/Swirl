@@ -394,6 +394,8 @@ jobs:
             if (Test-Path -LiteralPath $oldBootstrap -PathType Leaf) { Remove-Item -LiteralPath $oldBootstrap -Force }
           }
           ./scripts/Copy-VerifiedMsvcRuntime.ps1 -BuildDirectory build/swirl-quick -ApplicationDirectory dist
+          python tools/Compose-Qt612ProductSdk.py verify-msvc --receipt $env:SWIRL_QT_SELECTED_RECEIPT --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-crt"
+          if ($LASTEXITCODE -ne 0) { throw 'Deployed QA MSVC runtime differs from the selected Network producer toolchain.' }
           if ((Get-FileHash -LiteralPath 'dist/Swirl.exe' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/Swirl.exe' -Algorithm SHA256).Hash) { throw 'Test runtime CRT deployment requires the exact verified application.' }
           $msvc = Get-Content -LiteralPath 'dist/msvc-runtime.json' -Raw -Encoding UTF8 | ConvertFrom-Json
           foreach ($entry in $msvc.files.PSObject.Properties) {

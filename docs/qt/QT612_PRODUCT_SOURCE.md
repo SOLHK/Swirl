@@ -17,7 +17,7 @@ identity fields, and separately preserve that final receipt and workflow result.
 
 | Module | Role | Source identity |
 | --- | --- | --- |
-| QtBase | Core, GUI, Network, OpenGL and deployed platform, image and TLS plugins | Official 6.12.0 source archive; commit `025bdad181de241e81bf853c8a2d7bf3d19261a9` |
+| QtBase | Core, GUI, Network, OpenGL and deployed platform, image and TLS plugins | Official 6.12.0 source archive at `025bdad181de241e81bf853c8a2d7bf3d19261a9`, plus the complete modified QtBase source used for the Network backports |
 | QtDeclarative | QML, Quick, controls, dialogs, layouts, QML files and plugins | Complete tracked library source at `4332fbbb4c340463dc8cee36dda0c85d932122d8`, with the modification below |
 | QtSvg | SVG library, image and icon plugins | Official 6.12.0 source archive; commit `883a58532078d003cefef0a549bfe9f885ce41f5` |
 | QtTranslations | Source catalogs for the deployed translations | Official 6.12.0 source archive; commit `2811457ceff8f0c24a1c4d14f947a283a17239d0` |
@@ -35,7 +35,7 @@ checkout bytes. No general newline conversion is performed.
 
 ## Modification and actual build material
 
-Only `src/qml/memory/qv4mm.cpp` has the recorded library-source modification:
+The QtDeclarative library-source modification is in `src/qml/memory/qv4mm.cpp`:
 the allocator sweeping change from the official Qt commit
 [`8c92fe01338c76885f412a68fd39238147e21a81`](https://github.com/qt/qtdeclarative/commit/8c92fe01338c76885f412a68fd39238147e21a81).
 The exact patch is included under
@@ -44,6 +44,33 @@ Its SHA256 is
 `9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac`.
 The patched source-file SHA256 is
 `baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525`.
+
+The selected QtNetwork library includes the two HTTP parser bounds backports
+`aac1d303c0329241ac59c0c23cb5e4b82251fcfa` and
+`f78a3740281d26af7116517a2b20df36f8deffd7`. Its complete modified QtBase source is
+`sources/qtbase-network-corresponding-source.zip`. `network-build-evidence/`
+contains its exact source snapshot, patches, build recipe, compiler identities
+and module/ABI/feature records. The separate Network producer run and artifact
+are bound by `recipe/qt612-network-sdk.lock.json`; they do not replace the Qml
+producer's original identity. The retained official QtBase archive describes
+the other stock QtBase modules and is not substituted for the modified source.
+
+To rebuild QtNetwork, use the recorded x64 MSVC compiler and stock Qt 6.12 SDK
+with the complete configure/build commands in `network-build-evidence/`. The
+modified archive already contains both patches; do not apply them twice. The
+verified module payload contains `Qt6Network.dll`, its import library and the
+matching private HTTP reply header. Stock/modified ABI and feature equality
+and the HTTP bounds regression evidence remain required before selecting it.
+
+The historical Qml compiler bytes remain recorded unchanged. The Network
+producer permits an explicitly bounded MSVC 19.44 x64 servicing update at
+least as new as that compiler, with its matching linker. The product compiler
+and linker must then match that successful Network producer's exact hashes.
+This uses Qt DLLs and import libraries, without reusing historical `/GL` or
+`/LTCG` object code. The selected official CRT bytes, signatures and actual
+fixture results are retained; CRT and linker servicing numbers are not treated
+as interchangeable version counters. This policy follows Microsoft's
+[MSVC binary compatibility restrictions](https://learn.microsoft.com/en-us/cpp/porting/binary-compat-2015-2017).
 
 The archived build material is historical evidence of how this DLL was made;
 it retains its original source, run and diagnostic scope labels. Product

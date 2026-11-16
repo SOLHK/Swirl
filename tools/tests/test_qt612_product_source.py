@@ -67,12 +67,30 @@ class ProductSourceControls(unittest.TestCase):
         directory = self.root / "bundle"
         directory.mkdir()
         receipt = {"schema": 1, "status": "complete", "source_sha": "a" * 40,
-                   "runtime_files": {"Qt6Qml.dll": {"sha256": "c" * 64}},
+                   "runtime_files": {"Qt6Qml.dll": {"sha256": "c" * 64},
+                                     "Qt6Network.dll": {"sha256": "b" * 64}},
                    "installer_notes": {"licenses/qt/SOURCE-BUNDLE.json": {"sha256": "d" * 64}}}
+        self.network_lock = {"status": "verified", "producer": {"head": "a" * 40},
+                             "artifact": {"artifact": 1}, "receipt": {"patches": [{"sha256": "e" * 64}],
+                             "module_files": {"bin/Qt6Network.dll": {"sha256": "b" * 64}}}}
+        network_source_bytes = b"complete synthetic QtBase source fixture"
+        self.network_lock["receipt"]["corresponding_source"] = {"archive": {
+            "bytes": len(network_source_bytes), "sha256": SOURCE.sha(network_source_bytes)}}
+        receipt["network_artifact"] = {k: self.network_lock[k] for k in ("producer", "artifact")}
+        receipt["patched_network"] = {"patches": self.network_lock["receipt"]["patches"], "binary_sha256": "b" * 64}
+        original_reader = SOURCE.read_json
+        patcher = mock.patch.object(SOURCE, "read_json", side_effect=lambda path, *args, **kwargs:
+            self.network_lock if Path(path).name == "qt612-network-sdk.lock.json"
+            else original_reader(path, *args, **kwargs))
+        patcher.start()
+        self.addCleanup(patcher.stop)
         receipt["runtime_content_id"] = SOURCE.sha(SOURCE.canonical(receipt["runtime_files"]))
         with zipfile.ZipFile(directory / "source.zip", "x") as container:
-            container.writestr("bundle-manifest.json", SOURCE.json_bytes({
-                k: receipt[k] for k in ["schema", "source_sha", "runtime_files", "runtime_content_id"]}))
+            bound = {k: receipt[k] for k in ["schema", "source_sha", "runtime_files", "runtime_content_id", "network_artifact"]}
+            bound["modified_network"] = self.network_lock["receipt"]["corresponding_source"]
+            bound["source_archives"] = {"sources/qtbase-network-corresponding-source.zip": bound["modified_network"]["archive"]}
+            container.writestr("bundle-manifest.json", SOURCE.json_bytes(bound))
+            container.writestr("sources/qtbase-network-corresponding-source.zip", network_source_bytes)
         archive = {"filename": "source.zip", **SOURCE.file_identity(directory / "source.zip")}
         receipt["archive"] = archive
         self.write("bundle/qt-source-bundle.json", SOURCE.json_bytes(receipt))
@@ -248,6 +266,29 @@ class ProductSourceControls(unittest.TestCase):
         path.write_bytes(SOURCE.json_bytes(receipt))
         with self.assertRaisesRegex(SOURCE.SourceError, "SourceBundleReceiptMismatch"):
             SOURCE.verify_package(args)
+
+    def test_final_package_requires_the_current_network_producer_and_patch_identity(self):
+        args, _, _ = self.package_fixture()
+        self.network_lock["producer"]["head"] = "f" * 40
+        with self.assertRaisesRegex(SOURCE.SourceError, "SourceBundleNetworkBindingMismatch"):
+            SOURCE.verify_package(args)
+        self.assertFalse((self.root / "bundle/package-binding.json").exists())
+
+    def test_modified_qtbase_archive_is_checked_as_a_separate_complete_source_tree(self):
+        path = self.root / "qtbase.zip"
+        raw = b"license fixture"
+        with zipfile.ZipFile(path, "w") as archive:
+            info = zipfile.ZipInfo("qtbase/LICENSES/LGPL-3.0-only.txt")
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, raw)
+        snapshot = {"LICENSES/LGPL-3.0-only.txt": {"bytes": len(raw), "sha256": SOURCE.sha(raw)}}
+        source = {"archive": SOURCE.file_identity(path), "tracked_regular_files": 1, "tracked_bytes": len(raw),
+                  "source": {"commit": "a" * 40}, "omitted_gitlinks": []}
+        result, notices = SOURCE.inspect_modified_archive(path, source, snapshot, self.lock["limits"], module="qtbase")
+        self.assertEqual(result["members"], 1)
+        self.assertEqual(notices, {"LICENSES/LGPL-3.0-only.txt": raw})
+        with self.assertRaisesRegex(SOURCE.SourceError, "ModifiedSourceEntryRejected"):
+            SOURCE.inspect_modified_archive(path, source, snapshot, self.lock["limits"])
 
 
 if __name__ == "__main__":

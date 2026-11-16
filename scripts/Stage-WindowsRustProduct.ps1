@@ -146,6 +146,11 @@ if ($QtSdkReceipt) {
 }
 if($compilerId -eq 'MSVC'){
     & (Join-Path $PSScriptRoot 'Copy-VerifiedMsvcRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
+    if ($QtSdkReceipt) {
+        & $Python (Join-Path $repo 'tools/Compose-Qt612ProductSdk.py') verify-msvc --receipt $QtSdkReceipt `
+            --runtime-dir $stage --evidence (Join-Path $QtEvidenceDirectory 'post-crt')
+        if ($LASTEXITCODE -ne 0) { throw 'Deployed MSVC runtime differs from the selected Network producer toolchain.' }
+    }
 }else{
     & (Join-Path $PSScriptRoot 'Copy-VerifiedMingwRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
 }
@@ -209,6 +214,7 @@ if ($QtSdkReceipt) {
     # verifier and never blesses files added after the manifest was recorded.
     & $Python (Join-Path $repo 'tools/Prepare-Qt612ProductSource.py') prepare --runtime-dir $stage `
         --source-sha $sourceSha --sdk-evidence $selectedQt.sdk_evidence_dir `
+        --network-evidence $selectedQt.network.sdk_evidence_dir `
         --cache-dir $QtSourceCacheDirectory --output-dir $QtSourceDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Matching Qt sources and installation notices could not be prepared.' }
 }

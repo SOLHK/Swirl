@@ -15,7 +15,10 @@ replace those terms.
 
 QtDeclarative has the single documented allocator-sweep modification from
 official commit `8c92fe01338c76885f412a68fd39238147e21a81`. Its patch, exact modified
-source, file manifest and original build recipe are included. No additional Qt
+source, file manifest and original build recipe are included. QtNetwork also
+contains the two recorded HTTP parser bounds backports. Its complete modified
+QtBase source, both patches, source manifest and build evidence are supplied
+separately from the unmodified QtBase archive. No additional Qt
 commercial license or special permission is asserted here.
 
 Primary references:

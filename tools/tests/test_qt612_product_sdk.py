@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +25,10 @@ spec = importlib.util.spec_from_file_location("product_sdk_under_test", HERE.par
 product = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = product
 spec.loader.exec_module(product)
+producer_spec = importlib.util.spec_from_file_location("network_producer_under_test", HERE.parent / "Build-Qt612NetworkBackport.py")
+producer = importlib.util.module_from_spec(producer_spec)
+sys.modules[producer_spec.name] = producer
+producer_spec.loader.exec_module(producer)
 REPOSITORY = HERE.parents[1]
 CMAKE = None
 LOCK = product.load_lock()
@@ -58,7 +63,7 @@ def pr_event(base_ref="test"):
     return event, environment, source, [base, head]
 
 
-def minimal_pe(*, dll=True):
+def minimal_pe(*, dll=True, exports=()):
     data = bytearray(1024)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 60, 128)
@@ -67,6 +72,23 @@ def minimal_pe(*, dll=True):
     struct.pack_into("<H", data, 152, 0x20B)
     struct.pack_into("<I", data, 152 + 108, 16)
     struct.pack_into("<IIII", data, 152 + 240 + 8, 512, 4096, 512, 512)
+    if exports:
+        count = len(exports)
+        struct.pack_into("<II", data, 152 + 112, 4096, 40)
+        func_rva = 4136
+        names_rva = func_rva + count * 4
+        ords_rva = names_rva + count * 4
+        strings_rva = ords_rva + count * 2
+        struct.pack_into("<IIIIII", data, 512 + 16, 1, count, count, func_rva, names_rva, ords_rva)
+        cursor = strings_rva
+        for i, name in enumerate(exports):
+            encoded = name.encode("ascii") + b"\0"
+            struct.pack_into("<I", data, 512 + (func_rva - 4096) + i * 4, 4400 + i)
+            struct.pack_into("<I", data, 512 + (names_rva - 4096) + i * 4, cursor)
+            struct.pack_into("<H", data, 512 + (ords_rva - 4096) + i * 2, i)
+            offset = 512 + (cursor - 4096)
+            data[offset:offset + len(encoded)] = encoded
+            cursor += len(encoded)
     return data
 
 
@@ -347,8 +369,8 @@ class ProductSdkBoundaries(unittest.TestCase):
         with self.assertRaises(product.Rejected):
             product.capture_values("schema=1\nschema=1\n")
         values = {key: "value" for key in ("schema", "source_sha", "content_id", "configuration", "qml_dll",
-            "qml_import_library", "qml_private_includes", "application", "compiler", "compiler_version",
-            "compiler_id", "cmake", "source_directory", "build_directory")}
+            "qml_import_library", "qml_private_includes", "network_dll", "network_import_library", "application", "compiler", "compiler_version",
+            "compiler_id", "linker", "cmake", "source_directory", "build_directory")}
         values.update(schema="1", configuration="Debug")
         with self.assertRaises(product.Rejected):
             product.capture_values("\n".join(k + "=" + v for k, v in values.items()))
@@ -551,6 +573,243 @@ class InstalledEnvironmentBoundaries(unittest.TestCase):
                 product.qtenv2_bytes(root)
 
 
+class NetworkArtifactBoundaries(unittest.TestCase):
+    def fixture(self, root):
+        evidence = root / "network-sdk"
+        evidence.mkdir()
+        stock_dll = bytes(minimal_pe(exports=("alpha", "omega")))
+        patched_dll = bytes(minimal_pe(exports=("alpha", "?maxRawHeaderSize@QHttpHeaderParser@@QEBA_JXZ", "omega")))
+        module = {}
+        for name in product.NETWORK_FILES:
+            path = evidence / "module-install-output" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(patched_dll if name.endswith(".dll") else b"patched fixture")
+            module[name] = product.file_id(path)
+        snapshot = {"LICENSES/LGPL.txt": product.byte_id(b"license fixture"),
+                    "src/network/access/qhttpnetworkreply.cpp": product.byte_id(b"patched source")}
+        archive = evidence / "qtbase-corresponding-source.zip"
+        with zipfile.ZipFile(archive, "w") as output:
+            for name, raw in (("LICENSES/LGPL.txt", b"license fixture"),
+                              ("src/network/access/qhttpnetworkreply.cpp", b"patched source")):
+                output.writestr("qtbase/" + name, raw)
+        source = {"source": {"commit": "a" * 40}, "patches": [{"sha256": "b" * 64}],
+                  "archive": product.file_id(archive), "file_manifest_content_id": product.canonical(snapshot),
+                  "tracked_regular_files": len(snapshot), "tracked_bytes": sum(v["bytes"] for v in snapshot.values())}
+        receipt = {"schema": 1, "kind": "swirl-qt612-network-backport", "success": True, "errors": [],
+                   "source_sha": "c" * 40, "qt_version": "6.12.0", "architecture": "x86_64-windows-msvc",
+                   "source": source["source"], "patches": source["patches"], "module_files": module,
+                   "corresponding_source": source,
+                   "source_inputs": {},
+                   "stock_files": {name: product.byte_id(b"stock fixture") for name in product.NETWORK_FILES},
+                   "compiler": {"binary": copy.deepcopy(LOCK["content"]["producer_compiler_binary"]),
+                       "linker": {"path": "C:/fixture/link.exe", **product.byte_id(b"linker fixture")}, "metadata": {
+                       "compiler_id": LOCK["content"]["producer_compiler"]["CMAKE_CXX_COMPILER_ID"],
+                       "compiler_version": LOCK["content"]["producer_compiler"]["CMAKE_CXX_COMPILER_VERSION"],
+                       "linker_version": "14." + LOCK["content"]["producer_compiler"]["CMAKE_CXX_COMPILER_VERSION"].split(".", 1)[1],
+                       "msvc_architecture": "x64"}},
+                   "features": {"stock": {"ssl": 1}, "patched": {"ssl": 1}, "verified": True},
+                   "interface": {"stock": product.pe_interface(stock_dll), "patched": product.pe_interface(patched_dll)}}
+        receipt["tools"] = {"cl.exe": copy.deepcopy(receipt["compiler"]["binary"]),
+                            "link.exe": copy.deepcopy(receipt["compiler"]["linker"])}
+        (evidence / "CMakeCache.txt").write_text("CMAKE_LINKER:FILEPATH=" + receipt["compiler"]["linker"]["path"] + "\n")
+        (evidence / "CMakeCXXCompiler.cmake").write_text(
+            'set(CMAKE_CXX_COMPILER "' + receipt["compiler"]["binary"]["path"] + '")\n'
+            'set(CMAKE_CXX_COMPILER_ID "MSVC")\n'
+            'set(CMAKE_CXX_COMPILER_VERSION "' + receipt["compiler"]["metadata"]["compiler_version"] + '")\n'
+            'set(MSVC_CXX_ARCHITECTURE_ID "x64")\n')
+        for name, data in (("receipt.json", receipt), ("module-files.json", module),
+                           ("corresponding-source.json", source), ("source-snapshot-files.json", snapshot)):
+            product.write_json(evidence / name, data)
+        inventory = {p.relative_to(root).as_posix(): product.file_id(p) for p in root.rglob("*") if p.is_file()}
+        lock = {"receipt": copy.deepcopy(receipt), "producer": {"head": receipt["source_sha"]},
+                "critical_members": inventory,
+                "artifact": {"artifact": 1}}
+        return lock, inventory
+
+    def test_network_overlay_changes_new_content_identity_without_changing_qml_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lock, inventory = self.fixture(root)
+            network = product.verify_network_artifact(root, inventory, lock, LOCK, SDK, TRANSPORT)
+            before = {**network["receipt"]["stock_files"], "bin/Qt6Qml.dll": product.byte_id(b"stock qml")}
+            qml = {**before, "bin/Qt6Qml.dll": product.byte_id(b"patched qml")}
+            artifact = {"stock_files": before, "derived_files": qml}
+            combined = product.with_network_artifact(artifact, network)
+            self.assertEqual(artifact["derived_files"], qml)
+            self.assertEqual(combined["derived_files"], {**qml, **network["module_files"]})
+            self.assertNotEqual(product.canonical(combined["derived_files"]), product.canonical(qml))
+
+    def test_network_overlay_rejects_already_changed_or_unrelated_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lock, inventory = self.fixture(root)
+            network = product.verify_network_artifact(root, inventory, lock, LOCK, SDK, TRANSPORT)
+            before = dict(network["receipt"]["stock_files"])
+            for name in product.NETWORK_FILES:
+                changed = {**before, name: product.byte_id(b"unrelated overlay")}
+                with self.assertRaisesRegex(product.Rejected, "NetworkOverlayBaselineRejected"):
+                    product.with_network_artifact({"stock_files": before, "derived_files": changed}, network)
+
+    def test_network_source_snapshot_and_abi_are_verified_beyond_receipt_success(self):
+        for mutation in ("source", "abi", "features", "compiler", "linker", "module"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                lock, inventory = self.fixture(root)
+                receipt_path = root / "network-sdk/receipt.json"
+                receipt = product.read_json(receipt_path)
+                if mutation == "source":
+                    source_path = root / "network-sdk/corresponding-source.json"
+                    source = product.read_json(source_path)
+                    source["tracked_bytes"] += 1
+                    source_path.write_text(json.dumps(source))
+                    inventory["network-sdk/corresponding-source.json"] = product.file_id(source_path)
+                elif mutation == "linker":
+                    cache = root / "network-sdk/CMakeCache.txt"
+                    cache.write_text("CMAKE_LINKER:FILEPATH=C:/another/link.exe\n")
+                    inventory["network-sdk/CMakeCache.txt"] = product.file_id(cache)
+                elif mutation == "abi":
+                    receipt["interface"]["patched"]["exports"]["unexpected"] = 1
+                elif mutation == "features":
+                    receipt["features"]["patched"]["ssl"] = -1
+                elif mutation == "compiler":
+                    receipt["compiler"]["binary"]["sha256"] = "f" * 64
+                else:
+                    receipt["module_files"]["bin/other.dll"] = product.byte_id(b"unapproved")
+                if mutation not in ("source", "linker"):
+                    receipt_path.write_text(json.dumps(receipt))
+                    inventory["network-sdk/receipt.json"] = product.file_id(receipt_path)
+                    lock["receipt"] = receipt
+                with self.assertRaises(product.Rejected):
+                    product.verify_network_artifact(root, inventory, lock, LOCK, SDK, TRANSPORT)
+
+    def test_network_pin_is_required_before_composition(self):
+        with mock.patch.object(product, "read_json", return_value={"schema": 1, "status": "pending"}):
+            with self.assertRaisesRegex(product.Rejected, "NetworkArtifactPinIncomplete"):
+                product.load_network_lock()
+
+    def test_network_maintenance_admission_keeps_old_qml_identity_and_rejects_other_toolsets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lock, _ = self.fixture(Path(temporary))
+            compiler = lock["receipt"]["compiler"]
+            compiler["binary"]["sha256"] = "e" * 64
+            compiler["metadata"].update(compiler_version="19.44.35299.0", linker_version="14.44.35299.0")
+            admitted = product.network_compiler_compatibility(compiler, LOCK)
+            self.assertEqual(admitted["network_compiler_binary"]["sha256"], "e" * 64)
+            self.assertEqual(admitted["qml_compiler_binary"], LOCK["content"]["producer_compiler_binary"])
+            for field, value in (("compiler_version", "19.44.1.0"), ("compiler_version", "19.45.35299.0"),
+                                 ("msvc_architecture", "x86"), ("linker_version", "14.44.35298.0")):
+                changed = copy.deepcopy(compiler)
+                changed["metadata"][field] = value
+                with self.subTest(field=field, value=value), self.assertRaisesRegex(product.Rejected, "NetworkCompilerCompatibilityRejected"):
+                    product.network_compiler_compatibility(changed, LOCK)
+
+    def test_network_pe_interface_requires_exact_max_raw_header_size_export_and_ordinal_shift(self):
+        added = "?maxRawHeaderSize@QHttpHeaderParser@@QEBA_JXZ"
+        stock = {"machine": "AMD64", "dependencies": ["qt6core.dll", "ws2_32.dll"],
+                 "exports": {"alpha": 1, "beta": 2, "gamma": 3, "omega": 4}}
+        patched = {"machine": "AMD64", "dependencies": ["qt6core.dll", "ws2_32.dll"],
+                   "exports": {"alpha": 1, "beta": 2, added: 3, "gamma": 4, "omega": 5}}
+        for verifier, exc in ((producer.verify_network_pe_interface, RuntimeError),
+                              (product.verify_network_pe_interface, product.Rejected)):
+            verifier(stock, patched)
+            for label, mutation in (
+                    ("unpatched-identical-exports", lambda p: p.update(exports=copy.deepcopy(stock["exports"]))),
+                    ("wrong-added-symbol", lambda p: p.update(exports={"alpha": 1, "beta": 2, "?other@QHttpHeaderParser@@QEBA_JXZ": 3, "gamma": 4, "omega": 5})),
+                    ("extra-added-symbol", lambda p: p["exports"].update({"?extra@QHttpHeaderParser@@QEBA_JXZ": 6})),
+                    ("missing-original-symbol", lambda p: p["exports"].pop("omega")),
+                    ("wrong-ordinal-before-insertion", lambda p: p["exports"].update({"beta": 3})),
+                    ("wrong-ordinal-after-insertion", lambda p: p["exports"].update({"gamma": 3})),
+                    ("machine-mismatch", lambda p: p.update(machine="I386")),
+                    ("dependency-mismatch", lambda p: p.update(dependencies=["qt6core.dll"])),
+            ):
+                candidate = copy.deepcopy(patched)
+                mutation(candidate)
+                with self.subTest(verifier=verifier.__module__, case=label), self.assertRaises(exc):
+                    verifier(stock, candidate)
+
+    def test_network_producer_must_match_successful_run_job_head_and_artifact(self):
+        lock = copy.deepcopy(LOCK)
+        lock["producer"]["event"] = "push"
+        run, jobs, artifact = producer_metadata()
+        run.update(event="push", conclusion="success")
+        jobs["jobs"][0]["conclusion"] = "success"
+        product.validate_network_producer(run, jobs, artifact, lock, require_unexpired=True)
+        for target, key, replacement in (("run", "head_sha", "f" * 40),
+                                         ("run", "conclusion", "failure"),
+                                         ("job", "conclusion", "failure"),
+                                         ("artifact", "digest", "sha256:" + "f" * 64),
+                                         ("artifact", "expired", True)):
+            changed_run, changed_jobs, changed_artifact = copy.deepcopy((run, jobs, artifact))
+            changed = {"run": changed_run, "job": changed_jobs["jobs"][0], "artifact": changed_artifact}[target]
+            changed[key] = replacement
+            with self.subTest(target=target, key=key), self.assertRaises(product.Rejected):
+                product.validate_network_producer(changed_run, changed_jobs, changed_artifact, lock,
+                                                  require_unexpired=True)
+
+
+class SelectedMsvcBoundaries(unittest.TestCase):
+    def fixture(self, root):
+        compiler = {"binary": {"sha256": "c" * 64}, "linker": {"sha256": "d" * 64},
+                    "metadata": {"compiler_version": "19.44.35229.0", "linker_version": "14.44.35229.0"},
+                    "crt": {"files": {}}}
+        receipt = {"schema": 1, "kind": "msvc-app-local", "architecture": "x64",
+                   "source": {"compiler_sha256": "c" * 64, "compiler_version": "19.44.35229.0"},
+                   "required_imports": [], "files": {}}
+        for name in ("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "vcruntime140.dll", "vcruntime140_1.dll"):
+            (root / name).write_bytes((name + " synthetic runtime bytes").encode())
+            identity = product.file_id(root / name)
+            # DLL servicing builds need not equal the compiler/linker counter.
+            compiler["crt"]["files"][name] = {**identity, "version": "14.44.35211.0"}
+            receipt["required_imports"].append(name)
+            receipt["files"][name] = {"size": identity["bytes"], "sha256": identity["sha256"],
+                                      "file_version": "14.44.35211.0", "machine": "0x8664", "signature_status": "Valid"}
+        product.write_json(root / "msvc-runtime.json", receipt)
+        return compiler, receipt
+
+    def test_pinned_producer_crt_is_required_without_comparing_unrelated_servicing_counters(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            compiler, receipt = self.fixture(root)
+            result = product.verify_msvc_payload(root, compiler, SDK)
+            self.assertEqual(result["files"], compiler["crt"]["files"])
+            self.assertEqual(result["compiler_sha256"], receipt["source"]["compiler_sha256"])
+
+    def test_modified_runtime_is_rejected_even_with_a_rewritten_copy_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            compiler, receipt = self.fixture(root)
+            path = root / "msvcp140.dll"
+            path.write_bytes(b"same-version different runtime")
+            identity = product.file_id(path)
+            receipt["files"][path.name].update(size=identity["bytes"], sha256=identity["sha256"])
+            (root / "msvc-runtime.json").write_text(json.dumps(receipt))
+            with self.assertRaisesRegex(product.Rejected, "SelectedMsvcRuntimeChanged"):
+                product.verify_msvc_payload(root, compiler, SDK)
+
+    def test_unmatched_compiler_missing_core_and_invalid_signature_receipts_are_rejected(self):
+        for mutation in ("compiler", "core", "signature"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                compiler, receipt = self.fixture(root)
+                if mutation == "compiler":
+                    receipt["source"]["compiler_sha256"] = "e" * 64
+                elif mutation == "core":
+                    receipt["files"].pop("vcruntime140_1.dll")
+                    receipt["required_imports"].remove("vcruntime140_1.dll")
+                else:
+                    receipt["files"]["msvcp140.dll"]["signature_status"] = "UnknownError"
+                (root / "msvc-runtime.json").write_text(json.dumps(receipt))
+                with self.assertRaises(product.Rejected):
+                    product.verify_msvc_payload(root, compiler, SDK)
+
+    def test_product_and_qa_bind_crt_after_existing_copy_before_runtime_execution(self):
+        stage = (REPOSITORY / "scripts/Stage-WindowsRustProduct.ps1").read_text()
+        qa = (REPOSITORY / ".github/workflows/build-qt-quick-ui.yml").read_text()
+        for text, runtime_marker in ((stage, "--rust-core-self-test"), (qa, "& dist/Swirl.exe --tls-runtime-self-test")):
+            self.assertLess(text.index("Copy-VerifiedMsvcRuntime.ps1"), text.index(" verify-msvc "))
+            self.assertLess(text.index(" verify-msvc "), text.index(runtime_marker))
+
+
 class CmakeObservationBoundaries(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -562,10 +821,11 @@ class CmakeObservationBoundaries(unittest.TestCase):
             path.mkdir(parents=True)
         for name in ("Qt6", "Qt6Qml", "Qt6QmlPrivate"):
             (self.selected / "lib/cmake" / name).mkdir(parents=True)
-        for name in ("bin/Qt6Qml.dll", "lib/Qt6Qml.lib"):
+        for name in ("bin/Qt6Qml.dll", "lib/Qt6Qml.lib", "bin/Qt6Network.dll", "lib/Qt6Network.lib"):
             (self.selected / name).write_bytes(b"test bytes; never executed")
-        self.compiler, self.cmake = root / "cl.exe", root / "cmake.exe"
+        self.compiler, self.linker, self.cmake = root / "cl.exe", root / "link.exe", root / "cmake.exe"
         self.compiler.write_bytes(b"compiler identity only")
+        self.linker.write_bytes(b"linker identity only")
         self.cmake.write_bytes(b"cmake identity only")
         self.context = {"source_sha": "a" * 40}
         self.lock = copy.deepcopy(LOCK)
@@ -575,6 +835,9 @@ class CmakeObservationBoundaries(unittest.TestCase):
         self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.installed_content_id))
         self.receipt = {"cmake_capture_hook": {"path": str(self.hook), **product.file_id(self.hook)},
                         "selected_content_id": self.installed_content_id}
+        self.receipt["product_toolchain"] = {"binary": product.file_id(self.compiler),
+            "linker": product.file_id(self.linker), "metadata": {"compiler_id": "MSVC",
+                "compiler_version": self.lock["content"]["producer_compiler"]["CMAKE_CXX_COMPILER_VERSION"]}}
         self.cache = {"CMAKE_BUILD_TYPE": "Release", "CMAKE_CXX_COMPILER": str(self.compiler),
                       "CMAKE_COMMAND": str(self.cmake), "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": self.hook.as_posix(),
                       "CMAKE_CACHE_MAJOR_VERSION": "3", "CMAKE_CACHE_MINOR_VERSION": "31", "CMAKE_CACHE_PATCH_VERSION": "6"}
@@ -583,10 +846,12 @@ class CmakeObservationBoundaries(unittest.TestCase):
         self.capture = {"schema": "1", "source_sha": "a" * 40, "content_id": self.installed_content_id,
             "configuration": "Release", "qml_dll": str(self.selected / "bin/Qt6Qml.dll"),
             "qml_import_library": str(self.selected / "lib/Qt6Qml.lib"),
+            "network_dll": str(self.selected / "bin/Qt6Network.dll"),
+            "network_import_library": str(self.selected / "lib/Qt6Network.lib"),
             "qml_private_includes": ";".join(str(self.selected / n) for n in ("include/QtQml/6.12.0", "include/QtQml/6.12.0/QtQml")),
             "application": str(self.build / "Release/Swirl.exe"), "compiler": str(self.compiler),
             "compiler_version": self.lock["content"]["producer_compiler"]["CMAKE_CXX_COMPILER_VERSION"],
-            "compiler_id": "MSVC", "cmake": str(self.cmake), "source_directory": str(self.repo / "src/Swirl.Quick"),
+            "compiler_id": "MSVC", "linker": str(self.linker), "cmake": str(self.cmake), "source_directory": str(self.repo / "src/Swirl.Quick"),
             "build_directory": str(self.build)}
         self.compiler_metadata = self.build / "CMakeFiles/3.31.6/CMakeCXXCompiler.cmake"
         self.compiler_metadata.parent.mkdir(parents=True)
@@ -642,6 +907,13 @@ class CmakeObservationBoundaries(unittest.TestCase):
         with self.assertRaisesRegex(product.Rejected, "CmakeActualTargetPathRejected"):
             self.check()
 
+    def test_network_import_library_cannot_point_outside_selected_sdk(self):
+        wrong = self.root / "stock-network.lib"
+        wrong.write_bytes(b"stock")
+        self.capture["network_import_library"] = str(wrong)
+        with self.assertRaisesRegex(product.Rejected, "CmakeActualTargetPathRejected:network_import_library"):
+            self.check()
+
     def test_hook_and_compiler_byte_mutations_are_rejected(self):
         self.hook.write_bytes(self.hook.read_bytes() + b"# mutated\n")
         with self.assertRaisesRegex(product.Rejected, "CmakeCaptureHookChanged"):
@@ -649,6 +921,12 @@ class CmakeObservationBoundaries(unittest.TestCase):
         self.hook.write_bytes(product.capture_hook(self.selected, self.context, self.installed_content_id))
         self.compiler.write_bytes(b"changed compiler")
         with self.assertRaisesRegex(product.Rejected, "ProductCompilerDiffers"):
+            self.check()
+
+    def test_actual_linker_must_match_the_successful_network_producer(self):
+        self.check()
+        self.linker.write_bytes(b"unrelated linker servicing update")
+        with self.assertRaisesRegex(product.Rejected, "ProductLinkerDiffersFromPinnedNetworkLinker"):
             self.check()
 
     def test_missing_private_header_path_rejected(self):
@@ -671,12 +949,16 @@ add_library(Qt6::Qml SHARED IMPORTED)
 set_target_properties(Qt6::Qml PROPERTIES IMPORTED_LOCATION_RELEASE "@DLL@" IMPORTED_IMPLIB_RELEASE "@LIB@" _qt_module_has_private_headers "@PRIVATE_HEADERS@")
 add_library(Qt6::QmlPrivate INTERFACE IMPORTED)
 set_target_properties(Qt6::QmlPrivate PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "@INC@")
+add_library(Qt6::Network SHARED IMPORTED)
+set_target_properties(Qt6::Network PROPERTIES IMPORTED_LOCATION_RELEASE "@NETWORK_DLL@" IMPORTED_IMPLIB_RELEASE "@NETWORK_LIB@")
 add_executable(Swirl IMPORTED)
 set_target_properties(Swirl PROPERTIES IMPORTED_LOCATION_RELEASE "@APP@")
 '''.replace("@DLL@", (self.selected / "bin/Qt6Qml.dll").as_posix()).replace("@LIB@", (self.selected / "lib/Qt6Qml.lib").as_posix()).replace("@INC@", includes if includes is not None else self.capture["qml_private_includes"].replace("\\", "/")).replace("@APP@", app.as_posix()).replace("@PRIVATE_HEADERS@", private_headers)
+        text = text.replace("@NETWORK_DLL@", (self.selected / "bin/Qt6Network.dll").as_posix()).replace("@NETWORK_LIB@", (self.selected / "lib/Qt6Network.lib").as_posix())
         (source / "CMakeLists.txt").write_text(text)
         command = [str(CMAKE), "-S", str(source), "-B", str(build), "-DCMAKE_SYSTEM_NAME=Windows",
                    "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_CONFIGURATION_TYPES=Release",
+                   "-DCMAKE_LINKER=" + self.linker.as_posix(),
                    "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=" + self.hook.as_posix()]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr).decode(errors="replace"))
