@@ -856,7 +856,11 @@ int main(int argc, char *argv[])
             app.setProperty("qtDiagnosticFile",file);
             QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);
         }
-        if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
+        if(nodeTest){
+            const auto file=qEnvironmentVariableIntValue("SWIRL_NODE_UI_REQUIRE_NATIVE")==1
+                ?QStringLiteral("Swirl-node-ui-native-diagnostics.txt"):QStringLiteral("Swirl-node-ui-diagnostics.txt");
+            app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);
+        }
         if(policyTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-policy-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-policy-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         if(engineTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-engine-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-engine-ui-diagnostics.txt");}

@@ -823,6 +823,8 @@ jobs:
         with:
           name: Swirl-Node-Regression-Evidence
           path: |
+            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
+            build/swirl-quick/Release/Swirl-node-ui-native-diagnostics.txt
             build-evidence/critical-ui.xml
             build-evidence/critical-network.xml
             build-evidence/node-diagnostic-regression.xml
