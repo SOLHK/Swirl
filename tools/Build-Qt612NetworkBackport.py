@@ -104,13 +104,15 @@ def prepare_openssl_headers(root, work, evidence):
     candidates = list(root.with_name(root.name + "-build").glob("*/compile/libssl.lib"))
     require(len(candidates) == 1, "FreshOpenSslDevelopmentBuildRequired")
     build = candidates[0].parent
-    source_candidates = list(build.parent.glob("source/*/include/openssl/ssl.h"))
-    require(len(source_candidates) == 1 and (build / "libcrypto.lib").is_file(),
+    source_candidates = list(build.parent.glob("source/*/include/openssl"))
+    require(len(source_candidates) == 1 and (source_candidates[0] / "ssl.h.in").is_file()
+            and (build / "libcrypto.lib").is_file(),
             "OpenSslDevelopmentFilesMissing")
     include = work / "openssl-include"
-    shutil.copytree(source_candidates[0].parent.parent, include)
+    shutil.copytree(source_candidates[0].parent, include)
     generated = build / "include/openssl"
-    require((generated / "configuration.h").is_file(), "GeneratedOpenSslConfigurationMissing")
+    for name in ("configuration.h", "ssl.h", "crypto.h", "opensslv.h"):
+        require((generated / name).is_file(), "GeneratedOpenSslHeaderMissing:" + name)
     for path in generated.glob("*.h"):
         shutil.copyfile(path, include / "openssl" / path.name)
     sdk.write_json(evidence / "openssl-development.json", {
