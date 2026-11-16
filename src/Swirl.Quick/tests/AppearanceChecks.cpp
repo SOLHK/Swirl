@@ -647,7 +647,10 @@ Item {
                         QTest::qWait(30);
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
                         check(releaseDelivered&&released,"same-stack timed release reaches the actual control");
-                        check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
+                        // A spring can cross the resting scale while it still
+                        // runs. Retire that animation before the next initial
+                        // press; the later reversal deliberately interrupts it.
+                        check(QTest::qWaitFor([&]{return !paint->property("moving").toBool()&&paint->scale()==1&&content&&content->scale()==1;},1400),"released button springs back to its resting scale");
                         if(theme=="Light" && name=="reviewButton"){
                             SwirlPressClock *nativeClock=nullptr;
                             for(auto *candidate:control->findChildren<SwirlPressClock *>())
@@ -1068,7 +1071,7 @@ Item {
     if(proxy){
         // Observe real ownership without operating the host proxy. Controlled
         // states below exercise the same component against a counting fake.
-        const bool active=eval("engineController.proxyRequested || engineController.systemProxy.owned || engineController.processAlive").toBool();
+        const bool active=eval("engineController.proxyRequested || engineController.systemProxy.owned").toBool();
         const bool pending=eval("engineController.systemProxyBusy").toBool();
         const bool stopping=eval("engineController.systemProxyStopping").toBool();
         check(proxy->property("proxyEnabled").toBool()==active,"master proxy control reflects Swirl runtime and owned settings");
@@ -1086,7 +1089,7 @@ Item {
  id: fixture; x:230; y:90; width:420; height:60; z:1100
  property alias control: capsule
  property QtObject fake: QtObject {
-  property bool proxyRequested:false; property bool processAlive:false
+  property bool proxyRequested:false; property bool processAlive:false; property bool tunEnabled:false
   property bool systemProxyBusy:false; property bool systemProxyStopping:false
   property bool busy:false; property bool policyBusy:false
   property string routingError:""; property string policyError:""; property string errorCode:"None"; property string error:""
@@ -1099,11 +1102,12 @@ Item {
   function toggleSystemProxy(){++toggleCalls}
  }
  function scenario(name){
-  fake.proxyRequested=false;fake.processAlive=false;fake.systemProxyBusy=false;fake.systemProxyStopping=false
+  fake.proxyRequested=false;fake.processAlive=false;fake.tunEnabled=false;fake.systemProxyBusy=false;fake.systemProxyStopping=false
   fake.systemProxy.owned=false;fake.systemProxy.enabled=false;fake.systemProxy.systemEnabled=false;fake.systemProxy.stateReadError=""
   if(name==="external")fake.systemProxy.systemEnabled=true
   if(name==="core")fake.processAlive=true
-  if(name==="owned"){fake.proxyRequested=true;fake.processAlive=true;fake.systemProxy.owned=true;fake.systemProxy.enabled=true}
+  if(name==="tun"){fake.processAlive=true;fake.tunEnabled=true}
+  if(name==="owned" || name==="owned-tun"){fake.proxyRequested=true;fake.processAlive=true;fake.systemProxy.owned=true;fake.systemProxy.enabled=true;fake.tunEnabled=name==="owned-tun"}
   if(name==="starting"){fake.proxyRequested=true;fake.systemProxyBusy=true}
   if(name==="stopping"){fake.proxyRequested=true;fake.systemProxyStopping=true}
   if(name==="error")fake.systemProxy.stateReadError="受控读取失败"
@@ -1116,21 +1120,22 @@ Item {
         proxyStates->setParentItem(window->contentItem());
         auto *control=qvariant_cast<QQuickItem *>(proxyStates->property("control"));
         auto *fake=proxyStates->property("fake").value<QObject *>();
-        for(const QString scenario:{QStringLiteral("idle"),QStringLiteral("external"),QStringLiteral("core"),QStringLiteral("owned"),QStringLiteral("starting"),QStringLiteral("stopping"),QStringLiteral("error")}){
+        for(const QString scenario:{QStringLiteral("idle"),QStringLiteral("external"),QStringLiteral("core"),QStringLiteral("tun"),QStringLiteral("owned"),QStringLiteral("owned-tun"),QStringLiteral("starting"),QStringLiteral("stopping"),QStringLiteral("error")}){
             QMetaObject::invokeMethod(proxyStates,"scenario",Q_ARG(QVariant,scenario));QTest::qWait(35);
-            const bool starting=scenario=="starting",stopping=scenario=="stopping",error=scenario=="error",owned=scenario=="owned";
+            const bool starting=scenario=="starting",stopping=scenario=="stopping",error=scenario=="error",owned=scenario=="owned" || scenario=="owned-tun";
             const auto expectedLabel=starting?QStringLiteral("正在开启代理…"):stopping?QStringLiteral("正在关闭代理…"):QStringLiteral("系统代理");
             check(control && control->property("label").toString()==expectedLabel,"controlled proxy states retain stable label or specific pending text");
-            check(control && control->property("proxyEnabled").toBool()==(owned || scenario=="core" || starting || stopping)
+            check(control && control->property("proxyEnabled").toBool()==(owned || starting || stopping)
                 && control->property("proxyOwned").toBool()==owned,"proxy presentation derives enabled and ownership from controller state");
             check(control && control->property("tone").toString()==(error?"warning":owned?"success":"neutral")
                 && control->property("activityPhase").toString()==(starting || stopping?"pending":error?"failed":owned?"succeeded":"idle"),"state glyph phase and tone follow actual controller semantics");
-            const auto detailToken=starting?QStringLiteral("正在启动已保存策略"):stopping?QStringLiteral("正在结束配置操作"):error?QStringLiteral("受控读取失败"):owned?QStringLiteral("已接管系统代理"):scenario=="external"?QStringLiteral("其他应用的系统代理已开启"):scenario=="core"?QStringLiteral("内核正在运行"):QStringLiteral("点击启动已保存策略");
+            const auto detailToken=starting?QStringLiteral("正在检查代理端口和出口，点击取消"):stopping?QStringLiteral("正在恢复已接管的系统设置"):error?QStringLiteral("受控读取失败"):owned?QStringLiteral("已接管系统代理"):scenario=="external"?QStringLiteral("其他应用的系统代理已开启"):QStringLiteral("点击通过 Swirl 开启系统代理");
             const auto accessibleDescription=QQmlProperty::read(control,QStringLiteral("Accessible.description"),qmlContext(control));
             qInfo()<<"PROXY_APPEARANCE_ACCESSIBLE"<<scenario<<accessibleDescription<<"expected detail token"<<detailToken;
             check(control && control->property("detail").toString().contains(detailToken)
                 && accessibleDescription.isValid() && accessibleDescription==control->property("detail")
                 && (!error || control->property("detail").toString()=="受控读取失败"),"accessible description preserves operation and error details");
+            if(owned)check(control->property("detail").toString().contains(scenario=="owned-tun"?QStringLiteral("TUN 继续运行"):QStringLiteral("停止内核")),"proxy restore action preserves the independent TUN intent");
             const auto calls=fake?fake->property("toggleCalls").toInt():-1;
             if(control)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());
             check(fake && fake->property("toggleCalls").toInt()==calls+((stopping || error)?0:1),"proxy button invokes only its isolated controller and respects blocked states");

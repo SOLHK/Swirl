@@ -47,6 +47,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 {"nodeBusy",controller->nodeBusy()},{"canStart",controller->canStart()},
                 {"processAlive",controller->processAlive()},{"policyBusy",controller->policyBusy()},
                 {"policyApplyState",controller->policyApplyState()},{"policyError",controller->policyError()},
+                {"routingError",controller->routingError()},
                 {"policyRequestId",controller->policyRequestId()}}).toJson(QJsonDocument::Compact);
             if(auto *dialog=window->findChild<QObject *>("proxyAddDialog"))
                 qInfo()<<"Node editor failure state"<<"visible"<<dialog->property("visible")
@@ -153,6 +154,11 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     const auto foreignFixture=QStringLiteral("node-runtime.fixture.invalid");
     net.a.aliases={foreignFixture};net.b.aliases={foreignFixture};
     auto liveUrl=net.url();liveUrl.setHost(foreignFixture);
+    // The startup gate must traverse the same real, isolated SOCKS peer as
+    // later node requests. These peers deliberately reject public destinations.
+    const auto originalProxyProbeUrl=controller->m_proxyProbeUrl;
+    const auto restoreProxyProbe=qScopeGuard([&]{controller->m_proxyProbeUrl=originalProxyProbeUrl;});
+    controller->m_proxyProbeUrl=liveUrl;
     const auto probeSelected=[&](SocksPeer &selected,SocksPeer &other,const char *label){
         const auto forwarded=selected.forwarded,otherForwarded=other.forwarded;
         const auto before=net.httpRequestsByExit;
@@ -239,13 +245,18 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     const auto nodeA=eval("pageLoader.item.selectedId").toString();
     choosePolicy(nodeA,true);select(0);
     if(check(waitEngineReady(),"UI starts actual Rust Core")) {
-        check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
+        check(controller->requestSucceeded()&&net.httpRequestsByExit.value(net.a.label)>0
+            &&net.httpRequestsByExit.value("DIRECT-BYPASS")==0,
+            "activity startup verifies a real request through selected node A before owning the proxy");
+        fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         // Exercise the real Main toolbar after this test's node-page history,
         // without invoking the real Windows adapter on the developer's host.
         {
-            const auto hostProxyBefore=SystemProxySession::snapshot();
+            QString snapshotError;
+            const auto hostProxyBefore=SystemProxySession::snapshot(&snapshotError);
 #ifdef Q_OS_WIN
+            if(hostProxyBefore.isEmpty())qInfo()<<"Read-only Main proxy snapshot error"<<snapshotError;
             check(!hostProxyBefore.isEmpty(),"read-only Main proxy snapshot is available");
 #endif
             const auto pidBefore=controller->processId();
@@ -260,6 +271,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         property bool busy: false
                         property bool policyBusy: false
                         property bool processAlive: false
+                        property bool tunEnabled: false
                         property bool proxyRequested: false
                         property bool systemProxyStopping: false
                         property bool systemProxyBusy: false
@@ -306,8 +318,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                                     &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==enabled
                                     &&capsule->property("tone").toString()==(enabled?"success":"neutral")
                                     &&capsule->property("activityPhase").toString()==(enabled?"succeeded":"idle")
-                                    &&detail.contains(enabled?QStringLiteral("已接管系统代理"):QStringLiteral("点击启动已保存策略"))
-                                    &&detail.contains(enabled?QStringLiteral("点击恢复原设置并停止内核"):QStringLiteral("通过 Swirl 开启代理"))
+                                    &&detail.contains(enabled?QStringLiteral("已接管系统代理"):QStringLiteral("点击通过 Swirl 开启系统代理"))
+                                    &&detail.contains(enabled?QStringLiteral("点击恢复原设置并停止内核"):QStringLiteral("开启系统代理"))
                                     &&accessibleName.isValid()&&accessibleName.toString()==label
                                     &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail;
                             };
@@ -414,10 +426,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         const auto liveBeforeA=net.a.forwarded,liveBeforeB=net.b.forwarded;
         const auto liveReceipts=net.httpRequestsByExit;
         controller->testNode(liveUrl);
-        check(QTest::qWaitFor([&]{return controller->requestSucceeded()&&!controller->nodeBusy();},8000)
+        check(QTest::qWaitFor([&]{return controller->requestSucceeded()&&!controller->nodeBusy()
             &&net.a.forwarded>liveBeforeA&&net.b.forwarded==liveBeforeB
             &&net.httpRequestsByExit.value(net.a.label)>liveReceipts.value(net.a.label)
-            &&net.httpRequestsByExit.value("DIRECT-BYPASS")==liveReceipts.value("DIRECT-BYPASS"),
+            &&net.httpRequestsByExit.value("DIRECT-BYPASS")==liveReceipts.value("DIRECT-BYPASS");},8000),
             "the actual live runtime still forwards through A after browsing and testing B");
         choosePolicy(nodeB,false);select(1);
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==nodeB&&controller->processId()==pid,"policy selection switches real exit without restarting");

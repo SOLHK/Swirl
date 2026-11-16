@@ -1892,6 +1892,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 property bool systemProxyBusy: false
                 property bool proxyRequested: false
                 property bool processAlive: false
+                property bool tunEnabled: false
                 property bool systemProxyStopping: false
                 property bool policyBusy: false
                 property string routingError: ""
@@ -1912,7 +1913,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 function toggleSystemProxy() {
                     calls++
                     if(reject) { routingError="test-operation-failed"; return }
-                    const requested = !(proxyRequested || systemProxy.owned || processAlive || busy)
+                    const requested = !(proxyRequested || systemProxy.owned || systemProxyBusy)
                     if(requested) originalSystemEnabled=systemProxy.systemEnabled
                     proxyRequested=requested;processAlive=requested;busy=false;systemProxyBusy=false
                     systemProxy.owned=requested;systemProxy.enabled=requested
@@ -1943,14 +1944,14 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                     &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail
                     &&accessibleName.isValid()&&accessibleName.toString()==label;
             };
-            check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
+            check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击通过 Swirl 开启系统代理")));
             clickProxy();
             check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
             check("proxy-on-offers-disable",proxyState(true,true,true,"success","succeeded",QStringLiteral("点击恢复原设置并停止内核")));
             check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
             clickProxy();
             check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
-            check("proxy-disabled-state-updates-action",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
+            check("proxy-disabled-state-updates-action",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击通过 Swirl 开启系统代理")));
             fake->setProperty("proxyRequested",true);fake->setProperty("busy",true);fake->setProperty("systemProxyBusy",true);clickProxy();
             check("proxy-pending-request-can-be-cancelled",fake->property("calls").toInt()==3&&!fake->property("proxyRequested").toBool()&&!fake->property("busy").toBool());
             fake->setProperty("systemProxyStopping",true);clickProxy();
@@ -1961,7 +1962,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             clickProxy();clickProxy();
             check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             fake->setProperty("processAlive",true);
-            check("running-core-without-owned-proxy-stays-neutral",proxyState(true,false,true,"neutral","idle",QStringLiteral("内核正在运行")));
+            check("running-core-without-owned-proxy-stays-neutral",proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             fake->setProperty("processAlive",false);
             if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
             fake->setProperty("reject",true);clickProxy();

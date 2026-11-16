@@ -31,6 +31,13 @@ public:
         m_path=QStringLiteral("Software\\SwirlVolatileTests-")+QUuid::createUuid().toString(QUuid::WithoutBraces);
         if(RegCreateKeyExW(m_user,reinterpret_cast<LPCWSTR>(m_path.utf16()),0,nullptr,
             REG_OPTION_VOLATILE,KEY_ALL_ACCESS|KEY_WOW64_32KEY,nullptr,&m_fixture,nullptr)!=ERROR_SUCCESS)return false;
+        // Proxy snapshots read this key even when every proxy value is absent.
+        // Seed only the empty Windows namespace inside our volatile root; the
+        // user's real settings remain outside the redirected HKCU view.
+        HKEY internetSettings=nullptr;
+        if(RegCreateKeyExW(m_fixture,L"Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",0,nullptr,
+            REG_OPTION_VOLATILE,KEY_QUERY_VALUE,nullptr,&internetSettings,nullptr)!=ERROR_SUCCESS)return false;
+        RegCloseKey(internetSettings);
         if(RegOverridePredefKey(HKEY_CURRENT_USER,m_fixture)!=ERROR_SUCCESS)return false;
         m_overridden=true;
 #endif

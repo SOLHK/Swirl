@@ -280,6 +280,7 @@ signals:
 private:
     friend class PolicyConfigurationTests;
     friend int runPolicyUiChecks(QQuickWindow *,EngineController *,const QString &);
+    friend int runNodeUiChecks(QQuickWindow *,EngineController *);
 #ifdef SWIRL_PRIVATE_UI_QUOTA
     friend class PrivateUiQuotaSession;
 #endif
