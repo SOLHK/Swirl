@@ -89,11 +89,13 @@ def load_lock():
     lock = read_json(LOCK_PATH)
     require(lock.get("schema") == 1 and lock.get("kind") == "swirl-qt612-product-sdk-fixed-artifact-candidate",
             "ProductLockSchemaRejected")
-    require(lock["producer"]["run"] == 42338365419 and lock["artifact"]["artifact"] == 13561016761
-            and lock["artifact"]["sha256"] == "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
+    require(lock["producer"]["run"] == 43855072540 and lock["artifact"]["artifact"] == 14221516760
+            and lock["artifact"]["sha256"] == "130b3eb29bec634ef91c6f37687b4c004e87ead599ea2151ab7c305a4f8e3425",
             "FixedArtifactPolicyChanged")
     require(lock["recipe"]["patch"]["upstream_commit"] == "8c92fe01338c76885f412a68fd39238147e21a81"
-            and lock["content"]["derived"] == "6a2b82cc4a2133e128f83511a91764a121178c90cd3717399af612136ab2fc1c",
+            and [p["upstream_commit"] for p in lock["recipe"]["patch"].get("additional", [])]
+            == ["4c1054b0f997f2977a54d42523856805b309db9a"]
+            and lock["content"]["derived"] == "d668364f9f59abdf809681c46b878c3d0b738dd6915773176800248e6aee3f49",
             "FixedDerivationPolicyChanged")
     return lock
 
@@ -314,13 +316,13 @@ def validate_producer(run, jobs, artifact, lock, *, require_unexpired):
             and run.get("head_repository", {}).get("id") == repo["id"]
             and run.get("head_sha") == p["head"] and run.get("head_branch") == repo["branch"]
             and run.get("path") == p["workflow"] and run.get("event") == "pull_request"
-            and run.get("status") == "completed" and run.get("conclusion") == "failure",
+            and run.get("status") == "completed" and run.get("conclusion") == p["conclusion"],
             "ProducerFinalRunRejected")
     require(jobs.get("total_count") == 1 and len(jobs.get("jobs", [])) == 1, "ProducerJobsIncomplete")
     job = jobs["jobs"][0]
     require(job.get("id") == p["job"] and job.get("run_id") == p["run"]
             and job.get("name") == p["job_name"] and job.get("status") == "completed"
-            and job.get("conclusion") == "failure", "ProducerJobRejected")
+            and job.get("conclusion") == p["conclusion"], "ProducerJobRejected")
     actual_steps = [{k: s.get(k) for k in ("number", "name", "conclusion")} for s in job.get("steps", [])]
     require(actual_steps == p["steps"], "ProducerExpectedNegativeStepsChanged")
     owner = artifact.get("workflow_run", {})
@@ -336,7 +338,7 @@ def validate_producer(run, jobs, artifact, lock, *, require_unexpired):
             artifact["expires_at"].replace("Z", "+00:00")) > datetime.now(timezone.utc),
             "ProducerArtifactExpired")
     return {"run_id": p["run"], "job_id": p["job"], "run_attempt": p["attempt"],
-            "original_conclusion": "failure", "expected_negative_preserved": True,
+            "original_conclusion": p["conclusion"], "expected_negative_preserved": True,
             "metadata_checked_utc": datetime.now(timezone.utc).isoformat()}
 
 
@@ -553,11 +555,14 @@ def verify_fixture_records(root, inventory, lock, sdk):
     def get(name):
         return read_json(member(root, inventory, name, sdk))
     comparison = get("comparison/comparison.json")
+    has_jit = bool(lock["recipe"]["patch"].get("additional"))
+    require(lock["producer"]["conclusion"] == ("success" if has_jit else "failure"), "ProducerRegressionGateMismatch")
     require(comparison["source_sha"] == lock["producer"]["merge"]
             and comparison["pr_head_sha"] == lock["producer"]["head"]
             and comparison["stage"] == "complete" and comparison["comparison_collected"] is True
-            and comparison["success"] is False
-            and comparison["errors"] == ["OriginalFixtureFailurePreserved; see separate stock and patched receipts"]
+            and comparison["success"] is has_jit
+            and (not has_jit or comparison.get("negative_controls_observed") is True)
+            and comparison["errors"] == ([] if has_jit else ["OriginalFixtureFailurePreserved; see separate stock and patched receipts"])
             and comparison["runtime_delta"] == {"added": [], "removed": [], "changed": ["Qt6Qml.dll"]},
             "OriginalFixtureFailureNotPreserved")
     outcomes = get("step-outcomes.json")
@@ -566,8 +571,9 @@ def verify_fixture_records(root, inventory, lock, sdk):
             and outcomes["run_id"] == str(lock["producer"]["run"])
             and outcomes["run_attempt"] == "1" and outcomes["prepare_step"] == "success"
             and outcomes["boundaries_step"] == "success" and outcomes["sdk_step"] == "success"
-            and outcomes["comparison_step"] == "failure", "ProducerStepReceiptRejected")
+            and outcomes["comparison_step"] == lock["producer"]["conclusion"], "ProducerStepReceiptRejected")
     summary = {}
+    cases = ("popup-normal", "popup-incremental", "sweep-slots") + (("jit-setlookup",) if has_jit else ())
     for variant in ("stock", "patched"):
         aggregate_name = "comparison/" + variant + "/aggregate.json"
         aggregate = get(aggregate_name)
@@ -576,34 +582,64 @@ def verify_fixture_records(root, inventory, lock, sdk):
                 and variant_record["collected"] is True
                 and variant_record["runner_exit_code"] == (1 if variant == "stock" else 0)
                 and aggregate["success"] is (variant == "patched"), "FixtureAggregateRejected")
+        require([case["name"] for case in aggregate["cases"]] == list(cases)
+                and set(variant_record["cases"]) == set(cases), "FixtureCaseSetChanged")
         summary[variant] = {}
-        for case in ("popup-normal", "popup-incremental", "sweep-slots"):
+        for case in cases:
             prefix = "comparison/" + variant + "/" + case + "/"
             result = get(prefix + "receipt.json")
             proof = result["exit_proof"]
-            success = variant == "patched" or case != "sweep-slots"
+            success = variant == "patched" or case not in ("sweep-slots", "jit-setlookup")
+            expected_exit = 0 if success else 0xc0000005 if case == "jit-setlookup" else 2
             require(result["source_sha"] == lock["producer"]["merge"]
                     and result["success"] is success and result["timed_out"] is False
-                    and proof["exitCode"] == (0 if success else 2)
+                    and proof["exitCode"] & 0xffffffff == expected_exit
                     and proof["processSignaled"] is True and proof["ownedProcessSetEmpty"] is True
                     and proof["backend"] == "windows-single-process-job", "FixtureExitProofRejected")
             interpretation = variant_record["cases"][case]["interpretation"]
-            require(interpretation["conclusive"] is True and not interpretation["warning_lines"],
+            require(interpretation == result["interpretation"]
+                    and interpretation["conclusive"] is (success or case == "sweep-slots")
+                    and not interpretation["warning_lines"],
                     "FixtureInterpretationRejected")
             if case == "sweep-slots":
                 require(interpretation["same_bitmap_word_allocations"] == 8
                         and interpretation["free_runs_inside_live_objects"] == (8 if variant == "stock" else 0),
                         "AllocatorInvariantEvidenceChanged")
+            elif case == "jit-setlookup":
+                require(interpretation["qt_version"] == "6.12.0"
+                        and interpretation["interpreter_override"] == ""
+                        and interpretation["runtime_verified"] is True, "JitRuntimeIdentityRejected")
+                require(result["errors"] == ([] if success else ["MissingOrAmbiguousJitCompletion", "MissingOrNonzeroActualExit"]),
+                        "JitFailureSignatureChanged")
+                if success:
+                    require(interpretation["iterations"] == 100 and interpretation["qml_warning_count"] == 0,
+                            "JitRegressionIncomplete")
+                expected_qml = lock["content"]["qml_" + variant]
+                for phase in ("before", "after"):
+                    observed = result["qt_qml_dll_" + phase]
+                    require({key: observed[key] for key in ("bytes", "sha256")} == expected_qml,
+                            "JitQmlBinaryChanged")
+                    require(interpretation["qml_module"].replace("\\", "/").casefold()
+                            == observed["path"].replace("\\", "/").casefold(), "JitLoadedModulePathChanged")
             else:
                 require(interpretation["completed_helpers"] == 288 and interpretation["fixture_exit"] == 0
                         and interpretation["qml_warning_count"] == 0, "PopupCompatibilityEvidenceChanged")
                 if case == "popup-incremental":
                     require(interpretation["actual_time_limit_us"] == 1000 and interpretation["yield_observed"] is True
                             and interpretation["pending_returns"] > 0, "IncrementalCoverageMissing")
+            text = []
             for name in ("stdout.log", "stderr.log"):
                 path = member(root, inventory, prefix + name, sdk)
                 require(sdk.file_identity(path) == {k: result["outputs"][name][k] for k in ("bytes", "sha256")},
                         "FixtureOutputBindingChanged")
+                if case == "jit-setlookup":
+                    text.append(path.read_text(encoding="utf-8-sig", errors="replace"))
+            if case == "jit-setlookup":
+                samples = re.findall(r"^(?:\[info\] )?JIT_GC_RUNTIME (\{.*\})\s*$", "\n".join(text), re.MULTILINE)
+                require(len(samples) == 1, "JitLoadedModuleObservationMissing")
+                sample = json.loads(samples[0], object_pairs_hook=no_duplicates)
+                require(sample == {"qt": "6.12.0", "interpreter_override": "", "qml_module": interpretation["qml_module"]},
+                        "JitLoadedModuleObservationChanged")
             summary[variant][case] = {"success": success, "exit_proof": proof,
                                       "interpretation": interpretation}
     return summary
@@ -719,7 +755,7 @@ def verify_artifact(root, inventory, lock, sdk, transport):
     return {"receipt": receipt, "stock_files": before, "derived_files": derived, "module_files": module,
             "headers": headers, "retained_headers": retained, "interface": parsed["patched"],
             "corresponding_source": source, "fixtures": fixtures,
-            "verification": {"original_conclusion": "failure", "stock_negative_preserved": True,
+            "verification": {"original_conclusion": lock["producer"]["conclusion"], "stock_negative_preserved": True,
                              "patched_fixtures_passed": True, "actual_archive_members": len(inventory),
                              "source_files_checked": 23849, "actual_patched_pe_exports": len(actual_pe["exports"]),
                              "producer_compiler_binding": compiler_binding,
@@ -1035,7 +1071,7 @@ def compose(args, lock, sdk, transport, report):
            for name in ("bin/Qt6Qml.pdb", "lib/Qt6Qml.pdb")}
     selected_receipt = {"schema": 1, "kind": "swirl-selected-qt612-product-sdk", "success": True,
         "consumer": context, "producer": lock["producer"], "artifact": lock["artifact"],
-        "producer_metadata": metadata, "original_workflow_conclusion": "failure",
+        "producer_metadata": metadata, "original_workflow_conclusion": lock["producer"]["conclusion"],
         "stock_negative_preserved": True, "qt_version": lock["qt_version"],
         "qt_source": lock["recipe"]["source"], "qt_patch": lock["recipe"]["patch"],
         "stock_kit_root": str(stock), "kit_root": str(selected),
@@ -1312,7 +1348,7 @@ def copy_d3d(args, lock, sdk, transport, report):
     report.update({"consumer": state["context"],
                    "selected_receipt": sdk.file_identity(state["receipt_path"]),
                    "selected_content_id": canonical(state["actual"]),
-                   "original_conclusion": "failure", "d3d_compiler": {},
+                   "original_conclusion": lock["producer"]["conclusion"], "d3d_compiler": {},
                    "scope": "Copy only the fixed original-kit D3D compiler; no code execution. "
                             "DXC/DXIL retain their existing deployment behavior and are not selected-kit pins."})
     copy_fixed_d3d(selected, runtime, expected, sdk, report["d3d_compiler"])
@@ -1416,7 +1452,7 @@ def verify(args, lock, sdk, transport, report):
                                           require_application=args.phase != "configured")
     report.update({"consumer": context, "selected_receipt": sdk.file_identity(receipt_path),
                    "selected_content_id": canonical(actual), "stock_content_id": canonical(before),
-                   "configuration": configuration, "original_conclusion": "failure"})
+                   "configuration": configuration, "original_conclusion": lock["producer"]["conclusion"]})
     if args.phase == "post-deploy":
         require(args.runtime_dir is not None, "PostDeployRuntimeRequired")
         runtime = sdk.plain_path(Path(args.runtime_dir))

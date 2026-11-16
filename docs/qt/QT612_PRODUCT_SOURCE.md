@@ -18,7 +18,7 @@ identity fields, and separately preserve that final receipt and workflow result.
 | Module | Role | Source identity |
 | --- | --- | --- |
 | QtBase | Core, GUI, Network, OpenGL and deployed platform, image and TLS plugins | Official 6.12.0 source archive at `025bdad181de241e81bf853c8a2d7bf3d19261a9`, plus the complete modified QtBase source used for the Network backports |
-| QtDeclarative | QML, Quick, controls, dialogs, layouts, QML files and plugins | Complete tracked library source at `4332fbbb4c340463dc8cee36dda0c85d932122d8`, with the modification below |
+| QtDeclarative | QML, Quick, controls, dialogs, layouts, QML files and plugins | Complete tracked library source at `4332fbbb4c340463dc8cee36dda0c85d932122d8`, with the two modifications below |
 | QtSvg | SVG library, image and icon plugins | Official 6.12.0 source archive; commit `883a58532078d003cefef0a549bfe9f885ce41f5` |
 | QtTranslations | Source catalogs for the deployed translations | Official 6.12.0 source archive; commit `2811457ceff8f0c24a1c4d14f947a283a17239d0` |
 | QtShaderTools | Build dependency for Qt Quick shaders; not a deployed Swirl DLL | Official 6.12.0 source archive; commit `bccd516b990a6396900051470ac86cc27a7042ea` |
@@ -44,6 +44,19 @@ Its SHA256 is
 `9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac`.
 The patched source-file SHA256 is
 `baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525`.
+
+The JIT SetLookup accumulator repair in `src/qml/jit/qv4baselinejit.cpp` comes
+from official Qt commit
+[`4c1054b0f997f2977a54d42523856805b309db9a`](https://github.com/qt/qtdeclarative/commit/4c1054b0f997f2977a54d42523856805b309db9a).
+The exact patch is
+`sdk-build-evidence/reproduction/tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff`,
+SHA256 `ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22`.
+The patched source-file SHA256 is
+`f0d4350042403b6a131cf4b30e9806276e61bafb9f46047f15d676fab67a02a4`.
+The standalone regression is adapted from Qt's QTBUG-151325 test and retains
+its GPL-3.0-only notice and accompanying license. It is not linked into Swirl
+or the deployed Qt DLL. Original fixture failures remain recorded separately
+from the comparison gate and the passing patched-runtime results.
 
 The selected QtNetwork library includes the two HTTP parser bounds backports
 `aac1d303c0329241ac59c0c23cb5e4b82251fcfa` and
@@ -97,7 +110,7 @@ Use an x64 MSVC developer environment and the fixed official Qt 6.12.0
 `msvc2022_64` SDK described in the archived SDK lock. The recorded build uses
 Release, Ninja, `/MD` (`MultiThreadedDLL`), and separate source, build and install
 directories. Extract `sources/qtdeclarative-corresponding-source.zip`; it already
-contains the patch, so do not apply the patch a second time. Retain the supplied
+contains both patches, so do not apply them a second time. Retain the supplied
 license files and build metadata.
 
 The complete authoritative arguments are in the archived

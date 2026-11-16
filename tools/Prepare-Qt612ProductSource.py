@@ -465,6 +465,8 @@ def prepare(args):
             "runtime_modules": lock["runtime_modules"], "build_only_modules": lock["build_only_modules"],
             "qtdeclarative_source_commit": source["source"]["commit"],
             "patch_commit": source["patch"]["upstream_commit"],
+            "patch_commits": [p["upstream_commit"] for p in
+                              [source["patch"], *source["patch"].get("additional", [])]],
             "network_patch_commits": [p["upstream_commit"] for p in network_source["patches"]],
             "delivery": "Provide this complete source archive together with the installer. "
                         "CI artifact retention is temporary and is not a long-term source offer."}
@@ -485,6 +487,7 @@ def prepare(args):
                "installer_notes": {"licenses/qt/" + n: {"bytes": len(b), "sha256": sha(b)}
                                    for n, b in installed_notes.items()},
                "patched_qml": {"commit": source["patch"]["upstream_commit"],
+                               "patches": [source["patch"], *source["patch"].get("additional", [])],
                                "source_commit": source["source"]["commit"],
                                "binary_sha256": runtime_files["Qt6Qml.dll"]["sha256"]},
                "patched_network": {"source_commit": network_source["source"]["commit"],

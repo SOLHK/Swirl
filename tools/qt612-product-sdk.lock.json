@@ -6,20 +6,20 @@
   "repository": {
     "name": "SOLHK/Swirl",
     "id": 1411888911,
-    "branch": "work/node-probe-render-20261105",
-    "pr": 61,
+    "branch": "work/subscription-tun-0245-20261115",
+    "pr": 62,
     "base": "test"
   },
   "producer": {
-    "run": 42338365419,
+    "run": 43855072540,
     "attempt": 1,
-    "job": 128300316535,
+    "job": 133257133886,
     "workflow": ".github/workflows/diagnose-qt612-runtime-patch.yml",
     "job_name": "qt612-runtime-comparison",
-    "head": "d136505cb1ac8cfeb5b80c554daebbbb06ff1aa9",
-    "merge": "e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab",
-    "tree": "7c90f7e754f373e4dcac0bbfd656ccaa5ec061bc",
-    "conclusion": "failure",
+    "head": "c97f5acc71c04f4e2b812226205ce3afc1d76298",
+    "merge": "93b0990e85fe9609bf75862066c3990d9430b1be",
+    "tree": "bfe7afd7f3160493e42efd291a692218d251efd5",
+    "conclusion": "success",
     "steps": [
       {
         "number": 1,
@@ -63,8 +63,8 @@
       },
       {
         "number": 9,
-        "name": "Run unchanged fixtures once with each complete runtime and preserve baseline failures",
-        "conclusion": "failure"
+        "name": "Verify patched fixtures and the exact preserved stock regressions",
+        "conclusion": "success"
       },
       {
         "number": 10,
@@ -79,7 +79,7 @@
       {
         "number": 21,
         "name": "Post Select Python",
-        "conclusion": "skipped"
+        "conclusion": "success"
       },
       {
         "number": 22,
@@ -94,14 +94,14 @@
     ]
   },
   "artifact": {
-    "artifact": 13561016761,
-    "run": 42338365419,
+    "artifact": 14221516760,
+    "run": 43855072540,
     "name": "Swirl-Qt612-Isolated-Runtime-Patch-Diagnosis",
-    "bytes": 60774580,
-    "sha256": "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
-    "member_count": 1470,
-    "expanded_bytes": 139661307,
-    "member_inventory_sha256": "a4e29512de626954c498c7d3a4657f3596d74eb6670818f4093f792c17dfb74c"
+    "bytes": 60827211,
+    "sha256": "130b3eb29bec634ef91c6f37687b4c004e87ead599ea2151ab7c305a4f8e3425",
+    "member_count": 1492,
+    "expanded_bytes": 139875875,
+    "member_inventory_sha256": "fd5f8f8c7a2961d598e22b72286ab0a304e31beb0d63b13c3caf73f18b7e6df5"
   },
   "installation_qtenv2": {
     "path": "bin/qtenv2.bat",
@@ -113,65 +113,65 @@
       "function": "Updater.make_qtenv2",
       "encoding": "ASCII without BOM; five CRLF-terminated lines"
     },
-    "producer_kit_root": "D:\\a\\_temp\\qt612-patch-42338365419-1\\stock\\6.12.0\\msvc2022_64",
+    "producer_kit_root": "D:\\a\\_temp\\qt612-patch-43855072540-1\\stock\\6.12.0\\msvc2022_64",
     "producer_file": {
       "bytes": 276,
-      "sha256": "91e5545f0e77a2e07f914d6f24660611c2c4d7d944b2f4cb6af470ec383f1d8f"
+      "sha256": "7c4c98a70e26f044f0ff664be29740cb135d03a028d69180e61db5d6dd35d36a"
     },
     "policy": "Regenerate the exact expected bytes for the actual stock root; compare the whole inventories with only this one expected leaf changed. Preserve stock and its cloned batch file byte-for-byte. Never execute qtenv2 or treat it as selected-kit environment setup."
   },
   "critical_members": {
     "step-outcomes.json": {
       "bytes": 636,
-      "sha256": "c14a566fe3fa99378fcc869c433f0d64cc50916d59668ab2e8f5920f2a068d1e"
+      "sha256": "04f0776f37a8b8a0d41b12865cb07697b8afdd74dbb304c001809de2529fcd00"
     },
     "sdk/receipt.json": {
-      "bytes": 66395,
-      "sha256": "ca9c401827665956e929be87934d20252b61d525154da97148990fc1d0b7f361"
+      "bytes": 68089,
+      "sha256": "af81268c6b784ec3464e857e046c0387ae937047a8ca63e93550e394875238cd"
     },
     "sdk/stock-files-before.json": {
       "bytes": 1884420,
-      "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+      "sha256": "571c90a0af8f21de866df2fc1d8853dcba3c459867906837d6f397f3ff957862"
     },
     "sdk/stock-files-after.json": {
       "bytes": 1884420,
-      "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+      "sha256": "571c90a0af8f21de866df2fc1d8853dcba3c459867906837d6f397f3ff957862"
     },
     "sdk/derived-files.json": {
       "bytes": 1884576,
-      "sha256": "cf3853876854a7cf88e1dfceb700c6174cfe2291a1de69c0b754bef489ed0a1a"
+      "sha256": "651e95db561ee9afe3486fb150bde263ed1bd29dc6920f301a76cf4a3609fbe6"
     },
     "sdk/module-files.json": {
       "bytes": 61027,
-      "sha256": "dcbc21d7d6394bc88a5d9b73cccb9cdc7a2efb27a7eed869e9c02e73ae895f04"
+      "sha256": "557e1db5811875624abe39af5e2d1bbe016da505e688bc0e7f8d264ce9c627e6"
     },
     "sdk/header-alignment.json": {
       "bytes": 244886,
-      "sha256": "48e12238a77625668c803abeb366bc02c38cc6a06e4462489c48b39d971eb17e"
+      "sha256": "6532ca02949e973586bea544f1ea3dd047c78c212a06c7084d47971e48674e5f"
     },
     "sdk/module-header-retention.json": {
       "bytes": 242884,
-      "sha256": "5f695da83db225c35542c3b8788fbdc79d190915dcfeddac20f56cb24a331f9f"
+      "sha256": "67ee3ed22ad8ffcf221c3f278dadc950572ef6b6d6d1a89d87e58d254f5a3abb"
     },
     "sdk/configuration-identity.json": {
       "bytes": 10159,
-      "sha256": "63c9e1e04482bb5291bd2d24df59e51030514319b273d8f93e0f124d9c5c48a4"
+      "sha256": "dc819466a1d8ec83b64bf212b810270bbabd62fb1e3009ffd69629dfccb5235e"
     },
     "sdk/native-toolchain-files.json": {
-      "bytes": 1072830,
-      "sha256": "fff07a252295c5fdbf45da732cbf63af1920caa5ebe6fad8af5eb29394350f29"
+      "bytes": 1074508,
+      "sha256": "1d2ca01f0db1dac91a32090ee8f47cf46dfe1f037b5be5f12d1c014e5ff3cdf2"
     },
     "sdk/source-snapshot-files.json": {
-      "bytes": 7234465,
-      "sha256": "8000d2e3d6a5903d1732d19f717087239907955594a817165224c369c50e755c"
+      "bytes": 7234478,
+      "sha256": "efd9b15492fd59821dc97ed96fdbc89c65c1dbf0af8887a4fcba0c8e0e2edce9"
     },
     "sdk/corresponding-source.json": {
-      "bytes": 2116,
-      "sha256": "65f20366b34512e1b0b450c00c95e6d4d5ed3f191f8786e9f15e40085b1c1bf4"
+      "bytes": 2691,
+      "sha256": "c4b723771b3ffd1e14fd4b9a865a740279ad8d80d026728199de6043f4b01497"
     },
     "sdk/qtdeclarative-corresponding-source.zip": {
-      "bytes": 54653393,
-      "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+      "bytes": 54653389,
+      "sha256": "458820cf47bcd4ada3a1885fc4fa604931c6784cbf96bdb3199969e53897a9ac"
     },
     "sdk/pe-interface-review.json": {
       "bytes": 943,
@@ -179,31 +179,43 @@
     },
     "sdk/stock-sdk-receipt.json": {
       "bytes": 8545,
-      "sha256": "46a02c48f0e128fed32f4a8f9377dd0703e32e805935f1bdc71d662179b1f7b8"
+      "sha256": "8d57e768a2f687e43340c019b3fb3acf2ac6b0994ace71870fdf63beaf4f9f89"
     },
     "sdk/stock-Qml.json": {
       "bytes": 538,
       "sha256": "b801cee3cc9546b50b263ec8b7906c8137441d726ae0cbead37b6b881021214f"
     },
     "comparison/comparison.json": {
-      "bytes": 11833,
-      "sha256": "7a4a058437ec330d36f787e852919a2a16732a3d6e62bb406363bf09a5ad5708"
+      "bytes": 13987,
+      "sha256": "81dd1f609a7397cabbafba903e9dc439be043ea8ffc30700eaa76d94043be6a2"
     },
     "comparison/stock/aggregate.json": {
-      "bytes": 20086,
-      "sha256": "3b06c627f7edb360d1964f6837ea2005eac8b0920f9214db0590571daa0f6082"
+      "bytes": 25077,
+      "sha256": "d38121abbcf3b7fed813090b5e5b8d950ffb753bca1824fdc9007ac5e15b36b7"
     },
     "comparison/patched/aggregate.json": {
-      "bytes": 19960,
-      "sha256": "02e6323df1ea419c06e142d5ff458e0c9936d001433255759eb870772241d8b3"
+      "bytes": 24887,
+      "sha256": "ab7f801b2386ab702f887b171f72e84ceb7855112b6145da31a817be6c04ca5e"
     },
     "sdk/reproduction/tools/qt612-qml-patch.lock.json": {
-      "bytes": 9857,
-      "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+      "bytes": 10432,
+      "sha256": "dbbbd093ac96fbf50c3a90b161a7ad188ff364149d063e98d24f5c3d397ab2aa"
     },
     "sdk/reproduction/tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
       "bytes": 2284,
       "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
+    },
+    "sdk/reproduction/tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff": {
+      "bytes": 835,
+      "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22"
+    },
+    "sdk/reproduction/tools/repros/qt612-popup-gc/jit.cpp": {
+      "bytes": 2723,
+      "sha256": "7ffd8b6c89a42cfeec624711448ae7a0c8338c1357a87538e89dcc2791fc841e"
+    },
+    "sdk/reproduction/tools/repros/qt612-popup-gc/LICENSE-GPL-3.0.txt": {
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
     }
   },
   "recipe": {
@@ -318,7 +330,19 @@
       "preimage_sha256": "574d2d3d973a78cc6b3cb214069148dae5d0563d2c53c8602015f4735ee52780",
       "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
       "added_lines": 15,
-      "deleted_lines": 7
+      "deleted_lines": 7,
+      "additional": [
+        {
+          "upstream_commit": "4c1054b0f997f2977a54d42523856805b309db9a",
+          "path": "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff",
+          "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22",
+          "production_path": "src/qml/jit/qv4baselinejit.cpp",
+          "preimage_sha256": "703d72c6cd9ef3dc3a23ad5cbc9c39ed8007d5a67980cc9cd068585d783c1456",
+          "postimage_sha256": "f0d4350042403b6a131cf4b30e9806276e61bafb9f46047f15d676fab67a02a4",
+          "added_lines": 3,
+          "deleted_lines": 2
+        }
+      ]
     },
     "build": {
       "configuration": "Release",
@@ -336,7 +360,7 @@
       "image": "vctip.exe",
       "msvc_tools_version": "14.44.35207",
       "bytes": 335288,
-      "sha256": "d591358c6aee4b673562ca3b3a15c250e612708394fe3b44a7a7eda2470570a5",
+      "sha256": "c344a9dba77c62d271abb0a982486cfc9ae26b1f96dda6f5ec02703ff55526e6",
       "maximum_survivors": 1,
       "grace_seconds": 2,
       "proof_seconds": 5,
@@ -382,10 +406,10 @@
     }
   },
   "content": {
-    "stock": "941a8e89532137a1424758fd158d39af4f6522a1f315457f5e75a74f44d51de6",
-    "derived": "6a2b82cc4a2133e128f83511a91764a121178c90cd3717399af612136ab2fc1c",
-    "derivation": "265d7eb96a1d29d10c4e09ba75070d89b826b4b2bbbdb56bd35701dfd2a70c48",
-    "native_toolchain": "7610e3e82b24ead330531d77fbc6a4df7c3bbd2616d795ea533ee836097fc49b",
+    "stock": "d66291969c7f427cd3a222ace756118214fa4b71f194aba6e35370f1932fd129",
+    "derived": "d668364f9f59abdf809681c46b878c3d0b738dd6915773176800248e6aee3f49",
+    "derivation": "9f222d2bc62158adba1937d6b5b643477c21310d0e0f277b8371a7f02f8b5d37",
+    "native_toolchain": "62cca19c1c88c8c3a791de8520496ed8eb9e93e9971662254eb974c63965c9ae",
     "stock_files": 11380,
     "derived_files": 11381,
     "module_files": 380,
@@ -423,23 +447,23 @@
     },
     "qml_patched": {
       "bytes": 5377536,
-      "sha256": "66d291c47770c366627cfd68f3e050e30dbb6f1747639f32c6ea812803ad1cb3"
+      "sha256": "36565a87d761bfdf238267af6f2b2ce398af171a3f86288245f75a54c1484be2"
     },
     "qml_import_library": {
       "bytes": 2763402,
-      "sha256": "453b598dbcc4b85ec94517d90724573b2bd5f3071cbe1cf347bbea928c42f083"
+      "sha256": "2fa0b908058b28cedc31623f47e73c4c6680d8ea7bcb45caf84a9aea62427e0e"
     },
     "producer_compiler": {
       "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
       "CMAKE_CXX_COMPILER_ID": "MSVC",
-      "CMAKE_CXX_COMPILER_VERSION": "19.44.35229.0",
+      "CMAKE_CXX_COMPILER_VERSION": "19.44.35230.0",
       "MSVC_CXX_ARCHITECTURE_ID": "x64"
     },
     "patched_qml_platform": {
       "name": "Windows",
       "version": "10.0.20348",
       "compiler_id": "MSVC",
-      "compiler_version": "19.44.35229.0",
+      "compiler_version": "19.44.35230.0",
       "targets": [
         {
           "architecture": "x86_64",
@@ -449,12 +473,12 @@
     },
     "producer_compiler_metadata": {
       "bytes": 6603,
-      "sha256": "6b785cbe38f04d4be2b1b10fce27f15347e8298adb88db5b7a8f76cd5a1d5820"
+      "sha256": "15544101f5eb2482a70bf2e3b2778b950e770aaf52909476a0bd4015db17ffbd"
     },
     "producer_compiler_binary": {
       "path": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-      "bytes": 677776,
-      "sha256": "fe251ef50a1545b1b0835ee17b1e785459712b38d79e45b5c1d3d28970a36619"
+      "bytes": 677736,
+      "sha256": "e87e78b3ef6580b75aebda843f8a22e874612d9f766344046551399f898eb226"
     }
   },
   "pe_interface": {
@@ -512,5 +536,5 @@
       "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22"
     }
   },
-  "scope": "Product SDK candidate from the exact reviewed QtDeclarative single-file upstream patch. This separate composition admission does not alter diagnostic scope or claim full Swirl VME causality, release acceptance, Rust/OpenSSL/CRT pairing, or corresponding source for all Qt modules. Producer failure remains failure; only its completed build and explicitly verified patched fixtures are reused."
+  "scope": "Product SDK candidate from the two exact upstream QtDeclarative allocator and JIT repairs. The successful producer comparison preserves both actual stock failures and requires all patched fixtures. It does not establish full Swirl VME causality or whole-product acceptance."
 }

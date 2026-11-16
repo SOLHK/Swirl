@@ -13,9 +13,12 @@ different license identifiers; the retained files and attribution metadata
 must be consulted for the particular component. Copying this notice does not
 replace those terms.
 
-QtDeclarative has the single documented allocator-sweep modification from
-official commit `8c92fe01338c76885f412a68fd39238147e21a81`. Its patch, exact modified
-source, file manifest and original build recipe are included. QtNetwork also
+QtDeclarative includes the allocator-sweep modification from official commit
+`8c92fe01338c76885f412a68fd39238147e21a81` and the JIT SetLookup accumulator repair
+from `4c1054b0f997f2977a54d42523856805b309db9a`. Both patches, the exact modified
+source, file manifest and original build recipe are included. The standalone
+JIT regression fixture retains its separate GPL-3.0-only notice and license;
+it is build evidence and is not linked into Swirl or the Qt runtime. QtNetwork also
 contains the two recorded HTTP parser bounds backports. Its complete modified
 QtBase source, both patches, source manifest and build evidence are supplied
 separately from the unmodified QtBase archive. No additional Qt

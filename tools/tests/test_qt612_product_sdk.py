@@ -40,9 +40,9 @@ def producer_metadata():
     run = {"id": p["run"], "run_attempt": 1, "repository": {"id": repo["id"]},
            "head_repository": {"id": repo["id"]}, "head_sha": p["head"],
            "head_branch": repo["branch"], "path": p["workflow"], "event": "pull_request",
-           "status": "completed", "conclusion": "failure"}
+           "status": "completed", "conclusion": p["conclusion"]}
     jobs = {"total_count": 1, "jobs": [{"id": p["job"], "run_id": p["run"],
-             "name": p["job_name"], "status": "completed", "conclusion": "failure",
+             "name": p["job_name"], "status": "completed", "conclusion": p["conclusion"],
              "steps": copy.deepcopy(p["steps"])}]}
     artifact = {"id": a["artifact"], "name": a["name"], "size_in_bytes": a["bytes"],
                 "digest": "sha256:" + a["sha256"], "expired": False,
@@ -231,7 +231,7 @@ class ProductSdkBoundaries(unittest.TestCase):
         receipt = {"tools": {"cl.exe": binary}, "configuration": {
             "compiler_file": LOCK["content"]["producer_compiler_metadata"]}}
         actual = product.producer_compiler_binding(receipt, native, LOCK)
-        self.assertEqual(actual["binary"]["bytes"], 677776)
+        self.assertEqual(actual["binary"]["bytes"], 677736)
         self.assertEqual(actual["metadata_file"]["bytes"], 6603)
         self.assertNotEqual(actual["binary"]["sha256"], actual["metadata_file"]["sha256"])
         native[root][name] = receipt["configuration"]["compiler_file"]
@@ -262,7 +262,8 @@ class ProductSdkBoundaries(unittest.TestCase):
 
     def test_only_original_expected_negative_producer_is_admitted(self):
         self.assertTrue(product.validate_producer(*producer_metadata(), LOCK, require_unexpired=True)["expected_negative_preserved"])
-        for field, value in (("status", "in_progress"), ("conclusion", "success"), ("run_attempt", 2),
+        wrong_conclusion = "failure" if LOCK["producer"]["conclusion"] == "success" else "success"
+        for field, value in (("status", "in_progress"), ("conclusion", wrong_conclusion), ("run_attempt", 2),
                              ("head_sha", "f" * 40)):
             with self.subTest(field=field):
                 run, jobs, artifact = producer_metadata()
@@ -271,7 +272,8 @@ class ProductSdkBoundaries(unittest.TestCase):
                     product.validate_producer(run, jobs, artifact, LOCK, require_unexpired=True)
 
     def test_patched_fixture_step_cannot_be_skipped_or_promoted_green(self):
-        for value in ("success", "skipped", "cancelled"):
+        expected = next(step for step in LOCK["producer"]["steps"] if step["number"] == 9)["conclusion"]
+        for value in ({"success", "failure", "skipped", "cancelled"} - {expected}):
             run, jobs, artifact = producer_metadata()
             next(s for s in jobs["jobs"][0]["steps"] if s["number"] == 9)["conclusion"] = value
             with self.assertRaises(product.Rejected):
@@ -495,7 +497,7 @@ class InstalledEnvironmentBoundaries(unittest.TestCase):
 
     def test_exact_template_reproduces_both_independent_ci_inventory_hashes(self):
         self.assertEqual(product.byte_id(product.qtenv2_bytes(LOCK["installation_qtenv2"]["producer_kit_root"])),
-                         {"bytes": 276, "sha256": "91e5545f0e77a2e07f914d6f24660611c2c4d7d944b2f4cb6af470ec383f1d8f"})
+                         {"bytes": 276, "sha256": "7c4c98a70e26f044f0ff664be29740cb135d03a028d69180e61db5d6dd35d36a"})
         self.assertEqual(product.byte_id(self.raw),
                          {"bytes": 244, "sha256": "41aa852760cdc69ea031be1a6401c934816e4d453129c4227331c983cb68e0fe"})
         self.assertEqual(self.raw.count(b"\r\n"), 5)
