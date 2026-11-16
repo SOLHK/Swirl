@@ -140,7 +140,7 @@
     "image": "vctip.exe",
     "msvc_tools_version": "14.44.35207",
     "bytes": 335288,
-    "sha256": "d591358c6aee4b673562ca3b3a15c250e612708394fe3b44a7a7eda2470570a5",
+    "sha256": "c344a9dba77c62d271abb0a982486cfc9ae26b1f96dda6f5ec02703ff55526e6",
     "maximum_survivors": 1,
     "grace_seconds": 2,
     "proof_seconds": 5,

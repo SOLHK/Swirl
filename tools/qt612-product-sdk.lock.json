@@ -501,7 +501,7 @@
     },
     "tools/qt612-qml-patch.lock.json": {
       "bytes": 10432,
-      "sha256": "c6c2df157fe3b025bf926016a25d83dbef09a4fa1298625648fc4afb28e14456"
+      "sha256": "dbbbd093ac96fbf50c3a90b161a7ad188ff364149d063e98d24f5c3d397ab2aa"
     },
     "tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
       "bytes": 2284,
