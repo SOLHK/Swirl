@@ -21,7 +21,7 @@ CASE_SECONDS = 8.0  # Reuse OwnedProcess's existing, stricter maximum unchanged.
 STREAM_LIMIT = 8 * 1024 * 1024
 REPRO = Path("tools/repros/qt612-popup-gc")
 SOURCE_FILES = [str(REPRO / name) for name in (
-    "CMakeLists.txt", "main.cpp", "sweep.cpp", "Main.qml", "ProbeDialog.qml", "OwnedHelper.qml"
+    "CMakeLists.txt", "main.cpp", "sweep.cpp", "jit.cpp", "LICENSE-GPL-3.0.txt", "Main.qml", "ProbeDialog.qml", "OwnedHelper.qml"
 )] + ["tools/RunQt612GcProbe.py", "tools/PrivateSubscriptionProcess.py",
       "tools/PrivateSubscriptionBudget.py", "tools/Install-QtSdk.py",
       "tools/requirements-qt-sdk.txt", ".github/workflows/diagnose-qt612-gc.yml"]
@@ -56,6 +56,30 @@ def interpret(name, text):
     result = {"warning_lines": warnings, "errors": [], "conclusive": False}
     if warnings:
         result["errors"].append("QtWarningOrMoreSevereMessage")
+    if name == "jit-setlookup":
+        runtimes = re.findall(r"^JIT_GC_RUNTIME (\{.*\})\s*$", lines, re.MULTILINE)
+        if len(runtimes) != 1:
+            result["errors"].append("MissingOrAmbiguousJitRuntime")
+            return result
+        try:
+            runtime = json.loads(runtimes[0])
+        except json.JSONDecodeError:
+            result["errors"].append("InvalidJitRuntime")
+            return result
+        result.update(qt_version=runtime.get("qt"), qml_module=runtime.get("qml_module"),
+                      interpreter_override=runtime.get("interpreter_override"))
+        if runtime.get("qt") != "6.12.0" or runtime.get("interpreter_override") != "":
+            result["errors"].append("WrongQtVersionOrJitDisabled")
+        completions = re.findall(r"^JIT_GC_RESULT iterations (\d+) warnings (\d+)\s*$", lines, re.MULTILINE)
+        if len(completions) != 1:
+            result["errors"].append("MissingOrAmbiguousJitCompletion")
+            return result
+        iterations, warning_count = map(int, completions[0])
+        result.update(iterations=iterations, qml_warning_count=warning_count)
+        result["conclusive"] = iterations == 100 and warning_count == 0
+        if not result["conclusive"]:
+            result["errors"].append("JitCompletionRejected")
+        return result
     if name == "sweep-slots":
         matches = re.findall(r"^SWEEP_SLOTS_RESULT qt (\S+) sameBitmapWordAllocations (\d+) "
                              r"freeRunsInsideLiveObjects (\d+)\s*$", lines, re.MULTILINE)
@@ -198,6 +222,12 @@ def run_case(name, arguments, output, runtime, source_sha, qt_identity):
     text = "\n".join((case / name).read_bytes().decode("utf-8", errors="replace")
                      for name in ("stdout.log", "stderr.log") if (case / name).is_file())
     record["interpretation"] = interpret(name, text)
+    if name == "jit-setlookup":
+        module = record["interpretation"].get("qml_module")
+        verified = isinstance(module, str) and Path(module).resolve() == (runtime / "Qt6Qml.dll").resolve()
+        record["interpretation"]["runtime_verified"] = verified
+        if not verified:
+            record["errors"].append("LoadedQtQmlDoesNotMatchFixtureRuntime")
     record["errors"].extend(record["interpretation"]["errors"])
     if record["timed_out"] or record.get("stop_error"):
         record["errors"].append("DeadlineOrStopFailure")
@@ -219,6 +249,7 @@ def main():
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument("--expected-source-sha", required=True)
     parser.add_argument("--expected-pr-head-sha", required=True)
+    parser.add_argument("--jit-case", action="store_true")
     args = parser.parse_args()
     output = args.output_directory.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -265,6 +296,9 @@ def main():
         cases = [("popup-normal", "PopupGcFixture.exe", [str(root / REPRO / "Main.qml")]),
                  ("popup-incremental", "PopupGcFixture.exe", [str(root / REPRO / "Main.qml"), "--incremental"]),
                  ("sweep-slots", "SweepSlotsProbe.exe", [])]
+        if args.jit_case:
+            cases.append(("jit-setlookup", "JitGcProbe.exe", []))
+            report["scope"] = "Four isolated Qt 6.12 GC fixtures; JIT module identity is sampled in process. No Swirl VME-root-cause claim."
         for name, executable, arguments in cases:
             try:
                 record = run_case(name, [str(runtime / executable), *arguments], output, runtime, source, qt)
@@ -275,7 +309,7 @@ def main():
         report["sources_after"] = {p: identity(root / p) for p in SOURCE_FILES}
         if report["sources_before"] != report["sources_after"]:
             report["errors"].append("FixtureSourceChangedDuringExecution")
-        report["success"] = len(report["cases"]) == 3 and all(c["success"] for c in report["cases"]) and not report["errors"]
+        report["success"] = len(report["cases"]) == len(cases) and all(c["success"] for c in report["cases"]) and not report["errors"]
     except Exception as error:
         report["errors"].append(type(error).__name__ + ":" + str(error))
     report["finished_utc"] = utc()

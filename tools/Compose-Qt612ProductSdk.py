@@ -520,6 +520,8 @@ def member(root, inventory, name, sdk):
 
 
 def verify_source_archive(root, inventory, lock, sdk, transport):
+    patches = [lock["recipe"]["patch"], *lock["recipe"]["patch"].get("additional", [])]
+    postimages = {patch["production_path"]: patch["postimage_sha256"] for patch in patches}
     manifest = read_json(member(root, inventory, "sdk/source-snapshot-files.json", sdk))
     receipt = read_json(member(root, inventory, "sdk/corresponding-source.json", sdk))
     require(len(manifest) == 23849 and canonical(manifest) == receipt["file_manifest_content_id"]
@@ -541,9 +543,8 @@ def verify_source_archive(root, inventory, lock, sdk, transport):
             expected = {k: manifest[relative][k] for k in ("bytes", "sha256")}
             require(byte_id(raw) == expected, "CorrespondingSourceBytesChanged")
             actual[relative] = expected
-            if relative == lock["recipe"]["patch"]["production_path"]:
-                require(expected["sha256"] == lock["recipe"]["patch"]["postimage_sha256"],
-                        "AllocatorPostimageChanged")
+            if relative in postimages:
+                require(expected["sha256"] == postimages[relative], "PinnedQmlPostimageChanged")
     require(set(actual) == set(manifest), "CorrespondingSourceClosureMissing")
     return receipt
 

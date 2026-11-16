@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the unchanged three Qt 6.12 fixtures once per isolated stock/patched runtime."""
+"""Run Qt 6.12 GC fixtures once per isolated stock/patched runtime."""
 
 import argparse
 import importlib.util
@@ -16,8 +16,8 @@ _spec = importlib.util.spec_from_file_location(
 sdk = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sdk)
 
-EXECUTABLES = ("PopupGcFixture.exe", "SweepSlotsProbe.exe")
-CASES = ("popup-normal", "popup-incremental", "sweep-slots")
+EXECUTABLES = ("PopupGcFixture.exe", "SweepSlotsProbe.exe", "JitGcProbe.exe")
+CASES = ("popup-normal", "popup-incremental", "sweep-slots", "jit-setlookup")
 EXTERNAL_RUNTIME = re.compile(
     r"(?:vc_redist\.x64\.exe|(?:vcruntime140(?:_1|_threads)?|msvcp140(?:_[12]|_atomic_wait|_codecvt_ids)?"
     r"|concrt140|ucrtbase|api-ms-win-crt-[a-z0-9-]+|d3dcompiler_47|dxcompiler|dxil)\.dll)", re.IGNORECASE)
@@ -86,13 +86,31 @@ def validate_case_retirement(aggregate, source_sha, head_sha):
             for case in cases}
 
 
-def comparison_status(variants):
+def comparison_status(variants, expect_stock_regressions=False):
     # Baseline failures remain failures. Collection completeness is a separate field.
     complete = set(variants) == {"stock", "patched"} and all(
         value.get("collected") is True for value in variants.values())
     success = complete and all(value.get("runner_exit_code") == 0
                                and value.get("fixture_success") is True for value in variants.values())
-    return {"comparison_collected": complete, "success": success}
+    result = {"comparison_collected": complete, "success": success}
+    if expect_stock_regressions:
+        stock = variants.get("stock", {})
+        patched = variants.get("patched", {})
+        cases = stock.get("cases", {})
+        sweep, jit = cases.get("sweep-slots", {}), cases.get("jit-setlookup", {})
+        observed = (complete and stock.get("runner_exit_code") == 1 and stock.get("fixture_success") is False
+                    and patched.get("runner_exit_code") == 0 and patched.get("fixture_success") is True
+                    and set(cases) == set(CASES)
+                    and all(cases[name].get("success") is True for name in ("popup-normal", "popup-incremental"))
+                    and sweep.get("success") is False and sweep.get("exit_proof", {}).get("exitCode") == 2
+                    and set(sweep.get("errors", [])) == {"ObservedLiveObjectFreeListInvariantViolation", "MissingOrNonzeroActualExit"}
+                    and sweep.get("interpretation", {}).get("free_runs_inside_live_objects") == 8
+                    and jit.get("success") is False
+                    and jit.get("exit_proof", {}).get("exitCode", 0) & 0xffffffff == 0xc0000005
+                    and set(jit.get("errors", [])) == {"MissingOrAmbiguousJitCompletion", "MissingOrNonzeroActualExit"}
+                    and jit.get("interpretation", {}).get("runtime_verified") is True)
+        result.update(success=observed, negative_controls_observed=observed)
+    return result
 
 
 def main():
@@ -102,6 +120,7 @@ def main():
     parser.add_argument("--evidence-directory", required=True, type=Path)
     parser.add_argument("--expected-source-sha", required=True)
     parser.add_argument("--expected-pr-head-sha", required=True)
+    parser.add_argument("--expect-stock-regressions", action="store_true")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     report = {"schema": 1, "kind": "qt612-isolated-runtime-comparison",
@@ -109,7 +128,7 @@ def main():
               "started_utc": sdk.utc(), "errors": [], "stage": "admission",
               "source_sha": args.expected_source_sha, "pr_head_sha": args.expected_pr_head_sha,
               "real_provider_requests": 0, "actual_process_module_sampling": False,
-              "scope": "The existing normal, incremental and sweep fixtures, once per variant, "
+              "scope": "Normal, incremental, sweep and JIT fixtures, once per variant, "
                        "using identical fixture EXEs/source. No Swirl, native GPU, live node or VME fix claim."}
     evidence, build = None, None
     try:
@@ -180,7 +199,7 @@ def main():
         shutil.copyfile(build / "CMakeCache.txt", evidence / "fixture-CMakeCache.txt")
         shutil.copyfile(compiler_files[0], evidence / "fixture-CMakeCXXCompiler.cmake")
         sdk.run_compiler_logged("comparison:02-build-fixtures",
-            [tools["cmake.exe"], "--build", build, "--target", "PopupGcFixture", "SweepSlotsProbe",
+            [tools["cmake.exe"], "--build", build, "--target", "PopupGcFixture", "SweepSlotsProbe", "JitGcProbe",
              "--parallel", "2"], work, commands, 300, context=compile_context, lock=lock,
             tool_identities=receipt["tools"], known_executables=known_executables, env=env)
         executables = {name: sdk.file_identity(build / name) for name in EXECUTABLES}
@@ -254,7 +273,7 @@ def main():
                 [tools["python.exe"], repo / "tools/RunQt612GcProbe.py",
                  "--runtime-directory", value["runtime"], "--qt-root", value["kit"],
                  "--output-directory", case_directory, "--expected-source-sha", args.expected_source_sha,
-                 "--expected-pr-head-sha", args.expected_pr_head_sha],
+                 "--expected-pr-head-sha", args.expected_pr_head_sha, "--jit-case"],
                 cwd=repo, seconds=90, env=runner_env, accepted=(0, 1))
             aggregate = sdk.read_json(case_directory / "aggregate.json")
             summary = validate_case_retirement(aggregate, args.expected_source_sha, args.expected_pr_head_sha)
@@ -272,10 +291,11 @@ def main():
             # A safely retired, genuinely failed stock case does not skip the patched run.
         sdk.require(sdk.source_identity(repo, args.expected_source_sha, args.expected_pr_head_sha) == inputs,
                     "ComparisonSourceChanged")
-        report.update(comparison_status(report["variants"]))
+        report.update(comparison_status(report["variants"], args.expect_stock_regressions))
         report["stage"] = "complete"
         if not report["success"]:
-            report["errors"].append("OriginalFixtureFailurePreserved; see separate stock and patched receipts")
+            report["errors"].append("ExpectedStockRegressionsOrPatchedChecksMissing" if args.expect_stock_regressions
+                                    else "OriginalFixtureFailurePreserved; see separate stock and patched receipts")
     except BaseException as error:
         report["errors"].append(type(error).__name__ + ":" + str(error))
     finally:

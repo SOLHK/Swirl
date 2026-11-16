@@ -110,7 +110,19 @@
     "preimage_sha256": "574d2d3d973a78cc6b3cb214069148dae5d0563d2c53c8602015f4735ee52780",
     "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
     "added_lines": 15,
-    "deleted_lines": 7
+    "deleted_lines": 7,
+    "additional": [
+      {
+        "upstream_commit": "4c1054b0f997f2977a54d42523856805b309db9a",
+        "path": "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff",
+        "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22",
+        "production_path": "src/qml/jit/qv4baselinejit.cpp",
+        "preimage_sha256": "703d72c6cd9ef3dc3a23ad5cbc9c39ed8007d5a67980cc9cd068585d783c1456",
+        "postimage_sha256": "f0d4350042403b6a131cf4b30e9806276e61bafb9f46047f15d676fab67a02a4",
+        "added_lines": 3,
+        "deleted_lines": 2
+      }
+    ]
   },
   "build": {
     "configuration": "Release",

@@ -492,20 +492,24 @@
   },
   "reuse_inputs": {
     "tools/Build-Qt612QmlDiagnosticSdk.py": {
-      "bytes": 134627,
-      "sha256": "e841d43516cf4a4ba8a1920dcf820ac606155db9b52965a05113497e9bff8600"
+      "bytes": 135722,
+      "sha256": "189e8ef003e0eedde461632962a38157c89d5fbd799ebc7d8cd387a77a70fa52"
     },
     "tools/ReadPr61ArtifactEvidence.py": {
       "bytes": 24830,
       "sha256": "e9156fb5f27c7b5c42f752ce5f3ec3ddd036146464de47a2717fc858d095727e"
     },
     "tools/qt612-qml-patch.lock.json": {
-      "bytes": 9857,
-      "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+      "bytes": 10432,
+      "sha256": "c6c2df157fe3b025bf926016a25d83dbef09a4fa1298625648fc4afb28e14456"
     },
     "tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
       "bytes": 2284,
       "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
+    },
+    "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff": {
+      "bytes": 835,
+      "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22"
     }
   },
   "scope": "Product SDK candidate from the exact reviewed QtDeclarative single-file upstream patch. This separate composition admission does not alter diagnostic scope or claim full Swirl VME causality, release acceptance, Rust/OpenSSL/CRT pairing, or corresponding source for all Qt modules. Producer failure remains failure; only its completed build and explicitly verified patched fixtures are reused."

@@ -28,6 +28,9 @@ def load(name, filename):
 
 sdk = load("sdk_boundary_tests", "Build-Qt612QmlDiagnosticSdk.py")
 comparison = load("comparison_boundary_tests", "RunQt612RuntimeComparison.py")
+sys.path.insert(0, str(TOOLS))
+probe = load("gc_probe_boundary_tests", "RunQt612GcProbe.py")
+sys.path.pop(0)
 
 
 def synthetic_compiler_context(root):
@@ -88,7 +91,7 @@ class DiagnosticBoundaryTests(unittest.TestCase):
                 ("comparison:01-configure-fixtures", sdk.fixture_configure_arguments(
                     context["repo"], work, context["stock"], tools), work),
                 ("comparison:02-build-fixtures", [tools["cmake.exe"], "--build", work / "fixtures",
-                    "--target", "PopupGcFixture", "SweepSlotsProbe", "--parallel", "2"], work)]
+                    "--target", "PopupGcFixture", "SweepSlotsProbe", "JitGcProbe", "--parallel", "2"], work)]
             for phase, args, cwd in cases:
                 with self.subTest(phase=phase):
                     plan = sdk.compiler_phase_plan(phase, args, cwd, context, lock, identities, known)
@@ -871,6 +874,52 @@ class DiagnosticBoundaryTests(unittest.TestCase):
                          {"comparison_collected": False, "success": False})
         bad_exit = {"collected": True, "runner_exit_code": 1, "fixture_success": True}
         self.assertFalse(comparison.comparison_status({"stock": patched, "patched": bad_exit})["success"])
+
+    def test_negative_control_gate_requires_both_specific_faults_and_patched_success(self):
+        cases = {
+            "popup-normal": {"success": True}, "popup-incremental": {"success": True},
+            "sweep-slots": {"success": False, "exit_proof": {"exitCode": 2},
+                            "errors": ["ObservedLiveObjectFreeListInvariantViolation", "MissingOrNonzeroActualExit"],
+                            "interpretation": {"free_runs_inside_live_objects": 8}},
+            "jit-setlookup": {"success": False, "exit_proof": {"exitCode": 0xc0000005},
+                              "errors": ["MissingOrAmbiguousJitCompletion", "MissingOrNonzeroActualExit"],
+                              "interpretation": {"runtime_verified": True}},
+        }
+        variants = {"stock": {"collected": True, "runner_exit_code": 1, "fixture_success": False, "cases": cases},
+                    "patched": {"collected": True, "runner_exit_code": 0, "fixture_success": True}}
+        self.assertTrue(comparison.comparison_status(variants, True)["success"])
+        self.assertFalse(cases["jit-setlookup"]["success"])
+        for mutation in ("wrong-exit", "timeout", "wrong-runtime", "unreproduced", "patched-failure"):
+            candidate = copy.deepcopy(variants)
+            case = candidate["stock"]["cases"]["jit-setlookup"]
+            if mutation == "wrong-exit": case["exit_proof"]["exitCode"] = 6
+            elif mutation == "timeout": case["errors"].append("DeadlineOrStopFailure")
+            elif mutation == "wrong-runtime": case["interpretation"]["runtime_verified"] = False
+            elif mutation == "unreproduced": case["success"] = True
+            else: candidate["patched"]["fixture_success"] = False
+            with self.subTest(mutation=mutation):
+                self.assertFalse(comparison.comparison_status(candidate, True)["success"])
+
+    def test_jit_patch_source_is_bound_to_its_exact_postimage(self):
+        lock = json.loads((TOOLS / "qt612-qml-patch.lock.json").read_text())
+        jit = lock["patch"]["additional"][0]
+        self.assertEqual(jit["sha256"], sdk.digest(TOOLS.parent / jit["path"]))
+        with self.assertRaisesRegex(RuntimeError, "ArchivedPatchPostimageMismatch"):
+            sdk.verify_source_bytes(lock, jit["production_path"], b"unpatched or changed JIT", "")
+
+    def test_jit_evidence_keeps_crash_and_completion_distinct(self):
+        runtime = 'JIT_GC_RUNTIME {"qt":"6.12.0","qml_module":"C:/fixture/Qt6Qml.dll","interpreter_override":""}\n'
+        complete = 'JIT_GC_RESULT iterations 100 warnings 0\n'
+        passed = probe.interpret("jit-setlookup", runtime + complete)
+        self.assertTrue(passed["conclusive"])
+        self.assertFalse(passed["errors"])
+        crashed = probe.interpret("jit-setlookup", runtime)
+        self.assertFalse(crashed["conclusive"])
+        self.assertEqual(crashed["errors"], ["MissingOrAmbiguousJitCompletion"])
+        self.assertEqual(crashed["qml_module"], "C:/fixture/Qt6Qml.dll")
+        interpreted = runtime.replace('"interpreter_override":""', '"interpreter_override":"1"')
+        self.assertIn("WrongQtVersionOrJitDisabled", probe.interpret("jit-setlookup", interpreted + complete)["errors"])
+        self.assertFalse(probe.interpret("jit-setlookup", runtime + complete + complete)["conclusive"])
 
 
 if __name__ == "__main__":
