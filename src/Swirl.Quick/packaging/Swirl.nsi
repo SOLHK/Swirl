@@ -3,6 +3,7 @@
 Unicode true
 SetCompressor /SOLID lzma
 Var IsolatedInstall
+Var RecoverTunConsent
 Var Parameters
 Var FailurePhase
 Var FailureCode
@@ -168,12 +169,17 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     DetailPrint "$1"
     StrCmp $0 "0" 0 ${FailureLabel}
     ; Restoring host network state requires the user's explicit action.
-    ; A silent upgrade cannot consent on the user's behalf.
+    ; A silent upgrade or uninstall cannot consent on the user's behalf
+    ; unless the caller explicitly passes /RECOVER_TUN=1.
     StrCpy $FailurePhase "native-tun-consent"
     StrCpy $FailureCode "required"
-    IfSilent ${FailureLabel}
-    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "上次 Swirl TUN 网络恢复尚未确认。继续前需要管理员授权，恢复 Swirl 自己接管的网络设置；发生冲突时会保留恢复记录并停止更新。是否现在恢复？" IDOK +2 IDCANCEL ${FailureLabel}
+    IfSilent native_tun_silent native_tun_prompt
+    native_tun_silent:
+    StrCmp $RecoverTunConsent "1" native_tun_recover ${FailureLabel}
+    native_tun_prompt:
+    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "上次 Swirl TUN 网络恢复尚未确认。继续前需要管理员授权，恢复 Swirl 自己接管的网络设置；发生冲突时会保留恢复记录并停止更新。是否现在恢复？" IDOK native_tun_recover IDCANCEL ${FailureLabel}
     Goto ${FailureLabel}
+    native_tun_recover:
     ClearErrors
     StrCpy $FailurePhase "native-tun-maintenance"
     StrCpy $FailureCode "unavailable"
@@ -204,11 +210,18 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
 !macroend
 Function .onInit
     StrCpy $IsolatedInstall "0"
+    StrCpy $RecoverTunConsent "0"
     ${GetParameters} $Parameters
     ClearErrors
     ${GetOptions} $Parameters "/ISOLATED" $0
     IfErrors +2 0
     StrCpy $IsolatedInstall "1"
+    ClearErrors
+    ${GetOptions} $Parameters "/RECOVER_TUN=" $0
+    IfErrors init_recover_done 0
+    StrCmp $0 "1" 0 init_recover_done
+    StrCpy $RecoverTunConsent "1"
+    init_recover_done:
     StrCmp $IsolatedInstall "1" 0 init_done
     !insertmacro ValidateIsolatedDirectory
     init_done:
@@ -216,6 +229,14 @@ FunctionEnd
 Function un.onInit
     IfFileExists "$INSTDIR\.swirl-install-owned" 0 unowned_install
     StrCpy $IsolatedInstall "0"
+    StrCpy $RecoverTunConsent "0"
+    ${un.GetParameters} $Parameters
+    ClearErrors
+    ${un.GetOptions} $Parameters "/RECOVER_TUN=" $0
+    IfErrors uninit_recover_done 0
+    StrCmp $0 "1" 0 uninit_recover_done
+    StrCpy $RecoverTunConsent "1"
+    uninit_recover_done:
     IfFileExists "$INSTDIR\.swirl-isolated-install" 0 +2
     StrCpy $IsolatedInstall "1"
     StrCmp $IsolatedInstall "1" 0 uninstall_ready

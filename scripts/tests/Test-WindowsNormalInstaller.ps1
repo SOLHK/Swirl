@@ -314,7 +314,7 @@ function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$
         if($null -ne $capture){try{Close-SwirlCapturedProcess $capture}finally{$entry.exited=$capture.Exited;$entry.exit_code=$capture.ExitCode;$entry.created_handle_retained=$capture.CreatedHandleRetained;$entry.output_drains_completed=$capture.OutputsComplete;if($capture.ForcedTermination){$report.forced_termination=$true}}}
         $stderrPath=Join-Path $evidence ($Name+'.stderr.log')
         if($null -ne $entry.exit_code -and $entry.exit_code -ne 0 -and [IO.File]::Exists($stderrPath) -and (Get-Item -LiteralPath $stderrPath).Length -le 4096){
-            $receipts=[regex]::Matches([IO.File]::ReadAllText($stderrPath),'(?m)^SWIRL_(INSTALL|UNINSTALL)_FAILURE phase=([A-Za-z-]{1,64}) code=(-?\d{1,10}|error|timeout|missing-payload|unavailable)\r?$')
+            $receipts=[regex]::Matches([IO.File]::ReadAllText($stderrPath),'(?m)^SWIRL_(INSTALL|UNINSTALL)_FAILURE phase=([A-Za-z-]{1,64}) code=(-?\d{1,10}|error|timeout|missing-payload|unavailable|required)\r?$')
             $entry.failure_receipts=@($receipts|ForEach-Object {[ordered]@{operation=$_.Groups[1].Value;phase=$_.Groups[2].Value;code=$_.Groups[3].Value}})
         }
     }
