@@ -2,12 +2,13 @@
 
 Run with SWIRL_RUST_HARNESS set. Synthetic credentials only.
 """
-import hashlib, io, json, os, socket, socketserver, subprocess, tempfile, threading, traceback, unittest
+import hashlib, io, json, os, socket, socketserver, subprocess, sys, tempfile, threading, traceback, unittest
 import concurrent.futures
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from loopback_ports import ExclusiveLoopbackBind, reserve_tcp_udp
 from test_rust_core import exact, header, target
 
 PASSWORD='synthetic-ss-password'
@@ -46,13 +47,27 @@ class Writer:
     def chunk(self,data):
         return self.encrypt(len(data).to_bytes(2,'big'))+self.encrypt(data)
 
-class Peer(socketserver.ThreadingTCPServer):
-    allow_reuse_address=True;daemon_threads=True
+class Peer(ExclusiveLoopbackBind,socketserver.ThreadingTCPServer):
+    daemon_threads=True
     def handle_error(self,request,address): self.errors.append(traceback.format_exc())
 
-class UdpPeer(socketserver.ThreadingUDPServer):
-    allow_reuse_address=True;daemon_threads=True
+class UdpPeer(ExclusiveLoopbackBind,socketserver.ThreadingUDPServer):
+    daemon_threads=True
     def handle_error(self,request,address):self.errors.append('UdpReferenceFailure')
+
+class UdpTrap:
+    def __init__(self,address):
+        self.socket=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        try:
+            if sys.platform=='win32' and hasattr(socket,'SO_EXCLUSIVEADDRUSE'):
+                self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
+            self.socket.bind(address)
+            self.server_address=self.socket.getsockname()
+        except Exception:
+            self.socket.close();raise
+    def __enter__(self):return self
+    def __exit__(self,*_):self.close()
+    def close(self):self.socket.close()
 
 class UdpHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -130,8 +145,9 @@ class ShadowsocksTests(unittest.TestCase):
     def command(self,**data):
         self.process.stdin.write(json.dumps(data)+'\n');self.process.stdin.flush()
         return json.loads(self.process.stdout.readline())
-    def setup_peer(self,method='aes-128-gcm',obfs=False,mode='echo',salt=None,udp_enabled=True):
-        server=Peer(('127.0.0.1',0),Handler)
+    def setup_peer(self,method='aes-128-gcm',obfs=False,mode='echo',salt=None,udp_enabled=True,server=None):
+        if server is None:
+            server=Peer(('127.0.0.1',0),Handler)
         server.method=method;server.obfs=obfs;server.mode=mode;server.fixed_salt=salt
         server.targets=[];server.headers=[];server.errors=[];server.received=0
         threading.Thread(target=server.serve_forever,daemon=True).start();self.servers.append(server)
@@ -203,9 +219,10 @@ class ShadowsocksTests(unittest.TestCase):
             self.assertEqual(server.targets[-1],(host,8080))
     def test_udp_all_ciphers_boundaries_authentication_replay_and_client_pin(self):
         for method in ('aes-128-gcm','aes-256-gcm','chacha20-ietf-poly1305'):
-            peer=self.setup_peer(method,True)
-            udp=UdpPeer(peer.server_address,UdpHandler);udp.method=method;udp.received=[];udp.errors=[]
+            peer,udp=reserve_tcp_udp(lambda address:Peer(address,Handler),lambda address:UdpPeer(address,UdpHandler),label='Shadowsocks UDP fixture')
+            udp.method=method;udp.received=[];udp.errors=[]
             threading.Thread(target=udp.serve_forever,daemon=True).start();self.servers.append(udp)
+            self.setup_peer(method,True,server=peer)
             with socket.create_connection(('127.0.0.1',self.port),timeout=3) as control, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client:
                 control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
                 control.sendall(b'\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00')
@@ -223,15 +240,17 @@ class ShadowsocksTests(unittest.TestCase):
                 self.assertEqual(len(udp.received),count)
             self.command(op='stop',handle=self.handle)
     def test_explicit_udp_false_never_sends_to_server(self):
-        peer=self.setup_peer(udp_enabled=False)
-        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as remote, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client, socket.create_connection(('127.0.0.1',self.port),timeout=3) as control:
-            remote.bind(peer.server_address);remote.settimeout(.2)
-            control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
-            control.sendall(b'\x05\x03\x00\x01'+bytes(6));self.assertEqual(exact(control,3),b'\x05\x00\x00')
-            relay=target(control);client.sendto(b'\x00\x00\x00\x01\x7f\x00\x00\x01\x00\x35blocked',relay)
-            control.settimeout(.2)
-            with self.assertRaises(socket.timeout):control.recv(1)
-            with self.assertRaises(socket.timeout):remote.recvfrom(1024)
-            self.assertGreater(self.command(op='snapshot',handle=self.handle)['status']['udp_dropped'],0)
+        peer,trap=reserve_tcp_udp(lambda address:Peer(address,Handler),UdpTrap,label='Shadowsocks udp=false trap')
+        with trap, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client:
+            self.setup_peer(udp_enabled=False,server=peer)
+            remote=trap.socket;remote.settimeout(.2)
+            with socket.create_connection(('127.0.0.1',self.port),timeout=3) as control:
+                control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
+                control.sendall(b'\x05\x03\x00\x01'+bytes(6));self.assertEqual(exact(control,3),b'\x05\x00\x00')
+                relay=target(control);client.sendto(b'\x00\x00\x00\x01\x7f\x00\x00\x01\x00\x35blocked',relay)
+                control.settimeout(.2)
+                with self.assertRaises(socket.timeout):control.recv(1)
+                with self.assertRaises(socket.timeout):remote.recvfrom(1024)
+                self.assertGreater(self.command(op='snapshot',handle=self.handle)['status']['udp_dropped'],0)
 
 if __name__=='__main__':unittest.main(verbosity=2)
