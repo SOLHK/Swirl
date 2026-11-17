@@ -120,7 +120,7 @@ def classify_runtime(name, rules):
     if name.lower().endswith(".dll"):
         require(name in rules["non_qt_root_dlls"], "UnknownRuntimeLibrary")
     require(not name.lower().startswith("qt6")
-            and not name.startswith(("platforms/", "qmltooling/", "tls/", "imageformats/",
+            and not name.startswith(("platforms/", "qmltooling/", "styles/", "tls/", "imageformats/",
                                      "generic/", "networkinformation/", "iconengines/")),
             "UnknownQtRuntimeFile")
     return None

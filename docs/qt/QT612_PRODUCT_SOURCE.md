@@ -17,7 +17,7 @@ identity fields, and separately preserve that final receipt and workflow result.
 
 | Module | Role | Source identity |
 | --- | --- | --- |
-| QtBase | Core, GUI, Network, OpenGL and deployed platform, image and TLS plugins | Official 6.12.0 source archive at `025bdad181de241e81bf853c8a2d7bf3d19261a9`, plus the complete modified QtBase source used for the Network backports |
+| QtBase | Core, GUI, Network, OpenGL, Widgets and deployed platform, style, image and TLS plugins | Official 6.12.0 source archive at `025bdad181de241e81bf853c8a2d7bf3d19261a9`, plus the complete modified QtBase source used for the Network backports |
 | QtDeclarative | QML, Quick, controls, dialogs, layouts, QML files and plugins | Complete tracked library source at `4332fbbb4c340463dc8cee36dda0c85d932122d8`, with the two modifications below |
 | QtSvg | SVG library, image and icon plugins | Official 6.12.0 source archive; commit `883a58532078d003cefef0a549bfe9f885ce41f5` |
 | QtTranslations | Source catalogs for the deployed translations | Official 6.12.0 source archive; commit `2811457ceff8f0c24a1c4d14f947a283a17239d0` |

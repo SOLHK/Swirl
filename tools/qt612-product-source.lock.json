@@ -212,6 +212,7 @@
       "qmltooling/qmldbg_quickprofiler.dll": "qtdeclarative",
       "qmltooling/qmldbg_server.dll": "qtdeclarative",
       "qmltooling/qmldbg_tcp.dll": "qtdeclarative",
+      "styles/qmodernwindowsstyle.dll": "qtbase",
       "tls/qcertonlybackend.dll": "qtbase",
       "tls/qopensslbackend.dll": "qtbase",
       "tls/qschannelbackend.dll": "qtbase"
@@ -257,7 +258,9 @@
       "Qt6Quick.dll",
       "Qt6QuickControls2.dll",
       "Qt6Svg.dll",
+      "Qt6Widgets.dll",
       "platforms/qwindows.dll",
+      "styles/qmodernwindowsstyle.dll",
       "tls/qopensslbackend.dll"
     ],
     "root_dlls": {
@@ -296,7 +299,8 @@
       "Qt6QuickNativeStyle.dll": "qtdeclarative",
       "Qt6QuickShapes.dll": "qtdeclarative",
       "Qt6QuickTemplates2.dll": "qtdeclarative",
-      "Qt6Svg.dll": "qtsvg"
+      "Qt6Svg.dll": "qtsvg",
+      "Qt6Widgets.dll": "qtbase"
     }
   },
   "schema": 1,

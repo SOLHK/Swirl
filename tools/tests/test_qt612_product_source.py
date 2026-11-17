@@ -109,7 +109,9 @@ class ProductSourceControls(unittest.TestCase):
     def test_actual_release_scope_excludes_qa_and_unknown_modules(self):
         rules = self.lock["runtime_rules"]
         self.assertEqual(SOURCE.classify_runtime("Qt6QuickControls2.dll", rules), "qtdeclarative")
-        for name in ["Qt6Test.dll", "platforms/qoffscreen.dll", "Qt6WebEngineCore.dll",
+        self.assertEqual(SOURCE.classify_runtime("Qt6Widgets.dll", rules), "qtbase")
+        self.assertEqual(SOURCE.classify_runtime("styles/qmodernwindowsstyle.dll", rules), "qtbase")
+        for name in ["Qt6Test.dll", "platforms/qoffscreen.dll", "styles/unknown.dll", "Qt6WebEngineCore.dll",
                      "Qt6ShaderTools.dll", "qml/QtQuick3D/plugin.dll", "unexpected/native.dll"]:
             with self.subTest(name=name), self.assertRaises(SOURCE.SourceError):
                 SOURCE.classify_runtime(name, rules)
