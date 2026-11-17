@@ -157,10 +157,10 @@ QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
 #endif
 }
 }
-EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance,std::unique_ptr<SystemProxySession::Backend> proxyBackend)
+EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance,std::unique_ptr<SystemProxySession::Backend> proxyBackend,bool controlledAcceptance)
     // Runtime acceptance counts explicit requests. Its own periodic probes
     // would add unrelated Rust connections and corrupt per-request deltas.
-    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_systemProxy(this,{},std::move(proxyBackend)),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
+    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_systemProxy(this,{},std::move(proxyBackend)),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance),m_controlledAcceptance(controlledAcceptance) {
     m_lanSession=std::make_unique<LanProxySession>(m_engine.get(),storePath.isEmpty()?QString():storePath+".lan-firewall/session.dpapi",this);
     connect(m_lanSession.get(),&LanProxySession::changed,this,[this]{m_networkError=m_lanSession->error();emit optionsChanged();emit statusChanged();});
     const auto retainedNodeConfiguration=[this](const QString &sourceId,bool nodesOnly) {
@@ -929,7 +929,7 @@ bool EngineController::nodeProbeReady(){
 void EngineController::testAllNodes(const QUrl &url) { if(!nodeProbeReady())return;const auto options=nodeProbeOptions();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
 void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(!nodeProbeReady())return;m_tests.start(nodeProbeOptions(),ids,url); }
 bool EngineController::testNodesIfStale(const QStringList &ids,const QUrl &url) {
-    if(ids.isEmpty()||m_tests.busy()||m_tests.hasFreshResults(ids,url)||!nodeProbeReady())return false;
+    if(m_controlledAcceptance||ids.isEmpty()||m_tests.busy()||m_tests.hasFreshResults(ids,url)||!nodeProbeReady())return false;
     m_tests.start(nodeProbeOptions(),ids,url);return true;
 }
 void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(!nodeProbeReady())return;m_tests.refreshNode(nodeProbeOptions(),id,url); }

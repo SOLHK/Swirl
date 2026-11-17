@@ -764,7 +764,7 @@ int main(int argc, char *argv[])
     // with only host system-proxy I/O replaced by an owned in-memory adapter.
     std::unique_ptr<SystemProxySession::Backend> policyProxyBackend;
     if(policyTest||nodeTest||controlledNodeSession)policyProxyBackend=std::make_unique<PolicySystemProxyBackend>();
-    EngineController engineController(std::move(runtimeEngine),nullptr,nodeStorePath,realAcceptance,std::move(policyProxyBackend));
+    EngineController engineController(std::move(runtimeEngine),nullptr,nodeStorePath,realAcceptance,std::move(policyProxyBackend),controlledNodeSession);
 #else
     EngineController engineController(std::move(runtimeEngine),nullptr,nodeStorePath,realAcceptance);
 #endif

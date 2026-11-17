@@ -107,7 +107,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString policyMigrationSummary READ policyMigrationSummary NOTIFY policyChanged)
     Q_PROPERTY(bool processMatchingAvailable READ processMatchingAvailable CONSTANT)
 public:
-    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false,std::unique_ptr<SystemProxySession::Backend> proxyBackend={});
+    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false,std::unique_ptr<SystemProxySession::Backend> proxyBackend={},bool controlledAcceptance=false);
     bool rustCoreBuild() const {
         return true;
     }
@@ -358,6 +358,7 @@ private:
     bool m_moduleOverlayActive=false;
     bool m_nativeDocumentRouting=false;
     bool m_smartRoutingEligible=false;
+    bool m_controlledAcceptance=false;
     void updateRoutingFlags();
     void initializePolicyConfiguration();
     QVariantMap reviewSubscriptionConfiguration(const QString &sourceId);
