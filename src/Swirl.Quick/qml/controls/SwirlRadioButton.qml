@@ -41,7 +41,7 @@ RadioButton {
         text: control.text; textRole: "button"
         font: control.font
         color: control.enabled ? Theme.text : Theme.muted
-        leftPadding: control.indicator.width + control.spacing
+        leftPadding: Theme.dp(18) + control.spacing
         verticalAlignment: Text.AlignVCenter
         wrapMode: Text.Wrap
     }

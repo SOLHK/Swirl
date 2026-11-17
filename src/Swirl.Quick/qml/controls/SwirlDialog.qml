@@ -10,6 +10,7 @@ Dialog {
     property bool guardChanges:true
     property Item heroSource:null
     property bool presentationReady:false
+    property Item retainedBackground:null
     Component.onCompleted:presentationReady=true
     Component.onDestruction:presentationReady=false
     // Pages that move between native scenes provide their declaration owner.
@@ -67,17 +68,18 @@ Dialog {
     y:parent ? Math.round((parent.height-height)/2) : 0
     padding:Theme.dp(23)
     closePolicy: Popup.NoAutoClose
-    Dialog {
+    readonly property Dialog discardChangesDialog: Dialog {
         id:discardPrompt;objectName:"discardChangesPrompt"
         property var owner:dialog.ownerWindow
+        property Item retainedBackground:null
         function requestDismiss(){close()}
         modal:true;focus:true;title:qsTr("放弃未保存的修改？")
         font.family:Theme.fontFamily
         // The style owns this header (including its bold weight and padding).
         // Resolve its actual font after inheritance, without replacing it.
-        readonly property SwirlFontBinding headerFont:SwirlFontBinding {target:discardPrompt.header;textRole:"pageTitle"}
-        Binding {target:discardPrompt.header;property:"font.hintingPreference";value:Font.PreferFullHinting}
-        Binding {target:discardPrompt.header;property:"renderType";value:Text.NativeRendering}
+        readonly property SwirlFontBinding headerFont:SwirlFontBinding {target:dialog.presentationReady?discardPrompt.header:null;textRole:"pageTitle"}
+        Binding {target:dialog.presentationReady?discardPrompt.header:null;property:"font.hintingPreference";value:Font.PreferFullHinting;when:dialog.presentationReady && discardPrompt.header!==null}
+        Binding {target:dialog.presentationReady?discardPrompt.header:null;property:"renderType";value:Text.NativeRendering;when:dialog.presentationReady && discardPrompt.header!==null}
         parent:dialog.parent
         margins:dialog.margins
         width:Math.floor(Math.min(Theme.dp(400),dialog.width))
@@ -92,7 +94,7 @@ Dialog {
         exit:discardReveal.exitTransition
         onAboutToShow:{dismissals.push(discardPrompt,owner);discardReveal.prepare(SwirlMotion.popupVector(discardPrompt))}
         onClosed:{dismissals.pop(discardPrompt);discardReveal.reset()}
-        background:SwirlCardSurface{floating:true;cornerRadius:Theme.popupRadius}
+        background:SwirlCardSurface{id:discardBackground;Component.onCompleted:discardPrompt.retainedBackground=discardBackground;floating:true;cornerRadius:Theme.popupRadius}
         // Retain the prompt shell and header hook; its controls are only
         // instantiated while a real unsaved-change confirmation is visible.
         contentItem: Loader {
@@ -122,7 +124,10 @@ Dialog {
     } }
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){heroClock.finish();if(!dialog.dismissing){reveal.progress=1;dialog.opacity=1}motionPolicy.finishPopup(dialog)}}}
     font.family: Theme.fontFamily
+    readonly property Item retainedHeader: headerItem
     header: Item {
+        id:headerItem
+        readonly property SwirlText retainedTitle: dialogTitle
         implicitHeight:Math.max(Theme.dp(47),dialogTitle.implicitHeight+Theme.dp(20))
         opacity:dialog.heroSource?Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65)):1
         SwirlText {
@@ -138,8 +143,11 @@ Dialog {
     }
     background: Item {
         id:heroBackground
+        Component.onCompleted:dialog.retainedBackground=heroBackground
         readonly property point origin:dialog.heroSource?dialog.heroSource.mapToItem(heroBackground,0,0):Qt.point(0,0)
+        readonly property SwirlCardSurface retainedCardSurface:heroSurface
         SwirlCardSurface {
+            id:heroSurface
             floating:true
             x:Math.round(heroBackground.origin.x*(1-dialog.heroProgress));y:Math.round(heroBackground.origin.y*(1-dialog.heroProgress))
             width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)

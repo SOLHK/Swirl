@@ -8,6 +8,8 @@ ComboBox {
     implicitWidth:Theme.dp(146)
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
+    property bool popupOpen: false
+    property Popup retainedPopup: null
     readonly property Item ownedPressMotion: SwirlPressMotion {parent:control;pressed:control.pressed}
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
@@ -36,7 +38,7 @@ ComboBox {
 
     indicator: SwirlIcon {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
-        name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
+        name:"chevron-right";size:Theme.dp(14);rotation:control.popupOpen?270:90;color:Theme.muted
         Behavior on rotation {enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
     }
     background: SwirlControlSurface {
@@ -76,6 +78,9 @@ ComboBox {
     }
     popup: Popup {
         id:popupLayer
+        Component.onCompleted:control.retainedPopup=popupLayer
+        onVisibleChanged:control.popupOpen=visible
+        property Item retainedBackground:null
         function requestDismiss(){close()}
         parent:control.Overlay.overlay
         property point anchorPoint:Qt.point(0,0)
@@ -108,14 +113,14 @@ ComboBox {
         margins:edgeMargin
         enter:reveal.enterTransition
         exit:reveal.exitTransition
-        background: SwirlCardSurface { floating:true;transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+        background: SwirlCardSurface { id:popupBackground; Component.onCompleted:popupLayer.retainedBackground=popupBackground; floating:true;transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             cornerRadius:Theme.menuRadius }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             clip: true
             implicitHeight: contentHeight
-            model: control.popup.visible ? control.delegateModel : null
+            model: popupLayer.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
             highlightMoveDuration:0
             boundsBehavior:Flickable.StopAtBounds

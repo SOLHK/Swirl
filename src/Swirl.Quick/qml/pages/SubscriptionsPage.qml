@@ -203,7 +203,7 @@ Item {
             SubscriptionAction { visible:page.operationMessage.length>0; text: qsTr("详情"); onClicked: operationDialog.open() }
         }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedOperationDialog: SwirlDialog {
         id: operationDialog; ownerItem: page; title: qsTr("最近操作详情"); guardChanges: false
         contentItem: ColumnLayout {
             spacing: Theme.dp(16)
@@ -214,8 +214,8 @@ Item {
             SubscriptionAction { Layout.alignment: Qt.AlignRight; text: qsTr("关闭"); solid: true; onClicked: operationDialog.close() }
         }
     }
-    SubscriptionDialog { id: addDialog; ownerItem: page; canSave: !engineController.policyBusy && !engineController.imports.busy; recoveryRequired: engineController.policyApplyState === "reconciling"; onSaveRequested: page.saveSource(); onRecoveryRequested: engineController.recoverPolicyConfiguration() }
-    ConfigurationReviewDialog {
+    readonly property SubscriptionDialog retainedAddDialog: SubscriptionDialog { id: addDialog; ownerItem: page; canSave: !engineController.policyBusy && !engineController.imports.busy; recoveryRequired: engineController.policyApplyState === "reconciling"; onSaveRequested: page.saveSource(); onRecoveryRequested: engineController.recoverPolicyConfiguration() }
+    readonly property ConfigurationReviewDialog retainedReviewDialog: ConfigurationReviewDialog {
         id: reviewDialog; ownerItem: page
         canSubmit: !engineController.policyBusy && !engineController.imports.busy
         recoveryRequired: engineController.policyApplyState === "reconciling"
@@ -224,12 +224,12 @@ Item {
         onRecoveryRequested: engineController.recoverPolicyConfiguration()
         onReviewAgainRequested: { engineController.imports.reviewConfiguration(String(review.sourceId || "")); showReview(engineController.imports.configurationReview) }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedDeleteDialog: SwirlDialog {
         id: deleteDialog
         ownerItem: page; title: qsTr("删除订阅？"); property string recordId: ""; property string recordName: ""; property int nodeCount: 0; property bool pending: false
         guardChanges: false; dismissBlocked: pending
-        ColumnLayout {
-            width: parent.width; spacing: Theme.dp(12)
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(12)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("删除「%1」及其 %2 个所属节点。").arg(deleteDialog.recordName).arg(deleteDialog.nodeCount); textFormat: Text.PlainText; color: Theme.text }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("相关连接将断开。引用这些节点的策略将显示出口失效，需重新分配；不会自动改为直连。手动节点和历史未归属节点保留。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (deleteDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
@@ -241,12 +241,12 @@ Item {
             }
         }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedLegacyDialog: SwirlDialog {
         id: legacyDialog
         ownerItem: page; objectName: "legacyNodesDialog"; title: qsTr("清理历史未归属节点？"); property bool pending: false
         guardChanges: false; dismissBlocked: pending
-        ColumnLayout {
-            width: parent.width; spacing: Theme.dp(12)
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(12)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("将删除来源缺失的 %1 个历史节点，其中可能包含旧版手动节点。请先检查并备份；此操作不能撤销。明确归属的手动节点和现有订阅保持不变。").arg(engineController.imports.legacyNodeCount); color: Theme.text }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (legacyDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
             RowLayout {
