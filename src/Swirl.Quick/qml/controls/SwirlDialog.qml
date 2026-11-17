@@ -15,14 +15,19 @@ Dialog {
     // Pages that move between native scenes provide their declaration owner.
     // Overlay.overlay on the Popup itself otherwise retains the first scene.
     property Item ownerItem:null
+    // Keep non-visual motion helpers in explicit properties rather than default
+    // contentData children, and do not dereference deferred background/contentItem
+    // before the popup is shown: calling those getters during unopened page
+    // finalization triggers incomplete deferred creation (QTBUG-122956) and lets
+    // incremental V4 GC sweep child VME member storage.
     readonly property real heroProgress:heroClock.progress
-    SwirlTransitionCoordinator { id:heroClock;parent:dialog.background;duration:SwirlMotion.dialogDuration }
+    readonly property SwirlTransitionCoordinator heroMotionClock:SwirlTransitionCoordinator { id:heroClock;duration:SwirlMotion.dialogDuration }
     readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:dialog;motionEnabled:dialog.heroSource===null}
-    Binding {target:dialog.presentationReady && dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.presentationReady && dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
-    Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
-    Binding {target:dialog.contentItem;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
-    Binding {target:dialog.heroSource;property:"opacity";value:0;when:dialog.visible && dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
-    Binding {target:dialog.contentItem;property:"enabled";value:false;when:dialog.dismissing;restoreMode:Binding.RestoreBindingOrValue}
+    readonly property Translate contentMotionTransform:Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
+    Binding {target:dialog.presentationReady && dialog.visible && dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.presentationReady && dialog.visible && dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
+    Binding {target:dialog.visible && dialog.heroSource!==null?dialog.contentItem:null;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.visible && dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
+    Binding {target:dialog.visible && dialog.heroSource!==null?dialog.heroSource:null;property:"opacity";value:0;when:dialog.visible && dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
+    Binding {target:dialog.dismissing?dialog.contentItem:null;property:"enabled";value:false;when:dialog.dismissing;restoreMode:Binding.RestoreBindingOrValue}
     property bool dismissing:false
     property string savedFingerprint:""
     property string stateFingerprint:""
@@ -39,14 +44,15 @@ Dialog {
     focus: true
     transformOrigin:Item.Center
     onAboutToShow: {
-        returnFocus=ownerWindow?ownerWindow.activeFocusItem:null
+        const wasDismissing=dismissing
+        if(!wasDismissing)returnFocus=ownerWindow?ownerWindow.activeFocusItem:null
         dismissing=false;modal=true
         dismissals.push(dialog,ownerWindow)
         transformOrigin=SwirlMotion.popupOrigin(dialog)
         reveal.prepare(SwirlMotion.popupVector(dialog))
-        if(heroSource){scale=1;opacity=1;heroClock.progress=0;heroClock.moveTo(1)}
+        if(heroSource){scale=1;opacity=1;if(!wasDismissing)heroClock.progress=0;heroClock.moveTo(1)}
         else if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){opacity=0}
+        else if(!wasDismissing && scale===1 && opacity===1){opacity=0}
     }
     // The modal can be opened (and Escape pressed) before a Qt.callLater
     // callback executes. Snapshot the initialized fields synchronously when
@@ -79,8 +85,8 @@ Dialog {
         y:parent ? Math.round((parent.height-height)/2) : 0
         closePolicy:Popup.NoAutoClose
         readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:discardReveal;popup:discardPrompt}
-        Binding {target:dialog.presentationReady && discardPrompt.background?discardPrompt.background.parent:null;property:"transform";value:[discardTravel];when:dialog.presentationReady && discardPrompt.background!==null;restoreMode:Binding.RestoreBindingOrValue}
-        Translate {id:discardTravel;x:discardReveal.xOffset;y:discardReveal.yOffset}
+        readonly property Translate discardMotionTransform:Translate {id:discardTravel;x:discardReveal.xOffset;y:discardReveal.yOffset}
+        Binding {target:dialog.presentationReady && discardPrompt.visible && discardPrompt.background?discardPrompt.background.parent:null;property:"transform";value:[discardTravel];when:dialog.presentationReady && discardPrompt.visible && discardPrompt.background!==null;restoreMode:Binding.RestoreBindingOrValue}
         opacity:discardReveal.alpha
         enter:discardReveal.enterTransition
         exit:discardReveal.exitTransition
@@ -114,7 +120,7 @@ Dialog {
         NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
         NumberAnimation {target:reveal;property:"progress";to:0;duration:SwirlMotion.exitDuration;easing.type:Easing.InOutCubic}
     } }
-    Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){reveal.progress=1;dialog.opacity=1;motionPolicy.finishPopup(dialog)}}}
+    Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){heroClock.finish();if(!dialog.dismissing){reveal.progress=1;dialog.opacity=1}motionPolicy.finishPopup(dialog)}}}
     font.family: Theme.fontFamily
     header: Item {
         implicitHeight:Math.max(Theme.dp(47),dialogTitle.implicitHeight+Theme.dp(20))

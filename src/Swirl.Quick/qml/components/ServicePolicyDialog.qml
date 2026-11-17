@@ -71,7 +71,7 @@ SwirlDialog {
                     SwirlText {anchors.centerIn:parent;visible:domainList.count===0;text:qsTr("添加至少一个域名；任一条匹配即使用此策略。");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                 }
                 SwirlText {text:qsTr("出口");color:Theme.text;font.pixelSize:Theme.fontSize(12)}
-                SwirlButton {id:targetButton;objectName:"servicePolicyTarget";Layout.fillWidth:true;text:Policy.targetName(editor.selectedTarget,editor.targetOptions);outlined:true;enabled:!editor.pending;onClicked:targetPicker.begin(editor.selectedTarget,targetButton);Accessible.name:qsTr("策略出口：%1").arg(text)}
+                SwirlButton {id:targetButton;objectName:"servicePolicyTarget";Layout.fillWidth:true;text:Policy.targetName(editor.selectedTarget,editor.targetOptions);outlined:true;enabled:!editor.pending;onClicked:{targetPickerLoader.active=true;if(targetPickerLoader.item)targetPickerLoader.item.begin(editor.selectedTarget,targetButton)}Accessible.name:qsTr("策略出口：%1").arg(text)}
                 RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
                     SwirlText {Layout.alignment:Qt.AlignBaseline;text:qsTr("优先级");color:Theme.text;font.pixelSize:Theme.fontSize(12)}
                     SwirlTextField {id:priorityField;objectName:"servicePolicyPriority";Layout.preferredWidth:Theme.dp(90);Layout.alignment:Qt.AlignBaseline;font.features:({"tnum":1});validator:IntValidator {bottom:0;top:1000000}enabled:!editor.pending;Accessible.name:qsTr("策略优先级，数值越小越优先");onTextEdited:editor.conflictReviewDigest=""}
@@ -89,5 +89,9 @@ SwirlDialog {
             SwirlButton {objectName:"saveServicePolicy";text:editor.pending?qsTr("正在保存…"):editor.conflictReviewDigest.length?qsTr("确认保存"):qsTr("保存");primary:true;enabled:!editor.pending&&nameField.text.trim().length>0&&editor.domains.length>0&&priorityField.acceptableInput&&editor.selectedTarget.kind!=="unconfigured";onClicked:editor.saveRequested(editor.record())}
         }
     }
-    PolicyTargetPicker {id:targetPicker;ownerItem:editor.ownerItem;options:editor.targetOptions;allowDirect:true;onTargetChosen:target=>{editor.selectedTarget=Policy.copy(target);targetPicker.markSaved();targetPicker.close()}}
+    Loader {
+        id:targetPickerLoader
+        active:false
+        sourceComponent:PolicyTargetPicker {id:targetPicker;ownerItem:editor.ownerItem;options:editor.targetOptions;allowDirect:true;onTargetChosen:target=>{editor.selectedTarget=Policy.copy(target);targetPicker.markSaved();targetPicker.close()}}
+    }
 }

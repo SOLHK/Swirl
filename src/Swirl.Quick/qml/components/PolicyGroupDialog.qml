@@ -62,7 +62,7 @@ SwirlDialog {
                 SwirlComboBox {id:typeField;objectName:"policyGroupType";Layout.fillWidth:true;model:[qsTr("手动选择"),qsTr("自动测速"),qsTr("故障转移"),qsTr("负载均衡")];enabled:!editor.pending;Accessible.name:qsTr("策略类型");onActivated:index=>{if(index===1&&!editor.original.probe&&!editor.probeUserEdited){const probe=Policy.copy(editor.probeDraft);probe.tolerance_ms=50;editor.probeDraft=probe}}}
                 RowLayout {Layout.fillWidth:true
                     SwirlText {text:qsTr("候选出口");color:Theme.text;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-                    SwirlButton {id:addMember;objectName:"addPolicyGroupMember";text:qsTr("添加候选");quiet:true;enabled:!editor.pending;onClicked:memberPicker.begin({kind:"unconfigured"},addMember)}
+                    SwirlButton {id:addMember;objectName:"addPolicyGroupMember";text:qsTr("添加候选");quiet:true;enabled:!editor.pending;onClicked:{memberPickerLoader.active=true;if(memberPickerLoader.item)memberPickerLoader.item.begin({kind:"unconfigured"},addMember)}}
                 }
                 ListView {
                     id:memberList;objectName:"policyGroupMemberList";Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(180),Math.max(Theme.dp(48),contentHeight));clip:true;reuseItems:true;model:editor.members
@@ -92,5 +92,9 @@ SwirlDialog {
             SwirlButton {objectName:"savePolicyGroup";text:editor.pending?qsTr("正在保存…"):editor.conflictReviewDigest.length?qsTr("确认保存"):qsTr("保存");primary:true;enabled:!editor.pending&&nameField.text.trim().length>0&&editor.members.length>0&&(editor.strategy!=="manual"||editor.members.some(member=>Policy.sameTarget(member,editor.selectedMember)));onClicked:editor.saveRequested(editor.record())}
         }
     }
-    PolicyTargetPicker {id:memberPicker;ownerItem:editor.ownerItem;options:editor.targetOptions;excludedGroupId:String(editor.original.id||"");onTargetChosen:target=>{if(!editor.members.some(member=>Policy.sameTarget(member,target)))editor.members=editor.members.concat([Policy.copy(target)]);memberPicker.markSaved();memberPicker.close()}}
+    Loader {
+        id:memberPickerLoader
+        active:false
+        sourceComponent:PolicyTargetPicker {id:memberPicker;ownerItem:editor.ownerItem;options:editor.targetOptions;excludedGroupId:String(editor.original.id||"");onTargetChosen:target=>{if(!editor.members.some(member=>Policy.sameTarget(member,target)))editor.members=editor.members.concat([Policy.copy(target)]);memberPicker.markSaved();memberPicker.close()}}
+    }
 }
