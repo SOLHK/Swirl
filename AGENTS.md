@@ -1,3 +1,19 @@
+# Permanent Swirl maintainability and CI-scope guardrails (2026-11-17)
+
+These rules apply to all human and AI contributors (including Codex and Gemini). Read [engineering change policy](docs/ENGINEERING_CHANGE_POLICY.md) before changing code or CI. They supplement, and never weaken, the existing security, source-identity, installer, release, licensing and user-data requirements below.
+
+- Make the **smallest complete root-cause fix** for the requested issue. Name the affected modules and non-goals. Do not add unrelated features, duplicate state sources, alternative cores, broad abstractions, speculative fallbacks, redundant defenses, repeated evidence collectors, or extra test matrices without demonstrated need.
+- Keep the **Rust Core as the sole network runtime** and respect Qt/QML/C++ ownership boundaries. Delete obsolete or duplicate code only after proving it is unused and its migration/compatibility/security behavior is preserved.
+- Treat **20 changed production files or 1000 manually authored changed source lines** as default PR review/splitting triggers (not a hard cap). Split unrelated changes; for a necessary atomic exception, explain scope, why splitting is unsafe, and obtain owner approval. Never compress code or remove tests to hit the numbers.
+- Run **targeted, affected-module checks first**. Add a test only for a real reproduced regression, changed behavior, compatibility boundary or material security invariant. Prefer extending existing tests to adding redundant suites, guard wrappers or CI jobs.
+- Keep **all existing required security/release checks and their original assertions**, including TLS, DNS, TUN ownership/recovery, installer lifecycle, source/ABI identity, and real UI/Qt warning checks. Never silence warnings, relax thresholds/timeouts, fabricate green CI, or bypass branch protection to speed up delivery.
+- Optimize PR feedback with truthful change-impact classification, targeted tests and verified caches. Changes to a required gate need an equivalent coverage map **and explicit owner approval** before modification. Unknown impact on security means retaining the full relevant tests.
+- For failures, inspect the **latest applicable HEAD** workflow, failing step and raw artifact before modifying tests or rerunning; distinguish product, test and runner faults and document evidence. Do not hide a failure behind a new wrapper or perpetual retry.
+- Every PR must state scope, root cause, new complexity/test/CI justification, actual checks, unverified scenarios and any threshold exception. Keep `main` and official Releases reserved for the owner's explicit authorization; normal engineering work belongs to `test` candidates.
+- These files guide contributors but are **not automatically enforced GitHub branch rules**; never claim policy documentation alone changes protection settings.
+
+---
+
 # Current delivery and promotion (2026-11-05)
 
 - The owner's latest 2026-11-05 objective is the 0.2.38 subscription-selection and cold-navigation repair: integrate the other branches and deliver to test. This supersedes the earlier main-promotion and screenshot-refresh scope for this candidate. Keep the existing 0.2.x version sequence, increment one patch version per iteration unless a major update is requested, and prefer the smallest direct fix without unrelated features or configuration.
