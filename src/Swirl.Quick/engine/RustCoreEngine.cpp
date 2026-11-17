@@ -714,7 +714,7 @@ void RustCoreEngine::configurationCommand(const QJsonObject &input){
  }
  const auto result=call(request);
  if(result.value("ok").toBool()){
-  if(op=="activate_configuration_v2"||op=="rollback_configuration_v2")resetProbeState();
+  if(op=="activate_configuration_v2"||op=="rollback_configuration_v2")cancelProbe();
   if(op=="prepare_configuration_v2"){
    m_previousPolicy=m_options.policyDocument;m_preparedPolicy=request.value("candidate").toObject().value("policy").toObject();m_configurationRollback=false;
   }else if(op=="rollback_configuration_v2")m_configurationRollback=true;

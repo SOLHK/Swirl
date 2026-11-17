@@ -539,8 +539,16 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
     check(!liveEpoch.isEmpty(),QStringLiteral("Live receipt reports the actual runtime epoch"));
     const auto request=[&](const QUrl &url,SocksPeer *expected,const QString &label){
-        const auto before=net.httpRequestsByExit;const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;controller->testNode(url);
-        const bool finished=QTest::qWaitFor([&]{return !controller->nodeBusy()&&net.httpRequests>0&&(net.httpRequestsByExit!=before);},10000);
+        (void)QTest::qWaitFor([&]{return !controller->nodeBusy();},5000);
+        const auto before=net.httpRequestsByExit;const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;
+        bool sawBusy=false,sawFinished=false;
+        const auto probeConnection=QObject::connect(controller,&EngineController::statusChanged,window,[&]{
+            if(controller->nodeBusy())sawBusy=true;
+            else if(sawBusy||controller->requestStateText().startsWith(QStringLiteral("Rust HEAD 探测失败")))sawFinished=true;
+        });
+        controller->testNode(url);
+        const bool finished=QTest::qWaitFor([&]{return sawFinished&&!controller->nodeBusy()&&net.httpRequests>0&&(net.httpRequestsByExit!=before);},10000);
+        QObject::disconnect(probeConnection);
         const auto marker=expected?expected->label:QStringLiteral("DIRECT-BYPASS");
         bool route=finished&&controller->requestSucceeded()&&net.httpRequestsByExit.value(marker)>before.value(marker);
         if(expected)route=route&&net.httpRequestsByExit.value("DIRECT-BYPASS")==before.value("DIRECT-BYPASS")&&(expected==&net.a?net.b.forwarded==beforeB:net.a.forwarded==beforeA);
