@@ -489,6 +489,13 @@ int main(int argc, char *argv[])
         return 1;
 
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+#ifdef SWIRL_UI_TESTS
+    if (rootWindow && activityLayoutTest && qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR")) {
+        // Must precede --preview-size resize and show() so WindowsBackdrop allows
+        // high-DPR HWNDs to exceed the smaller hosted CI desktop work area.
+        rootWindow->setProperty("swirlViewportTest", true);
+    }
+#endif
     if (rootWindow) {
         rootWindow->setProperty("previewProfile", interactivePreview);
         rootWindow->contentItem()->setClip(true);

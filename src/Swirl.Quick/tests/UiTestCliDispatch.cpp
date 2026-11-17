@@ -218,10 +218,6 @@ int attachAndScheduleUiTests(QApplication &app,
     const bool gatewayTest = arguments.contains(QStringLiteral("--gateway-self-test"));
     const bool captureTest = arguments.contains(QStringLiteral("--capture-self-test"));
 
-    if (rootWindow && activityLayoutTest && qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR")) {
-        rootWindow->setProperty("swirlViewportTest", true);
-    }
-
     if (rootWindow && lifecycleTest) {
 #ifdef Q_OS_WIN
         if (qEnvironmentVariable("SWIRL_LIFECYCLE_SYSTEM_PROXY") == QStringLiteral("1")) {
