@@ -64,11 +64,18 @@ def read_controlled_state(path):
         import msvcrt
         storage = _WindowsStorage()
         try:
-            # QSaveFile atomically replaces this snapshot. Unlike ledger reads,
-            # this handle must share deletion and may outlive its directory link.
-            handle = storage.kernel.CreateFileW(str(path), 0x80020000, 7, None, 3, 0x00200000, None)
-            if handle == storage.c.c_void_p(-1).value:
-                raise BudgetError("ControlledStateOpenFailed")
+            # ReplaceFileW's user-mode rename sequence briefly reports
+            # ERROR_FILE_NOT_FOUND (2) or ERROR_SHARING_VIOLATION (32) to
+            # concurrent snapshot readers; QSaveFile/ReplaceFileW snapshots
+            # also share deletion and may outlive their directory link.
+            handle = storage.c.c_void_p(-1).value
+            for attempt in range(25):
+                handle = storage.kernel.CreateFileW(str(path), 0x80020000, 7, None, 3, 0x00200000, None)
+                if handle != storage.c.c_void_p(-1).value:
+                    break
+                if storage.c.get_last_error() not in (2, 32) or attempt == 24:
+                    raise BudgetError("ControlledStateOpenFailed")
+                time.sleep(0.002)
             try:
                 storage.validate(handle, allow_unlinked=True)
                 descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
@@ -653,13 +660,15 @@ def execute(executable, root, manifest, child_environment, proof, *, admission_c
             pipe_frame += native_handle
         def watch():
             deadline = started+20
+            state_seen = False
             while not done.wait(0.02):
                 try:
                     if process.poll() is not None:
                         return
                     state_path=root/"state.json"
-                    if state_path.exists():
+                    if state_seen or state_path.exists():
                         state=read_controlled_state(state_path)
+                        state_seen=True
                         if state.get("nonce")!=manifest["nonce"] or state.get("sourceSha")!=manifest["sourceSha"]:
                             raise ValueError("ChildStateIdentityMismatch")
                         if (state.get("phase")=="requests" or state.get("requestsStarted") is True) and not guard["requestPhaseObserved"]:
