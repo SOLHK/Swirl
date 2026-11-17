@@ -28,7 +28,19 @@ class RustOnlyRuntimeTests(unittest.TestCase):
                      'src/Swirl.Quick/packaging/SwirlRustNetworkCheck.nsi',
                      'src/Swirl.Quick/packaging/README-RustNetworkCheckInstaller.txt',
                      'tools/Invoke-WindowsRustPortableCheck.ps1',
-                     'tools/TEST-SWIRL-NETWORK.cmd'):
+                     'tools/TEST-SWIRL-NETWORK.cmd',
+                     'scripts/Build-WindowsCoreMonitorInstaller.ps1',
+                     'src/Swirl.Quick/packaging/SwirlCoreMonitor.nsi',
+                     'src/Swirl.Quick/packaging/README-SwirlCoreMonitor.txt',
+                     'tools/Monitor-SwirlCore.ps1',
+                     'tools/Test-SwirlMihomoPath.ps1',
+                     'tools/Run-SwirlMihomoPath.cmd',
+                     'tools/Start-SwirlCoreMonitor.ps1',
+                     'tools/Stop-SwirlCoreMonitor.ps1',
+                     'tools/SwirlCoreMonitor.config.json',
+                     'tools/Run-SwirlCoreMonitor.cmd',
+                     'tools/Stop-SwirlCoreMonitor.cmd',
+                     'tools/Open-SwirlCoreMonitorReport.cmd'):
             self.assertFalse((ROOT / path).exists(), path)
 
     def test_no_production_or_test_includes_or_build_references(self):

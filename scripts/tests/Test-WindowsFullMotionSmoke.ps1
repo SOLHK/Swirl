@@ -135,7 +135,14 @@ try {
             $case.errors = $caseErrors.ToArray(); $case.finished_utc = [DateTime]::UtcNow.ToString('o')
             if (-not $caseErrors.Count -and $case.exit_code -eq 0 -and $case.process_exit_observed -and -not $case.timed_out) { $case.status = 'passed' }
             Write-MotionJson (Join-Path $evidence 'result.json') $case; $cases.Add($case)
-            if ($case.status -ne 'passed') { $errors.Add("$mode full-motion smoke failed: $($case.errors -join ' ')") }
+            if ($case.status -ne 'passed') {
+                $diagPath = Join-Path $evidence 'Swirl-diagnostics.txt'
+                Write-Host ("[full-motion:{0}] FAILED exit_code={1} timed_out={2} vme_context_count={3} log={4}" -f $mode, $case.exit_code, $case.timed_out, $case.vme_context_count, $diagPath)
+                if ($case.Contains('warning_lines') -and $case.warning_lines) {
+                    foreach ($wline in ($case.warning_lines | Select-Object -First 10)) { Write-Host "[full-motion:$mode:warning] $wline" }
+                }
+                $errors.Add("$mode full-motion smoke failed: $($case.errors -join ' ')")
+            }
         }
         if ($case.Contains('process_id') -and -not $case.process_exit_observed) { throw 'Refusing another smoke while prior process exit is unproven.' }
     }

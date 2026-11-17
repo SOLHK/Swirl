@@ -4,9 +4,15 @@ on:
     branches: [work/native-tun-windows-20261030]
   pull_request:
     branches: [main, test]
+    paths:
+      - 'core/**'
+      - '.github/workflows/native-tun.yml'
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: native-tun-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   simulated:
     name: Packet flows and native TUN control on Linux
