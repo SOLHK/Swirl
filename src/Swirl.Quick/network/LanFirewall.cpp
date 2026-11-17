@@ -43,8 +43,8 @@
 #include <netfw.h>
 #include <netlistmgr.h>
 #include <sddl.h>
-#include <wincrypt.h>
 #endif
+#include "../app/DpapiDataProtection.h"
 
 namespace {
 bool reject(QString *error, const QString &message) {
@@ -127,17 +127,9 @@ bool ownerAlive(const QJsonObject &record) {
     return alive;
 }
 QByteArray crypt(const QByteArray &input, bool decrypt) {
-    DATA_BLOB source{DWORD(input.size()), reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))}, output{};
-    QByteArray purpose("Swirl.LanFirewall.v1");
-    DATA_BLOB entropy{DWORD(purpose.size()), reinterpret_cast<BYTE *>(purpose.data())};
-    const bool ok = decrypt
-        ? CryptUnprotectData(&source, nullptr, &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &output)
-        : CryptProtectData(&source, L"Swirl LAN firewall recovery", &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &output);
-    if (!ok) return {};
-    QByteArray result(reinterpret_cast<char *>(output.pbData), output.cbData);
-    SecureZeroMemory(output.pbData, output.cbData);
-    LocalFree(output.pbData);
-    return result;
+    static constexpr QByteArrayView kEntropy("Swirl.LanFirewall.v1");
+    return decrypt ? SwirlDpapi::unprotect(input, kEntropy)
+                   : SwirlDpapi::protect(input, L"Swirl LAN firewall recovery", kEntropy);
 }
 bool secureDirectory(const QString &path) {
     // This dedicated directory has no unrelated user files. Refuse junctions

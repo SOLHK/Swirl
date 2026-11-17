@@ -13,28 +13,16 @@
 #include <cstdio>
 #include <QUuid>
 #include <limits>
+#include "../app/DpapiDataProtection.h"
 #ifdef Q_OS_WIN
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <wininet.h>
-#include <wincrypt.h>
 #endif
 #include "SystemProxyState.h"
 
 namespace {
 QByteArray crypt(const QByteArray &bytes, bool decrypt) {
-#ifdef Q_OS_WIN
-    DATA_BLOB src{DWORD(bytes.size()),reinterpret_cast<BYTE *>(const_cast<char *>(bytes.constData()))}, out{};
-    QByteArray context("Swirl.SystemProxy.v1");
-    DATA_BLOB entropy{DWORD(context.size()),reinterpret_cast<BYTE *>(context.data())};
-    bool ok=decrypt?CryptUnprotectData(&src,nullptr,&entropy,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&out)
-        :CryptProtectData(&src,L"Swirl proxy recovery",&entropy,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&out);
-    if(!ok)return {};
-    QByteArray result(reinterpret_cast<char *>(out.pbData),out.cbData);
-    SecureZeroMemory(out.pbData,out.cbData);LocalFree(out.pbData);return result;
-#else
-    Q_UNUSED(bytes);Q_UNUSED(decrypt);return {};
-#endif
+    static constexpr QByteArrayView kEntropy("Swirl.SystemProxy.v1");
+    return decrypt ? SwirlDpapi::unprotect(bytes, kEntropy) : SwirlDpapi::protect(bytes, L"Swirl proxy recovery", kEntropy);
 }
 QJsonObject read(const QString &path) {
     QFile f(path);if(!f.open(QIODevice::ReadOnly)||f.size()>65536)return {};

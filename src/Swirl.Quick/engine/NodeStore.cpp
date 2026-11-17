@@ -23,25 +23,11 @@
 #include <QLockFile>
 #include <limits>
 #include <algorithm>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <wincrypt.h>
-#endif
+#include "../app/DpapiDataProtection.h"
 
 static QByteArray protect(const QByteArray &input, bool decrypt) {
-#ifdef Q_OS_WIN
-    DATA_BLOB source{DWORD(input.size()), reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))}, result{};
-    const QByteArray context("Swirl.NodeStore.v1");
-    DATA_BLOB entropy{DWORD(context.size()), reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
-    const bool ok = decrypt ? CryptUnprotectData(&source, nullptr, &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result)
-        : CryptProtectData(&source, L"Swirl nodes", &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result);
-    if (!ok) return {};
-    const QByteArray bytes(reinterpret_cast<char *>(result.pbData), result.cbData);
-    SecureZeroMemory(result.pbData, result.cbData); LocalFree(result.pbData);
-    return bytes;
-#else
-    Q_UNUSED(input); Q_UNUSED(decrypt); return {}; // No plaintext fallback.
-#endif
+    static constexpr QByteArrayView kEntropy("Swirl.NodeStore.v1");
+    return decrypt ? SwirlDpapi::unprotect(input, kEntropy) : SwirlDpapi::protect(input, L"Swirl nodes", kEntropy);
 }
 static QJsonObject serialize(const ProxyNode &n) {
     if(n.isXray()) {

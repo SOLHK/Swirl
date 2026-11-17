@@ -30,8 +30,8 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
-#include <wincrypt.h>
 #endif
+#include "../app/DpapiDataProtection.h"
 
 namespace {
 QByteArray networkIdentity(const QList<QNetworkInterface> &interfaces) {
@@ -146,15 +146,7 @@ bool destinationCidrRule(const QString &type) {
     return type=="IP-CIDR"||type=="IP-CIDR6";
 }
 QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
-#ifdef Q_OS_WIN
-    DATA_BLOB source{DWORD(input.size()),reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))},result{};
-    const bool ok=decrypt?CryptUnprotectData(&source,nullptr,nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&result)
-        :CryptProtectData(&source,L"Swirl LAN authentication",nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&result);
-    if(!ok)return {};
-    QByteArray bytes(reinterpret_cast<char *>(result.pbData),result.cbData);SecureZeroMemory(result.pbData,result.cbData);LocalFree(result.pbData);return bytes;
-#else
-    Q_UNUSED(input);Q_UNUSED(decrypt);return {};
-#endif
+    return decrypt ? SwirlDpapi::unprotect(input) : SwirlDpapi::protect(input,L"Swirl LAN authentication");
 }
 }
 EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance,std::unique_ptr<SystemProxySession::Backend> proxyBackend,bool controlledAcceptance)
