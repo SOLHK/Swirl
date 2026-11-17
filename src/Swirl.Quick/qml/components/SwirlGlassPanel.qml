@@ -41,7 +41,7 @@ SwirlContinuousSurface {
         property real floatingShadow: 0
         property color shadowColor: Theme.withAlpha(Theme.shadowColor, (Theme.dark ? 0.10 : 0.025) * (panel.pressed ? 0.65 : panel.interactive && panel.hovered ? 1.15 : 1))
         fragmentShader: "qrc:/swirl/shaders/card-shadow.frag.qsb"
-        Behavior on shadowColor { ColorAnimation { duration: SwirlMotion.hoverDuration } }
+        Behavior on shadowColor { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
     }
 
 }

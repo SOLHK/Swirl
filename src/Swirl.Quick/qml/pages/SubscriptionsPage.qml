@@ -18,6 +18,7 @@ Item {
     property var mutationOwner: null
     property var providerIdsBeforeSave: []
     property string mutationMessage: ""
+    property bool mutationFailed: false
     property var lastMutationCompletion: ({requestId: "", success: false})
     readonly property bool mutationPending: mutationSubmitting || mutationRequestId.length > 0
     readonly property bool editable: !mutationPending && !engineController.policyBusy && !engineController.imports.busy && !engineController.imports.hasPreview
@@ -30,10 +31,11 @@ Item {
     })
     readonly property int totalNodes: providers.reduce((total, record) => total + Number(record.nodes), 0)
     readonly property string operationMessage: mutationMessage || engineController.imports.message
+    readonly property bool operationFailed: mutationMessage.length ? mutationFailed : providers.some(record => Boolean(record.error) && record.error === engineController.imports.message)
 
     function edit(record, source) {
         if (!editable) return
-        mutationMessage = ""
+        mutationMessage = ""; mutationFailed = false
         addDialog.edit(record, source)
     }
     function finishMutation(success) {
@@ -41,6 +43,7 @@ Item {
         mutationSubmitting = false; mutationRequestId = ""; mutationOwner = null; mutationKind = ""; mutationSourceId = ""; providerIdsBeforeSave = []
         if (owner) owner.pending = false
         if (!success) {
+            mutationFailed = true
             mutationMessage = engineController.policyError || engineController.imports.message || qsTr("目录变更未能完成，请检查状态后重试。")
             if (owner && owner.errorMessage !== undefined) owner.errorMessage = mutationMessage
             return
@@ -48,9 +51,10 @@ Item {
         let savedId = source
         if (kind === "save" && !savedId.length) {
             const added = providers.filter(provider => before.indexOf(provider.id) < 0)
-            if (added.length !== 1) { mutationMessage = qsTr("来源已保存，但无法确认新增标识；请先检查列表再更新。"); return }
+            if (added.length !== 1) { mutationFailed = true; mutationMessage = qsTr("来源已保存，但无法确认新增标识；请先检查列表再更新。"); return }
             savedId = String(added[0].id)
         }
+        mutationFailed = false
         if (owner) { owner.markSaved(); owner.close() }
         if (kind === "save") engineController.imports.refreshSubscription(savedId)
         if (kind === "select") {
@@ -72,7 +76,7 @@ Item {
         else if (!engineController.policyBusy && String((engineController.policyReceipt || {}).request_id) === mutationRequestId) completeMutation(mutationRequestId, true)
     }
     function beginMutation(kind, source, owner) {
-        mutationMessage = ""; mutationKind = kind; mutationSourceId = String(source || ""); mutationOwner = owner
+        mutationMessage = ""; mutationFailed = false; mutationKind = kind; mutationSourceId = String(source || ""); mutationOwner = owner
         providerIdsBeforeSave = providers.map(provider => provider.id); mutationSubmitting = true
         if (owner) owner.pending = true
     }
@@ -83,7 +87,7 @@ Item {
     }
     function confirmDelete(record, source) {
         if (!editable) return
-        mutationMessage = ""; deleteDialog.recordId = record.id; deleteDialog.recordName = record.name; deleteDialog.nodeCount = record.nodes
+        mutationMessage = ""; mutationFailed = false; deleteDialog.recordId = record.id; deleteDialog.recordName = record.name; deleteDialog.nodeCount = record.nodes
         if (source) SwirlMotion.noteTrigger(source)
         deleteDialog.open()
     }
@@ -143,7 +147,7 @@ Item {
             Layout.fillWidth: true; visible: engineController.imports.legacyNodeCount > 0; spacing: Theme.dp(8)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("%1 个历史节点归属待确认，已保留。").arg(engineController.imports.legacyNodeCount); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SubscriptionAction { objectName: "reviewLegacyNodes"; text: qsTr("查看"); onClicked: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「历史未归属」查看。")) } }
-            SubscriptionAction { objectName: "cleanLegacyNodes"; text: qsTr("清理"); danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; legacyDialog.open() } }
+            SubscriptionAction { objectName: "cleanLegacyNodes"; text: qsTr("清理"); danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; page.mutationFailed = false; legacyDialog.open() } }
         }
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
@@ -178,7 +182,7 @@ Item {
                     onDeleteRequested: source => page.confirmDelete(record, source)
                     onReviewRequested: source => page.reviewSource(record, source)
                     onUseRequested: page.selectSource(String(record.id))
-                    onNodesRequested: { if (page.sourceSelected && page.activeSourceId !== record.id) page.mutationMessage = qsTr("请先使用「%1」，再查看该订阅的节点。").arg(record.name); else AppState.navigate("proxies") }
+                    onNodesRequested: { if (page.sourceSelected && page.activeSourceId !== record.id) { page.mutationFailed = true; page.mutationMessage = qsTr("请先使用「%1」，再查看该订阅的节点。").arg(record.name) } else AppState.navigate("proxies") }
                 }
             }
             ColumnLayout {
@@ -194,7 +198,7 @@ Item {
             SwirlText {
                 objectName: "subscriptionOperationMessage"; Layout.fillWidth: true
                 text: page.operationMessage || qsTr("自动更新只维护当前来源的节点；完整配置需要单独审阅。"); textFormat: Text.PlainText; elide: Text.ElideRight
-                color: page.mutationMessage.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
+                color: page.operationFailed ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
             }
             SubscriptionAction { visible:page.operationMessage.length>0; text: qsTr("详情"); onClicked: operationDialog.open() }
         }

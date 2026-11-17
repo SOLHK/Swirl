@@ -57,8 +57,8 @@ Item {
   y:selectionMotion.position.y
   color:sidebar.selectedEntry && sidebar.selectedEntry.down?Theme.navigationPressed:Theme.navigationSelected
   scale:sidebar.selectedEntry && sidebar.selectedEntry.down?SwirlMotion.pressScale:1
-  Behavior on scale {NumberAnimation {duration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
-  Behavior on color {ColorAnimation {duration:SwirlMotion.pressDuration}}
+  Behavior on scale {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
+  Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.pressDuration}}
  }
  property bool compactByWindow:false
  readonly property bool effectivelyCollapsed:AppState.sidebarCollapsed || compactByWindow

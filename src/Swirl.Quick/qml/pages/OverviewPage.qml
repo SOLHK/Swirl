@@ -65,7 +65,10 @@ Item {
                 title: qsTr("TUN 模式")
                 enabled: !page.engineController.busy && !page.engineController.policyBusy && !page.engineController.tunRecoveryBusy
                 description: qsTr("开启前确认管理员授权；切换期间连接可能短暂中断。")
-                status: page.engineController.tunRecoveryBusy ? qsTr("恢复中") : page.engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : page.engineController.tunBusy ? qsTr("切换中") : page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待启用") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+                status: {
+                    const state = page.engineController.tunRecoveryBusy ? qsTr("恢复中") : page.engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : page.engineController.tunBusy ? qsTr("切换中") : page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待启用") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+                    return page.engineController.routingError.length && !page.engineController.tunEnabled ? state + " · " + page.engineController.routingError : state
+                }
                 active: page.engineController.tunEnabled; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy && !page.engineController.tunRecoveryBusy
                 toggleVisible: !page.engineController.tunRecoveryRequired && !(page.engineController.tunRequested && !page.engineController.tunEnabled)
                 configurable: page.engineController.tunRecoveryRequired || (page.engineController.tunRequested && !page.engineController.tunEnabled)

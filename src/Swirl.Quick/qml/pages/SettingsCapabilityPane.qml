@@ -53,6 +53,8 @@ ColumnLayout {
             {name: qsTr("主要页面"), detail: qsTr("概览、节点、连接与检视。"), kind: "shortcut", value: "Ctrl+1 / 2 / 3 / 4"},
             {name: qsTr("侧栏展开与收起"), detail: qsTr("切换侧栏显示宽度。"), kind: "shortcut", value: "Ctrl+B"}]}
     })
+    readonly property string tunStatusText: engineController.tunRecoveryBusy ? qsTr("恢复中") : engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : engineController.tunBusy ? qsTr("切换中") : engineController.tunEnabled ? qsTr("已启用") : engineController.tunRequested ? qsTr("待启用") : engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+    readonly property string sectionError: section === "TUN" ? (engineController.routingError || engineController.networkConfigurationError) : engineController.networkConfigurationError
     readonly property var configuration: definitions[section] || {summary: "", rows: []}
     spacing: Theme.dp(10)
     SwirlText { Layout.fillWidth: true; text: pane.configuration.summary; color: Theme.muted; font.pixelSize: Theme.fontSize(13); wrapMode: Text.Wrap }
@@ -71,7 +73,7 @@ ColumnLayout {
         SwirlButton { text: qsTr("打开 DNS 配置"); onClicked: AppState.navigate("dns") }
     }
     SettingsRowPane { Layout.fillWidth: true; visible: pane.section === "端口"; title: qsTr("当前监听状态"); description: engineController.activeProxyPort > 0 ? qsTr("127.0.0.1:%1").arg(engineController.activeProxyPort) : qsTr("引擎未监听本地端口"); SwirlStatusBadge { label: engineController.stateText; tone: engineController.apiHealthy ? "success" : "neutral" } }
-    SwirlText { Layout.fillWidth: true; visible: (pane.section === "TUN" || pane.section === "DNS" || pane.section === "端口") && engineController.networkConfigurationError.length > 0; text: engineController.networkConfigurationError; color: Theme.red; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
+    SwirlText { Layout.fillWidth: true; visible: (pane.section === "TUN" || pane.section === "DNS" || pane.section === "端口") && pane.sectionError.length > 0; text: pane.sectionError; textFormat: Text.PlainText; color: Theme.red; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
     Item { Layout.preferredHeight: Theme.dp(8) }
     Repeater {
         model: pane.configuration.rows
@@ -80,7 +82,7 @@ ColumnLayout {
             required property var modelData
             Layout.fillWidth: true
             title: modelData.name
-            description: modelData.detail
+            description: modelData.runtime === "tun" ? qsTr("%1 · %2").arg(pane.tunStatusText).arg(modelData.detail) : modelData.detail
             SwirlToggle {
                 visible: setting.modelData.kind === "toggle" && !(setting.modelData.runtime === "tun" && engineController.tunRequested && !engineController.tunEnabled && !engineController.tunRecoveryRequired)
                 enabled: setting.modelData.runtime === "tun" && engineController.tunSupported && !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryRequired && !engineController.tunRecoveryBusy

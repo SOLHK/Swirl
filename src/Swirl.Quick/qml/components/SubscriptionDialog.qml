@@ -224,7 +224,7 @@ SwirlDialog {
                                     y: Theme.dp(2); color: Theme.surface
                                     Behavior on thumbPosition { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.switchDuration; easing.type: Easing.OutCubic } }
                                 }
-                                Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
+                                Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
                             }
                         }
                     }
