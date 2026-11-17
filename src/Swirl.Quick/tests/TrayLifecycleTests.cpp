@@ -64,8 +64,15 @@ int main(int argc,char **argv){
         }
     });
     QTimer::singleShot(100,&app,[&]{
+        {
+            QQuickWindow unavailableWindow;unavailableWindow.resize(160,90);unavailableWindow.show();
+            TrayController unavailableTray(&unavailableWindow,QIcon(pixels),[]{},[]{return false;});
+            check(!unavailableTray.isAvailable()&&!unavailableTray.icon()->isVisible(),"unavailable notification area does not install a phantom icon");
+            check(!unavailableTray.hideWindows()&&unavailableWindow.isVisible(),"window close falls back to normal shutdown when tray is unavailable");
+            unavailableWindow.hide();
+        }
         check(QSystemTrayIcon::isSystemTrayAvailable(),"Windows notification area is available");
-        check(tray->icon()->isVisible()&&!tray->icon()->icon().isNull(),"tray icon and context menu are installed");
+        check(tray->isAvailable()&&tray->icon()->isVisible()&&!tray->icon()->icon().isNull(),"tray icon and context menu are installed");
         mainWindow.close();mainWindow.close();
         check(!mainWindow.isVisible()&&!secondary.isVisible(),"close hides application windows");
         check(cleanupCalls==0&&!shutdown.started(),"close keeps the running services and event loop alive");

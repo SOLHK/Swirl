@@ -972,7 +972,7 @@ int main(int argc, char *argv[])
         if(!lifecycleTest)tray=std::make_unique<TrayController>(rootWindow,icon,[&]{shutdown->request();});
         instance.activate=[&]{
             if(shutdown->started())return false;
-            if(tray){tray->restore();return rootWindow->isVisible();}
+            if(tray&&tray->isAvailable()){tray->restore();return rootWindow->isVisible();}
             const auto states=rootWindow->windowStates();
             if(states.testFlag(Qt::WindowMinimized))
                 rootWindow->setWindowStates(states & ~Qt::WindowMinimized);
