@@ -57,7 +57,7 @@ Menu {
             required property int index
             required property var modelData
             objectName:"swirlContextOption-"+index
-            SwirlPressMotion{}
+            readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
             text: AppState.zh(String(modelData))
             height:Theme.dp(36)
             contentItem: SwirlText {

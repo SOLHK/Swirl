@@ -28,7 +28,7 @@ ApplicationWindow {
     minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
-    SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
     palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
@@ -409,7 +409,8 @@ ApplicationWindow {
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
-    SwirlShellOutline {
+    readonly property Item ownedWindowOutline: SwirlShellOutline {
+        parent:window.contentItem
         objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
         anchors.fill:parent;z:998
         radius:window.shellRadius

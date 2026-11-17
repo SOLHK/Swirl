@@ -220,7 +220,7 @@ Item {
     }
     function focusRowAt(index){if(projectionBlocked)return;const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
-    SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
+    readonly property QtObject ownedStableRows: SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
     property Item selectedItem:null
     property int itemHeight:Theme.tableRowHeight
@@ -370,8 +370,9 @@ Item {
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
-                    SwirlInteractionMotion {
+                    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {
                         id:rowFeedback
+                        parent:recordRow
                         hovered:!recordRow.pooled && mouse.containsMouse
                         pressed:!recordRow.pooled && mouse.pressed
                         focused:!recordRow.pooled && list.activeFocus && list.currentIndex===index

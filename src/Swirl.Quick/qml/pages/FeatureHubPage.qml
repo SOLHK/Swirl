@@ -41,7 +41,7 @@ Item {
         focusPolicy: Qt.StrongFocus
         synchronizedPressGeometry: false // This entry owns its independent feedback/spring below.
         motionScale: 1 - (1 - SwirlMotion.pressScale) * feedback.contact
-        SwirlInteractionMotion { id: feedback; hovered: entry.hovered; pressed: entry.down; focused: entry.visualFocus; controlEnabled: entry.enabled }
+        readonly property Item ownedFeedback: SwirlInteractionMotion { id: feedback; parent: entry; hovered: entry.hovered; pressed: entry.down; focused: entry.visualFocus; controlEnabled: entry.enabled }
         background: SwirlGlassPanel {
             id: surface
             interactive: true

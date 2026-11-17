@@ -93,7 +93,7 @@ ColumnLayout {
         text: assignments.routingMode === "rule" ? qsTr("分类仅用于浏览；匹配顺序由各策略的优先级决定。") : qsTr("专属分配已保存；切回规则分流后参与路由。")
         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
     }
-    SwirlAnimatedModel { id: services; source: assignments.visibleRows; keyRole: "id" }
+    readonly property QtObject ownedServicesModel: SwirlAnimatedModel { id: services; source: assignments.visibleRows; keyRole: "id" }
     Item {
         Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0
         ListView {

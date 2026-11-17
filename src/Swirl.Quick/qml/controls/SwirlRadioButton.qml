@@ -11,8 +11,8 @@ RadioButton {
     font.family: Theme.fontFamily
     font.pixelSize: Theme.bodySize
     font.weight: Theme.bodyFontWeight
-    SwirlFontBinding { target: control; textRole: "button" }
-    SwirlInteractionMotion {id:feedback;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: "button" }
+    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {id:feedback;parent:control;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     indicator: Rectangle {
         x: control.leftPadding
         y: (control.height - height) / 2

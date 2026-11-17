@@ -13,6 +13,7 @@ Item {
     readonly property var heroTargets:({title:motionTitle})
     required property var engineController
     property int tabIndex:0
+    property bool groupTabLoaded:tabIndex===1
     property var pendingOwner:null
     property string pendingRequestId:""
     property var lastCompletion:({requestId:"",success:false})
@@ -178,21 +179,25 @@ Item {
                 onMoveRequested:(id,direction)=>page.moveService(id,direction)
                 onDeleteRequested:(record,source)=>page.requestDelete("service",record,source)
             }
-            PolicyGroupList {
-                anchors.fill:parent;visible:tabMotion.progress>0;enabled:page.tabIndex===1
+            Loader {
+                id:groupListLoader
+                anchors.fill:parent;active:page.groupTabLoaded||page.tabIndex===1||tabMotion.progress>0
+                visible:tabMotion.progress>0;enabled:page.tabIndex===1
                 opacity:tabMotion.progress;transform:page.groupTabTranslation
-                records:page.groups;targetOptions:page.targets;editable:page.editable;running:page.engineController.processAlive
-                connectionRecords:visible?page.engineController.connections:[]
-                appliedRevision:String(page.engineController.appliedRevision||"");appliedGeneration:String((page.engineController.policyReceipt||{}).generation||"")
-                onEditRequested:(record,source)=>page.editGroup(record,source)
-                onMemberRequested:(record,source)=>page.openTarget("member",record,source)
-                onDeleteRequested:(record,source)=>page.requestDelete("group",record,source)
-                onCreateRequested:(strategy,source)=>page.editGroup(null,source,strategy)
+                sourceComponent:PolicyGroupList {
+                    records:page.groups;targetOptions:page.targets;editable:page.editable;running:page.engineController.processAlive
+                    connectionRecords:groupListLoader.visible?page.engineController.connections:[]
+                    appliedRevision:String(page.engineController.appliedRevision||"");appliedGeneration:String((page.engineController.policyReceipt||{}).generation||"")
+                    onEditRequested:(record,source)=>page.editGroup(record,source)
+                    onMemberRequested:(record,source)=>page.openTarget("member",record,source)
+                    onDeleteRequested:(record,source)=>page.requestDelete("group",record,source)
+                    onCreateRequested:(strategy,source)=>page.editGroup(null,source,strategy)
+                }
             }
         }
     }
-    SwirlTransitionCoordinator {id:tabMotion;duration:SwirlMotion.switchDuration}
-    onTabIndexChanged:tabMotion.moveTo(tabIndex)
+    readonly property Item ownedTabMotion: SwirlTransitionCoordinator {id:tabMotion;parent:page;duration:SwirlMotion.switchDuration}
+    onTabIndexChanged:{if(tabIndex===1)groupTabLoaded=true;tabMotion.moveTo(tabIndex)}
     // Build the dialog and editor trees on first use, then retain their instances for command receipts and popup transitions.
     Loader {
         id:advancedDialogLoader

@@ -39,7 +39,7 @@ CheckBox {
     ColorAnimation {id:colorTravel;target:control;property:"shownColor";duration:SwirlMotion.switchDuration}
     NumberAnimation {id:markFade;target:control;property:"markOpacity";duration:SwirlMotion.releaseDuration}
     NumberAnimation {id:markTravel;target:control;property:"markScale";duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}
-    SwirlInteractionMotion {id:contact;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
+    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {id:contact;parent:control;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     indicator: Rectangle {
         x: 0; y: (control.height - height) / 2
         width: Theme.dp(16); height: width; radius: Theme.dp(4)

@@ -21,7 +21,7 @@ Item {
         if (detailTabs.currentIndex === 1) return page.selected.requestHeaders + "\n\n" + (page.selected.requestBody || "无请求正文")
         return page.selected.responseHeaders + "\n\n" + (page.selected.responseBody || "无响应正文")
     }
-    SwirlArcMotion{id:tabMotion;targetX:detailTabs.currentIndex*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:detailTabs.currentIndex*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout{
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("HTTP 请求");description:qsTr("%1 条会话，%2 个活动连接").arg(page.captureProvider.sessions.length).arg(page.captureProvider.activeCount)

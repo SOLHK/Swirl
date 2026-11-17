@@ -120,7 +120,7 @@ Item {
     }
 
     Shortcut { sequences: [StandardKey.Find]; enabled: AppState.currentPage === "subscriptions" && !addDialog.visible && !deleteDialog.visible && !reviewDialog.visible && !operationDialog.visible && !legacyDialog.visible; onActivated: { search.forceActiveFocus(); search.selectAll() } }
-    SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
+    readonly property QtObject ownedSubscriptionModel: SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: Theme.pagePadding; spacing: Theme.dp(14)
         SwirlPageHeader {

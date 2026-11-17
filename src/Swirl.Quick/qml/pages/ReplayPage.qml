@@ -20,7 +20,7 @@ Item {
     function updateBuffer(value){if(!componentReady||editorBuffers[requestSection]===value)return;var next=Object.assign({},editorBuffers);next[requestSection]=value;editorBuffers=next}
     function selectRequest(row){selectedRequest=String(row.id);verb.currentIndex=Math.max(0,verb.model.indexOf(row.method));urlField.text=String(row.url||((row.host||"")+(row.path||"")));editorBuffers={Headers:row.requestHeaders||"",Body:row.requestBody||"",Cookies:"",Query:""}}
     Component.onCompleted:componentReady=true
-    SwirlArcMotion{id:tabMotion;targetX:page.tabs.indexOf(page.requestSection)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:page.tabs.indexOf(page.requestSection)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout{
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("请求重放");description:qsTr("从本地历史准备请求，分别编辑请求头和正文。");metadata:qsTr("重放服务尚未接入，编辑内容不会发送到网络")

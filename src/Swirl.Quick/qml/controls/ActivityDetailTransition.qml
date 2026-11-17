@@ -100,7 +100,7 @@ Item {
         else closeDetail()
         event.accepted = true
     }
-    SwirlTransitionCoordinator { id: clock }
+    readonly property Item ownedClock: SwirlTransitionCoordinator { id: clock; parent: transition }
     // The shield is present for the whole return, including interrupted travel.
     MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: wheel => wheel.accepted = true }
     SwirlCardSurface {

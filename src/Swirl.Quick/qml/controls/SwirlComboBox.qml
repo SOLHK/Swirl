@@ -8,14 +8,14 @@ ComboBox {
     implicitWidth:Theme.dp(146)
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
-    SwirlPressMotion {pressed:control.pressed}
+    readonly property Item ownedPressMotion: SwirlPressMotion {parent:control;pressed:control.pressed}
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
     focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
     font.weight: Theme.bodyFontWeight
     font.hintingPreference:Font.PreferFullHinting
-    SwirlFontBinding { target: control; textRole: "input" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: "input" }
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
@@ -49,7 +49,7 @@ ComboBox {
         id:option
         required property int index
         objectName:"swirlComboOption-"+index
-        SwirlPressMotion{}
+        readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
         width: ListView.view.width
         implicitHeight:Math.max(Theme.controlHeight,contentItem.implicitHeight+topPadding+bottomPadding)
         height:implicitHeight

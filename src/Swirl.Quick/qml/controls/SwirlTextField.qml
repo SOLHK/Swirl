@@ -23,7 +23,7 @@ TextField {
     font.pixelSize: Theme.bodySize
     font.hintingPreference: Font.PreferFullHinting
     renderType: TextInput.NativeRendering
-    SwirlFontBinding { target: control; textRole: "input" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: "input" }
     background: SwirlControlSurface {
         field: true
         hovered: control.hovered

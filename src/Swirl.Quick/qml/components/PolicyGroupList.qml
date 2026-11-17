@@ -79,7 +79,7 @@ ColumnLayout {
         SwirlText { Layout.preferredWidth: Theme.dp(220); leftPadding: Theme.dp(8); text: qsTr("实际出口 / 配置成员"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         Item { Layout.preferredWidth: Theme.dp(36) }
     }
-    SwirlAnimatedModel { id: groupModel; source: groups.visibleRecords; keyRole: "id" }
+    readonly property QtObject ownedGroupModel: SwirlAnimatedModel { id: groupModel; source: groups.visibleRecords; keyRole: "id" }
     Item {
         Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0
         ListView {

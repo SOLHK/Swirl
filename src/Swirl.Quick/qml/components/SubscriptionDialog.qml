@@ -114,7 +114,7 @@ SwirlDialog {
         }
         delegate: ItemDelegate {
             id: option
-            SwirlPressMotion{}
+            readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
             required property int index
             objectName: "swirlComboOption-" + index
             width: ListView.view.width

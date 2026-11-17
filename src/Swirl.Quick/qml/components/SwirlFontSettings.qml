@@ -23,7 +23,7 @@ ColumnLayout {
             function moveSelection(step){if(!count)return;const next=Math.max(0,Math.min(count-1,currentIndex+step));fontManager.choosePreviewFamily(model[next]);positionViewAtIndex(next,ListView.Contain)}
             Keys.onUpPressed:moveSelection(-1)
             Keys.onDownPressed:moveSelection(1)
-            SwirlArcMotion { id:fontSelection; parent:fontList.contentItem; targetX:0; targetY:fontList.currentItem?fontList.currentItem.y:0; bend:Theme.dp(5); motionEnabled:root.visible }
+            readonly property Item ownedFontSelection: SwirlArcMotion { id:fontSelection; parent:fontList.contentItem; targetX:0; targetY:fontList.currentItem?fontList.currentItem.y:0; bend:Theme.dp(5); motionEnabled:root.visible }
             Rectangle { parent:fontList.contentItem; z:1; x:fontSelection.position.x; y:fontSelection.position.y; width:Theme.dp(3); height:Theme.dp(38); radius:Theme.dp(1.5); color:Theme.accent; visible:fontList.currentIndex>=0 }
             model:fontManager.families.filter(function(family){return family.toLowerCase().indexOf(search.text.toLowerCase())>=0})
             ScrollBar.vertical:SwirlScrollBar {}
@@ -38,7 +38,7 @@ ColumnLayout {
                     SwirlText {width:parent.width;text:fontRow.text;font.pixelSize:Theme.fontSize(12);color:Theme.text;elide:Text.ElideRight}
                     SwirlText {width:parent.width;text:"连接让世界更近  Swirl 0123456789";font.family:fontRow.modelData;font.pixelSize:Theme.fontSize(16);color:Theme.text;elide:Text.ElideRight}
                 }
-                SwirlInteractionMotion { id:fontFeedback; hovered:fontRow.hovered; pressed:fontRow.down; focused:fontRow.visualFocus; controlEnabled:fontRow.enabled }
+                readonly property Item ownedFontFeedback: SwirlInteractionMotion { id:fontFeedback; parent:fontRow; hovered:fontRow.hovered; pressed:fontRow.down; focused:fontRow.visualFocus; controlEnabled:fontRow.enabled }
                 background:Rectangle { radius:Theme.controlRadius; color:fontManager.previewFamily===fontRow.modelData?Theme.withAlpha(Theme.accent,0.09):Theme.withAlpha(Theme.accent,fontFeedback.light*0.07) }
                 Accessible.name:modelData
             }
@@ -150,7 +150,7 @@ ColumnLayout {
                     font.pixelSize:Theme.fontSize(index===0?21:15)
                     font.weight:index===0?Font.DemiBold:Theme.bodyFontWeight
                     font.hintingPreference:Font.PreferFullHinting
-                    SwirlFontBinding {target:previewLine;preview:true;textRole:previewLine.index===0?"pageTitle":"body"}
+                    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding {target:previewLine;preview:true;textRole:previewLine.index===0?"pageTitle":"body"}
                 }
             }
         }

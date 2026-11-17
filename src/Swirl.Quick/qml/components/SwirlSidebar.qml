@@ -21,7 +21,7 @@ Item {
   x:Theme.shellInset;y:Theme.shellInset
   width:sidebar.width-2*Theme.shellInset;height:sidebar.height-2*Theme.shellInset
   readonly property real radius:Theme.sidebarRadius
-  SwirlInteractionMotion {id:materialResponse;hovered:glassHover.hovered;pressed:sidebar.selectedEntry && sidebar.selectedEntry.down;focused:sidebar.selectedEntry && sidebar.selectedEntry.visualFocus}
+  readonly property Item ownedMaterialResponse: SwirlInteractionMotion {id:materialResponse;parent:floatingBackground;hovered:glassHover.hovered;pressed:sidebar.selectedEntry && sidebar.selectedEntry.down;focused:sidebar.selectedEntry && sidebar.selectedEntry.visualFocus}
   HoverHandler {id:glassHover}
   SwirlLiquidGlass {
    id:liquidGlass
@@ -42,8 +42,8 @@ Item {
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }
- SwirlArcMotion {
-  id:selectionMotion;objectName:"sidebarArcMotion"
+ readonly property Item ownedSelectionMotion: SwirlArcMotion {
+  id:selectionMotion;parent:sidebar;objectName:"sidebarArcMotion"
   bend:Math.min(SwirlMotion.navigationArc,Theme.dp(7))
   targetX:Theme.dp(20)
   targetY:{sidebar.geometryRevision;sidebar.height;Theme.uiScale;const item=sidebar.selectedEntry;if(!item)return 0;item.y;return item.mapToItem(sidebar,0,0).y}
@@ -66,7 +66,7 @@ Item {
  readonly property real expansion:widthClock.progress
  readonly property real animatedWidth:Theme.sidebarCollapsedWidth+(Theme.sidebarWidth-Theme.sidebarCollapsedWidth)*expansion
  property bool initialized:false
- SwirlTransitionCoordinator {id:widthClock;progress:1;destination:1;duration:SwirlMotion.expandDuration}
+ readonly property Item ownedWidthClock: SwirlTransitionCoordinator {id:widthClock;parent:sidebar;progress:1;destination:1;duration:SwirlMotion.expandDuration}
  onEffectivelyCollapsedChanged:{
   if(!initialized)return
   widthClock.moveTo(effectivelyCollapsed?0:1)
