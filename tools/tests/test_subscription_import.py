@@ -324,7 +324,7 @@ class SubscriptionImportTests(unittest.TestCase):
                 self.assertTrue(capability['udp_declared'])
                 self.assertTrue(capability['native_udp_supported'])
                 self.assertTrue(capability['native_tcp_candidate'])
-                self.assertEqual(capability['diagnostic'], 'NativeCandidateRequiresNetworkVerification')
+                self.assertEqual(capability['diagnostic'], 'TcpCandidateNotYetVerified')
                 self.assertEqual(inspected['nodes'][0]['raw-uri'], uri)
                 self.assertIs(inspected['nodes'][0]['skip-cert-verify'], True)
                 self.assertIs(inspected['nodes'][0]['udp'], True)
@@ -342,7 +342,7 @@ class SubscriptionImportTests(unittest.TestCase):
                         stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
                                        b'Host: origin.fixture.invalid:443\r\n\r\n')
                         self.assertIn(b' 502 ', header(stream))
-                    self.assertTrue(self.command(op='select', handle=handle, node='opt-in')['ok'])
+                    self.assertTrue(self.command(op='select', handle=handle, id='opt-in')['ok'])
                     with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
                         stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
                                        b'Host: origin.fixture.invalid:443\r\n\r\n')
@@ -350,7 +350,7 @@ class SubscriptionImportTests(unittest.TestCase):
                         payload = b'opt-in-trojan-isolated-from-strict-sibling'
                         stream.sendall(payload)
                         self.assertEqual(exact(stream, len(payload)), payload)
-                    self.assertTrue(self.command(op='select', handle=handle, node='strict')['ok'])
+                    self.assertTrue(self.command(op='select', handle=handle, id='strict')['ok'])
                     with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
                         stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
                                        b'Host: origin.fixture.invalid:443\r\n\r\n')
