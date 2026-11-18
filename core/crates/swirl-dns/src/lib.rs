@@ -67,6 +67,7 @@ pub struct Resolver {
     pinned: Option<(String, Vec<IpAddr>)>,
     endpoint_guard: Option<EndpointGuard>,
     permits: Arc<Semaphore>,
+    os_permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
     tls_servers: Vec<DnsTlsServer>,
@@ -81,6 +82,7 @@ impl Default for Resolver {
             pinned: None,
             endpoint_guard: None,
             permits: Arc::new(Semaphore::new(8)),
+            os_permits: Arc::new(Semaphore::new(64)),
             hosts: HashMap::new(),
             servers: Vec::new(),
             tls_servers: Vec::new(),
@@ -258,6 +260,7 @@ impl Resolver {
             pinned: None,
             endpoint_guard: None,
             permits: self.permits.clone(),
+            os_permits: self.os_permits.clone(),
             hosts: hosts
                 .iter()
                 .map(|h| (h.name.to_ascii_lowercase(), h.address))
@@ -290,6 +293,7 @@ impl Resolver {
             pinned: Some((host.to_ascii_lowercase(), addresses)),
             endpoint_guard: self.endpoint_guard.clone(),
             permits: self.permits.clone(),
+            os_permits: self.os_permits.clone(),
             hosts: self.hosts.clone(),
             servers: self.servers.clone(),
             tls_servers: self.tls_servers.clone(),
@@ -379,16 +383,15 @@ impl Resolver {
             if let Some(result) = self.cached(&key, port)? {
                 return result;
             }
-            let permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
-                .await
-                .map_err(|_| "DnsBusy")?
-                .map_err(|_| "DnsStopped")?;
-            // Another query may have finished while this one waited for capacity.
-            if let Some(result) = self.cached(&key, port)? {
-                return result;
-            }
             if !self.servers.is_empty() || !self.tls_servers.is_empty() {
-                let _permit = permit;
+                let _permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
+                    .await
+                    .map_err(|_| "DnsBusy")?
+                    .map_err(|_| "DnsStopped")?;
+                // Another query may have finished while this one waited for capacity.
+                if let Some(result) = self.cached(&key, port)? {
+                    return result;
+                }
                 self.check_configured_endpoints()?;
                 let started = Instant::now();
                 let resolution = async {
@@ -411,6 +414,16 @@ impl Resolver {
                     cache.insert(key.clone(), (expires, answer.outcome.clone()));
                 }
                 return answer.outcome.for_port(port);
+            }
+            let permit = timeout(
+                Duration::from_secs(6),
+                self.os_permits.clone().acquire_owned(),
+            )
+            .await
+            .map_err(|_| "DnsBusy")?
+            .map_err(|_| "DnsStopped")?;
+            if let Some(result) = self.cached(&key, port)? {
+                return result;
             }
             // Keep the permit until the underlying OS lookup actually finishes even
             // if the caller times out/cancels. This bounds detached blocking lookups.
@@ -558,6 +571,7 @@ mod tests {
                         server_name: "dns.fixture.invalid".into(),
                         alpn: vec![],
                         ca_der_base64: None,
+                        insecure: false,
                     },
                     https_path: (protocol == "doh").then(|| "/dns-query".into()),
                 });
@@ -907,5 +921,32 @@ mod tests {
         let next = resolver.with_hosts(&[]);
         assert!(next.cache.lock().unwrap().is_empty());
         assert!(Arc::ptr_eq(&resolver.permits, &next.permits));
+    }
+
+    #[tokio::test]
+    async fn system_lookup_budget_is_isolated_from_configured_resolver_permits() {
+        let resolver = Resolver::default()
+            .with_config(&swirl_subscription::Dns {
+                use_system_hosts: false,
+                ..Default::default()
+            })
+            .unwrap();
+        let _held = resolver
+            .permits
+            .clone()
+            .acquire_many_owned(8)
+            .await
+            .unwrap();
+        let mut tasks = tokio::task::JoinSet::new();
+        for port in 4000..4016 {
+            let resolver = resolver.clone();
+            tasks.spawn(async move { resolver.resolve("localhost", port).await });
+        }
+        while let Some(joined) = tasks.join_next().await {
+            let addresses = joined
+                .unwrap()
+                .expect("OS lookup must not block on configured DNS permits");
+            assert!(!addresses.is_empty());
+        }
     }
 }

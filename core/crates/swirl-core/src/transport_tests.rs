@@ -43,6 +43,7 @@ fn native_tls_trust_errors_precede_listener_allocation() {
         server_name: "peer.invalid".into(),
         alpn: Vec::new(),
         ca_der_base64: Some("AA==".into()),
+        insecure: false,
     });
     assert_eq!(Core::start(config).err(), Some("TlsTrustAnchor"));
 }

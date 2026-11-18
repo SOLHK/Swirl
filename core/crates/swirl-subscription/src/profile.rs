@@ -283,6 +283,7 @@ fn dns(configuration: &Map<String, Value>) -> Result<Value, ProfileError> {
                     server_name: host.to_owned(),
                     alpn: vec![if https { "http/1.1" } else { "dot" }.to_owned()],
                     ca_der_base64: None,
+                    insecure: false,
                 },
                 https_path: https.then(|| {
                     if url.path().is_empty() {

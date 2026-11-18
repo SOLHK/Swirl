@@ -1733,12 +1733,23 @@ private slots:
    QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
   }
   auto insecure=base;insecure["tls"]=true;insecure["skip-cert-verify"]=true;
-  QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{insecure}}}).toJson()));
-  QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,over-tls=true,tls-verification=false\n"));
+  const auto socksTlsOptIn=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{insecure}}}).toJson());
+  QVERIFY2(bool(socksTlsOptIn),qPrintable(socksTlsOptIn.error));
+  QCOMPARE(socksTlsOptIn.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(true));
+  const auto iniSocksTlsOptIn=NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,over-tls=true,tls-verification=false\n");
+  QVERIFY2(bool(iniSocksTlsOptIn),qPrintable(iniSocksTlsOptIn.error));
+  QCOMPARE(iniSocksTlsOptIn.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(true));
   QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,udp-relay=maybe\n"));
   QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,udp-relay=true,udp=false\n"));
-  const auto valid=NodeImporter::parse(socks5Sources(1080,false,0,true).first());QVERIFY(bool(valid));
-  o.nodes=valid.nodes;o.selectedNodeId=o.nodes.first().id;o.nodes.first().parameters["skip-cert-verify"]=true;
+  const auto validTls=NodeImporter::parse(socks5Sources(1080,false,0,true).first());QVERIFY(bool(validTls));
+  o.nodes=validTls.nodes;o.selectedNodeId=o.nodes.first().id;
+  QJsonObject strictTlsCfg;QVERIFY2(RustCoreEngine::configuration(o,&strictTlsCfg).isEmpty(),"strict SOCKS5 TLS must map");
+  QVERIFY(!strictTlsCfg["nodes"].toArray().first().toObject()["outbound"].toObject()["tls"].toObject().contains("insecure"));
+  o.nodes.first().parameters["skip-cert-verify"]=true;
+  QJsonObject optInTlsCfg;QVERIFY2(RustCoreEngine::configuration(o,&optInTlsCfg).isEmpty(),"opt-in SOCKS5 TLS must map");
+  QCOMPARE(optInTlsCfg["nodes"].toArray().first().toObject()["outbound"].toObject()["tls"].toObject()["insecure"],QJsonValue(true));
+  const auto plainValid=NodeImporter::parse(socks5Sources(1080,false,0,false).first());QVERIFY(bool(plainValid));
+  o.nodes=plainValid.nodes;o.selectedNodeId=o.nodes.first().id;o.nodes.first().parameters["skip-cert-verify"]=true;
   QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
  }
  void singBoxQuicProductChainAgainstIndependentPeer(){
@@ -2042,7 +2053,8 @@ private slots:
    {"null UDP flag",{{"udp",QJsonValue(QJsonValue::Null)}}},
    {"object UDP flag",{{"udp",QJsonObject{}}}},
    {"array UDP flag",{{"udp",QJsonArray{}}}},
-   {"disabled certificate verification",{{"skip-cert-verify",true}}},
+   {"non-boolean certificate verification",{{"skip-cert-verify","true"}}},
+   {"skip-cert-verify without TLS",{{"tls",false},{"skip-cert-verify",true}}},
    {"unsupported VLESS flow",{{"flow","xtls-rprx-vision"}}}
   };
   const QJsonObject sentinel{{"unchanged",true}};

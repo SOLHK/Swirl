@@ -41,15 +41,35 @@ pub async fn secure<S: Stream + 'static>(
 }
 
 /// Authenticate TLS and require the selected application protocol where the
-/// transport needs it. An empty offer gets that transport's protocol; an
-/// explicit incompatible offer or a different negotiated offer is rejected.
+/// transport needs it. Non-outbound callers (DNS, origin HTTPS probes, nested
+/// inner TLS) always enforce strict certificate verification.
 pub async fn secure_with_alpn<S: Stream + 'static>(
     stream: S,
     tls: &swirl_subscription::Tls,
     required_alpn: Option<&[u8]>,
 ) -> Result<BoxStream, &'static str> {
+    secure_inner(stream, tls, required_alpn, false).await
+}
+
+/// Authenticate outbound proxy TLS. Per-node `tls.insecure` (`skip-cert-verify`)
+/// applies only to the explicit outbound node that declared it and never shares
+/// a `ClientConfig` or session state with verified nodes.
+pub async fn secure_outbound_with_alpn<S: Stream + 'static>(
+    stream: S,
+    tls: &swirl_subscription::Tls,
+    required_alpn: Option<&[u8]>,
+) -> Result<BoxStream, &'static str> {
+    secure_inner(stream, tls, required_alpn, true).await
+}
+
+async fn secure_inner<S: Stream + 'static>(
+    stream: S,
+    tls: &swirl_subscription::Tls,
+    required_alpn: Option<&[u8]>,
+    allow_insecure: bool,
+) -> Result<BoxStream, &'static str> {
     use tokio_rustls::TlsConnector;
-    let (config, name) = tls_context(tls, required_alpn)?;
+    let (config, name) = tls_context(tls, required_alpn, allow_insecure)?;
     let stream = TlsConnector::from(config)
         .connect(name, stream)
         .await
@@ -101,13 +121,21 @@ fn tls_failure_code(error: &io::Error) -> &'static str {
 #[path = "tls_failure_tests.rs"]
 mod tls_failure_tests;
 
-/// Validate certificate material, SNI and ALPN without opening a socket. The
-/// bounded cache also avoids rebuilding the root store on each TLS connection.
+/// Validate certificate material, SNI and ALPN without opening a socket.
+/// Non-outbound callers reject `tls.insecure`.
 pub fn validate_tls(
     tls: &swirl_subscription::Tls,
     required_alpn: Option<&[u8]>,
 ) -> Result<(), &'static str> {
-    tls_context(tls, required_alpn).map(|_| ())
+    tls_context(tls, required_alpn, false).map(|_| ())
+}
+
+/// Validate outbound proxy TLS parameters, honoring explicit per-node `insecure`.
+pub fn validate_outbound_tls(
+    tls: &swirl_subscription::Tls,
+    required_alpn: Option<&[u8]>,
+) -> Result<(), &'static str> {
+    tls_context(tls, required_alpn, true).map(|_| ())
 }
 
 type PreparedTls = (
@@ -115,25 +143,80 @@ type PreparedTls = (
     tokio_rustls::rustls::pki_types::ServerName<'static>,
 );
 
+#[derive(Debug)]
+struct OutboundInsecureVerifier {
+    ordinary: Arc<tokio_rustls::rustls::client::WebPkiServerVerifier>,
+}
+
+impl tokio_rustls::rustls::client::danger::ServerCertVerifier for OutboundInsecureVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[tokio_rustls::rustls::pki_types::CertificateDer<'_>],
+        _server_name: &tokio_rustls::rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: tokio_rustls::rustls::pki_types::UnixTime,
+    ) -> std::result::Result<
+        tokio_rustls::rustls::client::danger::ServerCertVerified,
+        tokio_rustls::rustls::Error,
+    > {
+        Ok(tokio_rustls::rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        dss: &tokio_rustls::rustls::DigitallySignedStruct,
+    ) -> std::result::Result<
+        tokio_rustls::rustls::client::danger::HandshakeSignatureValid,
+        tokio_rustls::rustls::Error,
+    > {
+        self.ordinary.verify_tls12_signature(message, cert, dss)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        dss: &tokio_rustls::rustls::DigitallySignedStruct,
+    ) -> std::result::Result<
+        tokio_rustls::rustls::client::danger::HandshakeSignatureValid,
+        tokio_rustls::rustls::Error,
+    > {
+        self.ordinary.verify_tls13_signature(message, cert, dss)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<tokio_rustls::rustls::SignatureScheme> {
+        self.ordinary.supported_verify_schemes()
+    }
+}
+
 fn tls_context(
     tls: &swirl_subscription::Tls,
     required_alpn: Option<&[u8]>,
+    allow_insecure: bool,
 ) -> Result<PreparedTls, &'static str> {
     use std::{
         collections::VecDeque,
         sync::{Mutex, OnceLock},
     };
     use tokio_rustls::rustls::{
-        ClientConfig, RootCertStore,
+        self, ClientConfig, RootCertStore,
+        client::WebPkiServerVerifier,
         pki_types::{CertificateDer, ServerName},
     };
     #[derive(Clone, PartialEq, Eq)]
     struct Key {
         ca: Option<String>,
         alpn: Vec<Vec<u8>>,
+        insecure: bool,
     }
     type Entry = (Key, Arc<ClientConfig>);
     static CONTEXTS: OnceLock<Mutex<VecDeque<Entry>>> = OnceLock::new();
+    if tls.insecure && !allow_insecure {
+        return Err("TlsInsecureForbidden");
+    }
     let name = ServerName::try_from(tls.server_name.clone()).map_err(|_| "TlsServerName")?;
     if tls.ca_der_base64.as_ref().is_some_and(|s| s.len() > 65536)
         || tls.alpn.len() > 16
@@ -157,6 +240,7 @@ fn tls_context(
     let key = Key {
         ca: tls.ca_der_base64.clone(),
         alpn,
+        insecure: tls.insecure,
     };
     let cache = CONTEXTS.get_or_init(|| Mutex::new(VecDeque::new()));
     {
@@ -178,9 +262,23 @@ fn tls_context(
             .add(CertificateDer::from(der))
             .map_err(|_| "TlsTrustAnchor")?;
     }
-    let mut config = ClientConfig::builder()
-        .with_root_certificates(roots)
-        .with_no_client_auth();
+    let mut config = if key.insecure {
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let ordinary =
+            WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
+                .build()
+                .map_err(|_| "TlsTrustAnchor")?;
+        ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .map_err(|_| "TlsParameters")?
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(OutboundInsecureVerifier { ordinary }))
+            .with_no_client_auth()
+    } else {
+        ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth()
+    };
     config.alpn_protocols = key.alpn.clone();
     // The current native schema does not expose session-resumption/0-RTT
     // policy. In particular, imported enableSessionResumption=false is honored.
@@ -247,28 +345,50 @@ mod tests {
             server_name: "one.invalid".into(),
             alpn: vec!["h2".into()],
             ca_der_base64: None,
+            insecure: false,
         };
-        let first = tls_context(&tls, Some(b"h2")).unwrap().0;
+        let first = tls_context(&tls, Some(b"h2"), false).unwrap().0;
         tls.server_name = "two.invalid".into();
-        let second = tls_context(&tls, Some(b"h2")).unwrap().0;
+        let second = tls_context(&tls, Some(b"h2"), false).unwrap().0;
         assert!(Arc::ptr_eq(&first, &second));
+        let mut insecure_tls = tls.clone();
+        insecure_tls.insecure = true;
+        assert_eq!(
+            validate_tls(&insecure_tls, Some(b"h2")),
+            Err("TlsInsecureForbidden")
+        );
+        assert!(validate_outbound_tls(&insecure_tls, Some(b"h2")).is_ok());
+        let outbound_insecure = tls_context(&insecure_tls, Some(b"h2"), true).unwrap().0;
+        assert!(!Arc::ptr_eq(&first, &outbound_insecure));
         tls.alpn = vec!["http/1.1".into()];
         assert!(matches!(
-            tls_context(&tls, Some(b"h2")),
+            tls_context(&tls, Some(b"h2"), false),
             Err("TlsAlpnUnsupported")
         ));
-        let http1 = tls_context(&tls, Some(b"http/1.1")).unwrap().0;
+        let http1 = tls_context(&tls, Some(b"http/1.1"), false).unwrap().0;
         assert!(!Arc::ptr_eq(&first, &http1));
         tls.ca_der_base64 = Some("AA==".into());
-        assert!(matches!(tls_context(&tls, None), Err("TlsTrustAnchor")));
+        assert!(matches!(
+            tls_context(&tls, None, false),
+            Err("TlsTrustAnchor")
+        ));
         tls.ca_der_base64 = Some("not-base64".into());
-        assert!(matches!(tls_context(&tls, None), Err("TlsTrustAnchor")));
+        assert!(matches!(
+            tls_context(&tls, None, false),
+            Err("TlsTrustAnchor")
+        ));
         tls.ca_der_base64 = None;
         tls.server_name = "bad/server".into();
-        assert!(matches!(tls_context(&tls, None), Err("TlsServerName")));
+        assert!(matches!(
+            tls_context(&tls, None, false),
+            Err("TlsServerName")
+        ));
         tls.server_name = "one.invalid".into();
         tls.alpn = vec!["h2\r\n".into()];
-        assert!(matches!(tls_context(&tls, None), Err("TlsParameters")));
+        assert!(matches!(
+            tls_context(&tls, None, false),
+            Err("TlsParameters")
+        ));
     }
     #[tokio::test]
     async fn eof_keeps_reverse_direction_alive() {

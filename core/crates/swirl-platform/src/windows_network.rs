@@ -699,9 +699,32 @@ try {
         if ($rules.Count -ne 1) { throw 'Ambiguous firewall rule ownership' }
         $rule = $rules[0]
         if ($p.mode -eq 'audit_dns_guards') {
-          # ActiveStore, unlike PersistentStore, exposes actual enforcement.
-          # Numeric CIM values are independent of localized display strings.
-          if ($null -eq $rule.PrimaryStatus -or [int]$rule.PrimaryStatus -ne 1 -or @($rule.EnforcementStatus).Count -eq 0 -or @($rule.EnforcementStatus | Where-Object { [int]$_ -ne 1 }).Count -ne 0) { throw 'DNS guard is not fully enforced by Windows' }
+          # ActiveStore exposes effective enforcement on raw CIM properties;
+          # NetSecurity.types.ps1xml shadows PrimaryStatus/EnforcementStatus
+          # with formatted ScriptProperty strings.
+          $rawPrimary = if ($rule -is [Microsoft.Management.Infrastructure.CimInstance]) {
+            $prop = $rule.CimInstanceProperties['PrimaryStatus']
+            if ($null -ne $prop) { $prop.Value } else { $null }
+          } else { $rule.PrimaryStatus }
+          $rawEnforcement = if ($rule -is [Microsoft.Management.Infrastructure.CimInstance]) {
+            $prop = $rule.CimInstanceProperties['EnforcementStatus']
+            if ($null -ne $prop) { $prop.Value } else { $null }
+          } else { $rule.EnforcementStatus }
+          if ($null -eq $rawPrimary -or $rawPrimary -is [string] -or $rawPrimary -is [bool] -or [int]$rawPrimary -ne 1) {
+            throw 'DNS guard primary status is not enforced by Windows'
+          }
+          $statuses = @($rawEnforcement)
+          if ($statuses.Count -eq 0) { throw 'DNS guard has no enforcement status entries' }
+          $hasEnforced = $false
+          foreach ($entry in $statuses) {
+            if ($null -eq $entry -or $entry -is [string] -or $entry -is [bool]) { throw 'DNS guard enforcement status is non-numeric' }
+            $code = [int]$entry
+            # 1 = Enforced on active network profiles; 5 = ProfileInactive on
+            # unconnected firewall profiles of a -Profile Any rule.
+            if ($code -eq 1) { $hasEnforced = $true }
+            elseif ($code -ne 5) { throw 'DNS guard is not fully enforced by Windows' }
+          }
+          if (-not $hasEnforced) { throw 'DNS guard has no active enforced profile' }
         }
         $pieces = ([string]$p.resource.name).Split('.')
         $owner = $pieces[$pieces.Length-2]
@@ -1185,6 +1208,39 @@ ConvertTo-Json -InputObject $values -Compress
     }
 
     #[test]
+    fn real_net_firewall_rule_exposes_numeric_cim_enforcement_read_only() {
+        // Verify the real Windows NetSecurity CIM schema without mutating any
+        // firewall rule. NetSecurity.types.ps1xml shadows EnforcementStatus
+        // with a formatted ScriptProperty string, while CimInstanceProperties
+        // retains the raw uint16 / uint16[] provider values.
+        const READ_FIREWALL_SCHEMA: &str = r#"
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$svc = Get-Service -Name 'mpssvc' -ErrorAction SilentlyContinue
+if ($null -eq $svc -or [string]$svc.Status -ne 'Running') {
+  ConvertTo-Json -InputObject @() -Compress
+  exit 0
+}
+$rows = @(Get-NetFirewallRule -PolicyStore ActiveStore -ErrorAction Stop | Select-Object -First 8)
+$values = @($rows | ForEach-Object {
+  $primary = $_.CimInstanceProperties['PrimaryStatus']
+  $enforcement = $_.CimInstanceProperties['EnforcementStatus']
+  if ($null -eq $primary -or $null -eq $primary.Value -or $null -eq $enforcement) {
+    throw 'Windows firewall CIM provider did not expose raw PrimaryStatus/EnforcementStatus'
+  }
+  $codes = @($enforcement.Value | ForEach-Object { [int]$_ })
+  @{ primary = [int]$primary.Value; codes = $codes }
+})
+ConvertTo-Json -InputObject $values -Compress
+"#;
+        let rows: Vec<serde_json::Value> = run_json(READ_FIREWALL_SCHEMA, &json!({})).unwrap();
+        for row in rows {
+            assert!(row["primary"].as_i64().is_some());
+            assert!(row["codes"].is_array());
+        }
+    }
+
+    #[test]
     fn missing_owned_resource_is_json_null_on_system_powershell() {
         // Read-only: use an absent test identity and never create an adapter.
         // Exercise the real system PowerShell version, including 5.1's null
@@ -1254,7 +1310,40 @@ function Get-NetFirewallRule {
   if ($PolicyStore -ne 'ActiveStore') { throw 'Audit read PersistentStore instead of enforcement state' }
   if ($p.drift -eq 'missing') { return }
   $owner=$Name.Split('.')[-2]
-  @{Name=$Name;DisplayName=$Name;Group='Swirl Native TUN DNS Guard';Description=('Swirl native TUN DNS guard owner ' + $owner);Direction='Outbound';Action='Block';Enabled='True';Profile='Any';PrimaryStatus=$(if ($p.drift -eq 'degraded') {2} else {1});EnforcementStatus=$(if ($p.drift -eq 'enforcement') {@(1,16)} else {@(1)})}
+  if ($p.drift -eq 'string_non_cim') {
+    return @{Name=$Name;DisplayName=$Name;Group='Swirl Native TUN DNS Guard';Description=('Swirl native TUN DNS guard owner ' + $owner);Direction='Outbound';Action='Block';Enabled='True';Profile='Any';PrimaryStatus=1;EnforcementStatus=@('1')}
+  }
+  $rule = [Microsoft.Management.Infrastructure.CimInstance]::new('MSFT_NetFirewallRule','root/standardcimv2')
+  $flags = [Microsoft.Management.Infrastructure.CimFlags]::Property
+  foreach ($entry in @(
+    @('Name',[string]$Name,[Microsoft.Management.Infrastructure.CimType]::String),
+    @('DisplayName',[string]$Name,[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Group','Swirl Native TUN DNS Guard',[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Description',('Swirl native TUN DNS guard owner ' + $owner),[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Direction','Outbound',[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Action','Block',[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Enabled','True',[Microsoft.Management.Infrastructure.CimType]::String),
+    @('Profile','Any',[Microsoft.Management.Infrastructure.CimType]::String)
+  )) {
+    $rule.CimInstanceProperties.Add([Microsoft.Management.Infrastructure.CimProperty]::Create($entry[0],$entry[1],$entry[2],$flags))
+  }
+  $primaryVal = if ($p.drift -eq 'null_primary') { $null } elseif ($p.drift -eq 'degraded') { [uint16]2 } else { [uint16]1 }
+  $rule.CimInstanceProperties.Add([Microsoft.Management.Infrastructure.CimProperty]::Create('PrimaryStatus',$primaryVal,[Microsoft.Management.Infrastructure.CimType]::UInt16,$flags))
+  [uint16[]]$enfVal = switch ([string]$p.drift) {
+    'profile_inactive_mix' { @(5,1) }
+    'all_profiles_inactive' { @(5,5) }
+    'disabled_in_profile' { @(5,2) }
+    'enforcement' { @(1,16) }
+    'optimized_out' { @(1,19) }
+    'empty_enforcement' { @() }
+    default { @(1) }
+  }
+  $rule.CimInstanceProperties.Add([Microsoft.Management.Infrastructure.CimProperty]::Create('EnforcementStatus',$enfVal,[Microsoft.Management.Infrastructure.CimType]::UInt16Array,$flags))
+  # Mirror Windows NetSecurity.types.ps1xml, where $rule.EnforcementStatus is a
+  # formatted ScriptProperty string (e.g. 'ProfileInactive, Enforced').
+  Add-Member -InputObject $rule -MemberType ScriptProperty -Name PrimaryStatus -Value { 'OK' } -Force
+  Add-Member -InputObject $rule -MemberType ScriptProperty -Name EnforcementStatus -Value { 'ProfileInactive, Enforced' } -Force
+  return $rule
 }
 function Get-NetFirewallPortFilter { process { @{Protocol=$(if ($p.drift -eq 'protocol') {'UDP'} elseif ($p.resource.name.EndsWith('.tcp')) {'TCP'} else {'UDP'});RemotePort=$(if ($p.drift -eq 'port') {'5353'} else {'53'});LocalPort='Any'} } }
 function Get-NetFirewallAddressFilter { process { @{LocalAddress='Any';RemoteAddress=$(if ($p.drift -eq 'ipv6') {'0.0.0.0/0'} else {'Any'})} } }
@@ -1287,6 +1376,7 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
     fn dns_guard_audit_checks_effective_dual_protocol_rules_without_network_writes() {
         assert!(mocked_dns_guard_audit("none").unwrap());
         assert!(mocked_dns_guard_audit("absent").unwrap());
+        assert!(mocked_dns_guard_audit("profile_inactive_mix").unwrap());
     }
 
     #[test]
@@ -1301,8 +1391,14 @@ function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
             "missing_status",
             "null_status",
             "invalid_status",
+            "null_primary",
             "degraded",
+            "all_profiles_inactive",
+            "disabled_in_profile",
             "enforcement",
+            "optimized_out",
+            "empty_enforcement",
+            "string_non_cim",
             "port",
             "protocol",
             "ipv6",

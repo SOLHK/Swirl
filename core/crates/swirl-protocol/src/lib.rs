@@ -842,7 +842,7 @@ async fn connect_stream_selected(
             "UpstreamTlsTimeout",
             timing::measure(
                 Phase::ProxyTls,
-                swirl_transport::secure_with_alpn(
+                swirl_transport::secure_outbound_with_alpn(
                     tcp,
                     tls,
                     transport.and_then(Transport::required_alpn),
@@ -916,7 +916,7 @@ pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Resul
         _ => None,
     };
     if let Some(tls) = tls {
-        swirl_transport::validate_tls(tls, transport.and_then(Transport::required_alpn))?;
+        swirl_transport::validate_outbound_tls(tls, transport.and_then(Transport::required_alpn))?;
     }
     Ok(())
 }

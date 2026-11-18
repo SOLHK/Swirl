@@ -30,6 +30,7 @@ async fn anytls_never_reuses_a_socket_across_private_guard_installation() {
             server_name: "fixture.test".into(),
             alpn: vec![],
             ca_der_base64: None,
+            insecure: false,
         },
         udp: true,
         idle_session_timeout_seconds: 5,

@@ -480,6 +480,26 @@ private slots:
         QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());
         QVERIFY(controller.routingError().contains("Controlled start declined"));
     }
+    void unconfiguredDefaultPolicyRejectsTunTransitionBeforeSavingOrLaunchingBroker(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-unconfigured.dpapi"));
+        auto draft=document();draft.insert("mode","rule");
+        QVERIFY(controller.applyPolicyDocument(draft.toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        const auto revision=controller.savedRevision();
+        QVERIFY(!controller.beginTunTransition(true));
+        QVERIFY(!controller.tunBusy());QVERIFY(!controller.tunRequested());
+        QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+        QCOMPARE(controller.savedRevision(),revision);QCOMPARE(engine->starts,0);
+        QVERIFY(!controller.routingError().isEmpty());
+
+        RustCoreEngine realEngine;
+        auto opts=controller.m_options;opts.tunEnabled=true;opts.policyDocument=draft;
+        realEngine.start(opts);
+        QCOMPARE(realEngine.status().state,ProxyEngine::State::Failed);
+        QCOMPARE(realEngine.status().error,ProxyEngine::Error::ConfigurationFailed);
+        QVERIFY(!realEngine.status().processAlive);
+        QVERIFY(!realEngine.status().tunRecoveryRequired);
+    }
     void explicitTunRecoveryKeepsUnconfirmedStateAndClosesFailedSavedPreference(){
         QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
         auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();

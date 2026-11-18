@@ -342,6 +342,7 @@ impl Tuic {
                 server_name,
                 alpn: alpn.unwrap_or_else(|| vec!["h3".into()]),
                 ca_der_base64: field_string(tls_map, "ca_der_base64")?,
+                insecure: false,
             },
             insecure,
             pin_sha256,

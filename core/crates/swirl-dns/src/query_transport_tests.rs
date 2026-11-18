@@ -30,6 +30,7 @@ fn held_resolver() -> Resolver {
                     server_name: "dns.fixture.invalid".into(),
                     alpn: vec![],
                     ca_der_base64: None,
+                    insecure: false,
                 },
                 https_path: None,
             }],
@@ -233,6 +234,7 @@ async fn encrypted_policy_transport_failure_never_tries_direct_endpoint_or_syste
                 server_name: "dns.fixture.invalid".into(),
                 alpn: vec![],
                 ca_der_base64: None,
+                insecure: false,
             },
             https_path,
         };
@@ -321,6 +323,7 @@ async fn policy_endpoint_denial_survives_dot_doh_without_failover_or_shared_fail
                             server_name: "dns.fixture.invalid".into(),
                             alpn: vec![],
                             ca_der_base64: None,
+                            insecure: false,
                         },
                         https_path: https_path.clone(),
                     })

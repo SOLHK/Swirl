@@ -160,7 +160,7 @@ async fn diagnose_with<T, F: Future<Output = io::Result<T>>>(
         Ok(addresses) => {
             dial_addresses_observed(addresses, deadline, connect, Some(&mut report)).await
         }
-        Err("UpstreamDnsTimeout" | "DnsTimeout") => Err("UpstreamDnsTimeout"),
+        Err("UpstreamDnsTimeout" | "DnsTimeout" | "DnsBusy") => Err("UpstreamDnsTimeout"),
         // DNS has many detailed internal codes. This interface intentionally
         // emits a small fixed vocabulary, never a supplied error string.
         Err(_) => Err("DnsLookupFailed"),
@@ -1007,6 +1007,17 @@ mod tests {
         assert_eq!(report.failure_stage, Some("dns"));
         assert!(!format!("{report:?}").contains("private-marker"));
         assert!(report.attempts.is_empty());
+
+        let (busy_report, busy_result) = diagnose_with(
+            Duration::from_secs(5),
+            Duration::from_secs(3),
+            async { Err("DnsBusy") },
+            |_| async { Ok(()) },
+        )
+        .await;
+        assert_eq!(busy_result, Err("UpstreamDnsTimeout"));
+        assert_eq!(busy_report.error_code, Some("UpstreamDnsTimeout"));
+        assert_eq!(busy_report.failure_stage, Some("dns"));
     }
 
     #[tokio::test]

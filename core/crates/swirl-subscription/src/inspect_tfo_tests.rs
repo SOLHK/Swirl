@@ -61,8 +61,19 @@ fn fallback_preserves_websocket_and_does_not_override_security_or_unknown_fields
         serde_json::to_value(&baseline.tcp_candidates[0]).unwrap()
     );
     assert!(fallback.tcp_candidates[0].is_some());
+    let mut insecure_ws = node.clone();
+    insecure_ws["skip-cert-verify"] = json!(true);
+    let accepted = project(&insecure_ws);
+    assert!(matches!(
+        accepted.tcp_candidates[0].as_ref(),
+        Some(crate::Outbound::Trojan { tls, .. }) if tls.insecure
+    ));
+    assert!(matches!(
+        fallback.tcp_candidates[0].as_ref(),
+        Some(crate::Outbound::Trojan { tls, .. }) if !tls.insecure
+    ));
     for (key, value) in [
-        ("skip-cert-verify", json!(true)),
+        ("skip-cert-verify", json!("true")),
         ("future-field", json!(1)),
     ] {
         let mut rejected = node.clone();

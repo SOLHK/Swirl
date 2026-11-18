@@ -390,6 +390,8 @@ fn config_key(config: &AnyTls) -> Vec<u8> {
         key.extend((alpn.len() as u64).to_be_bytes());
         key.extend(alpn.as_bytes());
     }
+    key.push(u8::from(config.tls.insecure));
+    key.push(u8::from(config.udp));
     key.push(u8::from(config.tls.ca_der_base64.is_some()));
     if let Some(ca) = &config.tls.ca_der_base64 {
         key.extend((ca.len() as u64).to_be_bytes());
@@ -467,7 +469,7 @@ impl Drop for Opening {
 
 pub fn validate(config: &AnyTls) -> Result<()> {
     config.validate()?;
-    swirl_transport::validate_tls(&config.tls, None)
+    swirl_transport::validate_outbound_tls(&config.tls, None)
 }
 pub async fn connect(
     config: &AnyTls,
@@ -567,7 +569,7 @@ async fn connect_inner(
         let mut tls = within(
             deadline,
             "UpstreamTlsTimeout",
-            swirl_transport::secure(tcp, &config.tls),
+            swirl_transport::secure_outbound_with_alpn(tcp, &config.tls, None),
         )
         .await?;
         let padding = client

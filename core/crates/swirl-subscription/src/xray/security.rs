@@ -293,6 +293,7 @@ fn tls(
 ) -> Option<Tls> {
     let settings = object(settings, path, diagnostics)?;
     let mut ca_der_base64 = None;
+    let mut insecure = false;
     for (key, value) in settings {
         let path = key_path(path, key);
         match key.as_str() {
@@ -309,7 +310,10 @@ fn tls(
                     push(diagnostics, "ExpectedString", &path, "error");
                 }
             }
-            "allowInsecure" => disabled_bool(value, &path, "TlsInsecureUnsupported", diagnostics),
+            "allowInsecure" => match value.as_bool() {
+                Some(flag) => insecure = flag,
+                None => push(diagnostics, "ExpectedBoolean", &path, "error"),
+            },
             "disableSystemRoot" => {
                 disabled_bool(value, &path, "TlsDisableSystemRootUnsupported", diagnostics)
             }
@@ -372,6 +376,7 @@ fn tls(
         server_name: server_name.to_owned(),
         alpn,
         ca_der_base64,
+        insecure,
     })
 }
 

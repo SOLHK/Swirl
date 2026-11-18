@@ -65,6 +65,7 @@ fn https_options(port: u16, trust_anchor: Option<&[u8]>) -> HealthProbe {
             alpn: vec!["http/1.1".into()],
             ca_der_base64: trust_anchor
                 .map(|der| base64::engine::general_purpose::STANDARD.encode(der)),
+            insecure: false,
         }),
         ..options(port)
     }
@@ -301,6 +302,7 @@ async fn url_test_tls_timeout_keeps_partial_outbound_timing() {
             server_name: "localhost".into(),
             alpn: vec![],
             ca_der_base64: None,
+            insecure: false,
         }),
     };
     let (release, held) = oneshot::channel::<()>();

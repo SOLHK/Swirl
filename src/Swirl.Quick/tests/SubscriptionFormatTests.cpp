@@ -101,7 +101,17 @@ private slots:
             QCOMPARE(outbound["tls"].toObject()["server_name"].toString(),QString("origin.test"));
             if(type=="tuic"){QCOMPARE(outbound["heartbeat_interval_ms"].toInt(),1250);QCOMPARE(outbound["congestion_control"].toString(),QString("new_reno"));QCOMPARE(outbound["udp_relay_mode"].toString(),QString("quic"));}
             else {QCOMPARE(outbound["obfs"].toString(),QString("salamander"));QCOMPARE(outbound["obfs_password"].toString(),QString("synthetic-obfs"));QCOMPARE(outbound["up_mbps"].toInt(),3);QCOMPARE(outbound["down_mbps"].toInt(),5);}
-            for(const auto &extra:QJsonArray{QJsonObject{{"unknown",true}},QJsonObject{{"network","udp"}},QJsonObject{{"tls",QJsonObject{{"enabled",false}}}},QJsonObject{{"tls",QJsonObject{{"enabled",true},{"insecure",true},{"alpn",QJsonArray{"h3"}}}}}}){
+            auto optInRaw=raw;optInRaw["tag"]="synthetic-opt-in";optInRaw["tls"]=QJsonObject{{"enabled",true},{"server_name","origin.test"},{"insecure",true},{"alpn",QJsonArray{"h3"}}};
+            const auto optInImported=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{optInRaw,raw}}}).toJson());
+            QVERIFY2(optInImported,qPrintable(optInImported.error));QCOMPARE(optInImported.nodes.size(),2);QCOMPARE(optInImported.nodes.first().originalConfiguration,optInRaw);
+            EngineStartOptions optInOptions;optInOptions.nodes=optInImported.nodes;optInOptions.selectedNodeId=optInImported.nodes.at(0).id;optInOptions.routingMode="global";
+            EngineStartOptions strictSiblingOptions=optInOptions;strictSiblingOptions.selectedNodeId=optInImported.nodes.at(1).id;
+            QJsonObject optInConfig,strictSiblingConfig;
+            QVERIFY2(RustCoreEngine::configuration(optInOptions,&optInConfig).isEmpty(),qPrintable(RustCoreEngine::configuration(optInOptions,&optInConfig)));
+            QVERIFY2(RustCoreEngine::configuration(strictSiblingOptions,&strictSiblingConfig).isEmpty(),qPrintable(RustCoreEngine::configuration(strictSiblingOptions,&strictSiblingConfig)));
+            QCOMPARE(optInConfig["nodes"].toArray().first().toObject()["outbound"].toObject()["insecure"].toBool(),true);
+            QCOMPARE(strictSiblingConfig["nodes"].toArray().first().toObject()["outbound"].toObject()["insecure"].toBool(),false);
+            for(const auto &extra:QJsonArray{QJsonObject{{"unknown",true}},QJsonObject{{"network","udp"}},QJsonObject{{"tls",QJsonObject{{"enabled",false}}}},QJsonObject{{"tls",QJsonObject{{"enabled",true},{"disable_sni",true},{"alpn",QJsonArray{"h3"}}}}},QJsonObject{{"tls",QJsonObject{{"enabled",true},{"insecure","true"},{"alpn",QJsonArray{"h3"}}}}}}){
                 auto rejected=raw;const auto object=extra.toObject();for(auto it=object.begin();it!=object.end();++it)rejected[it.key()]=it.value();
                 const auto imported=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{rejected}}}).toJson());QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.first().originalConfiguration,rejected);
                 options.nodes=imported.nodes;options.selectedNodeId=options.nodes.first().id;const QJsonObject sentinel{{"unchanged",true}};config=sentinel;QVERIFY(!RustCoreEngine::configuration(options,&config).isEmpty());QCOMPARE(config,sentinel);
@@ -184,6 +194,32 @@ private slots:
             qInfo()<<"FORMAT_DOWNLOAD_STORE_RUST_MAPPING"<<formats[i]<<"downloaded, parsed, DPAPI persisted, reloaded and mapped; protocol execution is a separate independent-peer test";
             controller.shutdown();
         }
+    }
+    void unsectionedAnyTlsIniAndVmessUriOptInIsolatePerNodeCertificatePolicy(){
+        const QByteArray unsectionedIni="Relay-04 = anytls, relay.fixture.invalid, 443, password=synthetic-secret, sni=cover.fixture.invalid, skip-cert-verify=true\n"
+                                        "Strict-01 = anytls, strict.fixture.invalid, 443, password=synthetic-secret, sni=strict.fixture.invalid\n";
+        const auto parsedIni=NodeImporter::parse(unsectionedIni);
+        QVERIFY2(parsedIni,qPrintable(parsedIni.error));QCOMPARE(parsedIni.nodes.size(),2);
+        QCOMPARE(parsedIni.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(true));
+        QVERIFY(!parsedIni.nodes.last().parameters.value("skip-cert-verify").toBool());
+        EngineStartOptions optInOpts;optInOpts.nodes=parsedIni.nodes;optInOpts.selectedNodeId=parsedIni.nodes.first().id;optInOpts.routingMode="global";
+        QJsonObject optInCfg;QVERIFY2(RustCoreEngine::configuration(optInOpts,&optInCfg).isEmpty(),"unsectioned AnyTLS opt-in must map");
+        QCOMPARE(optInCfg["nodes"].toArray().first().toObject()["outbound"].toObject()["tls"].toObject()["insecure"],QJsonValue(true));
+        EngineStartOptions strictOpts;strictOpts.nodes=parsedIni.nodes;strictOpts.selectedNodeId=parsedIni.nodes.last().id;strictOpts.routingMode="global";
+        QJsonObject strictCfg;QVERIFY2(RustCoreEngine::configuration(strictOpts,&strictCfg).isEmpty(),"unsectioned AnyTLS strict sibling must map");
+        QVERIFY(!strictCfg["nodes"].toArray().first().toObject()["outbound"].toObject()["tls"].toObject().contains("insecure"));
+
+        const QJsonObject vmessInsecure{{"v","2"},{"ps","VMess Relay"},{"add","vmess.fixture.invalid"},{"port","443"},
+            {"id","00112233-4455-4677-8899-aabbccddeeff"},{"aid","0"},{"scy","auto"},{"net","ws"},{"tls","tls"},
+            {"sni","vmess-sni.fixture.invalid"},{"host","cdn.fixture.invalid"},{"path","/ws"},{"allowInsecure",1}};
+        const QByteArray vmessUri="vmess://"+QJsonDocument(vmessInsecure).toJson(QJsonDocument::Compact).toBase64();
+        const auto parsedVmess=NodeImporter::parse(vmessUri);
+        QVERIFY2(parsedVmess,qPrintable(parsedVmess.error));QCOMPARE(parsedVmess.nodes.size(),1);
+        QVERIFY(parsedVmess.nodes.first().conversionIssues.isEmpty());
+        QCOMPARE(parsedVmess.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(true));
+        EngineStartOptions vmessOpts;vmessOpts.nodes=parsedVmess.nodes;vmessOpts.selectedNodeId=parsedVmess.nodes.first().id;vmessOpts.routingMode="global";
+        QJsonObject vmessCfg;QVERIFY2(RustCoreEngine::configuration(vmessOpts,&vmessCfg).isEmpty(),"VMess URI allowInsecure=1 must map");
+        QCOMPARE(vmessCfg["nodes"].toArray().first().toObject()["outbound"].toObject()["tls"].toObject()["insecure"],QJsonValue(true));
     }
 };
 QTEST_GUILESS_MAIN(SubscriptionFormatTests)

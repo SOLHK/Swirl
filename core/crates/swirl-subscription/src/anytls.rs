@@ -124,15 +124,13 @@ impl AnyTls {
         if raw.get("pcs").is_some_and(|v| v.as_str() != Some("")) {
             return Err("AnyTlsCertificatePinsUnsupported");
         }
-        if raw
-            .get("skip-cert-verify")
-            .is_some_and(|v| v != &Value::Bool(false))
-            || raw
-                .get("tls-verification")
-                .is_some_and(|v| v != &Value::Bool(true))
-        {
-            return Err("CertificateVerificationDisabledUnsupported");
-        }
+        let skip_cert_verify = match (raw.get("skip-cert-verify"), raw.get("tls-verification")) {
+            (None, None) => false,
+            (Some(Value::Bool(skip)), None) => *skip,
+            (None, Some(Value::Bool(verify))) => !*verify,
+            (Some(Value::Bool(skip)), Some(Value::Bool(verify))) if *skip == !*verify => *skip,
+            _ => return Err("AnyTlsTlsParameters"),
+        };
         if raw.get("tls").is_some_and(|v| v != &Value::Bool(true))
             || raw
                 .get("network")
@@ -189,6 +187,7 @@ impl AnyTls {
                 server_name,
                 alpn,
                 ca_der_base64: None,
+                insecure: skip_cert_verify,
             },
             udp: match raw.get("udp") {
                 None => true,

@@ -225,6 +225,7 @@ async fn run(input: Input, report: &mut Value, observation: Arc<Observation>) ->
                     server_name: input.inner_server_name,
                     alpn: Vec::new(),
                     ca_der_base64: Some(input.inner_ca_der_base64),
+                    insecure: false,
                 },
             )
             .await

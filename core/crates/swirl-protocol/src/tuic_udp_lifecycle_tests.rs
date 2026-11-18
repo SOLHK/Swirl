@@ -56,6 +56,7 @@ fn loopback_peer() -> (quinn::Endpoint, Tuic) {
             server_name: "reality.test".into(),
             alpn: vec!["h3".into()],
             ca_der_base64: Some(STANDARD.encode(der)),
+            insecure: false,
         },
         insecure: false,
         pin_sha256: None,

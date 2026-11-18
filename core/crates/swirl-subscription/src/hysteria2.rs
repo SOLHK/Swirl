@@ -209,6 +209,7 @@ pub fn from_raw(raw: &Value) -> Result<Hysteria2, &'static str> {
                 }
             },
             ca_der_base64: optional_string(raw, &["ca-der-base64"])?,
+            insecure: false,
         },
         host,
         port: port as u16,

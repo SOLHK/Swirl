@@ -641,6 +641,9 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
  if(!m_command){if(!m_library.load()){fail(Error::MissingExecutable,m_library.errorString());return;}m_command=m_library.command();}
  if(!m_library.supportsConfigurationV2()){fail(Error::ConfigurationFailed,QStringLiteral("内核不支持 V2 配置事务，未降级为旧路由语义。"));return;}
  if(options.tunEnabled){
+  const auto preflightId=options.configurationRequestId.isEmpty()?QUuid::createUuid().toString(QUuid::WithoutBraces):options.configurationRequestId;
+  const auto preflight=call({{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",preflightId},{"candidate",candidate},{"require_start",true},{"native_tun_startup",true}});
+  if(!preflight.value("ok").toBool()){fail(Error::ConfigurationFailed,preflight.value("error").toString(preflight.value("code").toString("ConfigurationRejected")));return;}
   QString error;
   if(!nativeTunAvailable()){fail(Error::MissingExecutable,QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。"));return;}
   if(!m_tunBroker.launch(&error)){fail(Error::ConfigurationFailed,error);return;}

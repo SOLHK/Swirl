@@ -284,10 +284,16 @@ class ImportedTransportXrayTests(unittest.TestCase):
             source = copy.deepcopy(original)
             source["outbounds"][0]["streamSettings"]["xhttpSettings"][key] = value
             cases.append(source)
-        for key, value in (("fingerprint", "chrome"), ("allowInsecure", True), ("disableSystemRoot", True)):
+        for key, value in (("fingerprint", "chrome"), ("allowInsecure", "true"), ("disableSystemRoot", True)):
             source = copy.deepcopy(original)
             source["outbounds"][0]["streamSettings"]["tlsSettings"][key] = value
             cases.append(source)
+        opt_in = copy.deepcopy(original)
+        opt_in["outbounds"][0]["streamSettings"]["tlsSettings"]["allowInsecure"] = True
+        opt_in_native = self.export(opt_in)
+        strict_native = self.export(original)
+        self.assertIs(opt_in_native["nodes"][0]["outbound"]["tls"].get("insecure"), True)
+        self.assertIsNone(strict_native["nodes"][0]["outbound"]["tls"].get("insecure"))
         upgrade = self.source(self.peer("vless", "httpupgrade"))
         for key, value in (("maxEarlyData", 2048), ("earlyDataHeaderName", "Sec-WebSocket-Protocol")):
             source = copy.deepcopy(upgrade)

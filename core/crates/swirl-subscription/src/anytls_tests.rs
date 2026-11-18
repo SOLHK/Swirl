@@ -48,22 +48,38 @@ fn anytls_import_preserves_credentials_sni_and_declared_udp() {
 
 #[test]
 fn anytls_security_and_unmapped_options_fail_closed() {
+    for (skip, verify, expected_insecure) in [
+        (None, None, false),
+        (Some(json!(false)), None, false),
+        (Some(json!(true)), None, true),
+        (None, Some(json!(true)), false),
+        (None, Some(json!(false)), true),
+        (Some(json!(true)), Some(json!(false)), true),
+        (Some(json!(false)), Some(json!(true)), false),
+    ] {
+        let mut input = raw();
+        if let Some(skip) = skip {
+            input["skip-cert-verify"] = skip;
+        }
+        if let Some(verify) = verify {
+            input["tls-verification"] = verify;
+        }
+        let parsed = AnyTls::from_raw(&input).unwrap();
+        assert_eq!(parsed.tls.insecure, expected_insecure);
+    }
+    for (skip, verify) in [(true, true), (false, false)] {
+        let mut conflicting = raw();
+        conflicting["skip-cert-verify"] = json!(skip);
+        conflicting["tls-verification"] = json!(verify);
+        assert_eq!(
+            AnyTls::from_raw(&conflicting).err(),
+            Some("AnyTlsTlsParameters")
+        );
+    }
     for (key, value, code) in [
-        (
-            "skip-cert-verify",
-            json!(true),
-            "CertificateVerificationDisabledUnsupported",
-        ),
-        (
-            "skip-cert-verify",
-            json!("false"),
-            "CertificateVerificationDisabledUnsupported",
-        ),
-        (
-            "tls-verification",
-            json!(false),
-            "CertificateVerificationDisabledUnsupported",
-        ),
+        ("skip-cert-verify", json!("false"), "AnyTlsTlsParameters"),
+        ("skip-cert-verify", json!(1), "AnyTlsTlsParameters"),
+        ("tls-verification", json!("false"), "AnyTlsTlsParameters"),
         (
             "pcs",
             json!("pin-request"),

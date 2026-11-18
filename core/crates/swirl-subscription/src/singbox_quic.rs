@@ -109,6 +109,7 @@ fn tls(raw: &Object, host: &str) -> Result<(Tls, bool), &'static str> {
             server_name,
             alpn,
             ca_der_base64: tls.get("certificate").map(certificate).transpose()?,
+            insecure: false,
         },
         boolean(tls, "insecure", false)?,
     ))

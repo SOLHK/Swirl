@@ -326,6 +326,7 @@ fn tls_first_flight() {
                 server_name: "localhost".into(),
                 alpn: vec![],
                 ca_der_base64: None,
+                insecure: false,
             }),
         };
         let peer = tokio::spawn(async move {

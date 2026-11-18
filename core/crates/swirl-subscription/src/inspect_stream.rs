@@ -151,6 +151,7 @@ pub(super) fn inspect(
         server_name: reality.server_name.clone(),
         alpn: reality.alpn.clone(),
         ca_der_base64: None,
+        insecure: false,
     });
     let mapped = crate::xray::stream_transport::build(
         &settings,

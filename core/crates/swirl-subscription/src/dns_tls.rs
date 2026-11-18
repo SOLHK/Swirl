@@ -70,7 +70,8 @@ impl Dns {
             } else {
                 "dot"
             };
-            if !valid_host(&tls.server_name)
+            if tls.insecure
+                || !valid_host(&tls.server_name)
                 || tls.ca_der_base64.as_ref().is_some_and(|s| s.len() > 65536)
                 || !(tls.alpn.is_empty() || (tls.alpn.len() == 1 && tls.alpn[0] == protocol))
             {
@@ -212,6 +213,12 @@ mod tests {
         let mut server = endpoint();
         server["tls"]["skip_cert_verify"] = json!(true);
         assert!(config(json!({"tls_servers": [server]})).is_err());
+        let mut insecure_server = endpoint();
+        insecure_server["tls"]["insecure"] = json!(true);
+        assert_eq!(
+            config(json!({"tls_servers": [insecure_server]})).err(),
+            Some("DnsTlsParameters")
+        );
     }
 
     #[test]

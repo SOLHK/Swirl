@@ -311,6 +311,10 @@ class SubscriptionImportTests(unittest.TestCase):
                     finally:
                         self.assertTrue(self.command(op='stop', handle=handle)['ok'])
             self.assertEqual(server.accepted, 0)
+            strict_uri = (f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}'
+                          '?allowInsecure=0&peer=localhost&sni=localhost&udp=false')
+            strict_outbound = self.inspect(strict_uri)['tcpCandidates'][0]
+            self.assertNotIn('insecure', strict_outbound['tls'])
             for udp in ('1', 'true'):
                 uri = (f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}'
                        f'?allowInsecure=1&peer=localhost&sni=localhost&udp={udp}')
@@ -318,13 +322,45 @@ class SubscriptionImportTests(unittest.TestCase):
                 capability = inspected['report']['nodes'][0]
                 self.assertTrue(inspected['report']['parsed'])
                 self.assertTrue(capability['udp_declared'])
-                self.assertFalse(capability['native_udp_supported'])
-                self.assertFalse(capability['native_tcp_candidate'])
-                self.assertEqual(capability['diagnostic'], 'CertificateVerificationDisabledUnsupported')
+                self.assertTrue(capability['native_udp_supported'])
+                self.assertTrue(capability['native_tcp_candidate'])
+                self.assertEqual(capability['diagnostic'], 'NativeCandidateRequiresNetworkVerification')
                 self.assertEqual(inspected['nodes'][0]['raw-uri'], uri)
                 self.assertIs(inspected['nodes'][0]['skip-cert-verify'], True)
                 self.assertIs(inspected['nodes'][0]['udp'], True)
-                self.assertEqual(inspected['tcpCandidates'], [None])
+                opt_in_outbound = inspected['tcpCandidates'][0]
+                self.assertIs(opt_in_outbound['tls']['insecure'], True)
+                started = self.command(op='start', config={
+                    'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'strict',
+                    'nodes': [{'id': 'opt-in', 'outbound': opt_in_outbound},
+                              {'id': 'strict', 'outbound': strict_outbound}]})
+                self.assertTrue(started['ok'], started)
+                handle = started['handle']
+                port = int(started['status']['address'].rsplit(':', 1)[1])
+                try:
+                    with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
+                        stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
+                                       b'Host: origin.fixture.invalid:443\r\n\r\n')
+                        self.assertIn(b' 502 ', header(stream))
+                    self.assertTrue(self.command(op='select', handle=handle, node='opt-in')['ok'])
+                    with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
+                        stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
+                                       b'Host: origin.fixture.invalid:443\r\n\r\n')
+                        self.assertIn(b' 200 ', header(stream))
+                        payload = b'opt-in-trojan-isolated-from-strict-sibling'
+                        stream.sendall(payload)
+                        self.assertEqual(exact(stream, len(payload)), payload)
+                    self.assertTrue(self.command(op='select', handle=handle, node='strict')['ok'])
+                    with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
+                        stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
+                                       b'Host: origin.fixture.invalid:443\r\n\r\n')
+                        self.assertIn(b' 502 ', header(stream))
+                finally:
+                    self.assertTrue(self.command(op='stop', handle=handle)['ok'])
+            self.assertEqual(server.accepted, 2)
+            conflict = (f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}'
+                        '?allowInsecure=1&skip-cert-verify=false&peer=localhost&sni=localhost')
+            self.assertFalse(self.inspect(conflict)['report']['parsed'])
 
     def test_mixed_positional_and_named_credentials_are_rejected(self):
         for declaration in (

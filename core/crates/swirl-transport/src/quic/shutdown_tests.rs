@@ -43,6 +43,7 @@ async fn peers() -> (Arc<Session>, Connection, Endpoint) {
         server_name: "reality.test".into(),
         alpn: vec!["h3".into()],
         ca_der_base64: Some(base64::engine::general_purpose::STANDARD.encode(certificate)),
+        insecure: false,
     };
     let connecting = connect(
         &addresses,

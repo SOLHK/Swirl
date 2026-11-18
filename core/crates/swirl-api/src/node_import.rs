@@ -2,7 +2,7 @@
 //! Qt sends every normalized option; there is no second protocol converter.
 use crate::import_ffi::encoded_response;
 use serde_json::{Value, json};
-use swirl_subscription::{Config, Limits, Node, Outbound, inspect};
+use swirl_subscription::{Config, Limits, Node, inspect};
 
 const MAX_INPUT: usize = 1024 * 1024;
 
@@ -48,14 +48,6 @@ fn response(input: &[u8], capacity: usize) -> Result<(usize, Option<Vec<u8>>), i
         let outbound = inspected.tcp_candidates[0]
             .as_ref()
             .ok_or(inspected.report.nodes[0].diagnostic)?;
-        // Product imports have always required certificate verification. The
-        // QUIC parsers understand the insecure alias, but it must not bypass
-        // that policy by using a spelling other than skip-cert-verify.
-        if matches!(outbound, Outbound::Hysteria2(config) if config.insecure)
-            || matches!(outbound, Outbound::Tuic(config) if config.insecure)
-        {
-            return Err("CertificateVerificationDisabledUnsupported");
-        }
         let config = Config {
             schema: 1,
             listen: "127.0.0.1:0".parse().expect("constant loopback"),
