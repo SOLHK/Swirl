@@ -371,7 +371,14 @@ async fn connect_inner(
         if remaining.is_zero() {
             return Err("QuicHandshakeTimeout");
         }
-        let bind = if address.is_ipv4() {
+        // Local peers must use the same explicit loopback binding exemption as
+        // other Core sockets. A wildcard bind would incorrectly apply physical
+        // egress selection to a loopback-only QUIC connection during a pause.
+        let bind = if address.is_ipv4() && address.ip().is_loopback() {
+            SocketAddr::from(([127, 0, 0, 1], 0))
+        } else if address.ip().is_loopback() {
+            SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0))
+        } else if address.is_ipv4() {
             SocketAddr::from(([0, 0, 0, 0], 0))
         } else {
             SocketAddr::from(([0u16; 8], 0))

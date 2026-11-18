@@ -7,7 +7,7 @@ Apple avar records are never silently collapsed by a Python dictionary.  The
 target keeps the original axis tags/ranges and uses an identity avar: the source
 mapping is baked into the sampled geometry and metric variations.
 
-No font is published as Swirl-VF.ttc until every original face/glyph passes the
+No font is published as SwirlVF.ttc until every original face/glyph passes the
 configured independent holdout checks. Even success is bounded sampled evidence,
 not a proof over the continuous design space or a Windows acceptance result.
 """
@@ -907,8 +907,9 @@ class FaceCheckpoints:
 
 
 def run(source, executable, destination, report_path, batch_size=64,
-        outline_limit=1.0, metric_limit=1.0, max_extra=24, checkpoint_dir=None):
-    check(destination.name == "Swirl-VF.ttc", "the final font filename must be Swirl-VF.ttc")
+        outline_limit=1.0, metric_limit=1.0, max_extra=24, checkpoint_dir=None,
+        cubic_error=0.05):
+    check(destination.name == "SwirlVF.ttc", "the final font filename must be SwirlVF.ttc")
     check(source.resolve() != destination.resolve(), "never overwrite the source font")
     check(not destination.exists(), "destination already exists; do not overwrite an unreviewed font")
     validate_io_paths(source, executable, destination, report_path)
@@ -918,6 +919,7 @@ def run(source, executable, destination, report_path, batch_size=64,
               "lossless_conversion": False, "windows_acceptance": "NOT_RUN",
               "fonttools_version": __import__('fontTools').__version__,
               "outline_limit_font_units": outline_limit, "metric_limit_font_units": metric_limit,
+              "cubic_approximation_limit_font_units": cubic_error,
               "faces": [], "failures": [], "status": "RUNNING"}
     oracle = checkpoints = None
     source_faces = None
@@ -995,7 +997,7 @@ def run(source, executable, destination, report_path, batch_size=64,
             checkpoints = FaceCheckpoints(checkpoint_dir, source, executable,
                                           (destination, report_path, report_path.parent / "native-oracle.log"),
                                           {"outline_limit": outline_limit, "metric_limit": metric_limit,
-                                           "max_extra": max_extra}, source_faces)
+                                           "max_extra": max_extra, "cubic_error": cubic_error}, source_faces)
             report["private_face_checkpoints"] = True
             report["checkpoint_transcript_policy"] = "complete_independent_session_before_each_face_checkpoint"
         with TTCollection(source, lazy=True) as original:
@@ -1090,7 +1092,7 @@ def run(source, executable, destination, report_path, batch_size=64,
                                     glyph, tuples, hm, vm, evidence = reconstruct_glyph(
                                         train, held, tl, hl, axes, src["hmtx"].metrics[name],
                                         src["vmtx"].metrics.get(name) if "vmtx" in src else None,
-                                        outline_limit, metric_limit)
+                                        outline_limit, metric_limit, cubic_error)
                                     context["adaptive_points"] = attempts
                                     context["max_outline_error"] = evidence["max_outline_error_bound_units"]
                                     context["max_metric_error"] = evidence["max_metric_error_units"]

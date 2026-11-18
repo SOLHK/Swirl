@@ -1,0 +1,9 @@
+{
+  "scope": "baseline production at remote 1327cb4 with candidate v2 runtime tests",
+  "head": "1327cb4d587eddc60563c926672f67a6da5c16ce",
+  "source_files": {
+    "core/crates/swirl-core/src/v2.rs": "880805fe1cd906abba7795bd5f8a5f85e8049bebefd4e2f7298d7072d4f504a4",
+    "core/crates/swirl-core/src/v2_runtime_tests.rs": "be34e852956e1f48406d41e0669052c5a69c6b5a8483eaf5e0ddb23cb57e51ee",
+    "core/crates/swirl-protocol/src/lib.rs": "684257697bba26c7bd70b8785a62299502866852811efedb60c0597767874187"
+  }
+}

@@ -144,12 +144,27 @@ static int fail(const char *message) {
     return 2;
 }
 
+static int parse_coords(const char *text, HVFAxisValue *coords, unsigned count) {
+    for (unsigned i = 0; i < count; ++i) {
+        char *next = NULL;
+        errno = 0;
+        coords[i] = strtod(text, &next);
+        if (next == text || errno || !isfinite(coords[i]) || coords[i] < -1.0 || coords[i] > 1.0 ||
+            (i + 1 < count ? *next != ',' : *next != '\0')) return 0;
+        text = next + (i + 1 < count);
+    }
+    return 1;
+}
+
 static int extract(int argc, char **argv) {
-    if (argc < 6 || argc > 7) return fail("usage: INPUT FACE DESIGN_COORDS START COUNT [parts]");
+    int requests = argc == 4 && !strcmp(argv[3], "requests");
+    if (!requests && (argc < 6 || argc > 7))
+        return fail("usage: INPUT FACE DESIGN_COORDS START COUNT [parts], or INPUT FACE requests < GID_COORDS_LINES");
     if (argc == 7 && strcmp(argv[6], "parts")) return fail("last argument must be parts");
     size_t face = 0, start = 0, requested = 0;
-    if (!parse_size(argv[2], &face) || !parse_size(argv[4], &start) ||
-        !parse_size(argv[5], &requested)) return fail("invalid nonnegative index/count");
+    if (!parse_size(argv[2], &face) || (!requests &&
+        (!parse_size(argv[4], &start) || !parse_size(argv[5], &requested))))
+        return fail("invalid nonnegative index/count");
     FILE *in = fopen(argv[1], "rb");
     if (!in) return fail("cannot open input");
     if (fseeko(in, 0, SEEK_END)) { fclose(in); return fail("cannot seek input"); }
@@ -193,16 +208,8 @@ static int extract(int argc, char **argv) {
     }
     coords = calloc(axis_count, sizeof(*coords));
     if (!coords) { fail("out of memory"); goto done; }
-    const char *text = argv[3];
-    for (unsigned i = 0; i < axis_count; ++i) {
-        char *next = NULL;
-        errno = 0;
-        coords[i] = strtod(text, &next);
-        if (next == text || errno || !isfinite(coords[i]) || coords[i] < -1.0 || coords[i] > 1.0 ||
-            (i + 1 < axis_count ? *next != ',' : *next != '\0')) {
-            fail("coordinates must match fvar axis count and lie in [-1,1]"); goto done;
-        }
-        text = next + (i + 1 < axis_count);
+    if (!requests && !parse_coords(argv[3], coords, axis_count)) {
+        fail("coordinates must match fvar axis count and lie in [-1,1]"); goto done;
     }
     /* malloc provides the required double alignment even if TTC table offsets do not. */
     aligned_hvgl = malloc(hvgl.size);
@@ -227,7 +234,7 @@ static int extract(int argc, char **argv) {
         (requested && requested > available - start)) {
         fail("requested range exceeds available glyphs/parts"); goto done;
     }
-    size_t count = requested ? requested : available - start;
+    size_t count = requests ? 0 : requested ? requested : available - start;
     HVFLibraryVersion library_version = HVF_library_version();
     HVFTableVersion supported_version = HVF_table_version(renderer);
     printf("{\"record\":\"header\",\"schema\":1,\"engine\":\"Apple HVF\","
@@ -249,9 +256,28 @@ static int extract(int argc, char **argv) {
     }
     fputs("],\"normalized_coords\":[", stdout);
     for (unsigned i = 0; i < axis_count; ++i) printf("%s%.17g", i ? "," : "", (double)coords[i]);
-    fputs("],\"metrics\":\"NOT_EXTRACTED\",\"user_axis_mapping\":\"NOT_TESTED\"}\n", stdout);
+    printf("],\"metrics\":\"NOT_EXTRACTED\",\"user_axis_mapping\":\"NOT_TESTED\","
+           "\"request_stream\":%s}\n", requests ? "true" : "false");
     size_t failed = 0, rendered = 0;
-    for (size_t part = start; part < start + count; ++part) {
+    char request_line[4096];
+    for (size_t ordinal = 0; requests || ordinal < count; ++ordinal) {
+        size_t part = start + ordinal;
+        if (requests) {
+            if (!fgets(request_line, sizeof(request_line), stdin)) {
+                if (ferror(stdin)) { fail("request read failed"); goto done; }
+                break;
+            }
+            if (ordinal >= 1000000 || (!strchr(request_line, '\n') && !feof(stdin))) {
+                fail("request count or line length exceeded"); goto done;
+            }
+            request_line[strcspn(request_line, "\r\n")] = '\0';
+            char *space = strchr(request_line, ' ');
+            if (!space) { fail("request needs GID space comma-separated coordinates"); goto done; }
+            *space++ = '\0';
+            if (!parse_size(request_line, &part) || part >= available || !parse_coords(space, coords, axis_count)) {
+                fail("invalid request glyph or design coordinates"); goto done;
+            }
+        }
         int code = HVF_set_render_part(renderer, part);
         int part_axes = code ? -1 : HVF_render_part_axis_count(renderer);
         unsigned applied = 0;
@@ -263,7 +289,12 @@ static int extract(int argc, char **argv) {
                 ++applied;
             }
         }
-        printf("{\"record\":\"outline\",\"part_index\":%zu,\"part_axis_count\":%d,"
+        if (requests) {
+            printf("{\"request_index\":%zu,\"normalized_coords\":[", ordinal);
+            for (unsigned i = 0; i < axis_count; ++i) printf("%s%.17g", i ? "," : "", (double)coords[i]);
+            fputs("],", stdout);
+        } else fputc('{', stdout);
+        printf("\"record\":\"outline\",\"part_index\":%zu,\"part_axis_count\":%d,"
                "\"applied_axis_count\":%u,\"events\":[", part, part_axes, applied);
         Output output = { .out = stdout };
         if (!code) code = HVF_render_current_part(renderer, emit, &output);

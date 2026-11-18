@@ -15,12 +15,12 @@ SwirlMotionButton {
         radius:Theme.controlRadius
         Rectangle { width:parent.width-Theme.dp(52); x:Theme.dp(52); height:Theme.dp(1); color:Theme.border; opacity:0.65 }
 
- Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.duration}}
  }
     contentItem:RowLayout {
         spacing:Theme.dp(24)
         SwirlIcon { name:row.iconName; size:Theme.dp(25) }
-        SwirlText { textRole:"list"; text:row.title; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
+        SwirlText { textRole:"label"; text:row.title; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
         SwirlIcon { visible:row.arrow; name:"chevron-right"; size:Theme.dp(17) }
     }
     Accessible.name:title

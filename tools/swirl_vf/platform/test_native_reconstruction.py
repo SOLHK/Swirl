@@ -2,7 +2,7 @@
 """Run the complete CoreText -> reconstruction -> CoreText path on synthetic data.
 
 The source is test_coretext_extract.make_fixture's original two-face TTC, never
-PingFang or an Apple derivative. The temporary file named Swirl-VF.ttc is removed
+PingFang or an Apple derivative. The temporary file named SwirlVF.ttc is removed
 after the test. Only logs, hashes, geometric observations and a scoped synthetic
 verdict remain. A successful test is not original-font or Windows acceptance.
 """
@@ -271,7 +271,7 @@ def main():
             with tempfile.TemporaryDirectory(prefix="synthetic-native-rebuild-", dir=out) as temporary:
                 temp = Path(temporary)
                 source = temp / "self-authored-two-face-fixture.ttc"
-                candidate = temp / "Swirl-VF.ttc"
+                candidate = temp / "SwirlVF.ttc"
                 make_fixture(source)
                 report["fixture_sha256"] = source_sha = digest(source)
                 original_records = native_records(binary, source, requests, out, "original-native", report["commands"])

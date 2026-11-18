@@ -148,6 +148,14 @@ impl From<&swirl_subscription::StreamTransport> for Transport {
 }
 
 pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Result<()> {
+    if let Outbound::Snell(config) = outbound {
+        config.validate()?;
+        return if matches!(selected, None | Some(Transport::Tcp {})) {
+            Ok(())
+        } else {
+            Err("SnellTransportUnsupported")
+        };
+    }
     let (tls, websocket, reality, flow) = match outbound {
         Outbound::Vless {
             tls,

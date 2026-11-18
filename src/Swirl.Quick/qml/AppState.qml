@@ -10,6 +10,11 @@ QtObject {
     readonly property bool proxyOn: engineController.connected
     readonly property bool systemProxyOn: engineController.systemProxy.enabled
     readonly property bool tunOn: engineController.tunEnabled
+    signal tunAuthorizationRequested(bool recovery)
+    function requestTunEnabled(enabled) {
+        if (enabled) tunAuthorizationRequested(engineController.tunRecoveryRequired)
+        else if (!engineController.setTunEnabled(false)) notice(engineController.routingError || engineController.policyError)
+    }
     property bool detailOpen: true
     property int trafficPeriod:0
     property string trafficSelectedProcess:""

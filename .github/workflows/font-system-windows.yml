@@ -1,8 +1,8 @@
-name: Font system Windows Qt 6.10.3
+name: Font system Windows Qt 6.12.0
 
 on:
   push:
-    branches: [work/core-completion-20261017]
+    branches: [work/core-completion-20261017, work/vf-smart-width-w1, work/swirlvf-delivery-20261102, work/swirlvf-recovery-20261102, test]
     paths:
       - '.github/workflows/font-system-windows.yml'
       - 'src/Swirl.Quick/CMakeLists.txt'
@@ -12,6 +12,24 @@ on:
       - 'src/Swirl.Quick/assets/fonts/**'
       - 'src/Swirl.Quick/tests/Font*'
       - 'src/Swirl.Quick/tests/generate_font_metadata_fixtures.py'
+      - 'tools/Install-QtSdk.py'
+      - 'tools/requirements-qt-sdk.txt'
+      - 'tools/SummarizeFontTests.py'
+      - 'tools/tests/test_font_ci_reports.py'
+      - 'docs/FONT_SYSTEM_CI.md'
+  pull_request:
+    branches: [test]
+    paths:
+      - '.github/workflows/font-system-windows.yml'
+      - 'src/Swirl.Quick/CMakeLists.txt'
+      - 'src/Swirl.Quick/main.cpp'
+      - 'src/Swirl.Quick/app/*Font*'
+      - 'src/Swirl.Quick/qml/**'
+      - 'src/Swirl.Quick/assets/fonts/**'
+      - 'src/Swirl.Quick/tests/Font*'
+      - 'src/Swirl.Quick/tests/generate_font_metadata_fixtures.py'
+      - 'tools/Install-QtSdk.py'
+      - 'tools/requirements-qt-sdk.txt'
       - 'tools/SummarizeFontTests.py'
       - 'tools/tests/test_font_ci_reports.py'
       - 'docs/FONT_SYSTEM_CI.md'
@@ -33,7 +51,12 @@ jobs:
   font-tests:
     # Standard public runners only. A visibility change must not silently start
     # consuming private-repository paid minutes or activate a larger runner.
-    if: github.ref == 'refs/heads/work/core-completion-20261017' && !github.event.repository.private
+    if: >-
+      !github.event.repository.private &&
+      ((github.event_name != 'pull_request' &&
+        contains(fromJSON('["refs/heads/work/core-completion-20261017","refs/heads/work/vf-smart-width-w1","refs/heads/work/swirlvf-delivery-20261102","refs/heads/work/swirlvf-recovery-20261102","refs/heads/test"]'), github.ref)) ||
+       (github.event_name == 'pull_request' && github.base_ref == 'test' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: windows-2022
     timeout-minutes: 40
     env:
@@ -42,6 +65,8 @@ jobs:
       # not measure the user's GPU, physical display quality, or 240 Hz delivery.
       QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
       QSG_INFO: '1'
+      # Final SwirlVF.ttc acceptance needs the actual private candidate; all
+      # public fixtures here are authored and cannot grant that acceptance.
       SWIRL_TEST_TTC: ''
       SWIRL_FONT_EVIDENCE: ''
     defaults:
@@ -59,8 +84,9 @@ jobs:
           $commit = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $commit -ne $env:GITHUB_SHA) { throw 'Source SHA mismatch' }
           @{ commit = $commit; ref = $env:GITHUB_REF; runId = $env:GITHUB_RUN_ID; runAttempt = $env:GITHUB_RUN_ATTEMPT;
-             runner = 'windows-2022'; qtRequested = '6.10.3'; qtArchitecture = 'win64_msvc2022_64';
-             nativeRendererRequested = 'D3D11 WARP'; physicalDpiVerified = $false; refresh240HzVerified = $false
+             runner = 'windows-2022'; qtRequested = '6.12.0'; qtArchitecture = 'win64_msvc2022_64';
+             nativeRendererRequested = 'D3D11 WARP'; physicalDpiVerified = $false; refresh240HzVerified = $false;
+             fontScope = 'authored_fixtures_only'; finalSwirlVFFont = 'NOT_RUN'; Windows11 = 'NOT_RUN'
           } | ConvertTo-Json | Set-Content -Encoding utf8 build/font-evidence/source.json
       - name: Set up fixture generator
         uses: actions/setup-python@v5
@@ -79,22 +105,32 @@ jobs:
           Copy-Item build/font-fixtures/cff.otf build/font-offscreen/
           python -m unittest discover -s tools/tests -p test_font_ci_reports.py
           if ($LASTEXITCODE -ne 0) { throw 'Font result reporter checks failed' }
-      - name: Install matching Qt MSVC SDK
+      - name: Install and verify the product Qt MSVC SDK
         id: qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.10.3'
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          # Avoid introducing another multi-GB cache into the account's quota.
-          cache: false
+        run: |
+          # Reuse product CI's installer for Qt 6.12's split Windows metadata.
+          # It validates official metadata/archive SHA256s and installed files.
+          python -m pip install -r tools/requirements-qt-sdk.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Qt SDK installer dependency installation failed' }
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-font-qt-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK installation failed' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI' }
+          foreach ($component in @('Qt6GuiPrivate', 'Qt6ShaderTools', 'Qt6QuickControls2', 'Qt6Test')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $qtRoot "lib/cmake/$component/${component}Config.cmake"))) { throw "Missing Qt font test component: $component" }
+          }
+          "QT_ROOT_DIR=$qtRoot" >> $env:GITHUB_ENV
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+          Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build/font-evidence/qt-sdk.json
       - name: Configure independent font targets
         id: configure
         run: |
           $qtVersion = (qmake -query QT_VERSION).Trim()
-          if ($LASTEXITCODE -ne 0 -or $qtVersion -ne '6.10.3') { throw "Unexpected Qt SDK: $qtVersion" }
+          if ($LASTEXITCODE -ne 0 -or $qtVersion -ne '6.12.0') { throw "Unexpected Qt SDK: $qtVersion" }
           $qtSpec = (qmake -query QMAKE_XSPEC).Trim()
           if ($LASTEXITCODE -ne 0 -or $qtSpec -ne 'win32-msvc') { throw "Unexpected Qt compiler specification: $qtSpec" }
           cmake -S src/Swirl.Quick -B build/swirl-font-tests -G 'Visual Studio 17 2022' -A x64 -DSWIRL_FONT_TESTS_ONLY=ON -DSWIRL_TEST_FONT_DIRECTORY="$PWD/build/font-offscreen" 2>&1 | Tee-Object build/font-evidence/configure.log
@@ -102,7 +138,7 @@ jobs:
           Copy-Item build/swirl-font-tests/font-toolchain.txt build/font-evidence/
           "QtMkspec=$qtSpec" | Add-Content build/font-evidence/font-toolchain.txt
           $toolchain = Get-Content -Raw build/font-evidence/font-toolchain.txt
-          if ($toolchain -notmatch '(?m)^Qt=6\.10\.3\r?$' -or $toolchain -notmatch '(?m)^Compiler=MSVC\r?$' -or $toolchain -notmatch '(?m)^PointerSize=8\r?$') { throw 'Qt/compiler ABI mismatch' }
+          if ($toolchain -notmatch '(?m)^Qt=6\.12\.0\r?$' -or $toolchain -notmatch '(?m)^Compiler=MSVC\r?$' -or $toolchain -notmatch '(?m)^PointerSize=8\r?$') { throw 'Qt/compiler ABI mismatch' }
       - name: Build independent font tests
         id: build
         run: |

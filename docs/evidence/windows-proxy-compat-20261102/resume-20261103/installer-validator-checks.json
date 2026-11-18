@@ -1,0 +1,30 @@
+[
+  {
+    "name": "exact-installed-payload",
+    "passed": true
+  },
+  {
+    "name": "tampered-runtime",
+    "passed": true
+  },
+  {
+    "name": "unlisted-runtime",
+    "passed": true
+  },
+  {
+    "name": "missing-runtime",
+    "passed": true
+  },
+  {
+    "name": "missing-isolation-marker",
+    "passed": true
+  },
+  {
+    "name": "mismatching-installed-manifest",
+    "passed": true
+  },
+  {
+    "name": "linked-installed-entry",
+    "passed": true
+  }
+]

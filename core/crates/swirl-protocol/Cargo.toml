@@ -3,6 +3,13 @@ name = "swirl-protocol"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+[features]
+private-acceptance = ["swirl-transport/private-acceptance"]
+
+[[test]]
+name = "anytls_private_guard"
+required-features = ["private-acceptance"]
+
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
@@ -14,6 +21,7 @@ swirl-transport.workspace = true
 sha2.workspace = true
 ring.workspace = true
 aes.workspace = true
+argon2.workspace = true
 quinn.workspace = true
 h3.workspace = true
 h3-quinn.workspace = true

@@ -204,7 +204,7 @@ class OfficialPeer:
 
     def start(self):
         self.log = (self.directory / f"{self.name}.log").open("ab")
-        self.process = subprocess.Popen([str(self.binary), "server", "-c", str(self.config)],
+        self.process = subprocess.Popen([str(self.binary), "server", "--disable-update-check", "-c", str(self.config)],
             stdout=self.log, stderr=self.log)
         time.sleep(0.35)
         if self.process.poll() is not None:

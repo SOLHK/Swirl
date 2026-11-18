@@ -1,0 +1,262 @@
+{
+  "status": "PARTIAL",
+  "commit": "137841c2d599fdceff2dee316f971a506239356d",
+  "checkout": "1f54ff8a1a0c2ad598a6ae65a0f2495f8b49ec3b",
+  "run": "https://github.com/SOLHK/Swirl/actions/runs/41398712433",
+  "production_accepted": false,
+  "python_tests": 927,
+  "audit_tests": 6,
+  "Windows": [
+    {
+      "platform": "Windows-11-10.0.26200-SP0",
+      "windows_product": "Microsoft Windows 11 Enterprise",
+      "architecture": {
+        "native_machine": 43620,
+        "query_succeeded": true,
+        "compiled_machine": 34404,
+        "process_emulated": true,
+        "process_machine": 0
+      },
+      "binary_sha256": "c65b822cc88ba01b51c67efb2152520932a119857db07c046b088c31d915d120",
+      "flat_capacity_exit_codes": {
+        "flat_regions_64": 0,
+        "flat_regions_192": 0,
+        "flat_regions_506": 0
+      },
+      "vertical_YAdvance": {
+        "vert/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vrt2/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vkrn/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        }
+      },
+      "artifact_id": 13120436947,
+      "artifact_sha256": "d803ed92f663ac1d6f4566e6653e4de400011ac7560e80d2ccca5e98f6ef0f1f"
+    },
+    {
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "windows_product": "Microsoft Windows Server 2025 Datacenter",
+      "architecture": {
+        "query_succeeded": true,
+        "process_machine": 0,
+        "compiled_machine": 34404,
+        "process_emulated": false,
+        "native_machine": 34404
+      },
+      "binary_sha256": "c3b85d6253365b59418f347f196aa92dc9d967300666f7425dee091bd954b964",
+      "flat_capacity_exit_codes": {
+        "flat_regions_64": 0,
+        "flat_regions_192": 0,
+        "flat_regions_506": 0
+      },
+      "vertical_YAdvance": {
+        "vert/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vrt2/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vkrn/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        }
+      },
+      "artifact_id": 13120497305,
+      "artifact_sha256": "58e33f6dbe01af7807dd0139d53e46d71ca226e82c9d4fc17c76481a03fff4eb"
+    },
+    {
+      "platform": "Windows-2022Server-10.0.20348-SP0",
+      "windows_product": "Microsoft Windows Server 2022 Datacenter",
+      "architecture": {
+        "process_machine": 0,
+        "native_machine": 34404,
+        "query_succeeded": true,
+        "compiled_machine": 34404,
+        "process_emulated": false
+      },
+      "binary_sha256": "e7431ca68b9eccf50e11fa9ad9f5670a6ea28711ba75dbf7e5ef37a3cceb2c2d",
+      "flat_capacity_exit_codes": {
+        "flat_regions_64": 0,
+        "flat_regions_192": 0,
+        "flat_regions_506": 0
+      },
+      "vertical_YAdvance": {
+        "vert/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vrt2/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        },
+        "vkrn/enabled/V": {
+          "raw_metrics_change": {
+            "checks": 128,
+            "max_abs_error": 0.0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change": {
+            "checks": 128,
+            "max_abs_error": 0,
+            "above_1_over_32": 0,
+            "above_reconstruction_1_FUnit": 0
+          },
+          "advance_change_minus_requested_model": {
+            "checks": 128,
+            "max_abs_error": 156.0,
+            "above_1_over_32": 116,
+            "above_reconstruction_1_FUnit": 116
+          }
+        }
+      },
+      "artifact_id": 13120906090,
+      "artifact_sha256": "243c47b3adb4fa751d8852016aba4873bca2b74a9a4eab566a6314f93d324d88"
+    }
+  ],
+  "CoreText_enabled_YAdvance_max_error": 0.003662109375,
+  "HarfBuzz_enabled_YAdvance_max_error": 0.007103652901150781,
+  "interpretation": "All three DirectWrite environments accept ordinary blends at 506 regions but do not apply variable YAdvance on the three initially tested routes. Native diagnostic completion is not an acceptance pass.",
+  "follow_up": "vpal/dist, fixed YAdvance, variable XAdvance and combined XY controls; source-table identity remains required",
+  "formal_font": "NOT_GENERATED",
+  "Windows11_x64_final_font": "NOT_RUN",
+  "Qt_final_font": "NOT_RUN",
+  "test_merge": "NOT_PERFORMED"
+}

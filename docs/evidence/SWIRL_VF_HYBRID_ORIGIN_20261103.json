@@ -1,0 +1,664 @@
+{
+  "scope": "Native X/Y layout precision and experimental coupled coordinates; not source-font acceptance",
+  "parent_commit": "4e282c43bb41bff45c21a369210e141de980ccb2",
+  "limit": 0.03125,
+  "previous_ci": {
+    "run": "https://github.com/SOLHK/Swirl/actions/runs/41493116243",
+    "native": {
+      "CoreText": {
+        "job_id": 125440976187,
+        "results": [
+          {
+            "components": "xy",
+            "repair_y_bearing": false,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0.0006918769991486329
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0.0006918769991486329
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "b37c8b7f54fb55e1022c74ba74af8204004b366871b04bed8892e73d4c58bd6a",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "x",
+            "repair_y_bearing": false,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "8e42083adab90903a315e88cfff03da7042a5be919735f888f42a2e0882286f1",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "xy",
+            "repair_y_bearing": true,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0.0006918769991486329
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0021219367785079157,
+                "maximum_Y_error": 0.0006918769991486329
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "f637c73b79f8c2cd672fd6ba0c55572333c4d60f0436017d22ea66ebbe07a750",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          }
+        ]
+      },
+      "Windows_11_ARM64_x64_emulation": {
+        "job_id": 125440976497,
+        "results": [
+          {
+            "components": "xy",
+            "repair_y_bearing": false,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 78,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "b37c8b7f54fb55e1022c74ba74af8204004b366871b04bed8892e73d4c58bd6a",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "x",
+            "repair_y_bearing": false,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "8e42083adab90903a315e88cfff03da7042a5be919735f888f42a2e0882286f1",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "xy",
+            "repair_y_bearing": true,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 34,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "f637c73b79f8c2cd672fd6ba0c55572333c4d60f0436017d22ea66ebbe07a750",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          }
+        ]
+      },
+      "Windows_Server_2025": {
+        "job_id": 125440976807,
+        "results": [
+          {
+            "components": "xy",
+            "repair_y_bearing": false,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 78,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "b37c8b7f54fb55e1022c74ba74af8204004b366871b04bed8892e73d4c58bd6a",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "x",
+            "repair_y_bearing": false,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "8e42083adab90903a315e88cfff03da7042a5be919735f888f42a2e0882286f1",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "xy",
+            "repair_y_bearing": true,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 34,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "f637c73b79f8c2cd672fd6ba0c55572333c4d60f0436017d22ea66ebbe07a750",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          }
+        ]
+      },
+      "Windows_Server_2022": {
+        "job_id": 125440976525,
+        "results": [
+          {
+            "components": "xy",
+            "repair_y_bearing": false,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 52
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 78,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "b37c8b7f54fb55e1022c74ba74af8204004b366871b04bed8892e73d4c58bd6a",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "x",
+            "repair_y_bearing": false,
+            "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 0
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 0,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "8e42083adab90903a315e88cfff03da7042a5be919735f888f42a2e0882286f1",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          },
+          {
+            "components": "xy",
+            "repair_y_bearing": true,
+            "status": "LAYOUT_NOT_ACCEPTED",
+            "layout": {
+              "horizontal/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "horizontal/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0,
+                "maximum_Y_error": 0
+              },
+              "vertical/zh-CN": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              },
+              "vertical/zh-HK": {
+                "checks": 39,
+                "maximum_X_error": 0.0026102180285079157,
+                "maximum_Y_error": 1.0006360367489542
+              }
+            },
+            "axis_failures": 24,
+            "raw_metric_changes": 34,
+            "font_processes": [
+              {
+                "variant": "source",
+                "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+                "exit_code": 0,
+                "observations": 156
+              },
+              {
+                "variant": "compensated",
+                "sha256": "f637c73b79f8c2cd672fd6ba0c55572333c4d60f0436017d22ea66ebbe07a750",
+                "exit_code": 0,
+                "observations": 156
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "hybrid": {
+    "model": "16x design-unit scaling preserves physical geometry; CFF2 supplies X, exact integer GPOS coefficients supply Y. Physical native comparison stays at 1000 DIP/em; tolerance stays 1/32 original FUnit.",
+    "raw_original_metrics": "NOT_ESTABLISHED",
+    "local_CoreText": {
+      "scope": "authored_CFF2_vertical_alternate_layout_only",
+      "os": "macOS-26.5.1-arm64-arm-64bit",
+      "native": "coretext",
+      "limit": 0.03125,
+      "source_font_acceptance": "NOT_RUN",
+      "raw_geometry_and_side_bearing_equivalence": "FAIL_BY_CONSTRUCTION",
+      "raw_axis_echo_failures": 24,
+      "raw_axis_echo_samples": [],
+      "components": "xy",
+      "repair_y_bearing": false,
+      "hybrid_upm16": true,
+      "raw_metric_changes": [],
+      "units_per_em": 16000,
+      "comparison_em_size": 1000,
+      "unchanged_horizontal_outlines": true,
+      "serialized": {
+        "checks": 312,
+        "maximum_control_translation_error": 4.547473508864641e-13,
+        "unchanged_tables": [
+          "GSUB",
+          "HVAR",
+          "OS/2",
+          "VORG",
+          "VVAR",
+          "cmap",
+          "fvar",
+          "hhea",
+          "hmtx",
+          "maxp",
+          "name",
+          "post",
+          "vhea",
+          "vmtx"
+        ]
+      },
+      "layout": {
+        "horizontal/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0,
+          "maximum_Y_error": 0
+        },
+        "horizontal/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0,
+          "maximum_Y_error": 0
+        },
+        "vertical/zh-CN": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0006918769991486329
+        },
+        "vertical/zh-HK": {
+          "checks": 39,
+          "maximum_X_error": 0.0021219367785079157,
+          "maximum_Y_error": 0.0006918769991486329
+        }
+      },
+      "visual_raster": "NOT_ESTABLISHED",
+      "processes": [
+        {
+          "variant": "source",
+          "sha256": "e90e2c792b19cf8ad637c2f5eba88f7bfd618b52ef999644cb0a3bc9af496780",
+          "exit_code": 0,
+          "observations": 156
+        },
+        {
+          "variant": "compensated",
+          "sha256": "c847712a618ca581a336751b1167377e1386b7ed784d412f71cedf0b4e7fb347",
+          "exit_code": 0,
+          "observations": 156
+        }
+      ],
+      "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+      "raw_axis_echo_status": "FAIL_RETAINED",
+      "raw_advance_origin_status": "NO_DIFFERENCE_OBSERVED",
+      "HarfBuzz_metrics_routes_and_Y_placement_checks": 156
+    }
+  },
+  "coupled_avar2": {
+    "purpose": "Test whether a native engine applies coupled coordinates before researching boundary-aligned source models",
+    "normative_status": "EXPERIMENTAL; current Microsoft avar specification describes v1",
+    "local_CoreText": {
+      "scope": "authored_experimental_avar2_coordinate_capability",
+      "os": "macOS-26.5.1-arm64-arm-64bit",
+      "native": "coretext",
+      "limit": 0.03125,
+      "mapping": "WDTH_out=(WDTH_in+HGHT_in)/2; other axes unchanged",
+      "source_font_acceptance": "NOT_RUN",
+      "production_accepted": false,
+      "cases": {
+        "baseline": {
+          "checks": 118,
+          "maximum_geometry_error": 0.0028037180352384894,
+          "failures": 0,
+          "raw_axis_echo_failures": 0,
+          "ignored_mapping_counterfactual_max_error": 0,
+          "font_sha256": "5ad8c38b0af6100c6e50bfb3c607477acaef494caa635f5c8224fd8665227747"
+        },
+        "coupled": {
+          "checks": 118,
+          "maximum_geometry_error": 0.0037520049699537594,
+          "failures": 0,
+          "raw_axis_echo_failures": 0,
+          "ignored_mapping_counterfactual_max_error": 64,
+          "font_sha256": "f5330d91f1e10a2e926e6afac4bbdaec1a1a084de264eea15291a2eed4e4942b"
+        }
+      },
+      "status": "PASS_AUTHORED_CAPABILITY"
+    },
+    "HarfBuzz": "PASS_GEOMETRY_VIA_DRAW_CALLBACKS",
+    "note": "HarfBuzz integer glyph extents are not fractional outline geometry; native controls retain their separate metrics."
+  },
+  "new_Windows": "NOT_RUN_PENDING_THIS_COMMIT_CI",
+  "production_accepted": false
+}

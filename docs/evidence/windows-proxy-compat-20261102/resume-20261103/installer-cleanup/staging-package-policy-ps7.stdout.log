@@ -1,0 +1,5 @@
+Package policy: 31 assertions passed.
+Release cache policy: 20 staging cases passed.
+Final manifest regression: 14 scenarios passed.
+TLS package policy: 42 scenarios passed.
+Empty staging directory policy: 12 scenarios passed.

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCase name="ProxyTests">
+  <Environment>
+    <QtVersion>6.12.0</QtVersion>
+    <QtBuild>Qt 6.12.0 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>
+    <QTestVersion>6.12.0</QTestVersion>
+  </Environment>
+  <TestFunction name="initTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0686"/>
+  </TestFunction>
+  <TestFunction name="takeoverRestoresPacAndCustomBypass">
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[pac-only]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[manual-and-pac]]></DataTag>
+    </Incident>
+    <Duration msecs="822.71"/>
+  </TestFunction>
+  <TestFunction name="lateAcknowledgementFromReleasedGuardCannotReplaceTheNextSession">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="433.042"/>
+  </TestFunction>
+  <TestFunction name="asynchronousTakeoverYieldsDuringJournalContentionAndCancelsSafely">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="278.793"/>
+  </TestFunction>
+  <TestFunction name="explicitOffDisablesExternalAndOwnedProxy">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="131.687"/>
+  </TestFunction>
+  <TestFunction name="currentUserRecovery">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="173.732"/>
+  </TestFunction>
+  <TestFunction name="abruptOwnerExit">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="185.574"/>
+  </TestFunction>
+  <TestFunction name="registryOnlyExternalEdit">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="96.0534"/>
+  </TestFunction>
+  <TestFunction name="restoreDistinctStoresAndAbsentValues">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="425.645"/>
+  </TestFunction>
+  <TestFunction name="malformedRegistryDoesNotMutateSettings">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.8477"/>
+  </TestFunction>
+  <TestFunction name="inconsistentRepresentationsCannotLeavePartialSettings">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="4.2295"/>
+  </TestFunction>
+  <TestFunction name="legacyJournalRecoveryPreservesRegistry">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="38.9099"/>
+  </TestFunction>
+  <TestFunction name="abruptEngineExit">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="387.927"/>
+  </TestFunction>
+  <TestFunction name="cleanupTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.033"/>
+  </TestFunction>
+  <Duration msecs="2980.35"/>
+</TestCase>

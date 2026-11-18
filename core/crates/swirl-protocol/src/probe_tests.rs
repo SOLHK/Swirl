@@ -95,6 +95,39 @@ async fn request_headers<R: AsyncRead + Unpin>(socket: &mut R) -> Vec<u8> {
 }
 
 #[tokio::test]
+async fn request_rtt_excludes_slow_verified_tls_but_keeps_cold_total() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let (certificate, acceptor) = tls_fixture();
+    let probe = https_options(listener.local_addr().unwrap().port(), Some(&certificate));
+    let peer = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        // Deliberately model a slow handshake and a separate response delay.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let mut stream = acceptor.accept(socket).await.unwrap();
+        request_headers(&mut stream).await;
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        stream
+            .write_all(b"HTTP/1.1 204 No Content\r\n\r\n")
+            .await
+            .unwrap();
+    });
+    let measured = url_test_head(&Outbound::Direct {}, &probe, &https_resolver(), Some(204))
+        .await
+        .unwrap();
+    assert_eq!(measured.http_status, 204);
+    assert!(measured.origin_tls_ms.unwrap() >= 120);
+    assert!(measured.request_rtt_ms >= 20);
+    assert!(measured.response_headers_ms >= measured.request_rtt_ms + 120);
+    assert!(
+        measured.response_headers_ms + 2
+            >= measured.outbound_connect_ms
+                + measured.origin_tls_ms.unwrap()
+                + measured.request_rtt_ms
+    );
+    peer.await.unwrap();
+}
+
+#[tokio::test]
 async fn url_test_head_returns_before_peer_body_or_close() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let probe = options(listener.local_addr().unwrap().port());

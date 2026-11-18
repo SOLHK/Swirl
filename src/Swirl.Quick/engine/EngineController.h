@@ -9,15 +9,18 @@
 #include "TelemetryService.h"
 #include "NodeTestService.h"
 #include "ConnectionDiagnostics.h"
+#include "../network/LanProxySession.h"
 #include <memory>
 #include <QJsonArray>
 #include <optional>
 class QTcpSocket;
+class QQuickWindow;
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
+    Q_PROPERTY(QUrl defaultProbeUrl READ defaultProbeUrl CONSTANT)
     Q_PROPERTY(QString stateText READ stateText NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(QString errorCode READ errorCode NOTIFY statusChanged)
@@ -37,6 +40,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString controlEndpoint READ controlEndpoint NOTIFY statusChanged)
     Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
     Q_PROPERTY(QVariantList nodeCatalog READ nodeCatalog NOTIFY nodeCatalogChanged)
+    Q_PROPERTY(QString activeSubscriptionId READ activeSubscriptionId NOTIFY optionsChanged)
+    Q_PROPERTY(bool subscriptionScopeEnabled READ subscriptionScopeEnabled NOTIFY optionsChanged)
     Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY selectionChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY statusChanged)
@@ -64,11 +69,21 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool meteredEnabled READ meteredEnabled NOTIFY statusChanged)
     Q_PROPERTY(QStringList meteredAllowlist READ meteredAllowlist NOTIFY optionsChanged)
     Q_PROPERTY(bool lanEnabled READ lanEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool lanSupported READ lanSupported NOTIFY statusChanged)
+    Q_PROPERTY(bool lanBusy READ lanBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool lanRecoveryNeeded READ lanRecoveryNeeded NOTIFY statusChanged)
+    Q_PROPERTY(QVariantMap lanConfiguration READ lanConfiguration NOTIFY optionsChanged)
+    Q_PROPERTY(QVariantMap lanStatus READ lanStatus NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList lanInterfaces READ lanInterfaces NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool lanConfigured READ lanConfigured NOTIFY optionsChanged)
     Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
+    Q_PROPERTY(bool tunBusy READ tunBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool tunRecoveryRequired READ tunRecoveryRequired NOTIFY statusChanged)
+    Q_PROPERTY(bool tunRecoveryBusy READ tunRecoveryBusy NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
     Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
     Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
@@ -92,7 +107,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString policyMigrationSummary READ policyMigrationSummary NOTIFY policyChanged)
     Q_PROPERTY(bool processMatchingAvailable READ processMatchingAvailable CONSTANT)
 public:
-    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false,std::unique_ptr<SystemProxySession::Backend> proxyBackend={});
+    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false,std::unique_ptr<SystemProxySession::Backend> proxyBackend={},bool controlledAcceptance=false);
     bool rustCoreBuild() const {
         return true;
     }
@@ -102,7 +117,7 @@ public:
     bool processAlive() const { return m_engine->status().processAlive; }
     bool apiHealthy() const { return m_engine->status().apiHealthy; }
     bool busy() const;
-    bool canStart() const { return !m_shuttingDown && !m_policyBusy && !busy() && !processAlive() && !m_imports.busy(); }
+    bool canStart() const { return !m_shuttingDown && !m_policyBusy && !busy() && !processAlive() && !m_imports.busy() && !m_engine->status().tunRecoveryRequired; }
     QString version() const { return m_engine->status().version; }
     QString engineName() const { return m_engine->status().engineName; }
     QString engineKind() const { return m_engine->status().engineKind; }
@@ -129,7 +144,10 @@ public:
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
     QVariantList nodeDiagnosticRows() const;
-    QVariantList nodeCatalog() const { return m_store.publicRows(); }
+    QVariantList nodeCatalog() const;
+    QString activeSubscriptionId() const { return m_store.networkConfiguration().value("activeSubscriptionId").toString(); }
+    bool subscriptionScopeEnabled() const { return m_store.networkConfiguration().contains("activeSubscriptionId"); }
+    Q_INVOKABLE bool selectSubscription(const QString &id);
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
     bool connected() const { const auto s=m_engine->status();return s.apiHealthy&&s.processAlive&&(!s.selectedNodeId.isEmpty()||s.directSession||!m_options.policyDocument.isEmpty()); }
@@ -151,6 +169,7 @@ public:
     Q_INVOKABLE void testNode(const QUrl &url);
     Q_INVOKABLE void disconnectNode();
     SystemProxySession *systemProxy() { return &m_systemProxy; }
+    QUrl defaultProbeUrl() const { return m_proxyProbeUrl; }
     QString routingMode() const { return processAlive()?m_engine->status().mode:m_options.routingMode; }
     QString routingError() const { return m_routingError; }
     bool routingBusy() const { return m_policyBusy||m_engine->status().routingBusy; }
@@ -159,6 +178,7 @@ public:
     NodeTestService *tests() { return &m_tests; }
     Q_INVOKABLE void testAllNodes(const QUrl &url);
     Q_INVOKABLE void testNodes(const QStringList &ids,const QUrl &url);
+    Q_INVOKABLE bool testNodesIfStale(const QStringList &ids,const QUrl &url);
     Q_INVOKABLE void testSelectedNode(const QString &id,const QUrl &url);
     QVariantList routingRules() const;
     QVariantMap dnsConfiguration() const { return m_options.dnsConfig; }
@@ -167,6 +187,11 @@ public:
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
+    bool tunSupported() const;
+    bool tunBusy() const {return m_tunTransition.has_value()||m_tunRecovering;}
+    bool tunRecoveryRequired() const {return m_engine->status().tunRecoveryRequired;}
+    bool tunRecoveryBusy() const {return m_tunRecovering||(m_tunTransition&&m_tunTransition->recovery);}
+    Q_INVOKABLE bool recoverTunNetwork();
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
@@ -174,8 +199,18 @@ public:
     QStringList meteredAllowlist() const { return m_options.meteredAllowlist; }
     Q_INVOKABLE bool setMeteredEnabled(bool enabled);
     Q_INVOKABLE bool configureMeteredAllowlist(const QStringList &processes);
-    bool lanEnabled() const { return m_engine->status().allowLan && processAlive() && apiHealthy(); }
-    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty(); }
+    // Retain the last positive Rust receipt until a stopped receipt arrives.
+    // Loss of API health is an unconfirmed state, never proof of a closed port.
+    bool lanEnabled() const { return m_engine->status().allowLan; }
+    bool lanSupported() const;
+    bool lanBusy() const { return m_lanSession && m_lanSession->busy(); }
+    bool lanRecoveryNeeded() const { return m_lanSession && m_lanSession->recoveryNeeded(); }
+    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty() && !m_options.lanConfiguration.isEmpty(); }
+    QVariantMap lanConfiguration() const;
+    QVariantMap lanStatus() const;
+    QVariantList lanInterfaces() const;
+    Q_INVOKABLE bool configureLanAccess(const QVariantMap &configuration);
+    Q_INVOKABLE bool recoverLan();
     QString lanUsername() const { return m_options.lanUsername; }
     QStringList lanAddresses() const;
     QList<QNetworkInterface> networkInterfaces() const { return m_interfaces; }
@@ -198,8 +233,12 @@ public:
     Q_INVOKABLE void setSystemProxy(bool enabled);
     Q_INVOKABLE void toggleSystemProxy();
     bool proxyRequested() const { return m_proxyRequested; }
-    bool systemProxyStopping() const { return m_stopAfterPolicy||m_engine->status().state==ProxyEngine::State::Stopping; }
-    bool systemProxyBusy() const { return m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
+    bool systemProxyStopping() const {
+        return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+            ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
+            ||m_engine->status().state==ProxyEngine::State::Stopping;
+    }
+    bool systemProxyBusy() const { return m_shutdownAwaitingProxyRelease||m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
     QVariantMap policyDocument() const { return m_policyDocument.toVariantMap(); }
     bool policyV2Active() const { return m_store.configurationV2(); }
     QVariantMap defaultPolicy() const { return m_policyDocument.value("default_policy").toObject().toVariantMap(); }
@@ -227,6 +266,7 @@ public:
     Q_INVOKABLE bool recoverPolicyConfiguration();
     bool applyCatalogTransaction(const NodeStore::ImportPlan &,const QJsonObject &,NodeImportService::ApplyCompletion,QString *error);
 signals:
+    void tunRecoveryFinished(bool success,const QString &message);
     void policyChanged();
     void policyApplyFinished(const QString &requestId,bool success);
     void lanAddressesChanged();
@@ -239,16 +279,41 @@ signals:
     void nodesChanged();
 private:
     friend class PolicyConfigurationTests;
+    friend int runPolicyUiChecks(QQuickWindow *,EngineController *,const QString &);
+    friend int runNodeUiChecks(QQuickWindow *,EngineController *);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    friend class PrivateUiQuotaSession;
+#endif
     QString nodeConnectionState(const QString &id) const;
+    QList<ProxyNode> availableNodes() const;
     void refreshLanAddresses();
     QStringList m_lanAddresses;
     QList<QNetworkInterface> m_interfaces;
     bool m_lanScanPending=false;
     bool m_shuttingDown=false;
+    bool m_shutdownAwaitingProxyRelease=false;
+    void finishShutdownAfterProxyRelease();
+    enum class StopPhase { Idle, ReleasingProxy, ReleaseFailed, StoppingCore };
+    StopPhase m_stopPhase=StopPhase::Idle;
+    void finishStopAfterProxyRelease();
+    enum class TunPhase { ReleasingProxy, StoppingCore, Saving, Starting };
+    struct TunTransition {
+        TunPhase phase=TunPhase::ReleasingProxy;
+        EngineStartOptions previous;
+        bool target=false,wasRunning=false,proxyIntent=false,saved=false,rollback=false,cancelled=false,recovery=false;
+        QString error;
+    };
+    std::optional<TunTransition> m_tunTransition;
+    bool m_tunRecovering=false;
+    bool beginTunTransition(bool enabled);
+    void advanceTunTransition();
+    void tunPolicyCompleted(bool success,const QString &error);
+    void finishTunTransition(const QString &error={});
     bool m_ingestingEngineStatus=false;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
     std::unique_ptr<ProxyEngine> m_engine;
+    std::unique_ptr<LanProxySession> m_lanSession;
     EngineStartOptions m_options;
     NodeStore m_store;
     NodeImportService m_imports;
@@ -259,7 +324,7 @@ private:
     QString m_previousProxyState;
     QVariantList m_previousNodePresentation;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
-    QJsonObject serializedNetworkConfiguration();
+    QJsonObject serializedNetworkConfiguration(const EngineStartOptions *candidate=nullptr);
     bool saveNetworkConfiguration();
     bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();
@@ -272,9 +337,11 @@ private:
     int m_captureProxyPort=0;
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
+    QByteArray m_networkIdentity;
     quint64 m_proxyCheckGeneration=0;
     quint64 m_proxyEnableRequest=0;
     QPointer<QTcpSocket> m_proxyCheckSocket;
+    QUrl m_proxyProbeUrl{QStringLiteral("https://cp.cloudflare.com/generate_204")};
     QString m_nodeError;
     QString m_pendingSelection,m_previousSelection;
     void rollbackPendingSelection(const QString &reason);
@@ -282,10 +349,16 @@ private:
     bool m_tunBeforeMetered=false;
     QString m_modeBeforeMetered="rule";
     bool m_restartPending=false;
+    bool m_startAfterProbes=false;
+    bool m_probeStartPosted=false;
+    quint64 m_probeStartGeneration=0;
     bool m_connectionRequested=false;
+    EngineStartOptions nodeProbeOptions() const;
+    bool nodeProbeReady();
     bool m_moduleOverlayActive=false;
     bool m_nativeDocumentRouting=false;
     bool m_smartRoutingEligible=false;
+    bool m_controlledAcceptance=false;
     void updateRoutingFlags();
     void initializePolicyConfiguration();
     QVariantMap reviewSubscriptionConfiguration(const QString &sourceId);
@@ -299,7 +372,7 @@ private:
     };
     std::optional<SubscriptionReviewTicket> m_subscriptionReview;
     QString m_reviewSession,m_policyReviewDigest;
-    bool applyPolicyConfiguration(const QJsonObject &,const EngineStartOptions &);
+    bool applyPolicyConfiguration(const QJsonObject &,const EngineStartOptions &,bool tunTransition=false);
     void policyCommandCompleted(const QString &,const QJsonObject &);
     void finishPolicyMutation(bool success,const QString &error={});
     void finishPolicyDiskCommit();
@@ -317,6 +390,7 @@ private:
     int m_policyRecoveryAttempts=0;
     QJsonObject m_policyCandidateNetwork,m_policyObservedReceipt,m_policyRuntimeCandidate;
     QString m_policyOperation,m_policyMigrationError;
+    QStringList m_policyRevokedNodeIds;
     bool m_policyRollingBack=false;
     bool m_policyDiskWrite=false;
     std::optional<NodeStore::ImportPlan> m_policyCatalog;

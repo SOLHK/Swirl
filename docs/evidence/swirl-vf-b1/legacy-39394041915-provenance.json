@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "description": "Complete historical Apple synthetic job log preserved as a control; native acceptance remains failed.",
+  "repository": "SOLHK/Swirl",
+  "run_id": 39394041915,
+  "job_id": 118532235918,
+  "source_sha": "53ca5ff74e17bfc65e338b460fa2fc4df3801c1d",
+  "source_branch": "work/core-completion-20261017",
+  "workflow_path": ".github/workflows/swirl-vf.yml",
+  "run_status": "completed",
+  "run_conclusion": "failure",
+  "job_name": "apple-oracles",
+  "job_status": "completed",
+  "job_conclusion": "failure",
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39394041915",
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39394041915/job/118532235918",
+  "retrieval": {
+    "tool": "mcp__codex_apps__github_fetch_workflow_job_logs",
+    "argument": {
+      "repo_full_name": "SOLHK/Swirl",
+      "job_id": 118532235918
+    },
+    "payload_field": "structuredContent.content",
+    "metadata_tools": [
+      "mcp__codex_apps__github_fetch_workflow_run_jobs",
+      "mcp__codex_apps__github_fetch"
+    ],
+    "saved_at_utc": "2026-10-20 09:08:50 UTC"
+  },
+  "log": {
+    "filename": "legacy-39394041915-apple.log",
+    "sha256": "52c3643f2ce26def0db59c32e96ed42861b82ef0a0d4b7918f3945ac62b51694",
+    "byte_length": 40879,
+    "line_count": 488,
+    "encoding": "UTF-8",
+    "utf8_bom_preserved": true,
+    "original_ansi_escape_sequences_preserved": true,
+    "newline": "LF",
+    "trailing_newline_preserved": true,
+    "connector_decoded_text_exact_readback_verified": true,
+    "reconstructed_from_summary": false,
+    "transport_limitation": "Hash covers the exact UTF-8 re-encoding of the complete connector-decoded text; raw HTTP transfer bytes are not exposed by this tool."
+  },
+  "failure": {
+    "original_budget_font_units": 0.03125,
+    "actual_vertical_advance": 849,
+    "expected_vertical_advance": 850,
+    "assertion_lines": [
+      {
+        "line_1based": 306,
+        "text": "2026-10-20T08:32:27.9200420Z   \"error\": \"request=face0-point0 face=0 gid=2: vertical advance is raw CGSize.width: actual=849, expected=850.0, tolerance=0.03125\","
+      },
+      {
+        "line_1based": 308,
+        "text": "2026-10-20T08:32:27.9201600Z     \"validation_error\": \"vertical advance is raw CGSize.width: actual=849, expected=850.0, tolerance=0.03125\","
+      }
+    ],
+    "raw_advance_height_lines": [
+      {
+        "line_1based": 332,
+        "text": "2026-10-20T08:32:27.9227450Z       \"advance_height\": 849,"
+      }
+    ],
+    "raw_advance_sum_lines": [
+      {
+        "line_1based": 391,
+        "text": "2026-10-20T08:32:27.9267600Z       \"vertical_advance_sum\": 849,"
+      }
+    ],
+    "raw_advance_vector_value_line_1based": 393,
+    "failed_step": {
+      "name": "Compile CoreText extractor and verify original two-face tracking fixture",
+      "status": "completed",
+      "conclusion": "failure",
+      "number": 6
+    },
+    "original_font_acceptance": "NOT_RUN",
+    "no_success_inferred_from_following_diagnostic_steps": true
+  },
+  "source_sha_log_lines": [
+    37,
+    95,
+    97,
+    104,
+    108,
+    442,
+    471,
+    472
+  ],
+  "disclosure_review": {
+    "result": "Visible paths are hosted-runner/public CI and synthetic-fixture paths; visible GitHub authentication fields were already masked as *** by GitHub.",
+    "added_redactions": false,
+    "known_unmasked_github_token_patterns": 0,
+    "known_unmasked_aws_access_key_patterns": 0,
+    "private_key_header_patterns": 0,
+    "unmasked_bearer_patterns": 0,
+    "signed_download_credential_patterns": 0,
+    "scope": "Reviewed this complete decoded job log; pattern checks are not a general guarantee about all possible secret formats."
+  }
+}

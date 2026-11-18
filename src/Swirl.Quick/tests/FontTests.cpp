@@ -137,11 +137,17 @@ private slots:
     void fontCachesAreBoundedAndStable();
     void displayContextHasBoundedLifecycle();
     void qmlLiveAutomaticFonts();
+    void qmlWidthControls();
     void fontDisplayContextLifetime();
     void previewFontResourcesInvalidateRaster();
     void previewWindowMetricsAndIdleStability();
     void previewRepeatedAxesReuseResources();
     void automaticWidthUsesRealAdvances();
+    void widthSolverRejectsUnsafeHistory();
+    void widthSolverBoundsAndNonmonotonic();
+    void automaticWidthNonmonotonicFonts();
+    void automaticWidthShaping();
+    void automaticWidthCacheAndResize();
     void optionalPhysicalFontIdentity();
     void fontInspectionRejectsUnsupportedAndInvalidVariations();
     void startupRejectsUnsupportedFontAndCorruptCache();
@@ -504,6 +510,7 @@ void FontTests::optionalCffImport()
 #include "FontQmlChecks.h"
 #include "FontPreviewInvalidationChecks.h"
 #include "FontWidthChecks.h"
+#include "FontWidthSolverChecks.h"
 #include "FontSourceChecks.h"
 #include "FontSwirlVfChecks.h"
 

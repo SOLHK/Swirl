@@ -1,0 +1,310 @@
+{
+  "scope": "upstream_controls_and_one_HVF_target",
+  "both_target_acceptance": false,
+  "limit": 0.03125,
+  "upstream": {
+    "HOI-test": {
+      "revision": "02c265d8f20bd063b014190e90f1beb3bfc3034b",
+      "license": "MIT",
+      "tests": {
+        "font_sha256": "f8ddf69bc5c4dacb5e1d2ab4e1062643d3376c3b22eb71ff0effc55d3b0e737d",
+        "bytes": 2624,
+        "engines": {
+          "CoreText": {
+            "observations": 65,
+            "max_error": 0.010140797087710977,
+            "failures": 0
+          },
+          "HarfBuzz": {
+            "observations": 65,
+            "max_error": 6.209877241554148e-05,
+            "failures": 0
+          },
+          "fontTools": {
+            "observations": 65,
+            "max_error": 0.0,
+            "failures": 0
+          }
+        },
+        "native_summary": {
+          "exact_axis_readback": true,
+          "font_sha256": "f8ddf69bc5c4dacb5e1d2ab4e1062643d3376c3b22eb71ff0effc55d3b0e737d",
+          "request_count": 65,
+          "run_tables_verified": true,
+          "type": "summary"
+        },
+        "uncoupled_axis_max_residual": 930.9457556700067
+      }
+    },
+    "how2avar2": {
+      "revision": "7f69eaece10f7006b240fb469f1be7136d400997",
+      "license": "OFL-1.1",
+      "tests": {
+        "font_sha256": "9c138238bc894655dd0959bda959327e46242d1580e3f800fec5c135a825bd86",
+        "bytes": 2144,
+        "engines": {
+          "CoreText": {
+            "observations": 91,
+            "max_error": 0.05900447171632135,
+            "failures": 38,
+            "max_error_vs_quantized_reference": 0.010709732733724846,
+            "failures_vs_quantized_reference": 0
+          },
+          "HarfBuzz": {
+            "observations": 91,
+            "max_error": 0.07126884686187211,
+            "failures": 38,
+            "max_error_vs_quantized_reference": 0.1187781027713077,
+            "failures_vs_quantized_reference": 12
+          },
+          "fontTools": {
+            "observations": 91,
+            "max_error": 0.05694262635449992,
+            "failures": 38,
+            "max_error_vs_quantized_reference": 0.0,
+            "failures_vs_quantized_reference": 0
+          }
+        },
+        "native_summary": {
+          "exact_axis_readback": true,
+          "font_sha256": "9c138238bc894655dd0959bda959327e46242d1580e3f800fec5c135a825bd86",
+          "request_count": 91,
+          "run_tables_verified": true,
+          "type": "summary"
+        }
+      }
+    }
+  },
+  "authored": {
+    "authored-hoi-v2": {
+      "scope": "authored_clamp_polynomial_control_only",
+      "production_accepted": false,
+      "encoding": "hoi",
+      "font_bytes": 13008,
+      "maximum_operand_stack": 31,
+      "engines": {
+        "CoreText": {
+          "failures": 0,
+          "max_error": 0.004174495187189098,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "HarfBuzz": {
+          "failures": 0,
+          "max_error": 0.0028635350746751033,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "fontTools": {
+          "failures": 0,
+          "max_error": 0.003309031055726687,
+          "observations": 155,
+          "selection_failures": 0
+        }
+      }
+    },
+    "authored-hoi-axis": {
+      "scope": "authored_clamp_polynomial_control_only",
+      "production_accepted": false,
+      "encoding": "hoi-axis",
+      "font_bytes": 17200,
+      "maximum_operand_stack": 39,
+      "engines": {
+        "CoreText": {
+          "failures": 0,
+          "max_error": 0.004174495187189098,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "HarfBuzz": {
+          "failures": 0,
+          "max_error": 0.0028635350746751033,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "fontTools": {
+          "failures": 0,
+          "max_error": 0.003309031055726687,
+          "observations": 155,
+          "selection_failures": 0
+        }
+      }
+    },
+    "authored-hoi-pooled": {
+      "scope": "authored_clamp_polynomial_control_only",
+      "production_accepted": false,
+      "encoding": "hoi",
+      "font_bytes": 9440,
+      "share_expressions": true,
+      "expression_pool": {
+        "shared_expressions": 20,
+        "drawing_chunks": 0,
+        "maximum_added_subroutine_depth": 1,
+        "encoded_program_bytes": 1040,
+        "maximum_main_bytes": 68,
+        "maximum_subroutine_bytes": 25
+      },
+      "maximum_operand_stack": 31,
+      "engines": {
+        "CoreText": {
+          "failures": 0,
+          "max_error": 0.004174495187189098,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "HarfBuzz": {
+          "failures": 0,
+          "max_error": 0.0028635350746751033,
+          "observations": 155,
+          "selection_failures": 0
+        },
+        "fontTools": {
+          "failures": 0,
+          "max_error": 0.003309031055726687,
+          "observations": 155,
+          "selection_failures": 0
+        }
+      }
+    }
+  },
+  "target_1166": {
+    "candidate_sha256": "858c9e9e568afd39162ccfe490ded7a26f5aa1012f6940b24e2cbb9102d58436",
+    "seed": 2026110443,
+    "engines": {
+      "CoreText": {
+        "observations": 3140,
+        "max_error": 0.01908212503481624,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.01430861723451926,
+        "max_advance_vs_unrounded_tables": 0.01430861723451926
+      },
+      "HarfBuzz": {
+        "observations": 3140,
+        "max_error": 0.018971427425542208,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.0,
+        "max_advance_vs_unrounded_tables": 0.5018399999999019
+      },
+      "fontTools": {
+        "observations": 269,
+        "max_error": 0.012548240656805962,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.0060232574523979565,
+        "max_advance_vs_unrounded_tables": 0.0060232574523979565
+      }
+    },
+    "categories": {
+      "boundary": 125,
+      "single": 192,
+      "dual": 192,
+      "triple": 2048,
+      "branch_axis_zero": 29,
+      "branch_tangent_lower": 21,
+      "branch_tangent_upper": 21,
+      "previous_dense_holdout": 128,
+      "region_seam": 384
+    },
+    "candidate_bytes": 86598392,
+    "maximum_operand_stack": 165,
+    "cff2_regions": 59582,
+    "artifact_hashes": {
+      "manifest.json": "e149957d3248129b7c667cd67ec26664d8dfd421d49c980be2a02b62ef6550f9",
+      "source-plan.json": "6996147a91312fd1e256952beb107d315e626529798547de40001ee0913f440a",
+      "coretext.jsonl": "5663e76c40881b01140223175a8f67ae67407d94e6ebdd8c65db971ff0d552b6",
+      "hvf.jsonl": "fb5e08635acf608aabf46b388d3c164e8a90f4226a2658b5952efa8f490b752b",
+      "coretext_joint_layout": "a243b333bf3bdb7081e2633f21b6e83482c82c12bea58a1c4710ff62ffdc425c"
+    }
+  },
+  "limitations": [
+    "single-source-glyph shaping scope",
+    "hidden computational axes remain at defaults",
+    "no continuous-space proof",
+    "no arbitrary binary64 transport certificate",
+    "full-font scalability not established"
+  ],
+  "target_1166_pooled": {
+    "candidate_sha256": "1854e6363a256c2afd568149f9980752638107d1d387018582cae0420be09d23",
+    "seed": 2026110445,
+    "engines": {
+      "CoreText": {
+        "observations": 3153,
+        "max_error": 0.02583148555841653,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.012224448897768525,
+        "max_advance_vs_unrounded_tables": 0.012224448897768525
+      },
+      "HarfBuzz": {
+        "observations": 3153,
+        "max_error": 0.023699382671840616,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.0,
+        "max_advance_vs_unrounded_tables": 0.5070541082164937
+      },
+      "fontTools": {
+        "observations": 271,
+        "max_error": 0.01839123266798431,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "advance_failures": 0,
+        "max_advance_error": 0.00608466933863383,
+        "max_advance_vs_unrounded_tables": 0.00608466933863383
+      }
+    },
+    "categories": {
+      "boundary": 125,
+      "single": 192,
+      "dual": 192,
+      "triple": 2048,
+      "branch_axis_zero": 42,
+      "branch_tangent_lower": 21,
+      "branch_tangent_upper": 21,
+      "previous_dense_holdout": 128,
+      "region_seam": 384
+    },
+    "unique_user_positions": 3134,
+    "positions_certifiably_disjoint_from_training_grid": 3078,
+    "independent_random_triples": 2048,
+    "artifacts_sha256": {
+      "manifest.json": "9491a0bc0022d0aae4ca3e10dcbffec7372db1018e93882d411f7e8f2da946ab",
+      "source-plan.json": "12001a6e64e428cd188cb532f4192571a2a4bf48a24c07c35a111aa7557cbe91",
+      "coretext.jsonl": "930276556d98ba224bf0b3bd6f279175ebfabd1c6ab862c90eba4dfd444bdc78",
+      "hvf.jsonl": "fe8f04beb0f2f0d74208addbacd0e91f8473e9cff244342b0bf0dee9a71f898d",
+      "coretext_joint_layout": "a243b333bf3bdb7081e2633f21b6e83482c82c12bea58a1c4710ff62ffdc425c"
+    },
+    "candidate_bytes": 62247684,
+    "maximum_operand_stack": 165,
+    "cff2_regions": 59582,
+    "expression_pool": {
+      "shared_expressions": 32768,
+      "drawing_chunks": 0,
+      "maximum_added_subroutine_depth": 1,
+      "encoded_program_bytes": 53808186,
+      "maximum_main_bytes": 36237,
+      "maximum_subroutine_bytes": 338
+    }
+  },
+  "regression": {
+    "tests": 1013,
+    "passed": 1006,
+    "skipped": 7,
+    "failures": 0,
+    "log_sha256": "a83c9faa01fd9fbd38d356fb1e27298ab184fb25e70b52048ed19f8023a8068a",
+    "earlier_failure": "global pathlib intern dictionary resize polluted in-process allocation measurement; unchanged threshold now measured in a fresh child process"
+  }
+}

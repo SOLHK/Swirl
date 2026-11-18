@@ -42,7 +42,9 @@ Item {
     property int groupIndex:0
     onGroupIndexChanged:if(groupIndex!==0)recentOnly=false
     readonly property var sources:engineController.imports.providers
-    readonly property var sourceOptions:[{id:"",kind:"",name:qsTr("全部来源")},{id:"",kind:"manual",name:qsTr("手动添加")}].concat(page.sources.map(s=>({id:s.id,kind:"subscription",name:s.name}))).concat(engineController.imports.legacyNodeCount>0?[{id:"",kind:"legacy",name:qsTr("历史未归属")}]:[])
+    readonly property var sourceOptions:engineController.subscriptionScopeEnabled
+        ? [{id:engineController.activeSubscriptionId,kind:engineController.activeSubscriptionId.length?"subscription":"",name:engineController.activeSubscriptionId.length?(page.sources.find(s=>s.id===engineController.activeSubscriptionId)||{}).name||qsTr("来源已删除"):qsTr("独立导入")}]
+        : [{id:"",kind:"",name:qsTr("全部来源")},{id:"",kind:"manual",name:qsTr("独立导入")}].concat(page.sources.map(s=>({id:s.id,kind:"subscription",name:s.name}))).concat(engineController.imports.legacyNodeCount>0?[{id:"",kind:"legacy",name:qsTr("历史未归属")}]:[])
     readonly property int sourceIndex:Math.max(0,sourceOptions.findIndex(s=>s.id===page.sourceId&&s.kind===page.sourceKind))
     function selectSource(index){const entry=sourceOptions[index]||sourceOptions[0];sourceKind=entry.kind;sourceId=entry.id}
     readonly property var countries:{const names={};for(const n of engineController.nodeCatalog)if((!sourceId||n.sourceId===sourceId)&&(!sourceKind||n.sourceKind===sourceKind))names[n.regionCode]=n.regionName;return Object.keys(names).sort().map(code=>({code:code,name:names[code]}))}
@@ -52,7 +54,7 @@ Item {
     readonly property var filterState:({protocol:protocol,regionCode:countryCode,sourceId:sourceId,sourceKind:sourceKind,status:statusFilter,maxLatency:maxLatency,available:availableOnly||groupIndex===1,group:groupIndex===2?"favorites":recentOnly?"recent":"all",sort:["name","latency","regionName","protocol"][sortOrder.currentIndex]})
     onFilterStateChanged:nodes.filters=filterState
     onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId)){sourceId="";sourceKind=""}
-    onSourceOptionsChanged:if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""
+    onSourceOptionsChanged:{if(engineController.subscriptionScopeEnabled){sourceKind=sourceOptions[0].kind;sourceId=sourceOptions[0].id}else if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""}
     Timer {id:searchDelay;interval:100;onTriggered:{nodes.query=search.text;nodeTable.scrollToBeginning()}}
     function dismissDetail(){if(!nodeHero.opened)return false;if(nodeDeletePending)return true;nodeHero.returnTo(nodeTable.selectedItem);if(nodeDeleteRecovery){nodeDeleteRecovery=false;inspectedId=""}return true}
     function selectRow(row) {if(row&&row.id)focusedId=row.id}
@@ -99,9 +101,9 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         SwirlPageHeader {
             id:nodeHeading;Layout.fillWidth:true;title:qsTr("节点资源库")
-            description:qsTr("浏览、收藏与独立测试节点，在策略页分配出口。")
+            description:engineController.subscriptionScopeEnabled?qsTr("仅显示当前来源的节点；在订阅管理中切换使用的来源。"):qsTr("浏览、收藏与独立测试节点，在策略页分配出口。")
             metadata:qsTr("%1 个节点，%2 个订阅来源").arg(nodes.total).arg(page.sources.length)
-            SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测试"):qsTr("测试连接");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.showAt()}}}
+            SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测试"):qsTr("测试全部");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else engineController.testAllNodes(testUrl.text.trim())}}
             SwirlButton {objectName:"nodeImportButton";text:qsTr("导入");quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:qsTr("添加节点");iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
         }
@@ -130,37 +132,34 @@ Item {
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:true;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
-                    sectioned:true;activateOnSingleClick:false
+                    sectioned:true;stagedProjection:true;activateOnSingleClick:false
                     sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
                     rowActionsWidth:Theme.dp(88)
+                    latencyCell:Component {Item {
+                        NodeLatencyButton {anchors.verticalCenter:parent.verticalCenter;width:Math.min(parent.width,implicitWidth);record:parent.parent.record;onClicked:engineController.testSelectedNode(record.id,testUrl.text.trim())}
+                    }}
                     rowActions:Component {
                         NodeRowActions {
                             record:parent.record
                             editable:!record.sourceId&&engineController.canStart&&!page.nodeSavePending&&!page.nodeDeletePending
-                            testable:!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
-                            onFavoriteRequested:nodes.toggleFavorite(record.id)
-                            onDetailsRequested:page.inspectRow(record)
-                            onEditRequested:page.edit(record)
-                            onTestRequested:engineController.testSelectedNode(record.id,testUrl.text.trim())
-                            onCopyRequested:nodes.copySafeInfo(record.id)
+                            testable:!record.testPending&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
+                            onFavoriteRequested:if(parent.acceptsInteraction())nodes.toggleFavorite(record.id)
+                            onDetailsRequested:if(parent.acceptsInteraction())page.inspectRow(record)
+                            onEditRequested:if(parent.acceptsInteraction())page.edit(record)
+                            onTestRequested:if(parent.acceptsInteraction())engineController.testSelectedNode(record.id,testUrl.text.trim())
+                            onCopyRequested:if(parent.acceptsInteraction())nodes.copySafeInfo(record.id)
                         }
                     }
                     anchors.fill:parent;anchors.margins:Theme.dp(6);externalModel:sections;selectedId:page.focusedId
                     cellPadding:Theme.dp(8)
-                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:62,min:44},{key:"regionName",label:"地区提示",w:70,min:54},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
+                    columns:[{key:"name",label:"节点名称",w:220,min:76},{key:"protocol",label:"协议",w:54,min:40},{key:"regionName",label:"地区提示",w:66,min:50},{key:"latency",label:"延迟",w:118,min:104},{key:"status",label:"状态",w:85,min:54}]
                     onRowSelected:function(row){page.selectRow(row)}
                     onRowActivated:function(row,titleItem){page.inspectRow(row)}
                     onSectionActivated:function(key){sections.toggleSection(key)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0&&!nodeTable.projectionBlocked;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
         }
-    }
-    SwirlContextMenu {
-        id:batchTestMenu;parent:allTestsButton;y:allTestsButton.height+Theme.dp(4);width:Theme.dp(230)
-        handleItemsInternally:false
-        items:[qsTr("当前筛选结果（%1）").arg(nodes.count),qsTr("全部节点（%1）").arg(nodes.total)]
-        onItemTriggered:function(index){if(index===0)engineController.testNodes(sections.nodeIds(),testUrl.text.trim());else engineController.testAllNodes(testUrl.text.trim())}
     }
     Rectangle {objectName:"nodeDetailScrim";anchors.fill:parent;radius:Theme.cardRadius;antialiasing:true;z:10;visible:nodeHero.opened||nodeHero.moving;color:Theme.withAlpha(Theme.shadowColor,0.10*nodeHero.progress)
         MouseArea {anchors.fill:parent;onClicked:page.dismissDetail()}
@@ -200,9 +199,9 @@ Item {
                         id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
                         SwirlText {renderType:Text.NativeRendering;text:qsTr("独立节点测试");color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium}
                         SwirlText {renderType:Text.NativeRendering;text:"测试 URL";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
-                        SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy&&!engineController.tests.busy;selectByMouse:true;Accessible.name:"真实请求测试地址"}
+                        SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:engineController.defaultProbeUrl.toString();enabled:!engineController.nodeBusy&&!engineController.tests.busy;selectByMouse:true;Accessible.name:"真实请求测试地址"}
                         Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
-                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.rustRequestMetric?(page.tested.success&&page.tested.outboundConnectMs>=0?"出站建立 "+page.tested.outboundConnectMs+" ms":"无出站耗时结果"):(page.tested.latency>=0?"完整请求 "+page.tested.latency+" ms":"无请求耗时结果"))+(page.tested.error?"\n"+page.tested.error:""):qsTr("尚未测试此节点");color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+(page.tested.success?"\n请求往返 "+page.tested.latency+" ms · 首次完整请求 "+page.tested.totalMs+" ms\n出站建立 "+page.tested.outboundConnectMs+" ms · 目标 TLS "+(page.tested.originTlsMs>=0?page.tested.originTlsMs+" ms":"不适用"):"")+(page.tested.error?"\n"+page.tested.error:""):qsTr("尚未测试此节点");color:page.tested.time?(page.tested.success?Theme.green:Theme.orange):Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:"出站建立耗时含 DNS 与节点握手；目标 HEAD 请求成功后才记录该值。此项不是 ICMP ping。";visible:page.rustRequestMetric;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:page.tested.error||(page.selectedActive?(engineController.nodeError||engineController.error):"");visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
@@ -218,7 +217,7 @@ Item {
             SwirlComboBox {objectName:"nodeCountryFilter";Layout.fillWidth:true;model:["全部地区提示"].concat(page.countries.map(c=>c.name));onActivated:page.countryCode=currentIndex?page.countries[currentIndex-1].code:"";Accessible.name:"订阅名称中的地区提示"}
             SwirlComboBox {Layout.fillWidth:true;model:page.sourceOptions.map(s=>s.name);currentIndex:page.sourceIndex;onActivated:index=>page.selectSource(index);Accessible.name:qsTr("节点来源")}
             SwirlComboBox {Layout.fillWidth:true;model:["全部状态","未测试","测试中","可用","超时","测试失败","正在连接","已连接","连接失败","会话就绪 · 未验证"];onActivated:page.statusFilter=currentIndex?currentText:"";Accessible.name:"状态"}
-            SwirlComboBox {Layout.fillWidth:true;model:[qsTr("不限出站耗时"),qsTr("低于 100 ms"),qsTr("低于 300 ms"),qsTr("低于 1000 ms")];onActivated:page.maxLatency=[-1,99,299,999][currentIndex];Accessible.name:"延迟"}
+            SwirlComboBox {Layout.fillWidth:true;model:[qsTr("不限延迟"),qsTr("低于 100 ms"),qsTr("低于 300 ms"),qsTr("低于 1000 ms")];onActivated:page.maxLatency=[-1,99,299,999][currentIndex];Accessible.name:"延迟"}
             RowLayout {SwirlText {text:"只看实际测试可用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.availableOnly||page.groupIndex===1;onToggled:{page.availableOnly=checked;if(!checked&&page.groupIndex===1)page.groupIndex=0}}}
             RowLayout {SwirlText {text:"最近使用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.recentOnly;onToggled:{page.recentOnly=checked;if(checked)page.groupIndex=0}}}
             SwirlText {text:nodes.count+" 个匹配节点";color:Theme.muted}

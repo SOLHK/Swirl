@@ -1,0 +1,432 @@
+{
+  "limit": 0.03125,
+  "branch_gate_39285": {
+    "resume-39285": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 39285
+      },
+      "command": "fit-fields",
+      "max_refinement_error": 0.024608662152796362,
+      "boxes": 4096,
+      "component_holdout": {
+        "holdout_count": 4096,
+        "max_physical_error": 0.04691320454154711,
+        "physical_failures": 1,
+        "max_envelope_error": 0.04691320454154711,
+        "envelope_failures": 1,
+        "holdouts_disjoint": true,
+        "production_accepted": false,
+        "source_projection_parameters_exact": true
+      },
+      "seed": 2026150986,
+      "seconds": 1341.9151147499942,
+      "stage_passed": false,
+      "stages": {
+        "source_initialize_seconds": 0.021424874998047017,
+        "field_fit_seconds": 1328.5136496660125,
+        "field_holdout_seconds": 3.3058974579907954,
+        "archive_write_seconds": 10.036022249987582
+      },
+      "source_evaluation_seconds": 378.28672265878413,
+      "source_positions_evaluated": 2916398,
+      "source_branch_cuts": 985,
+      "resumed_boxes": 2048
+    },
+    "branch-gate-39285": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 39285
+      },
+      "command": "fit-fields",
+      "max_refinement_error": 0.024078258299214745,
+      "boxes": 4608,
+      "component_holdout": {
+        "holdout_count": 4096,
+        "max_physical_error": 0.023941762628418555,
+        "physical_failures": 0,
+        "max_envelope_error": 0.023941762628418555,
+        "envelope_failures": 0,
+        "holdouts_disjoint": true,
+        "production_accepted": false,
+        "source_projection_parameters_exact": true
+      },
+      "seed": 2026110813,
+      "seconds": 1214.8431665000098,
+      "stage_passed": true,
+      "stages": {
+        "source_initialize_seconds": 0.02314775000559166,
+        "field_fit_seconds": 1202.59856462499,
+        "field_holdout_seconds": 2.568148583988659,
+        "archive_write_seconds": 9.617884124978445
+      },
+      "source_evaluation_seconds": 322.5739519337367,
+      "source_positions_evaluated": 2365858,
+      "source_branch_cuts": 143,
+      "branch_probe_gate": 0.03125,
+      "resumed_boxes": 4096
+    },
+    "prior_holdouts": {
+      "holdout_count": 4096,
+      "max_physical_error": 0.01992550354405474,
+      "physical_failures": 0,
+      "max_envelope_error": 0.01992550354405474,
+      "envelope_failures": 0,
+      "holdouts_disjoint": true,
+      "production_accepted": false,
+      "source_projection_parameters_exact": true,
+      "scope": "exact_previous_field_holdout_replay_not_training",
+      "seed": 2026150986,
+      "previous_max_error": 0.04691320454154711
+    }
+  },
+  "transform_cache": {
+    "maximum_cached_part_plans": 512,
+    "bulk_comparisons": [
+      {
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 1166
+        },
+        "reference_revision": "7e9557f20d618fa622b3321a094035404d92d58b",
+        "rows": [
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 1166
+            },
+            "method": "reference",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 2,
+            "seconds": 0.7835085839906242,
+            "peak_rss_bytes": 183566336,
+            "field_sha256": "6c924c715460e024b89d5c1d89d35a18efc05be9a470e2262518f401f4bbd261",
+            "parameter_sha256": "a670e605472c8d99b11ded5c43ce4be7149a943208ae6a78820cd14f5342d49f"
+          },
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 1166
+            },
+            "method": "current",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 2,
+            "seconds": 0.7408200830104761,
+            "peak_rss_bytes": 182157312,
+            "field_sha256": "6c924c715460e024b89d5c1d89d35a18efc05be9a470e2262518f401f4bbd261",
+            "parameter_sha256": "a670e605472c8d99b11ded5c43ce4be7149a943208ae6a78820cd14f5342d49f"
+          }
+        ],
+        "exact_field_and_parameter_bytes_equal": true,
+        "reference_batch_geometry": true,
+        "accuracy_acceptance": false,
+        "concurrent_host_activity_uncontrolled": true
+      },
+      {
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 19177
+        },
+        "reference_revision": "7e9557f20d618fa622b3321a094035404d92d58b",
+        "rows": [
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 19177
+            },
+            "method": "reference",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 4,
+            "seconds": 2.6213797079981305,
+            "peak_rss_bytes": 241876992,
+            "field_sha256": "623ebe7dc4c29e176835bac8132898ba4260a20d430cbfb932c1a5b53ed343ad",
+            "parameter_sha256": "9fac27598c98ef671344413afb13f88c491d1d93b77b67a9db53911b1f8defdb"
+          },
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 19177
+            },
+            "method": "current",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 4,
+            "seconds": 2.4736297089839354,
+            "peak_rss_bytes": 234160128,
+            "field_sha256": "623ebe7dc4c29e176835bac8132898ba4260a20d430cbfb932c1a5b53ed343ad",
+            "parameter_sha256": "9fac27598c98ef671344413afb13f88c491d1d93b77b67a9db53911b1f8defdb"
+          }
+        ],
+        "exact_field_and_parameter_bytes_equal": true,
+        "reference_batch_geometry": true,
+        "accuracy_acceptance": false,
+        "concurrent_host_activity_uncontrolled": true
+      },
+      {
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 46461
+        },
+        "reference_revision": "7e9557f20d618fa622b3321a094035404d92d58b",
+        "rows": [
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 46461
+            },
+            "method": "reference",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 2,
+            "seconds": 9.10883658300736,
+            "peak_rss_bytes": 532955136,
+            "field_sha256": "d488671ec291a29e4cb66b73ef5d589adffafad2bab000dd3bed8affcddfe536",
+            "parameter_sha256": "afc3e97453f21ae61642778662853f23118b3fcb7668f3c46355c7ff21c6ab89"
+          },
+          {
+            "identity": {
+              "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+              "face_index": 0,
+              "glyph_id": 46461
+            },
+            "method": "current",
+            "seed": 2026110841,
+            "positions": 16384,
+            "factors": 2,
+            "seconds": 9.106655417010188,
+            "peak_rss_bytes": 535035904,
+            "field_sha256": "d488671ec291a29e4cb66b73ef5d589adffafad2bab000dd3bed8affcddfe536",
+            "parameter_sha256": "afc3e97453f21ae61642778662853f23118b3fcb7668f3c46355c7ff21c6ab89"
+          }
+        ],
+        "exact_field_and_parameter_bytes_equal": true,
+        "reference_batch_geometry": true,
+        "accuracy_acceptance": false,
+        "concurrent_host_activity_uncontrolled": true
+      }
+    ],
+    "profile-type0-fields": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 46461
+      },
+      "command": "fit-fields",
+      "max_refinement_error": 0.795218665130377,
+      "boxes": 32,
+      "component_holdout": {
+        "holdout_count": 4096,
+        "max_physical_error": 0.8161465558933553,
+        "physical_failures": 3924,
+        "max_envelope_error": 0.8161465558933553,
+        "envelope_failures": 3925,
+        "holdouts_disjoint": true,
+        "production_accepted": false,
+        "source_projection_parameters_exact": true
+      },
+      "seed": 2026110843,
+      "seconds": 67.50881554200896,
+      "stage_passed": false,
+      "stages": {
+        "source_initialize_seconds": 0.10134983298485167,
+        "field_fit_seconds": 55.55699787501362,
+        "field_holdout_seconds": 11.14224583300529,
+        "archive_write_seconds": 0.6439113329979591
+      },
+      "source_evaluation_seconds": 36.7345842141076,
+      "source_positions_evaluated": 34727,
+      "source_branch_cuts": 24,
+      "branch_probe_gate": 0.03125,
+      "resumed_boxes": 0
+    },
+    "profile-type0-cache-fields": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 46461
+      },
+      "command": "fit-fields",
+      "max_refinement_error": 0.795218665130377,
+      "boxes": 32,
+      "component_holdout": {
+        "holdout_count": 4096,
+        "max_physical_error": 0.8161465558933553,
+        "physical_failures": 3924,
+        "max_envelope_error": 0.8161465558933553,
+        "envelope_failures": 3925,
+        "holdouts_disjoint": true,
+        "production_accepted": false,
+        "source_projection_parameters_exact": true
+      },
+      "seed": 2026110843,
+      "seconds": 47.951044874993386,
+      "stage_passed": false,
+      "stages": {
+        "source_initialize_seconds": 0.05909175000851974,
+        "field_fit_seconds": 40.876805833977414,
+        "field_holdout_seconds": 6.569948708987795,
+        "archive_write_seconds": 0.40871933300513774
+      },
+      "source_evaluation_seconds": 25.095863043214194,
+      "source_positions_evaluated": 34727,
+      "source_branch_cuts": 24,
+      "branch_probe_gate": 0.03125,
+      "resumed_boxes": 0
+    },
+    "fit_archive_arrays_exact_equal": true
+  },
+  "unresolved_fields": {
+    "35709": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 35709
+      },
+      "atlas_sha256": "28dcc73dd167c7df0a89c065abcb9fd2fd16a1063ce458665ca91eca71b0f5b1",
+      "seed": 2026110847,
+      "samples": 4096,
+      "holdouts_disjoint": true,
+      "boxes": 2048,
+      "factors": 12,
+      "maximum_component_envelope_error": 0.1638373089184363,
+      "component_failures": 1066,
+      "maximum_physical_error": 0.16383730891842882,
+      "physical_failures": 1066,
+      "worst_sample_field_maxima": [
+        0.16383730891842208,
+        0.0010693664722056027,
+        0.027964239750524627,
+        7.451649666408121e-06,
+        2.4048564108510088e-05,
+        4.163398573638505e-06,
+        1.2364509088723455e-05,
+        9.13344349434061e-06,
+        1.1756929534611613e-05,
+        8.621077874606592e-06,
+        1.1445924403993813e-05,
+        1.0187895967854334e-05,
+        1.082639607147526e-05
+      ],
+      "worst_cell_chord_event_counts": {
+        "axis_zero": 20
+      },
+      "measured_cubic_slice_lower_bound": 0.017342756642525714,
+      "witness_field": 0,
+      "witness_axis_index": 2,
+      "witness_scope": "retained component-field cubic on one existing cell; floating source evaluation",
+      "representation_or_format_impossibility_claimed": false,
+      "serialization_involved": false,
+      "native_acceptance": false,
+      "limit": 0.03125
+    },
+    "4985": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 4985
+      },
+      "atlas_sha256": "0b07ec561cb3527650522697265e634d564d510d7be38573fa24d0afc9496c03",
+      "seed": 2026110847,
+      "samples": 4096,
+      "holdouts_disjoint": true,
+      "boxes": 2048,
+      "factors": 3,
+      "maximum_component_envelope_error": 0.04353750575974104,
+      "component_failures": 34,
+      "maximum_physical_error": 0.040480470682478356,
+      "physical_failures": 13,
+      "worst_sample_field_maxima": [
+        0.021763865024482083,
+        0.02177364073525895,
+        4.353200753757148e-06,
+        6.8894529486358565e-06
+      ],
+      "worst_cell_chord_event_counts": {
+        "axis_zero": 8
+      },
+      "measured_cubic_slice_lower_bound": 0.002486829377511768,
+      "witness_field": 0,
+      "witness_axis_index": 2,
+      "witness_scope": "retained component-field cubic on one existing cell; floating source evaluation",
+      "representation_or_format_impossibility_claimed": false,
+      "serialization_involved": false,
+      "native_acceptance": false,
+      "limit": 0.03125
+    }
+  },
+  "native_gsub_recheck": {
+    "identity": {
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "face_index": 0,
+      "glyph_id": 46459
+    },
+    "seed": 2026157162,
+    "observations": 6939,
+    "engines": {
+      "CoreText": {
+        "observations": 6939,
+        "independent_observations": 5309,
+        "max_error": 0.014198547476157368,
+        "independent_max_error": 0.014198547476157368,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.00040052504725362207,
+        "max_advance_error": 0.009148961986397808,
+        "advance_failures": 0
+      },
+      "HarfBuzz": {
+        "observations": 6939,
+        "independent_observations": 5309,
+        "max_error": 0.01229325397907061,
+        "independent_max_error": 0.01229325397907061,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.0,
+        "max_advance_error": 0.0,
+        "advance_failures": 0
+      },
+      "fontTools": {
+        "observations": 256,
+        "independent_observations": 195,
+        "max_error": 0.0063662285684111565,
+        "independent_max_error": 0.0063662285684111565,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 9.094947017729282e-13,
+        "max_advance_error": 0.0,
+        "advance_failures": 0
+      }
+    },
+    "font_bytes": 68870804,
+    "candidate_sha256": "d31f8aad69aef253340296db3c93e05bcbcf32a6fcefd0e1aa40f5654e7025a6",
+    "strict_independent_native_passed": true,
+    "acceptance_scope": "joint_post_avar_q_geometry_and_reported_metrics",
+    "prior_mixed_coordinate_failures": 5,
+    "prior_mixed_coordinate_max_error": 20.138045908280972,
+    "same_request_manifest_sha256": "23193ce14f53428ad263d522035b6983ae269ce6c6428b8293b829e495518dbf",
+    "exact_original_requests_replayed": true
+  },
+  "production_accepted": false
+}

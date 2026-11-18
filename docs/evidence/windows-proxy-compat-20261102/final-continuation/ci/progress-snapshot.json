@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "snapshot_at_utc": "2026-11-02T15:20:37Z",
+  "purpose": "Progress snapshot; replace or supplement with final exact-source evidence before any acceptance claim.",
+  "branch": "work/windows-proxy-compat-20261102",
+  "pr": {
+    "number": 50,
+    "url": "https://github.com/SOLHK/Swirl/pull/50",
+    "state": "DRAFT",
+    "merged": false
+  },
+  "initial_source": {
+    "head_sha": "1327cb4d587eddc60563c926672f67a6da5c16ce",
+    "checkout_sha": "139f8d5d4e0d4cad8f7502389719c606eb2636f2",
+    "tree_sha": "7a028adbb3bc6d6ba5bf35d50a13604160742b5b"
+  },
+  "pushed_diagnostic_source": {
+    "head_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+    "checkout_sha": "8762af6086f5b04249f94d7a97d7773cf3805858",
+    "tree_sha": "cf1d0dd56ccc22f572aaf93e16f95f34d836d0bf"
+  },
+  "runs": [
+    {
+      "id": 41467700974,
+      "workflow": "source guards",
+      "status": "SUCCESS"
+    },
+    {
+      "id": 41467700966,
+      "workflow": "standalone policy form (prior four-case suite)",
+      "status": "SUCCESS",
+      "scope": "4048565 does not include the final synchronous viewport case or fix."
+    },
+    {
+      "id": 41467700964,
+      "workflow": "Rust Windows/Linux/macOS",
+      "status": "PENDING",
+      "linux_completed": {
+        "job_id": 125352825433,
+        "passed": 822,
+        "failed": 0,
+        "ignored": 0
+      },
+      "scope": "Windows/macOS completion not yet verified in this snapshot."
+    },
+    {
+      "id": 41467701293,
+      "workflow": "full Qt 6.12 application and production packaging",
+      "status": "PENDING",
+      "scope": "No Windows focus signal timeline/final assertion or package evidence for this candidate is yet available."
+    }
+  ],
+  "local_candidate": {
+    "source_commit_sha": null,
+    "base_head": "40485650ef72a41967b81cde72cb0600ce5b2538",
+    "core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "rust_workspace_passed": 822,
+    "v2_network_passed": 6,
+    "connectivity_diagnostics_passed": 23,
+    "all_failed": 0,
+    "all_skipped_or_ignored": 0,
+    "full_windows_application": "PENDING",
+    "windows11_codex_desktop": "NOT_RUN"
+  },
+  "new_1800s_soak": {
+    "status": "RUNNING",
+    "started_at_utc": "2026-11-02T15:12:05.616086+00:00",
+    "requested_duration_seconds": 1800,
+    "connections": 8,
+    "core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "api_binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+    "raw_result_included": false
+  },
+  "windows11_codex_ab": {
+    "status": "NOT_RUN",
+    "reason": "No physical Windows 11 desktop with logged-in Codex, real subscription and same-node Clash/Swirl A/B access."
+  }
+}

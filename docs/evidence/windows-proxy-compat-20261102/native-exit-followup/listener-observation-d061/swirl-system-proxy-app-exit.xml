@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCase name="SystemProxyExitTests">
+  <Environment>
+    <QtVersion>6.12.0</QtVersion>
+    <QtBuild>Qt 6.12.0 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>
+    <QTestVersion>6.12.0</QTestVersion>
+  </Environment>
+  <TestFunction name="initTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0674"/>
+  </TestFunction>
+  <TestFunction name="ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.4362"/>
+  </TestFunction>
+  <TestFunction name="listenerProbeDistinguishesClosedAndLivePorts">
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="220">
+      <Description><![CDATA['closedProbe.refused()' returned FALSE. (A known-closed control port must produce an explicit connection refusal.)]]></Description>
+    </Incident>
+    <Duration msecs="4509.82"/>
+  </TestFunction>
+  <TestFunction name="normalApplicationExitRestoresOwnedProxy">
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="381">
+      <DataTag><![CDATA[pac-only]]></DataTag>
+      <Description><![CDATA['listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="381">
+      <DataTag><![CDATA[manual-and-pac]]></DataTag>
+      <Description><![CDATA['listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="381">
+      <DataTag><![CDATA[pac-only-external-edit]]></DataTag>
+      <Description><![CDATA['listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="381">
+      <DataTag><![CDATA[manual-and-pac-external-edit]]></DataTag>
+      <Description><![CDATA['listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)]]></Description>
+    </Incident>
+    <Duration msecs="19551"/>
+  </TestFunction>
+  <TestFunction name="cleanupTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0417"/>
+  </TestFunction>
+  <Duration msecs="24062.4"/>
+</TestCase>

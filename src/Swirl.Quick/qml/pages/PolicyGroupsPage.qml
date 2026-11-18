@@ -13,6 +13,7 @@ Item {
     readonly property var heroTargets:({title:motionTitle})
     required property var engineController
     property int tabIndex:0
+    property bool groupTabLoaded:tabIndex===1
     property var pendingOwner:null
     property string pendingRequestId:""
     property var lastCompletion:({requestId:"",success:false})
@@ -78,9 +79,15 @@ Item {
     }
     function nextPriority() {return services.reduce((value,record)=>Math.max(value,Number(record.priority)+10),0)}
     function editService(record,source) {
-        serviceEditor.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
+        serviceEditorLoader.active=true
+        if(serviceEditorLoader.status===Loader.Ready)
+            serviceEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",enabled:true,priority:nextPriority(),domains:[],target:{kind:"unconfigured"}},source,!record)
     }
-    function editGroup(record,source,strategyPreset) {groupEditor.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)}
+    function editGroup(record,source,strategyPreset) {
+        groupEditorLoader.active=true
+        if(groupEditorLoader.status===Loader.Ready)
+            groupEditorLoader.item.begin(record||{id:engineController.newPolicyId(),name:"",strategy:strategyPreset||"manual",members:[]},source,!record)
+    }
     function moveService(id,direction) {
         const rows=services.slice().sort((a,b)=>a.priority-b.priority);const index=rows.findIndex(record=>record.id===id);const destination=index+direction
         if(index<0||destination<0||destination>=rows.length)return
@@ -88,32 +95,53 @@ Item {
         const next=Policy.copy(document);next.service_policies=rows.map((item,index)=>Object.assign({},item,{priority:index*10}));submit(next,null)
     }
     function openTarget(kind,record,source) {
+        targetPickerLoader.active=true
+        const picker=targetPickerLoader.item
+        if(!picker)return
         targetContext={kind:kind,id:record?record.id:""}
-        targetPicker.allowDirect=kind==="service";targetPicker.excludedGroupId="";targetPicker.options=targets
+        picker.allowDirect=kind==="service";picker.excludedGroupId="";picker.options=targets
         let current=kind==="default"?document.default_policy.target:record.target
         if(kind==="member"){
-            current=record.selected||{kind:"unconfigured"};targetPicker.excludedGroupId=record.id
-            targetPicker.options=(record.members||[]).map(member=>targets.find(option=>Policy.sameTarget(option,member))||{kind:member.kind,id:member.id||"",name:Policy.targetName(member,targets),available:false})
-            targetPicker.allowDirect=record.members.some(member=>member.kind==="direct")
+            current=record.selected||{kind:"unconfigured"};picker.excludedGroupId=record.id
+            picker.options=(record.members||[]).map(member=>targets.find(option=>Policy.sameTarget(option,member))||{kind:member.kind,id:member.id||"",name:Policy.targetName(member,targets),available:false})
+            picker.allowDirect=record.members.some(member=>member.kind==="direct")
         }
-        targetPicker.begin(current,source)
+        picker.begin(current,source)
     }
     function chooseTarget(target) {
+        const picker=targetPickerLoader.item
         const next=Policy.copy(document)
         if(targetContext.kind==="default")next.default_policy.target=target
-        else {const rows=targetContext.kind==="service"?next.service_policies:next.groups;const record=rows.find(item=>item.id===targetContext.id);if(!record){ownerError(targetPicker,qsTr("此策略已不存在，请重新打开。"));return}if(targetContext.kind==="service")record.target=target;else record.selected=target}
-        submit(next,targetPicker)
+        else {const rows=targetContext.kind==="service"?next.service_policies:next.groups;const record=rows.find(item=>item.id===targetContext.id);if(!record){ownerError(picker,qsTr("此策略已不存在，请重新打开。"));return}if(targetContext.kind==="service")record.target=target;else record.selected=target}
+        submit(next,picker)
     }
-    function requestDelete(kind,record,source) {deleteDialog.kind=kind;deleteDialog.recordId=record.id;deleteDialog.recordName=record.name;deleteDialog.message="";deleteDialog.pending=false;deleteDialog.heroSource=source;deleteDialog.open()}
+    function openAdvanced(source) {
+        advancedDialogLoader.active=true
+        const dialog=advancedDialogLoader.item
+        if(!dialog)return
+        dialog.heroSource=source;dialog.open()
+    }
+    function openMigration(source) {
+        migrationDialogLoader.active=true
+        const dialog=migrationDialogLoader.item
+        if(!dialog)return
+        dialog.message="";dialog.pending=false;dialog.heroSource=source;dialog.open()
+    }
+    function requestDelete(kind,record,source) {
+        deleteDialogLoader.active=true
+        const dialog=deleteDialogLoader.item
+        if(!dialog)return
+        dialog.kind=kind;dialog.recordId=record.id;dialog.recordName=record.name;dialog.message="";dialog.pending=false;dialog.heroSource=source;dialog.open()
+    }
 
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(12)
         SwirlPageHeader {
             id:policyHeading;Layout.fillWidth:true;title:qsTr("策略与出口")
             description:qsTr("先选择默认出口，再为需要单独处理的服务分配策略。")
-            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)
+            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)+(page.engineController.subscriptionScopeEnabled?qsTr(" · 当前来源：%1").arg(page.engineController.activeSubscriptionId.length?(page.engineController.imports.providers.find(source=>source.id===page.engineController.activeSubscriptionId)||{}).name||qsTr("来源已删除"):qsTr("独立导入")):"")
             SubscriptionAction {id:addButton;objectName:page.tabIndex===0?"addServicePolicy":"addPolicyGroup";text:page.tabIndex===0?qsTr("添加服务"):qsTr("添加策略组");solid:true;iconName:"plus";enabled:page.editable;onClicked:{if(page.tabIndex===0)page.editService(null,addButton);else page.editGroup(null,addButton)}}
-            SubscriptionAction {id:advancedButton;objectName:"policyAdvancedButton";iconName:"sliders";Accessible.name:qsTr("策略高级设置");tooltip:Accessible.name;onClicked:{advancedDialog.heroSource=advancedButton;advancedDialog.open()}}
+            SubscriptionAction {id:advancedButton;objectName:"policyAdvancedButton";iconName:"sliders";Accessible.name:qsTr("策略高级设置");tooltip:Accessible.name;onClicked:page.openAdvanced(advancedButton)}
         }
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
@@ -130,7 +158,7 @@ Item {
         SwirlText {id:pageMessage;objectName:"policyApplyMessage";Layout.fillWidth:true;visible:text.length>0;text:page.localMessage||page.engineController.policyError||page.engineController.nodeError||page.engineController.routingError;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;activeFocusOnTab:true;Accessible.name:text}
         RowLayout {Layout.fillWidth:true;visible:page.engineController.policyMigrationRequired
             SwirlText {Layout.fillWidth:true;text:qsTr("旧配置需要迁移为稳定策略引用，确认后才能编辑。");color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
-            SubscriptionAction {id:reviewMigration;objectName:"reviewPolicyMigration";text:qsTr("查看迁移说明");enabled:!page.engineController.policyBusy;onClicked:{migrationDialog.message="";migrationDialog.pending=false;migrationDialog.heroSource=reviewMigration;migrationDialog.open()}}
+            SubscriptionAction {id:reviewMigration;objectName:"reviewPolicyMigration";text:qsTr("查看迁移说明");enabled:!page.engineController.policyBusy;onClicked:page.openMigration(reviewMigration)}
         }
         RowLayout {Layout.fillWidth:true;visible:page.engineController.policyApplyState==="reconciling"
             SwirlText {Layout.fillWidth:true;text:qsTr("配置操作需要恢复，完成前不会使用旧凭据重新连接。");color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
@@ -151,74 +179,115 @@ Item {
                 onMoveRequested:(id,direction)=>page.moveService(id,direction)
                 onDeleteRequested:(record,source)=>page.requestDelete("service",record,source)
             }
-            PolicyGroupList {
-                anchors.fill:parent;visible:tabMotion.progress>0;enabled:page.tabIndex===1
+            Loader {
+                id:groupListLoader
+                anchors.fill:parent;active:page.groupTabLoaded||page.tabIndex===1||tabMotion.progress>0
+                visible:tabMotion.progress>0;enabled:page.tabIndex===1
                 opacity:tabMotion.progress;transform:page.groupTabTranslation
-                records:page.groups;targetOptions:page.targets;editable:page.editable;running:page.engineController.processAlive
-                connectionRecords:visible?page.engineController.connections:[]
-                appliedRevision:String(page.engineController.appliedRevision||"");appliedGeneration:String((page.engineController.policyReceipt||{}).generation||"")
-                onEditRequested:(record,source)=>page.editGroup(record,source)
-                onMemberRequested:(record,source)=>page.openTarget("member",record,source)
-                onDeleteRequested:(record,source)=>page.requestDelete("group",record,source)
-                onCreateRequested:(strategy,source)=>page.editGroup(null,source,strategy)
-            }
-        }
-    }
-    SwirlTransitionCoordinator {id:tabMotion;duration:SwirlMotion.switchDuration}
-    onTabIndexChanged:tabMotion.moveTo(tabIndex)
-    SwirlDialog {
-        id:advancedDialog;objectName:"policyAdvancedDialog";ownerItem:page;title:qsTr("策略高级设置");guardChanges:false
-        ColumnLayout {width:parent.width;spacing:Theme.dp(16)
-            SwirlText {Layout.fillWidth:true;text:qsTr("本机代理端口");color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
-            RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
-                SwirlTextField {
-                    id:portField;objectName:"policyProxyPort";Layout.preferredWidth:Theme.dp(100);implicitHeight:Theme.dp(34)
-                    text:String(page.engineController.proxyPort);enabled:page.engineController.canStart&&!page.engineController.policyBusy
-                    validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;Accessible.name:qsTr("本机代理端口")
-                    onEditingFinished:{if(acceptableInput)page.engineController.proxyPort=Number(text);text=Qt.binding(function(){return String(page.engineController.proxyPort)})}
+                sourceComponent:PolicyGroupList {
+                    records:page.groups;targetOptions:page.targets;editable:page.editable;running:page.engineController.processAlive
+                    connectionRecords:groupListLoader.visible?page.engineController.connections:[]
+                    appliedRevision:String(page.engineController.appliedRevision||"");appliedGeneration:String((page.engineController.policyReceipt||{}).generation||"")
+                    onEditRequested:(record,source)=>page.editGroup(record,source)
+                    onMemberRequested:(record,source)=>page.openTarget("member",record,source)
+                    onDeleteRequested:(record,source)=>page.requestDelete("group",record,source)
+                    onCreateRequested:(strategy,source)=>page.editGroup(null,source,strategy)
                 }
-                SwirlText {Layout.fillWidth:true;wrapMode:Text.Wrap;text:page.engineController.processAlive?qsTr("代理运行时不可修改。请先在活动页关闭代理。"):qsTr("更改后保存，开启代理时使用此端口。");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
-            }
-            Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.borderWidth;color:Theme.border}
-            RowLayout {Layout.fillWidth:true
-                SubscriptionAction {text:qsTr("查看规则");onClicked:{advancedDialog.close();AppState.navigate("rules")}}
-                SubscriptionAction {text:qsTr("节点资源库");onClicked:{advancedDialog.close();AppState.navigate("proxies")}}
-                Item {Layout.fillWidth:true}
-                SubscriptionAction {text:qsTr("完成");solid:true;onClicked:advancedDialog.close()}
             }
         }
     }
-    PolicyTargetPicker {id:targetPicker;ownerItem:page;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onTargetChosen:target=>page.chooseTarget(target)}
-    ServicePolicyDialog {id:serviceEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)}
-    PolicyGroupDialog {id:groupEditor;ownerItem:page;targetOptions:page.targets;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor);onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)}
-    SwirlDialog {
-        id:deleteDialog;objectName:"deletePolicyDialog";ownerItem:page;title:kind==="service"?qsTr("删除策略"):qsTr("删除策略组");guardChanges:false
-        property string kind:"service";property string recordId:"";property string recordName:"";property bool pending:false;property string pendingRequestId:"";property string message:""
-        dismissBlocked:pending
-        ColumnLayout {width:parent.width;spacing:Theme.dp(14)
-            SwirlText {Layout.fillWidth:true;text:qsTr("确定删除“%1”？").arg(deleteDialog.recordName);color:Theme.text;wrapMode:Text.Wrap}
-            SwirlText {Layout.fillWidth:true;text:deleteDialog.kind==="group"?qsTr("被引用的策略组不能删除；请先修改相关策略的出口。"):qsTr("之后匹配的流量将按其他规则或默认策略处理。");color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
-            SwirlText {Layout.fillWidth:true;visible:deleteDialog.message.length>0;text:deleteDialog.message;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Accessible.name:text}
-            RowLayout {Layout.alignment:Qt.AlignRight
-                SubscriptionAction {text:qsTr("恢复已保存的操作");visible:deleteDialog.pending&&page.engineController.policyApplyState==="reconciling";onClicked:page.engineController.recoverPolicyConfiguration()}
-                SubscriptionAction {objectName:"cancelDeletePolicy";text:qsTr("取消");enabled:!deleteDialog.pending;onClicked:deleteDialog.close()}
-                SubscriptionAction {objectName:"confirmDeletePolicy";text:deleteDialog.pending?qsTr("正在删除…"):qsTr("删除");danger:true;enabled:!deleteDialog.pending;onClicked:{const next=Policy.copy(page.document);const collection=deleteDialog.kind==="service"?"service_policies":"groups";next[collection]=next[collection].filter(item=>item.id!==deleteDialog.recordId);page.submit(next,deleteDialog)}}
+    readonly property Item ownedTabMotion: SwirlTransitionCoordinator {id:tabMotion;parent:page;duration:SwirlMotion.switchDuration}
+    onTabIndexChanged:{if(tabIndex===1)groupTabLoaded=true;tabMotion.moveTo(tabIndex)}
+    // Build the dialog and editor trees on first use, then retain their instances for command receipts and popup transitions.
+    Loader {
+        id:advancedDialogLoader
+        active:false
+        sourceComponent:SwirlDialog {
+            id:advancedDialog;objectName:"policyAdvancedDialog";ownerItem:page;title:qsTr("策略高级设置");guardChanges:false
+            ColumnLayout {width:parent.width;spacing:Theme.dp(16)
+                SwirlText {Layout.fillWidth:true;text:qsTr("本机代理端口");color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
+                RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
+                    SwirlTextField {
+                        id:portField;objectName:"policyProxyPort";Layout.preferredWidth:Theme.dp(100);implicitHeight:Theme.dp(34)
+                        text:String(page.engineController.proxyPort);enabled:page.engineController.canStart&&!page.engineController.policyBusy
+                        validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;Accessible.name:qsTr("本机代理端口")
+                        onEditingFinished:{if(acceptableInput)page.engineController.proxyPort=Number(text);text=Qt.binding(function(){return String(page.engineController.proxyPort)})}
+                    }
+                    SwirlText {Layout.fillWidth:true;wrapMode:Text.Wrap;text:page.engineController.processAlive?qsTr("代理运行时不可修改。请先在活动页关闭代理。"):qsTr("更改后保存，开启代理时使用此端口。");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+                }
+                Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.borderWidth;color:Theme.border}
+                RowLayout {Layout.fillWidth:true
+                    SubscriptionAction {text:qsTr("查看规则");onClicked:{advancedDialog.close();AppState.navigate("rules")}}
+                    SubscriptionAction {text:qsTr("节点资源库");onClicked:{advancedDialog.close();AppState.navigate("proxies")}}
+                    Item {Layout.fillWidth:true}
+                    SubscriptionAction {text:qsTr("完成");solid:true;onClicked:advancedDialog.close()}
+                }
             }
         }
     }
-    SwirlDialog {
-        id:migrationDialog;objectName:"policyMigrationDialog";ownerItem:page;title:qsTr("确认策略迁移");guardChanges:false
-        property bool pending:false;property string pendingRequestId:"";property string message:"";dismissBlocked:pending
-        width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-Theme.dp(36):Theme.dp(600)));height:Math.floor(Math.min(Theme.dp(500),parent?parent.height-Theme.dp(36):Theme.dp(500)))
-        contentItem:ColumnLayout {spacing:Theme.dp(14)
-            ScrollView {id:migrationScroll;Layout.fillWidth:true;Layout.fillHeight:true;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-                SwirlText {width:Math.floor(migrationScroll.availableWidth);text:page.engineController.policyMigrationSummary;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
+    Loader {
+        id:targetPickerLoader
+        active:false
+        sourceComponent:PolicyTargetPicker {id:targetPicker;ownerItem:page;recoveryAvailable:page.engineController.policyApplyState==="reconciling";onRecoveryRequested:page.engineController.recoverPolicyConfiguration();onTargetChosen:target=>page.chooseTarget(target)}
+    }
+    Loader {
+        id:serviceEditorLoader
+        active:false
+        sourceComponent:ServicePolicyDialog {
+            id:serviceEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("service_policies",record),serviceEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("service_policies",record),serviceEditor)
+        }
+    }
+    Loader {
+        id:groupEditorLoader
+        active:false
+        sourceComponent:PolicyGroupDialog {
+            id:groupEditor;ownerItem:page;targetOptions:page.targets
+            recoveryAvailable:page.engineController.policyApplyState==="reconciling"
+            onRecoveryRequested:page.engineController.recoverPolicyConfiguration()
+            onSaveRequested:record=>page.submit(page.candidateWithRecord("groups",record),groupEditor)
+            onValidationRequested:record=>page.validate(page.candidateWithRecord("groups",record),groupEditor)
+        }
+    }
+    Loader {
+        id:deleteDialogLoader
+        active:false
+        sourceComponent:SwirlDialog {
+            id:deleteDialog;objectName:"deletePolicyDialog";ownerItem:page;title:kind==="service"?qsTr("删除策略"):qsTr("删除策略组");guardChanges:false
+            property string kind:"service";property string recordId:"";property string recordName:"";property bool pending:false;property string pendingRequestId:"";property string message:""
+            dismissBlocked:pending
+            ColumnLayout {width:parent.width;spacing:Theme.dp(14)
+                SwirlText {Layout.fillWidth:true;text:qsTr("确定删除“%1”？").arg(deleteDialog.recordName);color:Theme.text;wrapMode:Text.Wrap}
+                SwirlText {Layout.fillWidth:true;text:deleteDialog.kind==="group"?qsTr("被引用的策略组不能删除；请先修改相关策略的出口。"):qsTr("之后匹配的流量将按其他规则或默认策略处理。");color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
+                SwirlText {Layout.fillWidth:true;visible:deleteDialog.message.length>0;text:deleteDialog.message;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Accessible.name:text}
+                RowLayout {Layout.alignment:Qt.AlignRight
+                    SubscriptionAction {text:qsTr("恢复已保存的操作");visible:deleteDialog.pending&&page.engineController.policyApplyState==="reconciling";onClicked:page.engineController.recoverPolicyConfiguration()}
+                    SubscriptionAction {objectName:"cancelDeletePolicy";text:qsTr("取消");enabled:!deleteDialog.pending;onClicked:deleteDialog.close()}
+                    SubscriptionAction {objectName:"confirmDeletePolicy";text:deleteDialog.pending?qsTr("正在删除…"):qsTr("删除");danger:true;enabled:!deleteDialog.pending;onClicked:{const next=Policy.copy(page.document);const collection=deleteDialog.kind==="service"?"service_policies":"groups";next[collection]=next[collection].filter(item=>item.id!==deleteDialog.recordId);page.submit(next,deleteDialog)}}
+                }
             }
-            SwirlText {Layout.fillWidth:true;visible:migrationDialog.message.length>0;text:migrationDialog.message;textFormat:Text.PlainText;color:Theme.orange;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
-            RowLayout {Layout.alignment:Qt.AlignRight
-                SubscriptionAction {text:qsTr("恢复已保存的操作");visible:migrationDialog.pending&&page.engineController.policyApplyState==="reconciling";onClicked:page.engineController.recoverPolicyConfiguration()}
-                SubscriptionAction {objectName:"cancelPolicyMigration";text:qsTr("取消");enabled:!migrationDialog.pending;onClicked:migrationDialog.close()}
-                SubscriptionAction {objectName:"confirmPolicyMigration";text:migrationDialog.pending?qsTr("正在迁移…"):qsTr("确认迁移");solid:true;enabled:!migrationDialog.pending&&page.engineController.policyMigrationSummary.length>0;onClicked:{migrationDialog.pending=true;page.registerCommand(migrationDialog,page.engineController.confirmPolicyMigration())}}
+        }
+    }
+    Loader {
+        id:migrationDialogLoader
+        active:false
+        sourceComponent:SwirlDialog {
+            id:migrationDialog;objectName:"policyMigrationDialog";ownerItem:page;title:qsTr("确认策略迁移");guardChanges:false
+            property bool pending:false;property string pendingRequestId:"";property string message:"";dismissBlocked:pending
+            width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-Theme.dp(36):Theme.dp(600)));height:Math.floor(Math.min(Theme.dp(500),parent?parent.height-Theme.dp(36):Theme.dp(500)))
+            contentItem:ColumnLayout {spacing:Theme.dp(14)
+                ScrollView {id:migrationScroll;Layout.fillWidth:true;Layout.fillHeight:true;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
+                    SwirlText {width:Math.floor(migrationScroll.availableWidth);text:page.engineController.policyMigrationSummary;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
+                }
+                SwirlText {Layout.fillWidth:true;visible:migrationDialog.message.length>0;text:migrationDialog.message;textFormat:Text.PlainText;color:Theme.orange;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
+                RowLayout {Layout.alignment:Qt.AlignRight
+                    SubscriptionAction {text:qsTr("恢复已保存的操作");visible:migrationDialog.pending&&page.engineController.policyApplyState==="reconciling";onClicked:page.engineController.recoverPolicyConfiguration()}
+                    SubscriptionAction {objectName:"cancelPolicyMigration";text:qsTr("取消");enabled:!migrationDialog.pending;onClicked:migrationDialog.close()}
+                    SubscriptionAction {objectName:"confirmPolicyMigration";text:migrationDialog.pending?qsTr("正在迁移…"):qsTr("确认迁移");solid:true;enabled:!migrationDialog.pending&&page.engineController.policyMigrationSummary.length>0;onClicked:{migrationDialog.pending=true;page.registerCommand(migrationDialog,page.engineController.confirmPolicyMigration())}}
+                }
             }
         }
     }

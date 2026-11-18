@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped WFP failure",
+  "development_sha": "d1bdea073ed63a21dd7761e1265ad5fac6a04791",
+  "actual_checkout_sha": "c46e3ba2658c8b022482907388e98288c93703d8",
+  "source_tree": "afe2cd4746821b4e273b081cd863cba7b42553d3",
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41285555117",
+  "job_id": 124786006400,
+  "runner_label": "windows-2025",
+  "artifact_id": 13074923601,
+  "artifact_zip_sha256": "aee13e2862a66c5649c18cecd1ee769eef1bbb4a7f74c4e13d58bc2be857f319",
+  "status": "failed",
+  "exit_code": 1,
+  "failure_phase": "verify provider/sublayer",
+  "sublayer_weight": {"requested": 256, "actual": 258},
+  "other_displayed_fields_equal": true,
+  "preceding_acl_comparisons_passed": true,
+  "root_cause": "The fixed expected sublayer weight incorrectly assumed BFE would return an occupied requested weight unchanged. The Microsoft SDK provider-installation example documents closest-available assignment.",
+  "wfp_enforcement_passed": false,
+  "system_kill_switch_acceptance": false,
+  "physical_windows_11_acceptance": false,
+  "cleanup_acceptance": "Install returned before commit; the transaction guard aborts on drop. This original log has no independent post-failure absence readback.",
+  "files": [
+    {"path": "windows-wfp-d1bdea0.log", "original_zip_entry": "swirl-wfp-scoped-smoke.log", "bytes": 838, "sha256": "36bfbac7905c21ca21def9be8d1ba85ecbbaf4b359f3c57e75d8b4e3119ac84b", "normalization": "none; original ZIP-entry bytes"},
+    {"path": "windows-wfp-d1bdea0-receipt.json", "original_zip_entry": "swirl-wfp-scoped-receipt.json", "bytes": 668, "sha256": "50b6e0218a3b75ec30004a0a1430068ea0b0125dda5820e7206bb93fede975ea", "normalization": "none; original ZIP-entry bytes"}
+  ]
+}

@@ -248,7 +248,7 @@ def pack_collection(face_paths, destination, *, expected_sha256=None, chunk_size
     _require(0 < len(paths) <= 65535, "invalid_collection_face_count")
     _require(validate is None or callable(validate), "invalid_collection_validator")
     destination = Path(destination)
-    _require(destination.name.casefold() != "swirl-vf.ttc", "production_filename_reserved")
+    _require(destination.name.casefold() not in {"swirlvf.ttc", "swirl-vf.ttc"}, "production_filename_reserved")
     _require(not destination.exists() and not destination.is_symlink(), "destination_exists")
     _require(all(destination.resolve() != path.resolve() for path in paths), "destination_source_alias")
     expected = [None] * len(paths) if expected_sha256 is None else list(expected_sha256)

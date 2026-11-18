@@ -1,0 +1,86 @@
+{
+  "scope": "one_source_glyph_standard_native_shaping",
+  "both_target_acceptance": false,
+  "gid": 1166,
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "candidate_sha256": "e6112a1ab32d1ca2adcce2bec0800982296185720c38299924828e92fc66bd2e",
+  "limit": 0.03125,
+  "seed": 2026110443,
+  "engines": {
+    "CoreText": {
+      "observations": 3140,
+      "max_error": 0.019208595255954072,
+      "failures": 0,
+      "topology_failures": 0,
+      "direction_failures": 0,
+      "advance_failures": 0,
+      "max_advance_error": 0.01430861723451926,
+      "max_advance_vs_unrounded_tables": 0.01430861723451926
+    },
+    "HarfBuzz": {
+      "observations": 3140,
+      "max_error": 0.018971427425542208,
+      "failures": 0,
+      "topology_failures": 0,
+      "direction_failures": 0,
+      "advance_failures": 0,
+      "max_advance_error": 0.0,
+      "max_advance_vs_unrounded_tables": 0.5018399999999019
+    },
+    "fontTools": {
+      "observations": 269,
+      "max_error": 0.012548240656749182,
+      "failures": 0,
+      "topology_failures": 0,
+      "direction_failures": 0,
+      "advance_failures": 0,
+      "max_advance_error": 0.0060232574523979565,
+      "max_advance_vs_unrounded_tables": 0.0060232574523979565
+    }
+  },
+  "categories": {
+    "boundary": 125,
+    "single": 192,
+    "dual": 192,
+    "triple": 2048,
+    "branch_axis_zero": 29,
+    "branch_tangent_lower": 21,
+    "branch_tangent_upper": 21,
+    "previous_dense_holdout": 128,
+    "region_seam": 384
+  },
+  "exact_axis_readback": true,
+  "run_tables_verified": true,
+  "candidate_bytes": 166353412,
+  "encoding": {
+    "maximum_operand_stack": 60,
+    "cff2_regions": 195,
+    "local_glyphs": 2048,
+    "global_subroutines": 2977
+  },
+  "code_sha256": {
+    "build_joint_candidate.py": "f4e5fed4a7f73eea9f0045df9a3f3a20ae9f6717e6e4ea6d63a9b0f1c39e35fa",
+    "joint_cells.py": "6d33593f6e35c573e15af7c4006c09a1bf76cc762597b034885fd002939337d9",
+    "joint_polynomial.py": "eb0c7e14821f34cff12afe9c7fb6b212fbbfd18dff4a6887b8945de46afbe1ee",
+    "projection_factorization.py": "c4b1d495a6a932feed31c3c8abfbe13c252d4c49e6e43d379ef7e72d4b6a4b38",
+    "sparse_projection.py": "5ada252578dda5b70ce2c1ca625c5e9dd1eb1003876c87f81ea7ab661f71f56e",
+    "joint_projection_font.py": "ac4d9931b2d2fdeb77e4e479154f2de6ff4c5a98cce42339033682b2bde4b65d",
+    "cff2_geometry.py": "a0f5891715a2328f6a86707d489e073f3ac59f1253cbafeabd8c13f903361b26",
+    "cff2_subroutines.py": "d355dbbb48927c2ef66a9900da8859f283f7d9f91b2c96d68a452fc3bbb95a64"
+  },
+  "artifact_hashes": {
+    "manifest.json": "123fff652c993bbca567d58e924ef1bc49da17303d76d082da8e5f9a3d632923",
+    "source-plan.json": "6996147a91312fd1e256952beb107d315e626529798547de40001ee0913f440a",
+    "coretext.jsonl": "808566ab2bff8c1287c17b807d6ae7a952e291d8691a00c359d469c7c36fa3b6",
+    "hvf.jsonl": "fb5e08635acf608aabf46b388d3c164e8a90f4226a2658b5952efa8f490b752b",
+    "coretext_joint_layout": "a243b333bf3bdb7081e2633f21b6e83482c82c12bea58a1c4710ff62ffdc425c"
+  },
+  "continuous_space_proof": false,
+  "input_sampling": "nearest stable decimal4 from fixed three-point stencil, before native execution",
+  "arbitrary_binary64_transport_certified": false,
+  "full_font": false,
+  "other_target": {
+    "gid": 19177,
+    "native_verification": "PENDING"
+  }
+}

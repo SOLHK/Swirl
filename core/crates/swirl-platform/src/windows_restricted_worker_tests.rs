@@ -1,0 +1,587 @@
+use super::*;
+
+#[test]
+fn restricted_worker_can_reopen_its_own_objects_with_an_elevated_default_dacl() {
+    // Only a new, unassigned token is changed. No impersonation, process,
+    // desktop, host ACL or elevated broker is needed for this regression.
+    let source = open_token(
+        unsafe { GetCurrentProcess() },
+        TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ADJUST_DEFAULT,
+    )
+    .unwrap();
+    let user = TokenBuffer::query(source.as_raw_handle(), TokenUser).unwrap();
+    let restricting = SID_AND_ATTRIBUTES {
+        Sid: user.value::<TOKEN_USER>().unwrap().User.Sid,
+        Attributes: 0,
+    };
+    let administrators = Sid::well_known(WinBuiltinAdministratorsSid).unwrap();
+    let disabled = SID_AND_ATTRIBUTES {
+        Sid: administrators.raw(),
+        Attributes: 0,
+    };
+    let mut raw = null_mut();
+    // SAFETY: all input SIDs remain live; only a new token is returned.
+    success(unsafe {
+        CreateRestrictedToken(
+            source.as_raw_handle(),
+            DISABLE_MAX_PRIVILEGE | LUA_TOKEN,
+            1,
+            &disabled,
+            0,
+            null(),
+            1,
+            &restricting,
+            &mut raw,
+        )
+    })
+    .unwrap();
+    let worker = owned(raw).unwrap();
+    // An elevated Windows token commonly grants GA only to BA and SYSTEM.
+    // Once BA is deny-only, neither matches both restricted access passes.
+    let elevated_dacl = LocalDescriptor::new("O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)").unwrap();
+    let (mut present, mut defaulted, mut acl) = (0, 0, null_mut());
+    // SAFETY: all pointers refer to our synthetic descriptor/output storage.
+    success(unsafe {
+        GetSecurityDescriptorDacl(elevated_dacl.0, &mut present, &mut acl, &mut defaulted)
+    })
+    .unwrap();
+    let initial = TOKEN_DEFAULT_DACL { DefaultDacl: acl };
+    // SAFETY: alter only the new unassigned restricted token, not its source.
+    success(unsafe {
+        SetTokenInformation(
+            worker.as_raw_handle(),
+            TokenDefaultDacl,
+            (&initial as *const TOKEN_DEFAULT_DACL).cast(),
+            size_of::<TOKEN_DEFAULT_DACL>() as u32,
+        )
+    })
+    .unwrap();
+    let profile_before = serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap();
+    let mut raw = null_mut();
+    // SAFETY: query-only duplicate, never assigned to a thread or child.
+    success(unsafe {
+        DuplicateTokenEx(
+            worker.as_raw_handle(),
+            TOKEN_QUERY,
+            null(),
+            SecurityIdentification,
+            TokenImpersonation,
+            &mut raw,
+        )
+    })
+    .unwrap();
+    let observer = owned(raw).unwrap();
+    let check = |token: HANDLE| {
+        let default = TokenBuffer::query(token, TokenDefaultDacl).unwrap();
+        let mapping = GENERIC_MAPPING {
+            GenericRead: 0x0002_0001,
+            GenericWrite: 0x0002_0002,
+            GenericExecute: 0x0012_0000,
+            GenericAll: 0x001f_0003,
+        }; // Event generic rights.
+        let acl = default.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl;
+        // Normalize generic ACE masks just as the object manager does when
+        // creating an event from this template. This changes only our query copy.
+        for index in 0..unsafe { (*acl).AceCount } {
+            let mut ace = null_mut();
+            // SAFETY: ordinary allow/deny ACEs share the same Mask layout.
+            unsafe {
+                success(GetAce(acl, u32::from(index), &mut ace)).unwrap();
+                MapGenericMask(&mut (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask, &mapping);
+            }
+        }
+        let mut descriptor = SECURITY_DESCRIPTOR::default();
+        // SAFETY: absolute descriptor only borrows live owned SIDs and ACL.
+        unsafe {
+            success(InitializeSecurityDescriptor(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                1,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorOwner(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                administrators.raw(),
+                0,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorGroup(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                administrators.raw(),
+                0,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorDacl(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                1,
+                default.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl,
+                0,
+            ))
+            .unwrap();
+        }
+        let decision = creation_access_check(
+            (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+            observer.as_raw_handle(),
+            GENERIC_ALL,
+            &mapping,
+        );
+        assert_eq!(decision.api_success, Some(true));
+        decision.allowed
+    };
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    grant_worker_default_dacl(worker.as_raw_handle()).unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(true));
+    assert_eq!(
+        serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap(),
+        profile_before
+    );
+    let updated = TokenBuffer::query(worker.as_raw_handle(), TokenDefaultDacl).unwrap();
+    let updated_acl = updated.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl;
+    // SAFETY: query returned a valid kernel-owned ACL inside updated.
+    assert_eq!(unsafe { (*updated_acl).AceCount }, 3);
+    let mut grants = Vec::new();
+    for index in 0..3 {
+        let mut ace = null_mut();
+        // SAFETY: index and ACE type/size come from this valid SDK ACL.
+        unsafe {
+            success(GetAce(updated_acl, index, &mut ace)).unwrap();
+            let allowed = &*ace.cast::<ACCESS_ALLOWED_ACE>();
+            assert_eq!(
+                (
+                    allowed.Header.AceType,
+                    allowed.Header.AceFlags,
+                    allowed.Mask
+                ),
+                (0, 0, GENERIC_ALL)
+            );
+            let sid: PSID = (&allowed.SidStart as *const u32).cast_mut().cast();
+            grants.push(
+                std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize).to_vec(),
+            );
+        }
+    }
+    let system = Sid::well_known(WinLocalSystemSid).unwrap();
+    let mut expected = [system.raw(), administrators.raw(), restricting.Sid].map(|sid| {
+        // SAFETY: all three expected SID owners remain live.
+        unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize).to_vec() }
+    });
+    expected.sort();
+    grants.sort();
+    assert_eq!(grants, expected);
+
+    // A pre-existing explicit denial remains authoritative after the repair.
+    // This prevents a future switch to SET_ACCESS from silently removing it.
+    let mut denial = EXPLICIT_ACCESS_W {
+        grfAccessPermissions: 0x0002_0002, // Event generic-write mapping.
+        grfAccessMode: windows_sys::Win32::Security::Authorization::DENY_ACCESS,
+        ..EXPLICIT_ACCESS_W::default()
+    };
+    // SAFETY: live current-user SID and independently queried ACL.
+    unsafe { BuildTrusteeWithSidW(&mut denial.Trustee, restricting.Sid) };
+    let mut denied_acl = null_mut();
+    // SAFETY: Windows allocates a new ACL without modifying updated_acl.
+    assert_eq!(
+        unsafe { SetEntriesInAclW(1, &denial, updated_acl, &mut denied_acl) },
+        0
+    );
+    let denied_default = TOKEN_DEFAULT_DACL {
+        DefaultDacl: denied_acl,
+    };
+    // SAFETY: change only the unassigned test token, then release the ACL copy.
+    let installed = success(unsafe {
+        SetTokenInformation(
+            worker.as_raw_handle(),
+            TokenDefaultDacl,
+            (&denied_default as *const TOKEN_DEFAULT_DACL).cast(),
+            size_of::<TOKEN_DEFAULT_DACL>() as u32,
+        )
+    });
+    unsafe { LocalFree(denied_acl.cast()) };
+    installed.unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    grant_worker_default_dacl(worker.as_raw_handle()).unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    assert_eq!(
+        serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap(),
+        profile_before
+    );
+}
+
+#[test]
+fn private_desktop_grants_sdk_full_access_only_to_worker_system_and_administrators() {
+    let descriptor = private_desktop_descriptor("S-1-5-21-100-200-300-400").unwrap();
+    let mut owner = null_mut();
+    let mut defaulted = 0;
+    let mut control = 0;
+    let mut revision = 0;
+    let mut present = 0;
+    let mut dacl = null_mut();
+    // SAFETY: all queries inspect only our allocated synthetic descriptor.
+    unsafe {
+        assert_ne!(
+            GetSecurityDescriptorOwner(descriptor.0, &mut owner, &mut defaulted),
+            0
+        );
+        assert_ne!(
+            GetSecurityDescriptorControl(descriptor.0, &mut control, &mut revision),
+            0
+        );
+        assert_ne!(
+            GetSecurityDescriptorDacl(descriptor.0, &mut present, &mut dacl, &mut defaulted),
+            0
+        );
+    }
+    let administrators = Sid::well_known(WinBuiltinAdministratorsSid).unwrap();
+    // SAFETY: descriptor and well-known SID allocations remain live.
+    assert_ne!(unsafe { EqualSid(owner, administrators.raw()) }, 0);
+    assert_ne!(control & SE_DACL_PROTECTED, 0);
+    assert_ne!(present, 0);
+    assert!(!dacl.is_null());
+    // SAFETY: the successful DACL query returned a live ACL in the descriptor.
+    assert_eq!(unsafe { (*dacl).AceCount }, 4);
+    let sid_bytes = |sid: PSID| {
+        // SAFETY: every caller lends a valid SDK/descriptor-owned SID.
+        unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize) }.to_vec()
+    };
+    let mut actual = Vec::new();
+    for index in 0..4 {
+        let mut ace = null_mut();
+        // SAFETY: the four ACEs belong to this synthetic descriptor's DACL.
+        unsafe {
+            assert_ne!(GetAce(dacl, index, &mut ace), 0);
+            let ace = &*ace.cast::<ACCESS_ALLOWED_ACE>();
+            assert_eq!((ace.Header.AceType, ace.Header.AceFlags), (0, 0));
+            let sid = (&ace.SidStart as *const u32).cast_mut().cast();
+            actual.push((sid_bytes(sid), ace.Mask));
+        }
+    }
+    let system = Sid::well_known(WinLocalSystemSid).unwrap();
+    let owner_rights = Sid::well_known(WinCreatorOwnerRightsSid).unwrap();
+    let mut worker_sid = vec![1, 5, 0, 0, 0, 0, 0, 5];
+    for subauthority in [21u32, 100, 200, 300, 400] {
+        worker_sid.extend_from_slice(&subauthority.to_le_bytes());
+    }
+    let mut expected = vec![
+        (sid_bytes(system.raw()), 0x000f_01ff),
+        (sid_bytes(administrators.raw()), 0x000f_01ff),
+        (worker_sid, 0x000f_01ff),
+        (sid_bytes(owner_rights.raw()), 0x0002_0000),
+    ];
+    actual.sort();
+    expected.sort();
+    // Exact equality excludes Everyone, Authenticated Users, extra rights and
+    // additional ACEs; the flags above also reject all inheritance grants.
+    assert_eq!(actual, expected);
+    assert_eq!(
+        serde_json::to_value(creation_object_label(descriptor.0).unwrap().unwrap()).unwrap(),
+        serde_json::json!({"integrity_rid":0x1000,"mandatory_policy":1})
+    );
+}
+
+#[test]
+fn delegated_journal_supports_allocator_io_without_attribute_or_delete_access() {
+    use std::{
+        fs::OpenOptions,
+        io::{Read, Seek, SeekFrom, Write},
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use windows_sys::Win32::{
+        Foundation::{FILETIME, GetHandleInformation, HANDLE_FLAG_INHERIT},
+        Storage::FileSystem::{
+            FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle, SetFileTime,
+        },
+    };
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "swirl-delegated-journal-{}-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+        NEXT.fetch_add(1, Ordering::Relaxed),
+    ));
+    struct Remove(std::path::PathBuf);
+    impl Drop for Remove {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    let _remove = Remove(path.clone());
+    let mut source = OpenOptions::new()
+        .create_new(true)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap();
+    source.write_all(b"prefix").unwrap();
+    let duplicate = inherited_fake_ip_journal(&source).unwrap();
+    let mut flags = 0;
+    // SAFETY: read-only query on the newly delegated temporary-file handle.
+    assert_ne!(
+        unsafe { GetHandleInformation(duplicate.as_raw_handle(), &mut flags) },
+        0
+    );
+    assert_ne!(flags & HANDLE_FLAG_INHERIT, 0);
+    let mut file = File::from(duplicate);
+    file.try_lock().unwrap();
+    file.seek(SeekFrom::Start(0)).unwrap();
+    let mut prefix = [0; 6];
+    file.read_exact(&mut prefix).unwrap();
+    assert_eq!(&prefix, b"prefix");
+    file.write_all(b"-record\n-torn").unwrap();
+    file.set_len(14).unwrap();
+    file.seek(SeekFrom::End(0)).unwrap();
+    file.write_all(b"next\n").unwrap();
+    file.sync_all().unwrap();
+    assert_eq!(file.metadata().unwrap().len(), 19);
+    file.unlock().unwrap();
+    let time = FILETIME {
+        dwLowDateTime: 1,
+        dwHighDateTime: 0,
+    };
+    // SAFETY: only this synthetic temporary file can be affected. The exact
+    // delegated rights must refuse FILE_WRITE_ATTRIBUTES before changing it.
+    assert_eq!(
+        unsafe { SetFileTime(file.as_raw_handle(), null(), null(), &time) },
+        0
+    );
+    assert_eq!(io::Error::last_os_error().raw_os_error(), Some(5));
+    let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+    // SAFETY: only this synthetic temporary file; DELETE must not be delegated.
+    assert_eq!(
+        unsafe {
+            SetFileInformationByHandle(
+                file.as_raw_handle(),
+                FileDispositionInfo,
+                (&disposition as *const FILE_DISPOSITION_INFO).cast(),
+                size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+        },
+        0
+    );
+    assert_eq!(io::Error::last_os_error().raw_os_error(), Some(5));
+    assert_eq!(std::fs::read(path).unwrap(), b"prefix-record\nnext\n");
+}
+
+#[test]
+fn delegated_journal_refuses_anonymous_pipe_before_any_file_io() {
+    let (read, _write) = pipe().unwrap();
+    let error = inherited_fake_ip_journal(&File::from(read)).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("regular disk file"));
+}
+
+#[test]
+fn desktop_restoration_is_conditional_and_checks_the_resulting_binding() {
+    use std::cell::{Cell, RefCell};
+    let original = 1usize as HDESK;
+    let private = 2usize as HDESK;
+    for starts_private in [false, true] {
+        let binding = Cell::new(if starts_private { private } else { original });
+        let operations = RefCell::new(Vec::new());
+        restore_desktop_binding(
+            original,
+            || {
+                operations.borrow_mut().push("get");
+                Ok(binding.get())
+            },
+            |handle| {
+                operations.borrow_mut().push("restore");
+                assert_eq!(handle, original);
+                binding.set(handle);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(binding.get(), original);
+        assert_eq!(
+            operations.into_inner(),
+            if starts_private {
+                vec!["get", "restore", "get"]
+            } else {
+                vec!["get"]
+            }
+        );
+    }
+    let error = restore_desktop_binding(original, || Ok(private), |_| Ok(())).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    assert!(error.to_string().contains("did not take effect"));
+}
+
+#[test]
+fn desktop_restoration_preserves_query_and_set_failures() {
+    let original = 1usize as HDESK;
+    let private = 2usize as HDESK;
+    let query = restore_desktop_binding(
+        original,
+        || Err(io::Error::from_raw_os_error(6)),
+        |_| panic!("query failure must not attempt restoration"),
+    )
+    .unwrap_err();
+    assert_eq!(query.raw_os_error(), Some(6));
+    let set = restore_desktop_binding(
+        original,
+        || Ok(private),
+        |_| Err(io::Error::from_raw_os_error(5)),
+    )
+    .unwrap_err();
+    assert_eq!(set.raw_os_error(), Some(5));
+}
+
+#[test]
+fn cleanup_failure_prevents_success_and_preserves_an_existing_failure() {
+    let cleanup = || io::Error::new(io::ErrorKind::PermissionDenied, "CloseDesktop denied");
+    let failed_close = checked_cleanup(Ok(42), Err(cleanup())).unwrap_err();
+    assert_eq!(failed_close.kind(), io::ErrorKind::PermissionDenied);
+    assert_eq!(failed_close.to_string(), "CloseDesktop denied");
+    let primary = io::Error::new(io::ErrorKind::InvalidData, "desktop identity changed");
+    let both = checked_cleanup::<()>(Err(primary), Err(cleanup())).unwrap_err();
+    assert_eq!(both.kind(), io::ErrorKind::InvalidData);
+    assert!(both.to_string().contains("desktop identity changed"));
+    assert!(both.to_string().contains("CloseDesktop denied"));
+    assert_eq!(checked_cleanup(Ok(42), Ok(())).unwrap(), 42);
+}
+
+#[test]
+fn current_desktop_identity_query_is_read_only_and_stable() {
+    let before = current_thread_desktop().unwrap();
+    let name = current_desktop_name().unwrap();
+    assert!(!name.is_empty());
+    assert_eq!(current_thread_desktop().unwrap(), before);
+    assert_eq!(object_name(before).unwrap(), name);
+}
+
+#[test]
+fn environment_is_explicit_sorted_and_excludes_parent_secrets() {
+    let encoded = environment(Path::new(r"C:\Windows"));
+    assert!(encoded.ends_with(&[0, 0]));
+    let entries = encoded
+        .split(|unit| *unit == 0)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| String::from_utf16(entry).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        entries,
+        vec![
+            r"PATH=C:\Windows\System32",
+            r"SystemRoot=C:\Windows",
+            r"WINDIR=C:\Windows"
+        ]
+    );
+}
+
+#[test]
+fn command_line_preserves_empty_quotes_and_trailing_backslashes() {
+    for (argument, expected) in [
+        ("", "\"\""),
+        ("hello world", "\"hello world\""),
+        ("quote\"test", "\"quote\\\"test\""),
+        ("C:\\path\\", "\"C:\\path\\\\\""),
+    ] {
+        assert_eq!(
+            String::from_utf16(&quote_argument(OsStr::new(argument)).unwrap()).unwrap(),
+            expected
+        );
+    }
+    let line = command_line(
+        Path::new(r"C:\Program Files\worker.exe"),
+        &[OsString::from("--child"), OsString::from("")],
+    )
+    .unwrap();
+    assert_eq!(line.last(), Some(&0));
+    assert_eq!(
+        String::from_utf16(&line[..line.len() - 1]).unwrap(),
+        "\"C:\\Program Files\\worker.exe\" \"--child\" \"\""
+    );
+}
+
+#[test]
+fn command_line_rejects_nul_and_oversize_before_process_creation() {
+    assert!(quote_argument(&OsString::from_wide(&[65, 0, 66])).is_err());
+    assert!(
+        command_line(
+            Path::new(r"C:\worker.exe"),
+            &[OsString::from("x".repeat(32768))]
+        )
+        .is_err()
+    );
+}
+
+fn valid_profile() -> TokenProfile {
+    TokenProfile {
+        elevated: false,
+        restricted: true,
+        admin_enabled: false,
+        admin_deny_only: true,
+        integrity_rid: 0x1000,
+        enabled_privileges: 1,
+        unexpected_enabled_privileges: 0,
+    }
+}
+
+#[test]
+fn restricted_gate_rejects_elevation_admin_privileges_or_wrong_integrity() {
+    verify_restricted(&valid_profile()).unwrap();
+    for change in 0..6 {
+        let mut profile = valid_profile();
+        match change {
+            0 => profile.elevated = true,
+            1 => profile.restricted = false,
+            2 => profile.admin_enabled = true,
+            3 => profile.admin_deny_only = false,
+            4 => profile.integrity_rid = 0x2000,
+            5 => profile.unexpected_enabled_privileges = 1,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            verify_restricted(&profile).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+}
+
+#[test]
+fn token_query_is_read_only_and_profile_contains_no_user_identity() {
+    let observed = current_token_profile().unwrap();
+    let serialized = serde_json::to_value(&observed).unwrap();
+    assert_eq!(serialized.as_object().unwrap().len(), 7);
+    assert!(serialized.get("user_sid").is_none());
+    assert!(observed.integrity_rid >= 0x1000);
+}
+
+#[test]
+fn token_variable_arrays_accept_zero_entries_at_the_header_offset() {
+    let groups = TokenBuffer {
+        words: vec![0; 2],
+        bytes: offset_of!(TOKEN_GROUPS, Groups),
+    };
+    assert_eq!(*groups.value::<u32>().unwrap(), 0);
+    assert!(
+        groups
+            .array::<SID_AND_ATTRIBUTES>(offset_of!(TOKEN_GROUPS, Groups), 0)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        groups
+            .array::<SID_AND_ATTRIBUTES>(offset_of!(TOKEN_GROUPS, Groups), 1)
+            .is_err()
+    );
+    let privileges = TokenBuffer {
+        words: vec![0; 2],
+        bytes: offset_of!(TOKEN_PRIVILEGES, Privileges),
+    };
+    assert_eq!(*privileges.value::<u32>().unwrap(), 0);
+    assert!(
+        privileges
+            .array::<LUID_AND_ATTRIBUTES>(offset_of!(TOKEN_PRIVILEGES, Privileges), 0)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        privileges
+            .array::<LUID_AND_ATTRIBUTES>(offset_of!(TOKEN_PRIVILEGES, Privileges), 1)
+            .is_err()
+    );
+}

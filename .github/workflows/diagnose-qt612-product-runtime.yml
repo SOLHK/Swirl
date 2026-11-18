@@ -1,0 +1,105 @@
+name: Compare fixed d136 QA Qt runtime
+
+# Fixed original QA bytes only. No compilation, deployment, real provider or release promotion.
+on:
+  pull_request:
+    branches: [test]
+    types: [labeled]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: swirl-pr61-product-runtime-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  fixed-product-comparison:
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'qa-qt612-product-runtime' && github.repository == 'SOLHK/Swirl' && github.event.pull_request.number == 61 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'work/node-probe-render-20261105' && github.base_ref == 'test' }}
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the unchanged target at its original absolute fixture root
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Checkout the separate reviewed diagnostic helper
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic-helper
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Select Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Prepare the original target native Windows display
+        shell: pwsh
+        timeout-minutes: 2
+        run: ./scripts/Set-CiDisplayResolution.ps1
+      - name: Compile helper syntax and verify directly relevant boundaries
+        shell: pwsh
+        working-directory: diagnostic-helper
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: '1'
+          SWIRL_QT612_RUNTIME_PATCH: '1'
+        run: |
+          python -m py_compile tools/RunQt612ProductRuntimeComparison.py tools/Build-Qt612QmlDiagnosticSdk.py tools/ReadPr61ArtifactEvidence.py tools/tests/test_qt612_product_runtime_comparison.py
+          if ($LASTEXITCODE -ne 0) { throw 'Product comparison helper syntax failed.' }
+          New-Item -ItemType Directory -Force -Path ../build-evidence | Out-Null
+          python -m unittest discover -s tools/tests -p test_qt612_diagnostic_sdk.py -v 2>&1 | Tee-Object -FilePath ../build-evidence/product-runtime-existing-boundaries.log
+          if ($LASTEXITCODE -ne 0) { throw 'Existing generic/compiler/native boundaries failed.' }
+          python -m unittest discover -s tools/tests -p test_qt612_product_runtime_comparison.py -v 2>&1 | Tee-Object -FilePath ../build-evidence/product-runtime-boundaries.log
+          if ($LASTEXITCODE -ne 0) { throw 'Product closure and capability boundaries failed.' }
+      - name: Restore only the saved d136 compiler cache
+        id: exact_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        timeout-minutes: 5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-082b4956bfe1f416398b268e050cb933a8b0b72160d0c2bec1827df3045f0f2c-e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab
+      - name: Audit all original bytes and prepare two isolated runtimes
+        id: prepare
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUTF8: '1'
+          SWIRL_PRODUCT_CACHE_HIT: ${{ steps.exact_cache.outputs.cache-hit }}
+          SWIRL_PRODUCT_CACHE_KEY: ${{ steps.exact_cache.outputs.cache-matched-key }}
+        run: |
+          python diagnostic-helper/tools/RunQt612ProductRuntimeComparison.py --phase prepare
+          if ($LASTEXITCODE -ne 0) { throw 'Original d136 closure incomplete; product cases were not started.' }
+      - name: Execute original QA cases with owned process and module evidence
+        if: ${{ success() && steps.prepare.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 21
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python diagnostic-helper/tools/RunQt612ProductRuntimeComparison.py --phase execute
+          if ($LASTEXITCODE -ne 0) { throw 'Original product failures or incomplete observation preserved; inspect separate variants.' }
+      - name: Preserve public diagnostic originals and all refusal evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        timeout-minutes: 3
+        with:
+          name: Swirl-PR61-d136-Product-Runtime-Comparison
+          path: |
+            build-evidence/qt612-product-comparison/
+            build-evidence/ci-display.json
+            build-evidence/product-runtime-existing-boundaries.log
+            build-evidence/product-runtime-boundaries.log
+            build-evidence/qt612-runtime-patch/native-boundaries/
+          if-no-files-found: warn
+          retention-days: 14

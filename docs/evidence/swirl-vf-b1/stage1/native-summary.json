@@ -1,0 +1,4805 @@
+{
+  "schema_version": 1,
+  "status": "NATIVE_DIAGNOSTIC_COMPLETE_NOT_ACCEPTANCE",
+  "source_commit": "9836e89130694fdc336c4f4d7de22259c51741f6",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "started_utc": "2026-10-20T09:18:51.885474+00:00",
+  "synthetic_only": true,
+  "original_font_acceptance": "NOT_ESTABLISHED",
+  "diagnosis_is_not_acceptance": true,
+  "measurement_correction_applied": false,
+  "strict_budget_font_units": 0.03125,
+  "production_oracle_modified": false,
+  "production_rebuilder_modified": false,
+  "manifest_sha256_before_native": "6b040a548902cb990755704c0960372c39bd5336dbf6bfe2eae35cc1f9ffe512",
+  "fixture_count": 26,
+  "planned_unique_observations": 624,
+  "binary_sha256": "ab86a5bb1f51b73c08fd2f7b3414c530315f5ba647d5d6216952408fa59509f1",
+  "probe_source_sha256": "1c9a80a7a7e62104925818edf63634d20a666d2f4bb2025016a80780c135d597",
+  "reverse_replay_pairs": 624,
+  "native_record_count": 1248,
+  "summary": {
+    "upem1000-gvar": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-hvar": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-vvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 0.75,
+        "vertical_origin_y": 0,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 3
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 6,
+          "holdout_matches": 9
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 3,
+          "holdout_matches": 9
+        }
+      }
+    },
+    "upem1000-hvar_vvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 0,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 3
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 6,
+          "holdout_matches": 9
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 3,
+          "holdout_matches": 9
+        }
+      }
+    },
+    "upem1000-hhea_ascent": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-vhea_ascent": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-os2_typo_ascent": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-os2_use_typo": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-os2_typo_ascent_use_typo": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-vorg_y": {
+      "records": 24,
+      "strict_metric_failures": 24,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 151,
+        "vertical_origin_x_current_half_width": 100
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 15
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-phantom_shift_1": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-phantom_shift_91": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 6,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1000-phantom_only": {
+      "records": 24,
+      "strict_metric_failures": 21,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1.25,
+        "vertical_origin_y": 0.5,
+        "vertical_origin_x_current_half_width": 0.006103515625
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 12
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 3,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "round_each_phantom": {
+          "training_matches": 6,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 9,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-gvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-hvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-vvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 0,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 3
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        }
+      }
+    },
+    "upem1024-hvar_vvar": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 0,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 3
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 0
+        }
+      }
+    },
+    "upem1024-hhea_ascent": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-vhea_ascent": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-os2_typo_ascent": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-os2_use_typo": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-os2_typo_ascent_use_typo": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-vorg_y": {
+      "records": 24,
+      "strict_metric_failures": 24,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 151,
+        "vertical_origin_x_current_half_width": 100
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 15
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-phantom_shift_1": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-phantom_shift_91": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 1,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    },
+    "upem1024-phantom_only": {
+      "records": 24,
+      "strict_metric_failures": 15,
+      "witness_failures": 0,
+      "layout_vs_direct_disagreements": 0,
+      "max_metric_error": {
+        "advance_width": 0,
+        "advance_height": 0.75,
+        "vertical_origin_y": 0.5,
+        "vertical_origin_x_current_half_width": 0
+      },
+      "partitions": {
+        "training": {
+          "records": 15,
+          "strict_metric_failures": 6
+        },
+        "holdout": {
+          "records": 9,
+          "strict_metric_failures": 9
+        }
+      },
+      "hypotheses": {
+        "ideal_continuous_height": {
+          "training_matches": 9,
+          "holdout_matches": 0
+        },
+        "round_height_once": {
+          "training_matches": 12,
+          "holdout_matches": 9
+        },
+        "round_each_phantom": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "difference_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        },
+        "coordinate_first_em16_then_trunc": {
+          "training_matches": 12,
+          "holdout_matches": 6
+        }
+      }
+    }
+  },
+  "table_effects": {
+    "upem1000-hvar": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 16,
+        "advance_height": 0,
+        "vertical_translation_x": 16,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 16,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0.01220703125,
+        "advance_height": 0,
+        "vertical_translation_x": 0.006103515625,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0.006103515625,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-vvar": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 9,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 3,
+        "vertical_advance_sum": 9,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 3,
+        "layout_step": 9,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 1,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 1,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 1,
+        "layout_step": 1,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-hvar_vvar": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 16,
+        "advance_height": 9,
+        "vertical_translation_x": 16,
+        "vertical_translation_y": 3,
+        "vertical_advance_sum": 9,
+        "vertical_origin_x": 16,
+        "vertical_origin_y": 3,
+        "layout_step": 9,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0.01220703125,
+        "advance_height": 1,
+        "vertical_translation_x": 0.006103515625,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 1,
+        "vertical_origin_x": 0.006103515625,
+        "vertical_origin_y": 1,
+        "layout_step": 1,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-hhea_ascent": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 24,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 91.00341796875,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-vhea_ascent": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-os2_typo_ascent": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-os2_use_typo": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-os2_typo_ascent_use_typo": {
+      "compared_with": "upem1000-os2_typo_ascent",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-vorg_y": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 16,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 16,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 100.006103515625,
+        "vertical_translation_y": 151,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 100.006103515625,
+        "vertical_origin_y": 151,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-phantom_shift_1": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 1,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-phantom_shift_91": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 91,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 91,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1000-phantom_only": {
+      "compared_with": "upem1000-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 12,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 12,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0.5,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0.5,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-hvar": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-vvar": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 12,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 3,
+        "vertical_advance_sum": 12,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 3,
+        "layout_step": 12,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 1,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 1,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 1,
+        "layout_step": 1,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-hvar_vvar": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 12,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 3,
+        "vertical_advance_sum": 12,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 3,
+        "layout_step": 12,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 1,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 1,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 1,
+        "layout_step": 1,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-hhea_ascent": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 24,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 91,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-vhea_ascent": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-os2_typo_ascent": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-os2_use_typo": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-os2_typo_ascent_use_typo": {
+      "compared_with": "upem1024-os2_typo_ascent",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-vorg_y": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 16,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 16,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 100,
+        "vertical_translation_y": 151,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 100,
+        "vertical_origin_y": 151,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-phantom_shift_1": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 1,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 1,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-phantom_shift_91": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 24,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 24,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 91,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 91,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    },
+    "upem1024-phantom_only": {
+      "compared_with": "upem1024-gvar",
+      "records": 24,
+      "changed_fields": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 12,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 12,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      },
+      "max_absolute_difference": {
+        "advance_width": 0,
+        "advance_height": 0,
+        "vertical_translation_x": 0,
+        "vertical_translation_y": 0.5,
+        "vertical_advance_sum": 0,
+        "vertical_origin_x": 0,
+        "vertical_origin_y": 0.5,
+        "layout_step": 0,
+        "global_ascent": 0,
+        "global_descent": 0,
+        "global_leading": 0
+      }
+    }
+  },
+  "strict_metric_failures": 468,
+  "strict_synthetic_metric_acceptance": "FAIL",
+  "anchor_observations": [
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1000-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 761
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 821
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 836
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 843.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 881
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 828.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 858.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 850,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 851
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 926
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 933.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1150,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 971
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 906.25,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 872.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 918.5
+    },
+    {
+      "fixture": "upem1000-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 948.5
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 849,
+      "raw_bits": "408a880000000000",
+      "witness_height": 1000,
+      "layout_step": 849,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1000,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1000,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 843
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1149,
+      "raw_bits": "4091f40000000000",
+      "witness_height": 1000,
+      "layout_step": 1149,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 905,
+      "raw_bits": "408c480000000000",
+      "witness_height": 1000,
+      "layout_step": 905,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1000,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 828
+    },
+    {
+      "fixture": "upem1000-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1000,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 858
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-gvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-hvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1037,
+      "raw_bits": "4090340000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1037,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1056,
+      "raw_bits": "4090800000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1056,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1018,
+      "raw_bits": "408fd00000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1018,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-hvar_vvar",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1093,
+      "raw_bits": "4091140000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1093,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-hhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-vhea_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-os2_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 842.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 781.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 827.5
+    },
+    {
+      "fixture": "upem1024-os2_typo_ascent_use_typo",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 857.5
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-vorg_y",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 761
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 821
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 836
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 843.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 881
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 828.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_1",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 858.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 850,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 851
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 911
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1037.5,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 926
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1056.25,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 933.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1150,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 971
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 906.25,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 872.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1018.75,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 918.5
+    },
+    {
+      "fixture": "upem1024-phantom_shift_91",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1093.75,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 948.5
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -1
+      },
+      "partition": "training",
+      "raw_height": 850,
+      "raw_bits": "408a900000000000",
+      "witness_height": 1000,
+      "layout_step": 850,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 760
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0
+      },
+      "partition": "training",
+      "raw_height": 1000,
+      "raw_bits": "408f400000000000",
+      "witness_height": 1000,
+      "layout_step": 1000,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 820
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.25
+      },
+      "partition": "training",
+      "raw_height": 1038,
+      "raw_bits": "4090380000000000",
+      "witness_height": 1000,
+      "layout_step": 1038,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 835
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.375
+      },
+      "partition": "training",
+      "raw_height": 1057,
+      "raw_bits": "4090840000000000",
+      "witness_height": 1000,
+      "layout_step": 1057,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 843
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 1
+      },
+      "partition": "training",
+      "raw_height": 1150,
+      "raw_bits": "4091f80000000000",
+      "witness_height": 1000,
+      "layout_step": 1150,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 880
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": -0.625
+      },
+      "partition": "holdout",
+      "raw_height": 906,
+      "raw_bits": "408c500000000000",
+      "witness_height": 1000,
+      "layout_step": 906,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 782
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.125
+      },
+      "partition": "holdout",
+      "raw_height": 1019,
+      "raw_bits": "408fd80000000000",
+      "witness_height": 1000,
+      "layout_step": 1019,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 828
+    },
+    {
+      "fixture": "upem1024-phantom_only",
+      "axes": {
+        "WDTH": 0,
+        "HGHT": 0.625
+      },
+      "partition": "holdout",
+      "raw_height": 1094,
+      "raw_bits": "4091180000000000",
+      "witness_height": 1000,
+      "layout_step": 1094,
+      "vertical_origin_x": 500,
+      "vertical_origin_y": 858
+    }
+  ]
+}

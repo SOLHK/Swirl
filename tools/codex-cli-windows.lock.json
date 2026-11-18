@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "purpose": "Official native CLI fixture for isolated Windows configuration and DPAPI tests; not a Swirl runtime dependency or an authenticated Codex session.",
+  "repository": "openai/codex",
+  "version": "0.166.0",
+  "version_output": "codex-cli 0.166.0",
+  "release_tag": "rust-v0.166.0",
+  "release_id": 428320524,
+  "release_published_at": "2026-10-29T19:47:53Z",
+  "tag_object_sha": "593389380740f7b4762771573c447ccfdc59742f",
+  "source_commit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+  "release_url": "https://github.com/openai/codex/releases/tag/rust-v0.166.0",
+  "release_api_url": "https://api.github.com/repos/openai/codex/releases/tags/rust-v0.166.0",
+  "digest_provenance": "SHA256 values are the official GitHub release assets' digest fields, read on 2026-11-03. The release tag is unsigned; no signature verification is claimed.",
+  "archive": {
+    "asset_id": 689711096,
+    "name": "codex-x86_64-pc-windows-msvc.exe.tar.gz",
+    "size": 124156226,
+    "sha256": "dafeb48b5a853b2898453a6b5bdae0fa0646bd5d5b73c5dfe74c97d0af4a4a0d",
+    "url": "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-x86_64-pc-windows-msvc.exe.tar.gz"
+  },
+  "binary": {
+    "asset_id": 689711071,
+    "name": "codex-x86_64-pc-windows-msvc.exe",
+    "size": 371735856,
+    "sha256": "9d563ee4e0441ff9d59d612013e0460ddf8e5709735c2d9f6b98b7ef8ca4eb42",
+    "url": "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-x86_64-pc-windows-msvc.exe",
+    "pe_machine": "0x8664"
+  }
+}

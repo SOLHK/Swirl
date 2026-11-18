@@ -27,6 +27,24 @@ class GeometryBatch:
     paths: list[np.ndarray]
     sources: list[ContourSource]
     sample_count: int
+    trace: list | None = None
+
+
+@dataclass(frozen=True)
+class GeometryNodeTrace:
+    """Optional, detached pre-resolution data in a node's local frame.
+
+    This records the actual evaluator inputs, including axes outside [-1,1].
+    It is diagnostic data, not independent native evidence. Shape coordinates
+    precede curve-factor clamping and tangent projection; matrix/offset map the
+    resolved shape into the root glyph frame.
+    """
+    part_index: int
+    tree_part_offset: int
+    axes: np.ndarray
+    matrix: np.ndarray
+    offset: np.ndarray
+    shape_coordinates: np.ndarray | None
 
 
 class BatchGeometry:
@@ -35,8 +53,12 @@ class BatchGeometry:
     def __init__(self, table: HVGL, *, isolated_tangents: bool = False):
         self.table = table
         self.isolated_tangents = isolated_tangents
+        # Parsed source arrays are read-only views of immutable table bytes.
+        # Bound the per-renderer cache; never cache mutable authored inputs.
+        from collections import OrderedDict
+        self._transform_plans = OrderedDict()
 
-    def render(self, glyph_id: int, design_locations) -> GeometryBatch:
+    def render(self, glyph_id: int, design_locations, *, capture_trace=False) -> GeometryBatch:
         root = self.table.part(glyph_id)
         locations = np.asarray(design_locations, dtype=np.float64)
         require(locations.ndim == 2 and locations.shape[1] == root.axis_count,
@@ -52,13 +74,24 @@ class BatchGeometry:
         values[:, :root.axis_count] = locations
         translations = np.zeros((count, root.tree_parts, 2), dtype=np.float64)
         rotations = np.zeros((count, root.tree_parts), dtype=np.float64)
-        result = GeometryBatch([], [], count)
+        result = GeometryBatch([], [], count, [] if capture_trace else None)
         active = set()
         point_count = 0
 
         def compose_transforms(part, base, weights):
-            from transform_geometry import blend_transform_rows
-            for row, delta in blend_transform_rows(part, weights).items():
+            from transform_geometry import compile_transform_rows,blend_compiled_rows
+            arrays=[a for record in (part.translations,part.rotations) for a in
+                (record.master_rows,record.master_values,record.extreme_indices,record.extreme_values)]
+            immutable=all(not a.flags.writeable for a in arrays)
+            saved=self._transform_plans.get(part.index) if immutable else None
+            if saved is None or saved[0] is not part:
+                plan=compile_transform_rows(part)
+                if immutable:
+                    self._transform_plans[part.index]=(part,plan)
+                    if len(self._transform_plans)>512:self._transform_plans.popitem(last=False)
+            else:
+                plan=saved[1];self._transform_plans.move_to_end(part.index)
+            for row, delta in blend_compiled_rows(plan,part.axis_count,weights).items():
                 target = base + 1 + row
                 cosine, sine = np.cos(delta[:, 2]), np.sin(delta[:, 2])
                 old = translations[:, target].copy()
@@ -84,6 +117,9 @@ class BatchGeometry:
             matrix = np.einsum("nij,njk->nik", parent_matrix, rotation)
             offset = parent_offset + np.einsum("nij,nj->ni", parent_matrix, translations[:, part_base])
             if isinstance(part, Composite):
+                if capture_trace:
+                    result.trace.append(GeometryNodeTrace(index, part_base,
+                        axis_values.copy(), matrix.copy(), offset.copy(), None))
                 descendants = axis_base + part.axis_count
                 # Reader validation requires every individual index vector to
                 # be strictly increasing, so direct indexed addition is exact.
@@ -108,6 +144,9 @@ class BatchGeometry:
                 coordinates = np.broadcast_to(part.master, (count, *part.master.shape)).copy()
                 if part.axis_count:
                     coordinates += np.einsum("na,asp->nsp", weights, part.delta)
+                if capture_trace:
+                    result.trace.append(GeometryNodeTrace(index, part_base,
+                        axis_values.copy(), matrix.copy(), offset.copy(), coordinates.copy()))
                 start = 0
                 for path_index, size in enumerate(part.path_sizes):
                     segment = coordinates[:, start:start + size].copy()

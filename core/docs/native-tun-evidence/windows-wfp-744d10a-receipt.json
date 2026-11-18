@@ -1,0 +1,45 @@
+{
+  "schema": 2,
+  "owner": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    24,
+    227,
+    223,
+    86,
+    21,
+    98,
+    32,
+    64
+  ],
+  "application": "D:\\a\\Swirl\\Swirl\\core\\target\\release\\examples\\windows-wfp-scoped-smoke.exe",
+  "sublayer_weight": 258,
+  "rules": [
+    {
+      "endpoint": "127.0.0.1:52187",
+      "protocol": "Tcp",
+      "action": "Block"
+    },
+    {
+      "endpoint": "127.0.0.1:56470",
+      "protocol": "Udp",
+      "action": "Block"
+    },
+    {
+      "endpoint": "[::1]:52188",
+      "protocol": "Tcp",
+      "action": "Block"
+    },
+    {
+      "endpoint": "[::1]:56471",
+      "protocol": "Udp",
+      "action": "Block"
+    }
+  ]
+}

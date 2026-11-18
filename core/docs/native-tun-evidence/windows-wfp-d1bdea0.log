@@ -1,0 +1,5 @@
+   Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+    Finished `release` profile [optimized] target(s) in 16.16s
+     Running `target\release\examples\windows-wfp-scoped-smoke.exe --disposable-network --receipt D:\a\_temp\swirl-wfp-scoped-receipt.json`
+scoped WFP smoke failed: scoped WFP ownership or policy differs: {"phase":"verify provider/sublayer","provider_flags":{"actual":1,"expected":1},"provider_metadata_equal":true,"provider_service_name_is_null":true,"sublayer_flags":{"actual":1,"expected":1},"sublayer_metadata_equal":true,"sublayer_provider_equal":true,"sublayer_weight":{"actual":258,"expected":256}}
+error: process didn't exit successfully: `target\release\examples\windows-wfp-scoped-smoke.exe --disposable-network --receipt D:\a\_temp\swirl-wfp-scoped-receipt.json` (exit code: 1)

@@ -24,11 +24,32 @@ func diagnosticMain() throws {
     let data = try Data(contentsOf:url, options:[.mappedIfSafe])
     guard sha256(data) == "SOURCE_HASH" else { throw OracleError.invalid("wrong_source") }
     let states = try locateDescriptors(parseFaces(Bytes(data:data)), url:url)
+    let unavailable = states.filter { $0.baseFont == nil }.map { $0.raw.index }
+    // An unreadable source is an actual diagnostic result, not a Swift trap or
+    // permission to substitute an installed font. Do not request any instances.
+    if !unavailable.isEmpty {
+        let urlDescriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor]
+        let dataDescriptors = CTFontManagerCreateFontDescriptorsFromData(data as CFData) as? [CTFontDescriptor]
+        let provider = CGDataProvider(data:data as CFData)
+        let graphicsFont = provider.flatMap { CGFont($0) }
+        try emit(["status":"BLOCKED_SOURCE_IDENTITY", "source_sha256":sha256(data),
+            "source_face_count":states.count,
+            "physical_faces_verified":states.count - unavailable.count,
+            "unavailable_face_indices":unavailable,
+            "url_descriptors_returned":urlDescriptors != nil,
+            "url_descriptor_count":urlDescriptors?.count ?? 0,
+            "data_descriptors_returned":dataDescriptors != nil,
+            "data_descriptor_count":dataDescriptors?.count ?? 0,
+            "cgfont_created":graphicsFont != nil,
+            "os_version":ProcessInfo.processInfo.operatingSystemVersionString,
+            "font_data_published":false, "production_assertion_unchanged":true,
+            "glyph_extraction_performed":false, "observations":[]])
+        return
+    }
     var observations: [[String:Any]] = []
     let factors: [Double] = [0, -1, 1, 0.5, -0.5, 0.201171875,
                              -0.265625, 0.951416015625, 0.123456789]
     for state in states {
-        guard state.baseFont != nil else { throw OracleError.invalid("missing_physical_face") }
         for axis in state.raw.axes {
             for factor in factors {
                 var requested = Dictionary(uniqueKeysWithValues: state.raw.axes.map { ($0.tag, $0.defaultValue) })
@@ -45,11 +66,14 @@ func diagnosticMain() throws {
         }
     }
     try emit(["status":"AXIS_READBACK_DIAGNOSIS_NOT_ACCEPTANCE", "source_sha256":sha256(data),
+              "source_face_count":states.count,
               "physical_faces_verified":states.count, "font_data_published":false,
+              "os_version":ProcessInfo.processInfo.operatingSystemVersionString,
               "production_assertion_unchanged":true, "glyph_extraction_performed":false,
               "observations":observations])
 }
-try diagnosticMain()
+do { try diagnosticMain() }
+catch { stderr("Axis readback diagnosis: \(error)"); exit(2) }
 '''
 
 
@@ -81,7 +105,34 @@ def diagnose(source, output):
         if run.returncode:
             raise RuntimeError(f'axis diagnostic exit {run.returncode}: {run.stderr[-4000:]}')
         report = json.loads(run.stdout)
+    report = summarize(report)
+    report['source_code_sha256'] = hashlib.sha256(original.read_bytes()).hexdigest()
+    report['diagnostic_harness_sha256'] = hashlib.sha256(harness(original).encode()).hexdigest()
+    output.parent.mkdir(parents=True,exist_ok=True)
+    with output.open('x') as stream:
+        json.dump(report,stream,indent=2,allow_nan=False)
+    print(json.dumps(report,allow_nan=False),flush=True)
+    return report
+
+
+def summarize(native):
+    """Keep unavailable physical faces explicit; they have no axis observations."""
+    report = dict(native)
     rows = report.pop('observations')
+    count = report['source_face_count']
+    verified = report['physical_faces_verified']
+    if report['status'] == 'BLOCKED_SOURCE_IDENTITY':
+        unavailable = report['unavailable_face_indices']
+        if (rows or type(count) is not int or type(verified) is not int
+                or not 0 <= verified < count
+                or len(unavailable) != count - verified
+                or len(set(unavailable)) != len(unavailable)
+                or any(type(i) is not int or not 0 <= i < count for i in unavailable)):
+            raise ValueError('inconsistent blocked source identity evidence')
+        report.update(faces=[], position_count=0)
+        return report
+    if report['status'] != 'AXIS_READBACK_DIAGNOSIS_NOT_ACCEPTANCE' or verified != count:
+        raise ValueError('axis observations require every physical source face')
     faces = []
     for index in range(report['physical_faces_verified']):
         relevant = [r for r in rows if r['face_index'] == index]
@@ -93,11 +144,6 @@ def diagnose(source, output):
                           for tag in relevant[0]['signed_errors']}})
     report['faces'] = faces
     report['position_count'] = len(rows)
-    report['source_code_sha256'] = hashlib.sha256(original.read_bytes()).hexdigest()
-    output.parent.mkdir(parents=True,exist_ok=True)
-    with output.open('x') as stream:
-        json.dump(report,stream,indent=2,allow_nan=False)
-    print(json.dumps(report,allow_nan=False),flush=True)
     return report
 
 
@@ -106,4 +152,5 @@ if __name__ == '__main__':
     parser.add_argument('source',type=Path)
     parser.add_argument('--output',type=Path,required=True)
     args = parser.parse_args()
-    diagnose(args.source,args.output)
+    report = diagnose(args.source,args.output)
+    raise SystemExit(2 if report['status'] == 'BLOCKED_SOURCE_IDENTITY' else 0)

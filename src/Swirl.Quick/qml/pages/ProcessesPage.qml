@@ -18,7 +18,7 @@ Item {
  readonly property var processes:{if(!visible)return [];let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
- SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
+ readonly property Item ownedDetailClock: SwirlTransitionCoordinator {id:detailClock;parent:page;duration:SwirlMotion.dialogDuration}
  readonly property var selected:processes.find(r=>r.id===selectedId)||null
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
@@ -57,7 +57,7 @@ Item {
  height:Math.min(Theme.dp(430),parent?parent.height-Theme.dp(32):Theme.dp(430))
  contentItem:ScrollView {id:meteredScroll;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
  ColumnLayout{width:meteredScroll.availableWidth;spacing:Theme.dp(12)
-  SwirlText {renderType:Text.NativeRendering;text:"当前尚未实现 TUN 与进程网络阻止。下面的允许名单仅保存为配置，不代表已限制任何程序的网络。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+  SwirlText {renderType:Text.NativeRendering;text:"原生 TUN 可接管不遵循系统代理的应用，请在活动页选择并授权。进程网络阻止尚未接入；下面的允许名单仅保存为配置，不代表已限制任何程序的网络。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
   SwirlText {text:page.engineController.elevated?"已具备管理员权限；当前构建仍不支持计费网络接管。":"当前构建不支持计费网络接管；保存名单不会自动开启。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
   SwirlTextArea {id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
   SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError||page.engineController.routingError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}

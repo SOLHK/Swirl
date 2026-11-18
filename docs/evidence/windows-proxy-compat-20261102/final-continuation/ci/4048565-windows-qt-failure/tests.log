@@ -1,0 +1,93 @@
+test_actual_qt_import_dpapi_select_route_and_recreate (__main__.RealityQtInterop.test_actual_qt_import_dpapi_select_route_and_recreate) ... ok
+test_actual_qt_tls12_never_enters_vision_direct (__main__.RealityQtInterop.test_actual_qt_tls12_never_enters_vision_direct) ... ok
+test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) ... 
+  test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='short-id') ... FAIL
+  test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='public-key') ... FAIL
+  test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='servername') ... FAIL
+test_actual_qt_cancels_authenticated_stream_and_releases_listener (__main__.RealityQtInterop.test_actual_qt_cancels_authenticated_stream_and_releases_listener) ... ok
+test_actual_qt_domain_and_match_reject_a_proven_reachable_origin (__main__.RealityQtInterop.test_actual_qt_domain_and_match_reject_a_proven_reachable_origin) ... FAIL
+
+======================================================================
+FAIL: test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='short-id')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1369, in test_actual_qt_bad_credentials_never_reach_origin_or_spare
+    self.lifecycle(a, b, "authentication-failure", node=node, label="bad-" + kind)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1329, in lifecycle
+    self.assertEqual(result.returncode, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ********* Start testing of RustCoreTests *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows server2022
+PASS   : RustCoreTests::initTestCase()
+FAIL!  : RustCoreTests::realityLifecycleProductChainAgainstIndependentPeer() 'check["frontend_response_valid"].toBool()' returned FALSE. ()
+D:\a\Swirl\Swirl\src\Swirl.Quick\tests\RustCoreTests.cpp(983) : failure location
+PASS   : RustCoreTests::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 450ms
+********* Finished testing of RustCoreTests *********
+
+
+======================================================================
+FAIL: test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='public-key')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1369, in test_actual_qt_bad_credentials_never_reach_origin_or_spare
+    self.lifecycle(a, b, "authentication-failure", node=node, label="bad-" + kind)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1329, in lifecycle
+    self.assertEqual(result.returncode, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ********* Start testing of RustCoreTests *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows server2022
+PASS   : RustCoreTests::initTestCase()
+FAIL!  : RustCoreTests::realityLifecycleProductChainAgainstIndependentPeer() 'check["frontend_response_valid"].toBool()' returned FALSE. ()
+D:\a\Swirl\Swirl\src\Swirl.Quick\tests\RustCoreTests.cpp(983) : failure location
+PASS   : RustCoreTests::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 457ms
+********* Finished testing of RustCoreTests *********
+
+
+======================================================================
+FAIL: test_actual_qt_bad_credentials_never_reach_origin_or_spare (__main__.RealityQtInterop.test_actual_qt_bad_credentials_never_reach_origin_or_spare) (invalid='servername')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1369, in test_actual_qt_bad_credentials_never_reach_origin_or_spare
+    self.lifecycle(a, b, "authentication-failure", node=node, label="bad-" + kind)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1329, in lifecycle
+    self.assertEqual(result.returncode, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ********* Start testing of RustCoreTests *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows server2022
+PASS   : RustCoreTests::initTestCase()
+FAIL!  : RustCoreTests::realityLifecycleProductChainAgainstIndependentPeer() 'check["frontend_response_valid"].toBool()' returned FALSE. ()
+D:\a\Swirl\Swirl\src\Swirl.Quick\tests\RustCoreTests.cpp(983) : failure location
+PASS   : RustCoreTests::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 447ms
+********* Finished testing of RustCoreTests *********
+
+
+======================================================================
+FAIL: test_actual_qt_domain_and_match_reject_a_proven_reachable_origin (__main__.RealityQtInterop.test_actual_qt_domain_and_match_reject_a_proven_reachable_origin)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1396, in test_actual_qt_domain_and_match_reject_a_proven_reachable_origin
+    self.lifecycle(a, b, "reject")
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "D:\a\Swirl\Swirl\tools\tests\test_reality_runtime.py", line 1329, in lifecycle
+    self.assertEqual(result.returncode, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ********* Start testing of RustCoreTests *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows server2022
+PASS   : RustCoreTests::initTestCase()
+FAIL!  : RustCoreTests::realityLifecycleProductChainAgainstIndependentPeer() '!accepted&&check["frontend_response_valid"].toBool()' returned FALSE. ()
+D:\a\Swirl\Swirl\src\Swirl.Quick\tests\RustCoreTests.cpp(981) : failure location
+PASS   : RustCoreTests::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 952ms
+********* Finished testing of RustCoreTests *********
+
+
+----------------------------------------------------------------------
+Ran 5 tests in 14.663s
+
+FAILED (failures=4)

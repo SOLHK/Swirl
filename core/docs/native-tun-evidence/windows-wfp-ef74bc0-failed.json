@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped WFP failure",
+  "development_sha": "ef74bc03504c18c37a5b104647604612da76e9ca",
+  "actual_checkout_sha": "b7986bb57b6ec5b1d37b7c0a4ad98c0b51e6be2b",
+  "source_tree": "c53c968d5f91197a5cca885455de0714f2016257",
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41281650816",
+  "job_id": 124774618843,
+  "runner_label": "windows-2025",
+  "artifact_id": 13074101614,
+  "artifact_zip_sha256": "5c42c91ecdbc1f8bf0e748bb6512b2c2a251353447b20949bf4834f7a512d773",
+  "status": "failed",
+  "exit_code": 1,
+  "original_failure": "scoped WFP ownership or policy differs",
+  "root_cause": "Undetermined in the original log; comparison phase and fields are absent. Strict diagnostics require a fresh real run.",
+  "wfp_enforcement_passed": false,
+  "system_kill_switch_acceptance": false,
+  "physical_windows_11_acceptance": false,
+  "cleanup_acceptance": "No independent WFP post-failure readback in this log; receipt retained.",
+  "files": [
+    {
+      "path": "windows-wfp-ef74bc0.log",
+      "original_zip_entry": "swirl-wfp-scoped-smoke.log",
+      "bytes": 1461,
+      "sha256": "8d38a3bab19f8c2af7b1be308d887bb4735985028b349801284d01ba9aba07bd",
+      "normalization": "none; original ZIP-entry bytes"
+    },
+    {
+      "path": "windows-wfp-ef74bc0-receipt.json",
+      "original_zip_entry": "swirl-wfp-scoped-receipt.json",
+      "bytes": 667,
+      "sha256": "db113b4a009a097fb35175a1ec11d4ba08431448c778095c50fe0bed3bcc0c7f",
+      "normalization": "none; original ZIP-entry bytes"
+    }
+  ]
+}

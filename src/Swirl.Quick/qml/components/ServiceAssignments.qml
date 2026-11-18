@@ -93,7 +93,7 @@ ColumnLayout {
         text: assignments.routingMode === "rule" ? qsTr("分类仅用于浏览；匹配顺序由各策略的优先级决定。") : qsTr("专属分配已保存；切回规则分流后参与路由。")
         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
     }
-    SwirlAnimatedModel { id: services; source: assignments.visibleRows; keyRole: "id" }
+    readonly property QtObject ownedServicesModel: SwirlAnimatedModel { id: services; source: assignments.visibleRows; keyRole: "id" }
     Item {
         Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 0
         ListView {
@@ -158,7 +158,7 @@ ColumnLayout {
                         onToggled: { const requested = checked; checked = Qt.binding(function() { return Boolean(row.record.enabled) }); assignments.enabledRequested(row.record.id, requested) }
                         indicator.x: (width - indicator.width) / 2
                     }
-                    SubscriptionAction { id: more; objectName: "servicePolicyMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: assignments.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name || ""); tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible; onClicked: moreMenu.showAt() }
+                    SubscriptionAction { id: more; objectName: "servicePolicyMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: assignments.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name || ""); tooltip: Accessible.name; onClicked: moreMenu.showAt() }
                 }
                 Rectangle { visible: !row.headerRow; anchors.bottom: parent.bottom; width: parent.width; height: Theme.borderWidth; color: Theme.border }
                 SwirlContextMenu {

@@ -1,0 +1,21 @@
+{
+    "close_requested": false,
+    "failure_code": "",
+    "fixture_failed": false,
+    "guard_acknowledged": true,
+    "native_backend": true,
+    "native_listener_matches_rust": true,
+    "phase": "ready",
+    "pid": 8936,
+    "proxy_enabled": true,
+    "proxy_owned": true,
+    "qt_version": "6.12.0",
+    "ready": true,
+    "runtime_alive": true,
+    "runtime_healthy": true,
+    "runtime_pid": 8936,
+    "rust_port": 52471,
+    "saved_applied_policy_matches": true,
+    "schema": 1,
+    "source_sha": "ec7e54fced672561f8f06f958b75f1364403184e"
+}

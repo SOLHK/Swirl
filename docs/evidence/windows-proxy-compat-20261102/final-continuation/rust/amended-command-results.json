@@ -1,0 +1,55 @@
+[
+  {
+    "check": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.843
+  },
+  {
+    "check": "workspace-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 49.168
+  },
+  {
+    "check": "release-build",
+    "command": [
+      "cargo",
+      "build",
+      "--workspace",
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 113.985
+  },
+  {
+    "check": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 17.898
+  }
+]

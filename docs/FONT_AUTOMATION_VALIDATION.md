@@ -1,6 +1,14 @@
 # 智能字体系统：实际构建与验证记录
 
-本记录对应本次从远端 `fcc5937e9121031ac387f120f8c9dc6f242f71b1`
+## W1-B 最新记录入口
+
+智能宽度的接续研发位于 `work/vf-smart-width-w1`，本轮未合并或推送集成分支。
+四笔历史提交的实时核查、Windows CI 的真实失败与修正、QML 覆盖、性能
+数据和未完成的 Windows 11 物理验收，集中记录在
+[W1-B 验证报告](FONT_SMART_WIDTH_W1B_VALIDATION.md)。下文保留先前集成阶段
+的事实和失败证据，不能用其中的旧成功替代 W1-B 对应提交的测试。
+
+以下历史记录对应从远端 `fcc5937e9121031ac387f120f8c9dc6f242f71b1`
 开始的开发，目标分支始终为 `work/core-completion-20261017`。
 没有修改 main、强推或更换 GitHub App/Secrets。
 

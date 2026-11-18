@@ -18,6 +18,8 @@ import subprocess
 import sys
 import time
 
+from hvf_transcript import validate_transcript
+
 
 def sha256(path: Path) -> str:
     value = hashlib.sha256()
@@ -89,26 +91,11 @@ def run(args: argparse.Namespace) -> int:
         returncode = result.returncode
         report["runtime_exit_code"] = returncode
         report["outline_sha256"] = sha256(outline)
-        counts = {"headers": 0, "outlines": 0, "failed_outlines": 0, "summaries": 0}
-        final = None
-        header = None
-        with outline.open(encoding="utf-8") as lines:
-            for line in lines:
-                row = json.loads(line)
-                kind = row.get("record")
-                if kind == "header":
-                    counts["headers"] += 1
-                    header = row
-                elif kind == "outline":
-                    counts["outlines"] += 1
-                    if row.get("status") != "OK":
-                        counts["failed_outlines"] += 1
-                elif kind == "summary":
-                    counts["summaries"] += 1
-                    final = row
-        report["counts"] = counts
-        report["native_header"] = header
-        report["native_summary"] = final
+        checked = validate_transcript(outline, face=args.face,
+            coords=tuple(float(v) for v in args.coords.split(',')), start=args.start,
+            count=args.count, parts=args.parts, input_bytes=font.stat().st_size)
+        report.update(checked)
+        counts, final, header = checked['counts'], checked['native_summary'], checked['native_header']
         if (returncode == 0 and counts["headers"] == 1 and counts["summaries"] == 1
                 and counts["failed_outlines"] == 0 and final
                 and final.get("status") == "EXTRACTED" and final.get("failed") == 0

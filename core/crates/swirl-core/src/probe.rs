@@ -3,7 +3,10 @@
 use serde::Serialize;
 use std::{
     future::Future,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 use swirl_protocol::{ConnectTimings, UrlTestFailure, UrlTestMetrics, UrlTestStage};
 use tokio::{runtime::Handle, task::JoinHandle};
@@ -25,6 +28,7 @@ pub struct ProbeMetrics {
     pub outbound_connect_ms: u64,
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
+    pub request_rtt_ms: u64,
     pub http_status: u16,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outbound_timing: Option<ConnectTimings>,
@@ -67,21 +71,36 @@ struct Slot {
     task: Option<JoinHandle<()>>,
 }
 
+#[derive(Clone)]
 pub(super) struct ProbeRuntime {
     runtime: Handle,
     slot: Arc<Mutex<Slot>>,
+    in_flight: Arc<AtomicUsize>,
+}
+struct ActiveProbe(Arc<AtomicUsize>);
+impl Drop for ActiveProbe {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 
 impl ProbeRuntime {
     pub fn new(runtime: Handle) -> Self {
         Self {
             runtime,
+            in_flight: Arc::new(AtomicUsize::new(0)),
             slot: Arc::new(Mutex::new(Slot {
                 generation: 0,
                 status: ProbeStatus::default(),
                 task: None,
             })),
         }
+    }
+
+    /// Cancellation may update the UI status before the runtime drops its
+    /// sockets. Native TUN acquisition needs the actual future lifetime.
+    pub fn quiescent(&self) -> bool {
+        self.in_flight.load(Ordering::Acquire) == 0
     }
 
     pub fn status(&self) -> Result<ProbeStatus> {
@@ -110,7 +129,10 @@ impl ProbeRuntime {
             failure: None,
         };
         let shared = self.slot.clone();
+        self.in_flight.fetch_add(1, Ordering::AcqRel);
+        let active = ActiveProbe(self.in_flight.clone());
         slot.task = Some(self.runtime.spawn(async move {
+            let _active = active;
             let result = future.await;
             Self::finish(&shared, generation, result);
         }));
@@ -137,6 +159,7 @@ impl ProbeRuntime {
                     outbound_connect_ms: metrics.outbound_connect_ms,
                     origin_tls_ms: metrics.origin_tls_ms,
                     response_headers_ms: metrics.response_headers_ms,
+                    request_rtt_ms: metrics.request_rtt_ms,
                     http_status: metrics.http_status,
                     outbound_timing: metrics.outbound_timing,
                 }),

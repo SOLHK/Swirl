@@ -1,0 +1,15 @@
+test_all_complete_modes_are_accepted_with_authored_fields_only (__main__.QtLifecycleEvidenceTests.test_all_complete_modes_are_accepted_with_authored_fields_only) ... ok
+test_authentication_reject_requires_general_failure_not_refusal_or_policy_denial (__main__.QtLifecycleEvidenceTests.test_authentication_reject_requires_general_failure_not_refusal_or_policy_denial) ... ok
+test_certificate_tls12_and_actual_echo_are_mandatory (__main__.QtLifecycleEvidenceTests.test_certificate_tls12_and_actual_echo_are_mandatory) ... ok
+test_explicit_profile_selection_preserves_original_and_adds_exactly_four (__main__.QtLifecycleEvidenceTests.test_explicit_profile_selection_preserves_original_and_adds_exactly_four) ... ok
+test_failed_or_timed_out_child_preserves_partial_typed_evidence (__main__.QtLifecycleEvidenceTests.test_failed_or_timed_out_child_preserves_partial_typed_evidence) ... ok
+test_invalid_uuid_may_fail_after_frontend_ack_but_never_after_http_success (__main__.QtLifecycleEvidenceTests.test_invalid_uuid_may_fail_after_frontend_ack_but_never_after_http_success) ... ok
+test_missing_duplicate_entrance_and_unproven_proxy_are_rejected (__main__.QtLifecycleEvidenceTests.test_missing_duplicate_entrance_and_unproven_proxy_are_rejected) ... ok
+test_missing_product_state_or_truthy_non_boolean_fails (__main__.QtLifecycleEvidenceTests.test_missing_product_state_or_truthy_non_boolean_fails) ... ok
+test_policy_reject_requires_ruleset_reply_not_refusal_or_handshake_failure (__main__.QtLifecycleEvidenceTests.test_policy_reject_requires_ruleset_reply_not_refusal_or_handshake_failure) ... ok
+test_reject_needs_direct_positive_control_and_exact_reject_reply (__main__.QtLifecycleEvidenceTests.test_reject_needs_direct_positive_control_and_exact_reject_reply) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.006s
+
+OK

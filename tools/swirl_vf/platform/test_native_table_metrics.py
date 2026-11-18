@@ -177,7 +177,7 @@ def run(output, binary=None, require_native=False):
             report['native_binary_sha256'] = source_hash(binary)
             with tempfile.TemporaryDirectory(prefix='native-table-metrics-', dir=output) as temporary:
                 temp = Path(temporary)
-                source, candidate = temp / 'original-fixture.ttc', temp / 'Swirl-VF.ttc'
+                source, candidate = temp / 'original-fixture.ttc', temp / 'SwirlVF.ttc'
                 make_fixture(source)
                 source_digest = source_hash(source)
                 report['source_sha256'] = source_digest

@@ -1,0 +1,883 @@
+﻿2026-10-30T03:57:27.8225670Z Current runner version: '2.338.0'
+2026-10-30T03:57:27.8247580Z ##[group]Runner Image Provisioner
+2026-10-30T03:57:27.8248366Z Hosted Compute Agent
+2026-10-30T03:57:27.8248887Z Version: 20261021.618
+2026-10-30T03:57:27.8249490Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-30T03:57:27.8250128Z Build Date: 2026-10-21T00:45:21Z
+2026-10-30T03:57:27.8251164Z Worker ID: {8c7ca042-10d7-4419-8140-7973e9e28746}
+2026-10-30T03:57:27.8252083Z Region: centralus
+2026-10-30T03:57:27.8252581Z Cloud: Azure
+2026-10-30T03:57:27.8253114Z ##[endgroup]
+2026-10-30T03:57:27.8254392Z ##[group]Operating System
+2026-10-30T03:57:27.8255028Z Microsoft Windows Server 2025
+2026-10-30T03:57:27.8255646Z 10.0.26100
+2026-10-30T03:57:27.8256123Z Datacenter
+2026-10-30T03:57:27.8256618Z ##[endgroup]
+2026-10-30T03:57:27.8257117Z ##[group]Runner Image
+2026-10-30T03:57:27.8257650Z Image: windows-2025-vs2026
+2026-10-30T03:57:27.8258194Z Version: 20261021.278.1
+2026-10-30T03:57:27.8259638Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261021.278/images/windows/Windows2025-VS2026-Readme.md
+2026-10-30T03:57:27.8261107Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261021.278
+2026-10-30T03:57:27.8261925Z ##[endgroup]
+2026-10-30T03:57:27.8262895Z ##[group]GITHUB_TOKEN Permissions
+2026-10-30T03:57:27.8264518Z Contents: read
+2026-10-30T03:57:27.8265070Z Metadata: read
+2026-10-30T03:57:27.8265597Z ##[endgroup]
+2026-10-30T03:57:27.8267308Z Secret source: Actions
+2026-10-30T03:57:27.8268106Z Cache mode: write
+2026-10-30T03:57:27.8268818Z Prepare workflow directory
+2026-10-30T03:57:27.8802874Z Prepare all required actions
+2026-10-30T03:57:27.8866041Z Getting action download info
+2026-10-30T03:57:28.0911001Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-30T03:57:28.2822785Z Complete job name: native-protocols (windows-latest)
+2026-10-30T03:57:28.4051373Z ##[group]Run actions/checkout@v4
+2026-10-30T03:57:28.4052724Z with:
+2026-10-30T03:57:28.4053225Z   ref: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:28.4053815Z   persist-credentials: false
+2026-10-30T03:57:28.4054333Z   repository: SOLHK/Swirl
+2026-10-30T03:57:28.4057836Z   token: ***
+2026-10-30T03:57:28.4058272Z   ssh-strict: true
+2026-10-30T03:57:28.4058736Z   ssh-user: git
+2026-10-30T03:57:28.4059196Z   clean: true
+2026-10-30T03:57:28.4059660Z   sparse-checkout-cone-mode: true
+2026-10-30T03:57:28.4060203Z   fetch-depth: 1
+2026-10-30T03:57:28.4060677Z   fetch-tags: false
+2026-10-30T03:57:28.4061130Z   show-progress: true
+2026-10-30T03:57:28.4061582Z   lfs: false
+2026-10-30T03:57:28.4062039Z   submodules: false
+2026-10-30T03:57:28.4062734Z   set-safe-directory: true
+2026-10-30T03:57:28.4063524Z   allow-unsafe-pr-checkout: false
+2026-10-30T03:57:28.4064406Z env:
+2026-10-30T03:57:28.4065035Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:28.4065697Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:57:28.4066209Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:57:28.4066700Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:57:28.4067220Z ##[endgroup]
+2026-10-30T03:57:28.5407460Z Syncing repository: SOLHK/Swirl
+2026-10-30T03:57:28.5409041Z ##[group]Getting Git version info
+2026-10-30T03:57:28.5409612Z Working directory is 'D:\a\Swirl\Swirl'
+2026-10-30T03:57:28.6032537Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-30T03:57:28.9109238Z git version 2.56.0.windows.2
+2026-10-30T03:57:28.9160975Z ##[endgroup]
+2026-10-30T03:57:28.9181032Z Temporarily overriding HOME='D:\a\_temp\4949485c-a26c-4dd6-acf2-19566861d711' before making global git config changes
+2026-10-30T03:57:28.9182397Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-30T03:57:28.9191153Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Swirl\Swirl
+2026-10-30T03:57:28.9797486Z Deleting the contents of 'D:\a\Swirl\Swirl'
+2026-10-30T03:57:28.9804013Z ##[group]Initializing the repository
+2026-10-30T03:57:28.9812118Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\Swirl\Swirl
+2026-10-30T03:57:29.0685072Z Initialized empty Git repository in D:/a/Swirl/Swirl/.git/
+2026-10-30T03:57:29.0730723Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/SOLHK/Swirl
+2026-10-30T03:57:29.1324029Z ##[endgroup]
+2026-10-30T03:57:29.1324949Z ##[group]Disabling automatic garbage collection
+2026-10-30T03:57:29.1332015Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-30T03:57:29.1724042Z ##[endgroup]
+2026-10-30T03:57:29.1724901Z ##[group]Setting up auth
+2026-10-30T03:57:29.1734764Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-30T03:57:29.2080994Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-30T03:57:30.4849024Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-30T03:57:30.5204456Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-30T03:57:31.0008902Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-30T03:57:31.0358793Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-30T03:57:31.5047908Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-30T03:57:31.5392676Z ##[endgroup]
+2026-10-30T03:57:31.5400820Z ##[group]Fetching the repository
+2026-10-30T03:57:31.5401804Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:33.7572132Z From https://github.com/SOLHK/Swirl
+2026-10-30T03:57:33.7573060Z  * branch            2bf61c4fe8ca8a6948f64f34caab7379169890d8 -> FETCH_HEAD
+2026-10-30T03:57:33.7619908Z ##[endgroup]
+2026-10-30T03:57:33.7620790Z ##[group]Determining the checkout info
+2026-10-30T03:57:33.7621529Z ##[endgroup]
+2026-10-30T03:57:33.7632160Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-30T03:57:33.8110511Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-30T03:57:33.8459531Z ##[group]Checking out the ref
+2026-10-30T03:57:33.8471342Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:34.5771290Z Note: switching to '2bf61c4fe8ca8a6948f64f34caab7379169890d8'.
+2026-10-30T03:57:34.5771890Z 
+2026-10-30T03:57:34.5772166Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-30T03:57:34.5772801Z changes and commit them, and you can discard any commits you make in this
+2026-10-30T03:57:34.5773388Z state without impacting any branches by switching back to a branch.
+2026-10-30T03:57:34.5773776Z 
+2026-10-30T03:57:34.5774017Z If you want to create a new branch to retain commits you create, you may
+2026-10-30T03:57:34.5774608Z do so (now or later) by using -c with the switch command. Example:
+2026-10-30T03:57:34.5774869Z 
+2026-10-30T03:57:34.5775170Z   git switch -c <new-branch-name>
+2026-10-30T03:57:34.5775893Z 
+2026-10-30T03:57:34.5776617Z Or undo this operation with:
+2026-10-30T03:57:34.5776974Z 
+2026-10-30T03:57:34.5777087Z   git switch -
+2026-10-30T03:57:34.5777278Z 
+2026-10-30T03:57:34.5777635Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-30T03:57:34.5778173Z 
+2026-10-30T03:57:34.5779581Z HEAD is now at 2bf61c4 docs(tun): retain dual-stack UDP driver evidence and open failure
+2026-10-30T03:57:34.5894856Z ##[endgroup]
+2026-10-30T03:57:34.6318585Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-30T03:57:34.6700248Z 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:34.6745525Z ##[group]Removing auth
+2026-10-30T03:57:34.6755131Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-30T03:57:34.7122229Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-30T03:57:35.2899207Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-30T03:57:35.3193169Z http.https://github.com/.extraheader
+2026-10-30T03:57:35.3236470Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-30T03:57:35.3566693Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-30T03:57:35.8963904Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-30T03:57:35.9314533Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-30T03:57:36.4851439Z ##[endgroup]
+2026-10-30T03:57:36.5225164Z ##[group]Run rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+2026-10-30T03:57:36.5226060Z [36;1mrustup toolchain install stable --profile minimal --component rustfmt --component clippy[0m
+2026-10-30T03:57:36.5806221Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:57:36.5806798Z env:
+2026-10-30T03:57:36.5807193Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:36.5807615Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:57:36.5807967Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:57:36.5808256Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:57:36.5808549Z ##[endgroup]
+2026-10-30T03:57:41.6222242Z info: syncing channel updates for stable-x86_64-pc-windows-msvc
+2026-10-30T03:57:42.1354872Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-30T03:57:42.1613183Z info: component clippy is up to date
+2026-10-30T03:57:42.1613771Z info: component rustfmt is up to date
+2026-10-30T03:57:42.1635534Z 
+2026-10-30T03:57:42.1846146Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-30T03:57:42.1847252Z 
+2026-10-30T03:57:42.3108436Z ##[group]Run cargo fmt --all -- --check
+2026-10-30T03:57:42.3108890Z [36;1mcargo fmt --all -- --check[0m
+2026-10-30T03:57:42.3175467Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:57:42.3175923Z env:
+2026-10-30T03:57:42.3176265Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:42.3176654Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:57:42.3176952Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:57:42.3177258Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:57:42.3177587Z ##[endgroup]
+2026-10-30T03:57:46.8876390Z ##[group]Run cargo check --workspace --locked
+2026-10-30T03:57:46.8876844Z [36;1mcargo check --workspace --locked[0m
+2026-10-30T03:57:46.8938509Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:57:46.8939322Z env:
+2026-10-30T03:57:46.8939722Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:57:46.8940114Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:57:46.8940455Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:57:46.8940796Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:57:46.8941323Z ##[endgroup]
+2026-10-30T03:57:47.9322487Z     Updating crates.io index
+2026-10-30T03:57:48.8782843Z  Downloading crates ...
+2026-10-30T03:57:49.2116607Z   Downloaded base64ct v1.8.3
+2026-10-30T03:57:49.2414039Z   Downloaded cfg_aliases v0.2.2
+2026-10-30T03:57:49.2518130Z   Downloaded cfg-if v1.0.5
+2026-10-30T03:57:49.2674629Z   Downloaded c2rust-bitfields-derive v0.18.0
+2026-10-30T03:57:49.2784436Z   Downloaded atomic-waker v1.1.2
+2026-10-30T03:57:49.2881936Z   Downloaded block-buffer v0.10.4
+2026-10-30T03:57:49.2959928Z   Downloaded alloc-no-stdlib v2.0.4
+2026-10-30T03:57:49.3110152Z   Downloaded alloc-stdlib v0.2.4
+2026-10-30T03:57:49.3250412Z   Downloaded futures-io v0.3.34
+2026-10-30T03:57:49.3315189Z   Downloaded multiversion_no_op v1.0.0
+2026-10-30T03:57:49.3395674Z   Downloaded once_cell v1.21.4
+2026-10-30T03:57:49.3629617Z   Downloaded c2rust-bitfields v0.18.0
+2026-10-30T03:57:49.3702725Z   Downloaded curve25519-dalek-derive v0.1.1
+2026-10-30T03:57:49.3766258Z   Downloaded defmt-parser v1.1.0
+2026-10-30T03:57:49.3836204Z   Downloaded crypto-common v0.2.2
+2026-10-30T03:57:49.4007383Z   Downloaded futures-macro v0.3.34
+2026-10-30T03:57:49.4079239Z   Downloaded equivalent v1.0.3
+2026-10-30T03:57:49.4164287Z   Downloaded futures-sink v0.3.34
+2026-10-30T03:57:49.4233159Z   Downloaded lru-slab v0.1.3
+2026-10-30T03:57:49.4290521Z   Downloaded futures-task v0.3.34
+2026-10-30T03:57:49.4413659Z   Downloaded h3-quinn v0.0.10
+2026-10-30T03:57:49.4473801Z   Downloaded itoa v1.0.18
+2026-10-30T03:57:49.4564522Z   Downloaded hash32 v0.3.1
+2026-10-30T03:57:49.4695783Z   Downloaded futures-core v0.3.34
+2026-10-30T03:57:49.4779248Z   Downloaded flagset v0.4.7
+2026-10-30T03:57:49.4897581Z   Downloaded autocfg v1.5.1
+2026-10-30T03:57:49.5051864Z   Downloaded form_urlencoded v1.2.2
+2026-10-30T03:57:49.5125137Z   Downloaded scopeguard v1.2.0
+2026-10-30T03:57:49.5233243Z   Downloaded ctutils v0.4.4
+2026-10-30T03:57:49.5392009Z   Downloaded generic-array v0.14.7
+2026-10-30T03:57:49.5497153Z   Downloaded managed v0.8.0
+2026-10-30T03:57:49.5607904Z   Downloaded idna_adapter v1.2.1
+2026-10-30T03:57:49.5669916Z   Downloaded crypto-common v0.1.7
+2026-10-30T03:57:49.5807050Z   Downloaded cpufeatures v0.3.1
+2026-10-30T03:57:49.5897638Z   Downloaded inout v0.1.4
+2026-10-30T03:57:49.5976934Z   Downloaded md-5 v0.10.6
+2026-10-30T03:57:49.6102901Z   Downloaded arraydeque v0.5.1
+2026-10-30T03:57:49.6180105Z   Downloaded bitflags v1.3.2
+2026-10-30T03:57:49.6455173Z   Downloaded core_detect v1.0.0
+2026-10-30T03:57:49.6556385Z   Downloaded fnv v1.0.7
+2026-10-30T03:57:49.6615153Z   Downloaded byteorder v1.5.0
+2026-10-30T03:57:49.6734566Z   Downloaded displaydoc v0.2.7
+2026-10-30T03:57:49.6886004Z   Downloaded encoding_rs_io v0.1.8
+2026-10-30T03:57:49.7009771Z   Downloaded constant_time_eq v0.4.2
+2026-10-30T03:57:49.7237952Z   Downloaded digest v0.11.3
+2026-10-30T03:57:49.7388707Z   Downloaded ipnet v2.12.2
+2026-10-30T03:57:49.7527476Z   Downloaded cmov v0.5.4
+2026-10-30T03:57:49.7657651Z   Downloaded sponge-cursor v0.1.0
+2026-10-30T03:57:49.7734471Z   Downloaded tokio-macros v2.7.2
+2026-10-30T03:57:49.7855520Z   Downloaded yoke-derive v0.8.4
+2026-10-30T03:57:49.7937037Z   Downloaded kem v0.3.0
+2026-10-30T03:57:49.8034731Z   Downloaded libloading v0.8.9
+2026-10-30T03:57:49.8255248Z   Downloaded cipher v0.4.4
+2026-10-30T03:57:49.8364525Z   Downloaded der_derive v0.8.0
+2026-10-30T03:57:49.8486849Z   Downloaded jobserver v0.1.35
+2026-10-30T03:57:49.8645214Z   Downloaded futures-executor v0.3.34
+2026-10-30T03:57:49.8742620Z   Downloaded cpufeatures v0.2.17
+2026-10-30T03:57:49.8868104Z   Downloaded defmt-macros v1.2.0
+2026-10-30T03:57:49.9150182Z   Downloaded keccak v0.2.2
+2026-10-30T03:57:49.9254922Z   Downloaded arrayvec v0.7.8
+2026-10-30T03:57:49.9401500Z   Downloaded blake2 v0.10.6
+2026-10-30T03:57:49.9587310Z   Downloaded find-msvc-tools v0.1.14
+2026-10-30T03:57:49.9699554Z   Downloaded chacha20 v0.10.2
+2026-10-30T03:57:49.9876058Z   Downloaded anstyle v1.0.14
+2026-10-30T03:57:49.9961612Z   Downloaded digest v0.10.7
+2026-10-30T03:57:50.0131440Z   Downloaded fastrand v2.5.0
+2026-10-30T03:57:50.0216092Z   Downloaded litemap v0.8.3
+2026-10-30T03:57:50.0370345Z   Downloaded annotate-snippets v0.12.16
+2026-10-30T03:57:50.0628326Z   Downloaded icu_provider v2.1.1
+2026-10-30T03:57:50.0818996Z   Downloaded getrandom v0.2.17
+2026-10-30T03:57:50.1033614Z   Downloaded defmt v1.2.0
+2026-10-30T03:57:50.1542715Z   Downloaded futures-channel v0.3.34
+2026-10-30T03:57:50.1672527Z   Downloaded hybrid-array v0.4.15
+2026-10-30T03:57:50.1841748Z   Downloaded icu_properties v2.1.2
+2026-10-30T03:57:50.1962003Z   Downloaded futures v0.3.34
+2026-10-30T03:57:50.2348171Z   Downloaded getrandom v0.4.3
+2026-10-30T03:57:50.2650535Z   Downloaded httparse v1.10.1
+2026-10-30T03:57:50.2839660Z   Downloaded log v0.4.34
+2026-10-30T03:57:50.2971173Z   Downloaded const-oid v0.10.2
+2026-10-30T03:57:50.3158816Z   Downloaded bytes v1.12.1
+2026-10-30T03:57:50.3421178Z   Downloaded icu_normalizer v2.1.1
+2026-10-30T03:57:50.3690256Z   Downloaded base64 v0.22.1
+2026-10-30T03:57:50.3991342Z   Downloaded icu_collections v2.1.1
+2026-10-30T03:57:50.4806428Z   Downloaded icu_normalizer_data v2.1.1
+2026-10-30T03:57:51.0084676Z   Downloaded pkcs8 v0.11.0
+2026-10-30T03:57:51.3292543Z   Downloaded rustc-hash v2.1.3
+2026-10-30T03:57:51.3985054Z   Downloaded blake3 v1.8.7
+2026-10-30T03:57:51.6779633Z   Downloaded percent-encoding v2.3.2
+2026-10-30T03:57:51.7217949Z   Downloaded zerofrom v0.1.8
+2026-10-30T03:57:51.7812347Z   Downloaded windows-targets v0.52.6
+2026-10-30T03:57:51.8009872Z   Downloaded icu_locale_core v2.1.1
+2026-10-30T03:57:52.1256687Z   Downloaded http v1.5.0
+2026-10-30T03:57:52.2041195Z   Downloaded memchr v2.8.3
+2026-10-30T03:57:52.3462705Z   Downloaded rustc_version v0.4.1
+2026-10-30T03:57:52.3704816Z   Downloaded indexmap v2.14.2
+2026-10-30T03:57:52.5813576Z   Downloaded windows-link v0.2.1
+2026-10-30T03:57:52.6167650Z   Downloaded cc v1.8.0
+2026-10-30T03:57:52.7798408Z   Downloaded mio v1.2.4
+2026-10-30T03:57:53.0322997Z   Downloaded untrusted v0.9.0
+2026-10-30T03:57:53.0450858Z   Downloaded der v0.8.2
+2026-10-30T03:57:53.0997474Z   Downloaded h3 v0.0.8
+2026-10-30T03:57:53.1567137Z   Downloaded heapless v0.9.3
+2026-10-30T03:57:53.2003391Z   Downloaded aes v0.8.4
+2026-10-30T03:57:53.2549968Z   Downloaded futures-util v0.3.34
+2026-10-30T03:57:53.9245261Z   Downloaded h2 v0.4.20
+2026-10-30T03:57:53.9719957Z   Downloaded idna v1.1.0
+2026-10-30T03:57:53.9890870Z   Downloaded brotli-decompressor v5.0.3
+2026-10-30T03:57:54.0152685Z   Downloaded hashbrown v0.17.1
+2026-10-30T03:57:54.0468966Z   Downloaded icu_properties_data v2.1.2
+2026-10-30T03:57:54.1291537Z   Downloaded granit-parser v2.0.0
+2026-10-30T03:57:54.2181986Z   Downloaded zerofrom-derive v0.1.8
+2026-10-30T03:57:54.2292682Z   Downloaded curve25519-dalek v5.0.0
+2026-10-30T03:57:54.2876409Z   Downloaded encoding_rs v0.8.42
+2026-10-30T03:57:54.3130895Z   Downloaded rand_pcg v0.10.2
+2026-10-30T03:57:54.3332194Z   Downloaded brotli v8.0.4
+2026-10-30T03:57:54.3957487Z   Downloaded potential_utf v0.1.6
+2026-10-30T03:57:54.4024558Z   Downloaded version_check v0.9.5
+2026-10-30T03:57:54.4135700Z   Downloaded libc v0.2.190
+2026-10-30T03:57:55.4736806Z   Downloaded subtle v2.6.1
+2026-10-30T03:57:55.4807369Z   Downloaded utf8_iter v1.0.4
+2026-10-30T03:57:55.4866653Z   Downloaded module-lattice v0.2.3
+2026-10-30T03:57:55.4958921Z   Downloaded pin-project-lite v0.2.17
+2026-10-30T03:57:55.5386625Z   Downloaded simdutf8 v0.1.5
+2026-10-30T03:57:55.5541113Z   Downloaded synstructure v0.14.0
+2026-10-30T03:57:55.5593802Z   Downloaded thiserror-impl v1.0.69
+2026-10-30T03:57:55.5684956Z   Downloaded pkg-config v0.3.32
+2026-10-30T03:57:55.5786620Z   Downloaded rustversion v1.0.23
+2026-10-30T03:57:55.5970606Z   Downloaded shlex v2.0.1
+2026-10-30T03:57:55.6038944Z   Downloaded slab v0.4.12
+2026-10-30T03:57:55.6108825Z   Downloaded spki v0.8.1
+2026-10-30T03:57:55.6235725Z   Downloaded rand_core v0.10.1
+2026-10-30T03:57:55.6332128Z   Downloaded thiserror v2.0.21
+2026-10-30T03:57:55.6804058Z   Downloaded writeable v0.6.4
+2026-10-30T03:57:55.6918880Z   Downloaded stable_deref_trait v1.2.1
+2026-10-30T03:57:55.6971354Z   Downloaded thiserror-impl v2.0.21
+2026-10-30T03:57:55.7062189Z   Downloaded quote v1.0.47
+2026-10-30T03:57:55.7232734Z   Downloaded thiserror v1.0.69
+2026-10-30T03:57:55.7665642Z   Downloaded tinystr v0.8.4
+2026-10-30T03:57:55.7804928Z   Downloaded rustls-pki-types v1.15.1
+2026-10-30T03:57:55.7978911Z   Downloaded unicode-ident v1.0.27
+2026-10-30T03:57:55.8450867Z   Downloaded zeroize v1.9.1
+2026-10-30T03:57:55.8539703Z   Downloaded zerovec-derive v0.11.6
+2026-10-30T03:57:55.8658528Z   Downloaded sha2 v0.10.9
+2026-10-30T03:57:55.8860456Z   Downloaded smallvec v1.16.3
+2026-10-30T03:57:55.8937905Z   Downloaded semver v1.0.28
+2026-10-30T03:57:55.9080329Z   Downloaded yoke v0.8.3
+2026-10-30T03:57:55.9203640Z   Downloaded zmij v1.0.23
+2026-10-30T03:57:55.9290475Z   Downloaded tokio-rustls v0.26.6
+2026-10-30T03:57:55.9372060Z   Downloaded zstd-safe v8.2.0
+2026-10-30T03:57:55.9505294Z   Downloaded ml-kem v0.3.3
+2026-10-30T03:57:55.9652940Z   Downloaded proc-macro2 v1.0.107
+2026-10-30T03:57:55.9844898Z   Downloaded quinn-udp v0.5.16
+2026-10-30T03:57:55.9951515Z   Downloaded socket2 v0.6.5
+2026-10-30T03:57:56.0028698Z   Downloaded tinyvec v1.13.3
+2026-10-30T03:57:56.0212038Z   Downloaded tracing-core v0.1.36
+2026-10-30T03:57:56.0387008Z   Downloaded zstd v0.14.3
+2026-10-30T03:57:56.0606810Z   Downloaded serde_core v1.0.229
+2026-10-30T03:57:56.0768445Z   Downloaded serde_derive v1.0.229
+2026-10-30T03:57:56.4299762Z   Downloaded num-traits v0.2.19
+2026-10-30T03:57:56.4460282Z   Downloaded url v2.5.8
+2026-10-30T03:57:56.4591017Z   Downloaded rand v0.10.3
+2026-10-30T03:57:56.4828972Z   Downloaded zerotrie v0.2.5
+2026-10-30T03:57:56.5043514Z   Downloaded quinn v0.11.12
+2026-10-30T03:57:56.5208895Z   Downloaded rustls-webpki v0.103.16
+2026-10-30T03:57:56.5395713Z   Downloaded serde v1.0.229
+2026-10-30T03:57:56.5568312Z   Downloaded x25519-dalek v3.0.0
+2026-10-30T03:57:56.5649364Z   Downloaded typenum v1.20.1
+2026-10-30T03:57:56.5790227Z   Downloaded x509-cert v0.3.0
+2026-10-30T03:57:56.6271032Z   Downloaded zerovec v0.11.8
+2026-10-30T03:57:56.6764434Z   Downloaded tokio-util v0.7.20
+2026-10-30T03:57:56.7275731Z   Downloaded serde_json v1.0.154
+2026-10-30T03:57:56.7728913Z   Downloaded sha3 v0.12.0
+2026-10-30T03:57:56.7886406Z   Downloaded webpki-roots v1.0.10
+2026-10-30T03:57:56.8001237Z   Downloaded syn v1.0.109
+2026-10-30T03:57:56.8532268Z   Downloaded quinn-proto v0.11.19
+2026-10-30T03:57:56.8833704Z   Downloaded syn v3.0.9
+2026-10-30T03:57:56.9429365Z   Downloaded unicode-width v0.2.2
+2026-10-30T03:57:56.9611217Z   Downloaded shake v0.1.0
+2026-10-30T03:57:56.9704661Z   Downloaded syn v2.0.119
+2026-10-30T03:57:57.0228463Z   Downloaded smoltcp v0.14.0
+2026-10-30T03:57:57.1026218Z   Downloaded tracing v0.1.44
+2026-10-30T03:57:57.1571857Z   Downloaded wintun v0.5.1
+2026-10-30T03:57:57.1809610Z   Downloaded serde-saphyr v2.0.0
+2026-10-30T03:57:57.9648371Z   Downloaded windows_x86_64_msvc v0.52.6
+2026-10-30T03:57:58.2382405Z   Downloaded zstd-sys v2.1.2+zstd.1.5.7
+2026-10-30T03:57:58.3123986Z   Downloaded tokio v1.53.3
+2026-10-30T03:57:58.5871737Z   Downloaded ring v0.17.14
+2026-10-30T03:57:58.8008686Z   Downloaded windows-sys v0.52.0
+2026-10-30T03:57:59.5992595Z   Downloaded windows-sys v0.61.2
+2026-10-30T03:58:00.6742015Z    Compiling proc-macro2 v1.0.107
+2026-10-30T03:58:00.6743415Z    Compiling quote v1.0.47
+2026-10-30T03:58:00.6743965Z    Compiling unicode-ident v1.0.27
+2026-10-30T03:58:00.6744462Z     Checking cfg-if v1.0.5
+2026-10-30T03:58:03.5921228Z    Compiling getrandom v0.4.3
+2026-10-30T03:58:08.3641983Z    Compiling find-msvc-tools v0.1.14
+2026-10-30T03:58:10.8502649Z    Compiling shlex v2.0.1
+2026-10-30T03:58:11.0940262Z     Checking typenum v1.20.1
+2026-10-30T03:58:11.1618428Z     Checking stable_deref_trait v1.2.1
+2026-10-30T03:58:11.2022915Z     Checking zeroize v1.9.1
+2026-10-30T03:58:11.7418188Z    Compiling jobserver v0.1.35
+2026-10-30T03:58:12.0872182Z    Compiling cc v1.8.0
+2026-10-30T03:58:12.2210469Z     Checking windows-link v0.2.1
+2026-10-30T03:58:12.3036018Z     Checking rand_core v0.10.1
+2026-10-30T03:58:12.3275373Z    Compiling version_check v0.9.5
+2026-10-30T03:58:12.5025760Z     Checking pin-project-lite v0.2.17
+2026-10-30T03:58:12.6041842Z     Checking subtle v2.6.1
+2026-10-30T03:58:12.6857787Z    Compiling generic-array v0.14.7
+2026-10-30T03:58:12.7149721Z     Checking windows-sys v0.61.2
+2026-10-30T03:58:13.1064494Z    Compiling syn v3.0.9
+2026-10-30T03:58:13.1853692Z     Checking bytes v1.12.1
+2026-10-30T03:58:14.3384640Z    Compiling syn v2.0.119
+2026-10-30T03:58:14.7535389Z    Compiling ring v0.17.14
+2026-10-30T03:58:15.8081155Z     Checking socket2 v0.6.5
+2026-10-30T03:58:16.0296648Z     Checking litemap v0.8.3
+2026-10-30T03:58:16.1871897Z     Checking cmov v0.5.4
+2026-10-30T03:58:16.3957779Z    Compiling serde_core v1.0.229
+2026-10-30T03:58:16.6391235Z    Compiling rustversion v1.0.23
+2026-10-30T03:58:16.9360186Z    Compiling synstructure v0.14.0
+2026-10-30T03:58:17.5913592Z     Checking memchr v2.8.3
+2026-10-30T03:58:18.0980724Z     Checking writeable v0.6.4
+2026-10-30T03:58:18.2875531Z     Checking once_cell v1.21.4
+2026-10-30T03:58:18.5209855Z     Checking ctutils v0.4.4
+2026-10-30T03:58:18.7278269Z     Checking mio v1.2.4
+2026-10-30T03:58:18.9446503Z     Checking crypto-common v0.1.7
+2026-10-30T03:58:19.0249720Z    Compiling zerofrom-derive v0.1.8
+2026-10-30T03:58:19.0419663Z    Compiling yoke-derive v0.8.4
+2026-10-30T03:58:19.0918583Z    Compiling zerovec-derive v0.11.6
+2026-10-30T03:58:19.6537067Z    Compiling displaydoc v0.2.7
+2026-10-30T03:58:20.4771263Z    Compiling tokio-macros v2.7.2
+2026-10-30T03:58:20.4817563Z     Checking getrandom v0.2.17
+2026-10-30T03:58:20.4981955Z     Checking smallvec v1.16.3
+2026-10-30T03:58:20.5601826Z     Checking zerofrom v0.1.8
+2026-10-30T03:58:20.5837334Z     Checking futures-sink v0.3.34
+2026-10-30T03:58:20.6642268Z     Checking yoke v0.8.3
+2026-10-30T03:58:20.6806382Z     Checking cpufeatures v0.3.1
+2026-10-30T03:58:20.6881827Z    Compiling autocfg v1.5.1
+2026-10-30T03:58:20.7215753Z     Checking itoa v1.0.18
+2026-10-30T03:58:20.8476907Z     Checking zerovec v0.11.8
+2026-10-30T03:58:20.8477901Z     Checking zerotrie v0.2.5
+2026-10-30T03:58:21.1046614Z     Checking slab v0.4.12
+2026-10-30T03:58:21.1492097Z     Checking untrusted v0.9.0
+2026-10-30T03:58:21.2282615Z     Checking alloc-no-stdlib v2.0.4
+2026-10-30T03:58:21.2730038Z     Checking futures-core v0.3.34
+2026-10-30T03:58:21.2730599Z    Compiling icu_normalizer_data v2.1.1
+2026-10-30T03:58:21.3090108Z    Compiling icu_properties_data v2.1.2
+2026-10-30T03:58:21.3681201Z     Checking alloc-stdlib v0.2.4
+2026-10-30T03:58:21.4620808Z     Checking tokio v1.53.3
+2026-10-30T03:58:21.4666926Z     Checking tinystr v0.8.4
+2026-10-30T03:58:21.4755875Z     Checking potential_utf v0.1.6
+2026-10-30T03:58:21.5645671Z     Checking icu_collections v2.1.1
+2026-10-30T03:58:21.6245381Z     Checking icu_locale_core v2.1.1
+2026-10-30T03:58:21.9883757Z    Compiling num-traits v0.2.19
+2026-10-30T03:58:22.1676078Z     Checking hybrid-array v0.4.15
+2026-10-30T03:58:22.4505509Z     Checking icu_provider v2.1.1
+2026-10-30T03:58:23.2459470Z     Checking rustls-pki-types v1.15.1
+2026-10-30T03:58:23.4876166Z    Compiling cfg_aliases v0.2.2
+2026-10-30T03:58:23.5386523Z    Compiling encoding_rs v0.8.42
+2026-10-30T03:58:23.7740097Z     Checking brotli-decompressor v5.0.3
+2026-10-30T03:58:23.8240623Z     Checking tracing-core v0.1.36
+2026-10-30T03:58:24.1546505Z     Checking block-buffer v0.10.4
+2026-10-30T03:58:24.2536340Z     Checking futures-io v0.3.34
+2026-10-30T03:58:24.5570836Z    Compiling rustls v0.23.46 (D:\a\Swirl\Swirl\core\vendor\rustls)
+2026-10-30T03:58:24.5893678Z    Compiling serde v1.0.229
+2026-10-30T03:58:24.7272573Z    Compiling syn v1.0.109
+2026-10-30T03:58:24.8599048Z    Compiling zmij v1.0.23
+2026-10-30T03:58:24.8944622Z    Compiling windows_x86_64_msvc v0.52.6
+2026-10-30T03:58:25.1006529Z     Checking brotli v8.0.4
+2026-10-30T03:58:25.1072392Z     Checking digest v0.10.7
+2026-10-30T03:58:25.1379872Z     Checking tracing v0.1.44
+2026-10-30T03:58:25.1672187Z     Checking icu_properties v2.1.2
+2026-10-30T03:58:25.2838325Z     Checking icu_normalizer v2.1.1
+2026-10-30T03:58:25.6858381Z     Checking rustls-webpki v0.103.16
+2026-10-30T03:58:25.9885280Z     Checking crypto-common v0.2.2
+2026-10-30T03:58:26.1616437Z     Checking http v1.5.0
+2026-10-30T03:58:26.3174933Z    Compiling serde_derive v1.0.229
+2026-10-30T03:58:26.7190757Z     Checking simdutf8 v0.1.5
+2026-10-30T03:58:26.8366198Z    Compiling semver v1.0.28
+2026-10-30T03:58:26.9136585Z    Compiling serde_json v1.0.154
+2026-10-30T03:58:27.1000004Z     Checking scopeguard v1.2.0
+2026-10-30T03:58:27.1636973Z     Checking core_detect v1.0.0
+2026-10-30T03:58:27.1639719Z    Compiling libc v0.2.190
+2026-10-30T03:58:27.2723343Z    Compiling multiversion_no_op v1.0.0
+2026-10-30T03:58:27.4859132Z    Compiling thiserror v2.0.21
+2026-10-30T03:58:27.9645612Z    Compiling rustc_version v0.4.1
+2026-10-30T03:58:28.2639560Z     Checking idna_adapter v1.2.1
+2026-10-30T03:58:28.9281201Z    Compiling quinn-udp v0.5.16
+2026-10-30T03:58:29.2636146Z     Checking chacha20 v0.10.2
+2026-10-30T03:58:29.4760349Z    Compiling thiserror-impl v2.0.21
+2026-10-30T03:58:30.5325691Z    Compiling pkg-config v0.3.32
+2026-10-30T03:58:30.9827246Z     Checking cpufeatures v0.2.17
+2026-10-30T03:58:31.0277710Z     Checking unicode-width v0.2.2
+2026-10-30T03:58:31.1471589Z     Checking utf8_iter v1.0.4
+2026-10-30T03:58:31.2189688Z    Compiling thiserror v1.0.69
+2026-10-30T03:58:31.2406546Z     Checking anstyle v1.0.14
+2026-10-30T03:58:31.2890166Z     Checking arraydeque v0.5.1
+2026-10-30T03:58:31.3973208Z     Checking percent-encoding v2.3.2
+2026-10-30T03:58:31.4591489Z     Checking granit-parser v2.0.0
+2026-10-30T03:58:31.5098609Z     Checking form_urlencoded v1.2.2
+2026-10-30T03:58:31.5495058Z     Checking annotate-snippets v0.12.16
+2026-10-30T03:58:31.5995112Z     Checking idna v1.1.0
+2026-10-30T03:58:31.8660859Z    Compiling zstd-sys v2.1.2+zstd.1.5.7
+2026-10-30T03:58:32.0382681Z     Checking ipnet v2.12.2
+2026-10-30T03:58:32.1379197Z     Checking rand v0.10.3
+2026-10-30T03:58:32.2315037Z     Checking encoding_rs_io v0.1.8
+2026-10-30T03:58:32.3049314Z     Checking windows-targets v0.52.6
+2026-10-30T03:58:32.3624893Z    Compiling curve25519-dalek v5.0.0
+2026-10-30T03:58:32.8453788Z     Checking digest v0.11.3
+2026-10-30T03:58:32.9098533Z    Compiling quinn v0.11.12
+2026-10-30T03:58:32.9385120Z     Checking futures-channel v0.3.34
+2026-10-30T03:58:33.1348523Z    Compiling thiserror-impl v1.0.69
+2026-10-30T03:58:33.1585703Z    Compiling der_derive v0.8.0
+2026-10-30T03:58:33.1957494Z    Compiling futures-macro v0.3.34
+2026-10-30T03:58:33.2964749Z    Compiling c2rust-bitfields-derive v0.18.0
+2026-10-30T03:58:33.8675204Z     Checking rand_pcg v0.10.2
+2026-10-30T03:58:33.9782759Z     Checking keccak v0.2.2
+2026-10-30T03:58:34.0328015Z     Checking rustc-hash v2.1.3
+2026-10-30T03:58:34.0631568Z     Checking const-oid v0.10.2
+2026-10-30T03:58:34.1088088Z     Checking lru-slab v0.1.3
+2026-10-30T03:58:34.1988048Z     Checking futures-task v0.3.34
+2026-10-30T03:58:34.3265292Z     Checking sponge-cursor v0.1.0
+2026-10-30T03:58:34.4479524Z     Checking flagset v0.4.7
+2026-10-30T03:58:34.4656258Z     Checking tinyvec v1.13.3
+2026-10-30T03:58:34.5405994Z     Checking futures-util v0.3.34
+2026-10-30T03:58:34.5607283Z     Checking c2rust-bitfields v0.18.0
+2026-10-30T03:58:34.8212832Z     Checking quinn-proto v0.11.19
+2026-10-30T03:58:34.8609474Z     Checking windows-sys v0.52.0
+2026-10-30T03:58:36.6025074Z     Checking der v0.8.2
+2026-10-30T03:58:36.9687020Z     Checking serde-saphyr v2.0.0
+2026-10-30T03:58:37.5987920Z     Checking url v2.5.8
+2026-10-30T03:58:38.0391996Z     Checking sha2 v0.10.9
+2026-10-30T03:58:38.3135844Z     Checking tokio-util v0.7.20
+2026-10-30T03:58:38.3748964Z    Compiling curve25519-dalek-derive v0.1.1
+2026-10-30T03:58:38.8610034Z     Checking libloading v0.8.9
+2026-10-30T03:58:38.9976751Z     Checking log v0.4.34
+2026-10-30T03:58:39.0138988Z    Compiling httparse v1.10.1
+2026-10-30T03:58:39.1337803Z     Checking base64 v0.22.1
+2026-10-30T03:58:39.3643933Z     Checking hashbrown v0.17.1
+2026-10-30T03:58:39.3865279Z     Checking equivalent v1.0.3
+2026-10-30T03:58:39.4351611Z     Checking swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:58:39.4366640Z     Checking wintun v0.5.1
+2026-10-30T03:58:39.9314990Z     Checking indexmap v2.14.2
+2026-10-30T03:58:40.5284135Z     Checking spki v0.8.1
+2026-10-30T03:58:40.6902397Z     Checking shake v0.1.0
+2026-10-30T03:58:40.7742014Z     Checking sha3 v0.12.0
+2026-10-30T03:58:40.9209192Z     Checking kem v0.3.0
+2026-10-30T03:58:41.0120984Z     Checking module-lattice v0.2.3
+2026-10-30T03:58:41.1761668Z    Compiling zstd-safe v8.2.0
+2026-10-30T03:58:41.2316014Z     Checking fnv v1.0.7
+2026-10-30T03:58:41.2921685Z     Checking atomic-waker v1.1.2
+2026-10-30T03:58:41.3610977Z     Checking ml-kem v0.3.3
+2026-10-30T03:58:41.3629374Z     Checking h2 v0.4.20
+2026-10-30T03:58:42.0519289Z     Checking x509-cert v0.3.0
+2026-10-30T03:58:42.4801943Z     Checking x25519-dalek v3.0.0
+2026-10-30T03:58:42.5253999Z     Checking swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:58:42.7879983Z     Checking futures-executor v0.3.34
+2026-10-30T03:58:42.9018366Z     Checking tokio-rustls v0.26.6
+2026-10-30T03:58:43.0392757Z     Checking webpki-roots v1.0.10
+2026-10-30T03:58:43.1284788Z    Compiling blake3 v1.8.7
+2026-10-30T03:58:43.1328269Z     Checking inout v0.1.4
+2026-10-30T03:58:43.2380733Z     Checking fastrand v2.5.0
+2026-10-30T03:58:43.4051012Z     Checking byteorder v1.5.0
+2026-10-30T03:58:43.4131111Z    Compiling heapless v0.9.3
+2026-10-30T03:58:43.5701203Z     Checking hash32 v0.3.1
+2026-10-30T03:58:43.6571595Z     Checking h3 v0.0.8
+2026-10-30T03:58:43.7946619Z     Checking cipher v0.4.4
+2026-10-30T03:58:43.9081027Z     Checking futures v0.3.34
+2026-10-30T03:58:43.9782915Z     Checking arrayvec v0.7.8
+2026-10-30T03:58:44.0188112Z     Checking swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:58:44.1243812Z    Compiling smoltcp v0.14.0
+2026-10-30T03:58:44.1508911Z     Checking constant_time_eq v0.4.2
+2026-10-30T03:58:44.4573873Z     Checking zstd v0.14.3
+2026-10-30T03:58:44.5591915Z     Checking aes v0.8.4
+2026-10-30T03:58:44.7155550Z     Checking h3-quinn v0.0.10
+2026-10-30T03:58:44.9228623Z     Checking blake2 v0.10.6
+2026-10-30T03:58:44.9868622Z     Checking md-5 v0.10.6
+2026-10-30T03:58:45.0868978Z     Checking managed v0.8.0
+2026-10-30T03:58:45.1335063Z     Checking bitflags v1.3.2
+2026-10-30T03:58:45.1795988Z     Checking swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:58:45.2727044Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T03:58:45.2792695Z     Checking swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:58:45.7661467Z     Checking swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:58:46.3819762Z     Checking swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:58:47.3468035Z     Checking swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:58:49.6109151Z     Finished `dev` profile [unoptimized] target(s) in 1m 02s
+2026-10-30T03:58:49.8005079Z ##[group]Run cargo clippy --workspace --all-targets --locked -- -D warnings
+2026-10-30T03:58:49.8005993Z [36;1mcargo clippy --workspace --all-targets --locked -- -D warnings[0m
+2026-10-30T03:58:49.8095997Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:58:49.8096622Z env:
+2026-10-30T03:58:49.8097221Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:58:49.8097816Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:58:49.8098242Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:58:49.8099611Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:58:49.8100018Z ##[endgroup]
+2026-10-30T03:58:51.1128477Z     Checking swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:58:51.1131888Z     Checking tokio v1.53.3
+2026-10-30T03:58:51.1179965Z     Checking swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:58:51.1207127Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T03:58:54.0440273Z     Checking swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:58:54.3651368Z     Checking tokio-util v0.7.20
+2026-10-30T03:58:54.4469218Z     Checking quinn v0.11.12
+2026-10-30T03:58:54.5207891Z     Checking tokio-rustls v0.26.6
+2026-10-30T03:58:54.7565321Z     Checking h3 v0.0.8
+2026-10-30T03:58:54.8757509Z     Checking h2 v0.4.20
+2026-10-30T03:58:55.0186318Z     Checking swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:58:55.8414445Z     Checking h3-quinn v0.0.10
+2026-10-30T03:58:57.3227357Z     Checking swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:58:58.2979120Z     Checking swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:58:58.8806409Z     Checking swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:59:00.7455524Z     Checking swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:59:05.4558651Z     Finished `dev` profile [unoptimized] target(s) in 14.78s
+2026-10-30T03:59:05.6257840Z ##[group]Run cargo test --workspace --locked
+2026-10-30T03:59:05.6258369Z [36;1mcargo test --workspace --locked[0m
+2026-10-30T03:59:05.6325537Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:59:05.6326010Z env:
+2026-10-30T03:59:05.6326408Z   SWIRL_SOURCE_SHA: 2bf61c4fe8ca8a6948f64f34caab7379169890d8
+2026-10-30T03:59:05.6326842Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:59:05.6327158Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-30T03:59:05.6327557Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-30T03:59:05.6327884Z ##[endgroup]
+2026-10-30T03:59:06.1196071Z warning: output filename collision at D:\a\Swirl\Swirl\core\target\debug\deps\swirl_api.pdb
+2026-10-30T03:59:06.1196907Z   |
+2026-10-30T03:59:06.1198175Z   = note: the bin target `swirl-api` in package `swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)` has the same output filename as the lib target `swirl_api` in package `swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)`
+2026-10-30T03:59:06.1200390Z   = note: if this looks unexpected, it may be a bug in Cargo. Please file a bug report at https://github.com/rust-lang/cargo/issues/ with as much information as you can provide.
+2026-10-30T03:59:06.1201785Z   = note: cargo 1.99.1 (5f94df478 2026-08-27) running on `x86_64-pc-windows-msvc` target `x86_64-pc-windows-msvc`
+2026-10-30T03:59:06.1204707Z   = note: first unit: Unit { pkg: Package { id: PackageId { name: "swirl-api", version: "0.1.0", source: "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api" }, ..: ".." }, target: TargetInner { name: "swirl-api", doc: true, ..: with_path("D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api\\src\\main.rs", Edition2024) }, profile: Profile { name: "test", debug_assertions: true, overflow_checks: true, strip: Resolved(Named("debuginfo")), ..: default() }, kind: Host, mode: Build, features: [], rustflags: [], rustdocflags: [], links_overrides: {}, artifact: false, artifact_target_for_features: None, is_std: false, dep_hash: 18094655277230838388 }
+2026-10-30T03:59:06.1210274Z   = note: second unit: Unit { pkg: Package { id: PackageId { name: "swirl-api", version: "0.1.0", source: "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api" }, ..: ".." }, target: TargetInner { name_inferred: true, ..: lib_target("swirl_api", ["cdylib", "rlib"], "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api\\src\\lib.rs", Edition2024) }, profile: Profile { name: "test", debug_assertions: true, overflow_checks: true, strip: Resolved(Named("debuginfo")), ..: default() }, kind: Host, mode: Build, features: [], rustflags: [], rustdocflags: [], links_overrides: {}, artifact: false, artifact_target_for_features: None, is_std: false, dep_hash: 18384329820020840453 }
+2026-10-30T03:59:06.2631543Z    Compiling stable_deref_trait v1.2.1
+2026-10-30T03:59:06.2635521Z    Compiling bytes v1.12.1
+2026-10-30T03:59:06.2648230Z    Compiling zerofrom v0.1.8
+2026-10-30T03:59:06.2648901Z    Compiling memchr v2.8.3
+2026-10-30T03:59:06.3200619Z    Compiling typenum v1.20.1
+2026-10-30T03:59:06.3746538Z    Compiling yoke v0.8.3
+2026-10-30T03:59:06.5537874Z    Compiling zerovec v0.11.8
+2026-10-30T03:59:06.9986580Z    Compiling itoa v1.0.18
+2026-10-30T03:59:07.0744335Z    Compiling serde_core v1.0.229
+2026-10-30T03:59:07.1834840Z    Compiling tinystr v0.8.4
+2026-10-30T03:59:07.2200545Z    Compiling litemap v0.8.3
+2026-10-30T03:59:07.3764595Z    Compiling writeable v0.6.4
+2026-10-30T03:59:07.3908021Z    Compiling potential_utf v0.1.6
+2026-10-30T03:59:07.4215975Z    Compiling zerotrie v0.2.5
+2026-10-30T03:59:07.5215870Z    Compiling smallvec v1.16.3
+2026-10-30T03:59:07.6215879Z    Compiling icu_locale_core v2.1.1
+2026-10-30T03:59:07.7305664Z    Compiling icu_collections v2.1.1
+2026-10-30T03:59:07.7338801Z    Compiling windows-link v0.2.1
+2026-10-30T03:59:07.7775582Z    Compiling icu_properties_data v2.1.2
+2026-10-30T03:59:07.9247505Z    Compiling zmij v1.0.23
+2026-10-30T03:59:08.2910739Z    Compiling icu_normalizer_data v2.1.1
+2026-10-30T03:59:08.3174651Z    Compiling num-traits v0.2.19
+2026-10-30T03:59:08.3469824Z    Compiling http v1.5.0
+2026-10-30T03:59:08.8061754Z    Compiling icu_provider v2.1.1
+2026-10-30T03:59:09.1208814Z    Compiling icu_properties v2.1.2
+2026-10-30T03:59:09.1298895Z    Compiling icu_normalizer v2.1.1
+2026-10-30T03:59:09.4723310Z    Compiling core_detect v1.0.0
+2026-10-30T03:59:09.5981006Z    Compiling serde v1.0.229
+2026-10-30T03:59:09.6822044Z    Compiling serde_json v1.0.154
+2026-10-30T03:59:09.7742215Z    Compiling scopeguard v1.2.0
+2026-10-30T03:59:09.8428116Z    Compiling zeroize v1.9.1
+2026-10-30T03:59:10.0020910Z    Compiling simdutf8 v0.1.5
+2026-10-30T03:59:10.2047830Z    Compiling ipnet v2.12.2
+2026-10-30T03:59:10.2537483Z    Compiling encoding_rs v0.8.42
+2026-10-30T03:59:10.5927236Z    Compiling idna_adapter v1.2.1
+2026-10-30T03:59:10.7041546Z    Compiling windows-sys v0.61.2
+2026-10-30T03:59:10.7634573Z    Compiling subtle v2.6.1
+2026-10-30T03:59:10.8933193Z    Compiling percent-encoding v2.3.2
+2026-10-30T03:59:10.9342484Z    Compiling arraydeque v0.5.1
+2026-10-30T03:59:11.0645779Z    Compiling anstyle v1.0.14
+2026-10-30T03:59:11.1164840Z    Compiling utf8_iter v1.0.4
+2026-10-30T03:59:11.2785444Z    Compiling unicode-width v0.2.2
+2026-10-30T03:59:11.2892613Z    Compiling pin-project-lite v0.2.17
+2026-10-30T03:59:11.3567165Z    Compiling idna v1.1.0
+2026-10-30T03:59:11.5382670Z    Compiling annotate-snippets v0.12.16
+2026-10-30T03:59:12.0974938Z    Compiling encoding_rs_io v0.1.8
+2026-10-30T03:59:12.2464317Z    Compiling granit-parser v2.0.0
+2026-10-30T03:59:12.4174434Z    Compiling form_urlencoded v1.2.2
+2026-10-30T03:59:12.5682668Z    Compiling generic-array v0.14.7
+2026-10-30T03:59:12.8188758Z    Compiling url v2.5.8
+2026-10-30T03:59:13.2439948Z    Compiling serde-saphyr v2.0.0
+2026-10-30T03:59:13.2510207Z    Compiling base64 v0.22.1
+2026-10-30T03:59:13.6001740Z    Compiling rand_core v0.10.1
+2026-10-30T03:59:13.7345854Z    Compiling crypto-common v0.1.7
+2026-10-30T03:59:13.7613351Z    Compiling getrandom v0.2.17
+2026-10-30T03:59:13.8215519Z    Compiling untrusted v0.9.0
+2026-10-30T03:59:13.8693145Z    Compiling block-buffer v0.10.4
+2026-10-30T03:59:13.9405136Z    Compiling ring v0.17.14
+2026-10-30T03:59:13.9883119Z    Compiling socket2 v0.6.5
+2026-10-30T03:59:14.4599116Z    Compiling mio v1.2.4
+2026-10-30T03:59:14.4930819Z    Compiling digest v0.10.7
+2026-10-30T03:59:14.7101949Z    Compiling once_cell v1.21.4
+2026-10-30T03:59:14.9066925Z    Compiling tokio v1.53.3
+2026-10-30T03:59:15.2764368Z    Compiling swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:59:16.3392769Z    Compiling cmov v0.5.4
+2026-10-30T03:59:16.5575386Z    Compiling ctutils v0.4.4
+2026-10-30T03:59:16.7895818Z    Compiling futures-sink v0.3.34
+2026-10-30T03:59:16.8009160Z    Compiling futures-core v0.3.34
+2026-10-30T03:59:16.8692923Z    Compiling slab v0.4.12
+2026-10-30T03:59:16.9161794Z    Compiling cpufeatures v0.3.1
+2026-10-30T03:59:16.9639444Z    Compiling cpufeatures v0.2.17
+2026-10-30T03:59:17.0105381Z    Compiling alloc-no-stdlib v2.0.4
+2026-10-30T03:59:17.0233629Z    Compiling hybrid-array v0.4.15
+2026-10-30T03:59:17.1010558Z    Compiling alloc-stdlib v0.2.4
+2026-10-30T03:59:17.1863245Z    Compiling rustls-pki-types v1.15.1
+2026-10-30T03:59:17.7054077Z    Compiling brotli-decompressor v5.0.3
+2026-10-30T03:59:18.1398563Z    Compiling windows_x86_64_msvc v0.52.6
+2026-10-30T03:59:18.1872487Z    Compiling sha2 v0.10.9
+2026-10-30T03:59:18.5949089Z    Compiling tracing-core v0.1.36
+2026-10-30T03:59:18.8486916Z    Compiling futures-io v0.3.34
+2026-10-30T03:59:19.0175283Z    Compiling tracing v0.1.44
+2026-10-30T03:59:19.1903426Z    Compiling brotli v8.0.4
+2026-10-30T03:59:19.2378283Z    Compiling windows-targets v0.52.6
+2026-10-30T03:59:19.2831456Z    Compiling crypto-common v0.2.2
+2026-10-30T03:59:20.4627010Z    Compiling rustls-webpki v0.103.16
+2026-10-30T03:59:20.5304470Z    Compiling thiserror v1.0.69
+2026-10-30T03:59:20.6057052Z    Compiling c2rust-bitfields v0.18.0
+2026-10-30T03:59:20.7320585Z    Compiling windows-sys v0.52.0
+2026-10-30T03:59:21.5230320Z    Compiling getrandom v0.4.3
+2026-10-30T03:59:21.6751520Z    Compiling chacha20 v0.10.2
+2026-10-30T03:59:21.9322925Z    Compiling libloading v0.8.9
+2026-10-30T03:59:22.1429986Z    Compiling log v0.4.34
+2026-10-30T03:59:22.3557289Z    Compiling thiserror v2.0.21
+2026-10-30T03:59:22.4482769Z    Compiling rustls v0.23.46 (D:\a\Swirl\Swirl\core\vendor\rustls)
+2026-10-30T03:59:22.7275539Z    Compiling rand v0.10.3
+2026-10-30T03:59:22.8207045Z    Compiling libc v0.2.190
+2026-10-30T03:59:22.9464702Z    Compiling digest v0.11.3
+2026-10-30T03:59:23.0632118Z    Compiling rand_pcg v0.10.2
+2026-10-30T03:59:23.2017753Z    Compiling keccak v0.2.2
+2026-10-30T03:59:23.3056758Z    Compiling flagset v0.4.7
+2026-10-30T03:59:23.4146089Z    Compiling rustc-hash v2.1.3
+2026-10-30T03:59:23.5030915Z    Compiling sponge-cursor v0.1.0
+2026-10-30T03:59:23.5035329Z    Compiling tinyvec v1.13.3
+2026-10-30T03:59:23.6093857Z    Compiling lru-slab v0.1.3
+2026-10-30T03:59:23.7204220Z    Compiling const-oid v0.10.2
+2026-10-30T03:59:23.9286159Z    Compiling quinn-udp v0.5.16
+2026-10-30T03:59:24.3064007Z    Compiling tokio-util v0.7.20
+2026-10-30T03:59:25.1564138Z    Compiling hashbrown v0.17.1
+2026-10-30T03:59:25.6843656Z    Compiling wintun v0.5.1
+2026-10-30T03:59:25.8983975Z    Compiling equivalent v1.0.3
+2026-10-30T03:59:25.9606069Z    Compiling indexmap v2.14.2
+2026-10-30T03:59:26.3480554Z    Compiling der v0.8.2
+2026-10-30T03:59:26.4547905Z    Compiling quinn-proto v0.11.19
+2026-10-30T03:59:26.7772645Z    Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:59:27.9915024Z    Compiling spki v0.8.1
+2026-10-30T03:59:28.2130846Z    Compiling curve25519-dalek v5.0.0
+2026-10-30T03:59:29.5105663Z    Compiling quinn v0.11.12
+2026-10-30T03:59:29.6370241Z    Compiling shake v0.1.0
+2026-10-30T03:59:29.7367058Z    Compiling sha3 v0.12.0
+2026-10-30T03:59:30.0263852Z    Compiling kem v0.3.0
+2026-10-30T03:59:30.1118456Z    Compiling module-lattice v0.2.3
+2026-10-30T03:59:30.1594488Z    Compiling atomic-waker v1.1.2
+2026-10-30T03:59:30.2556217Z    Compiling fnv v1.0.7
+2026-10-30T03:59:30.3255135Z    Compiling h2 v0.4.20
+2026-10-30T03:59:30.3596150Z    Compiling ml-kem v0.3.3
+2026-10-30T03:59:31.0170825Z    Compiling x25519-dalek v3.0.0
+2026-10-30T03:59:31.1085544Z    Compiling httparse v1.10.1
+2026-10-30T03:59:31.3307843Z    Compiling x509-cert v0.3.0
+2026-10-30T03:59:31.4203950Z    Compiling tokio-rustls v0.26.6
+2026-10-30T03:59:31.5773366Z    Compiling webpki-roots v1.0.10
+2026-10-30T03:59:31.6757211Z    Compiling futures-channel v0.3.34
+2026-10-30T03:59:31.6972047Z    Compiling futures-task v0.3.34
+2026-10-30T03:59:31.8605001Z    Compiling inout v0.1.4
+2026-10-30T03:59:31.8988540Z    Compiling futures-util v0.3.34
+2026-10-30T03:59:31.9679252Z    Compiling fastrand v2.5.0
+2026-10-30T03:59:32.2040864Z    Compiling cipher v0.4.4
+2026-10-30T03:59:32.4203805Z    Compiling arrayvec v0.7.8
+2026-10-30T03:59:32.6628492Z    Compiling constant_time_eq v0.4.2
+2026-10-30T03:59:32.8130994Z    Compiling blake3 v1.8.7
+2026-10-30T03:59:33.4064801Z    Compiling aes v0.8.4
+2026-10-30T03:59:34.0365118Z    Compiling md-5 v0.10.6
+2026-10-30T03:59:34.1519885Z    Compiling blake2 v0.10.6
+2026-10-30T03:59:34.5275708Z    Compiling swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:59:34.5452509Z    Compiling zstd-sys v2.1.2+zstd.1.5.7
+2026-10-30T03:59:34.6458555Z    Compiling zstd-safe v8.2.0
+2026-10-30T03:59:34.9067539Z    Compiling zstd v0.14.3
+2026-10-30T03:59:35.0824425Z    Compiling futures-executor v0.3.34
+2026-10-30T03:59:35.1594406Z    Compiling h3 v0.0.8
+2026-10-30T03:59:35.2519770Z    Compiling futures v0.3.34
+2026-10-30T03:59:35.3145853Z    Compiling swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:59:35.3156203Z    Compiling byteorder v1.5.0
+2026-10-30T03:59:35.5042250Z    Compiling hash32 v0.3.1
+2026-10-30T03:59:35.6152925Z    Compiling heapless v0.9.3
+2026-10-30T03:59:36.0128002Z    Compiling bitflags v1.3.2
+2026-10-30T03:59:36.0684024Z    Compiling managed v0.8.0
+2026-10-30T03:59:36.3792315Z    Compiling smoltcp v0.14.0
+2026-10-30T03:59:36.8270156Z    Compiling swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:59:37.9003764Z    Compiling h3-quinn v0.0.10
+2026-10-30T03:59:38.1374256Z    Compiling swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:59:38.2228394Z    Compiling swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:59:43.1295575Z    Compiling swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:59:51.0835434Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T04:00:19.9386035Z     Finished `test` profile [unoptimized] target(s) in 1m 14s
+2026-10-30T04:00:19.9839339Z      Running unittests src\lib.rs (target\debug\deps\swirl_api-c018b8d1546109c0.exe)
+2026-10-30T04:00:19.9970102Z 
+2026-10-30T04:00:19.9970735Z running 52 tests
+2026-10-30T04:00:19.9992827Z test control_v2::tests::duplicate_nested_keys_and_unknown_secrets_never_fall_back_or_echo ... ok
+2026-10-30T04:00:20.0028526Z test control_v2::tests::offline_validation_is_pure_and_draft_default_is_not_a_listener ... ok
+2026-10-30T04:00:20.0087648Z test control_v2::tests::stale_epoch_and_noncanonical_revision_do_not_prepare ... ok
+2026-10-30T04:00:20.0090820Z test control_v2::tests::activation_requires_durable_finish_and_returns_actual_revision ... ok
+2026-10-30T04:00:20.0092187Z test control_v2::tests::legacy_mutations_cannot_bypass_v2_but_read_only_and_stop_work ... ok
+2026-10-30T04:00:20.0093114Z test control_v2::tests::prepared_failure_discards_only_after_old_receipt_reconciles ... ok
+2026-10-30T04:00:20.0173183Z test native_tun::tests::packet_bridge_ipv4_udp_preserves_empty_datagram_and_packet_boundaries ... ok
+2026-10-30T04:00:20.0189487Z test native_tun::tests::packet_bridge_ipv4_tcp_dns_frames_finish_and_truncation_resets ... ok
+2026-10-30T04:00:20.0193536Z test native_tun::tests::packet_bridge_ipv6_dns_fake_ip_tcp_half_close_reaches_real_core_socket ... ok
+2026-10-30T04:00:20.0234294Z test native_tun::tests::packet_bridge_ipv6_tcp_dns_frames_finish_and_truncation_resets ... ok
+2026-10-30T04:00:20.0237301Z test native_tun::tests::packet_bridge_ipv6_udp_preserves_empty_datagram_and_packet_boundaries ... ok
+2026-10-30T04:00:20.0238978Z test native_tun_control::tests::unsupported_schema_and_unknown_options_never_fall_back ... ok
+2026-10-30T04:00:20.0243724Z test native_tun_control::tests::validation_is_offline_and_gui_cannot_start_or_recover_network ... ok
+2026-10-30T04:00:20.0284408Z test node_import::tests::independent_concurrent_calls_have_no_runtime_or_credential_state ... ok
+2026-10-30T04:00:20.0307609Z test native_tun::tests::packet_bridge_ipv4_dns_fake_ip_tcp_half_close_reaches_real_core_socket ... ok
+2026-10-30T04:00:20.0328710Z test node_import::tests::previous_http_and_socks_protocols_preserve_authentication_dns_and_udp ... ok
+2026-10-30T04:00:20.0331885Z test node_import::tests::product_optional_shape_and_empty_tls_name_aliases_remain_compatible ... ok
+2026-10-30T04:00:20.0370986Z test node_import::tests::clash_stream_transports_reuse_native_xray_ir_and_runtime_validation ... ok
+2026-10-30T04:00:20.0375974Z test node_import::tests::security_aliases_unknown_fields_and_malformed_authentication_fail_closed ... ok
+2026-10-30T04:00:20.0380061Z test node_import::tests::quic_protocols_preserve_authentication_bandwidth_obfs_and_udp_controls ... ok
+2026-10-30T04:00:20.0390297Z test node_import::tests::shadowsocks_aead_and_2022_key_are_not_downgraded ... ok
+2026-10-30T04:00:20.0393276Z test node_import::tests::size_query_undersized_output_overlap_and_limits_preserve_buffer_contract ... ok
+2026-10-30T04:00:20.0403218Z test node_import::tests::single_node_boundary_rejects_global_policy_documents_multiple_nodes_and_duplicates ... ok
+2026-10-30T04:00:20.0417002Z test node_import::tests::tfo_fallback_is_reported_without_changing_outbound_or_certificate_policy ... ok
+2026-10-30T04:00:20.0427652Z test node_import::tests::vless_and_trojan_preserve_udp_and_tls_instead_of_using_old_cpp_whitelist ... ok
+2026-10-30T04:00:20.0451412Z test node_import::tests::vmess_websocket_tls_and_security_reach_existing_native_schema ... ok
+2026-10-30T04:00:20.0465235Z test profile_import::tests::complete_ini_document_is_validated_in_portable_rust_including_rejected_sections ... ok
+2026-10-30T04:00:20.0466687Z test node_import::tests::stream_controls_without_equivalent_semantics_are_never_dropped ... ok
+2026-10-30T04:00:20.0477117Z test profile_import::tests::complete_profiles_have_bounded_abi_and_explicit_failures ... ok
+2026-10-30T04:00:20.0481892Z test profile_import::tests::data_only_extraction_does_not_authorize_foreign_profile_execution ... ok
+2026-10-30T04:00:20.0484225Z test profile_import::tests::foreign_global_data_grants_only_node_extraction_never_native_configuration ... ok
+2026-10-30T04:00:20.0487695Z test tests::build_identity_is_bounded_and_matches_compiled_inputs ... ok
+2026-10-30T04:00:20.0488477Z test tests::rejects_unknown_and_redacts_secrets ... ok
+2026-10-30T04:00:20.0490644Z test xray_import::tests::abi_rejects_null_overlap_and_pointer_range_overflow_without_writes ... ok
+2026-10-30T04:00:20.0500374Z test xray_import::tests::abi_projection_preserves_unicode_authentication_and_separates_four_states ... ok
+2026-10-30T04:00:20.0513837Z test xray_import::tests::duplicate_keys_and_error_responses_never_echo_input_secrets ... ok
+2026-10-30T04:00:20.0514946Z test probe_tests::ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status ... ok
+2026-10-30T04:00:20.0545975Z test xray_import::tests::expanded_candidates_keep_server_account_and_local_action_indices ... ok
+2026-10-30T04:00:20.0691563Z test xray_import::tests::authoritative_transport_candidates_keep_options_and_reject_unsupported_controls ... ok
+2026-10-30T04:00:20.0692749Z test xray_import::tests::imported_native_candidates_reach_real_core_abi_lifecycle_and_reject_changes_atomically ... ok
+2026-10-30T04:00:20.0701188Z test xray_import::tests::inbounds_never_become_remote_nodes_or_configure_listeners ... ok
+2026-10-30T04:00:20.0702395Z test xray_import::tests::insufficient_buffer_is_untouched_and_reports_exact_size ... ok
+2026-10-30T04:00:20.0711629Z test xray_import::tests::invalid_uuid_and_zero_port_are_parameter_failures_not_json_successful_execution ... ok
+2026-10-30T04:00:20.0712678Z test xray_import::tests::imports_are_independent_across_threads ... ok
+2026-10-30T04:00:20.0746208Z test xray_import::tests::native_capability_reuses_existing_rust_mapper_and_preserves_reality_vision ... ok
+2026-10-30T04:00:20.1935067Z test xray_import::tests::maximum_input_is_bounded_before_pointer_access ... ok
+2026-10-30T04:00:20.1962229Z test xray_import::tests::password_candidates_preserve_unicode_nul_and_exact_cipher_without_claiming_network ... ok
+2026-10-30T04:00:20.1997596Z test xray_import::tests::six_protocol_names_and_local_actions_are_not_renamed ... ok
+2026-10-30T04:00:20.2899779Z test xray_import::tests::structural_errors_budgets_and_invalid_utf8_use_the_strict_parser ... ok
+2026-10-30T04:00:20.4590615Z test xray_import::tests::multiple_accounts_do_not_duplicate_the_raw_outbound ... ok
+2026-10-30T04:00:20.5507341Z test native_tun::tests::packet_bridge_reject_records_core_decision_and_never_dials_proxy_or_replies_with_data ... ok
+2026-10-30T04:00:21.8718516Z test xray_import::tests::output_serialization_limit_is_enforced_before_allocation_or_writing ... ok
+2026-10-30T04:00:21.8719151Z 
+2026-10-30T04:00:21.8719431Z test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s
+2026-10-30T04:00:21.8719865Z 
+2026-10-30T04:00:21.8779167Z      Running unittests src\main.rs (target\debug\deps\swirl_api-d5e7877b58082d3f.exe)
+2026-10-30T04:00:21.8879933Z 
+2026-10-30T04:00:21.8880381Z running 0 tests
+2026-10-30T04:00:21.8880660Z 
+2026-10-30T04:00:21.8881180Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T04:00:21.8882693Z 
+2026-10-30T04:00:21.8897643Z      Running unittests src\bin\swirl-diagnose.rs (target\debug\deps\swirl_diagnose-f643b22375811089.exe)
+2026-10-30T04:00:21.8989909Z 
+2026-10-30T04:00:21.8990351Z running 3 tests
+2026-10-30T04:00:21.8999873Z test tests::stdin_preserves_small_budgets_and_normalizes_ipv6 ... ok
+2026-10-30T04:00:21.9001982Z test tests::diagnostic_uses_product_dns_validation ... ok
+2026-10-30T04:00:21.9005379Z test tests::stdin_rejects_ambiguous_input_and_never_echoes_private_values ... ok
+2026-10-30T04:00:21.9005820Z 
+2026-10-30T04:00:21.9006113Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T04:00:21.9006543Z 
+2026-10-30T04:00:21.9022577Z      Running unittests src\bin\swirl-inspect.rs (target\debug\deps\swirl_inspect-f6ce409fbd16f5e4.exe)
+2026-10-30T04:00:21.9108753Z 
+2026-10-30T04:00:21.9109217Z running 0 tests
+2026-10-30T04:00:21.9109499Z 
+2026-10-30T04:00:21.9110042Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T04:00:21.9110538Z 
+2026-10-30T04:00:21.9126419Z      Running unittests src\bin\swirl-tun-helper.rs (target\debug\deps\swirl_tun_helper-284b36dcd3164ea1.exe)
+2026-10-30T04:00:21.9213848Z 
+2026-10-30T04:00:21.9214161Z running 4 tests
+2026-10-30T04:00:21.9321849Z test tests::failed_output_forwarding_cannot_bypass_recovery ... ok
+2026-10-30T04:00:21.9528130Z test tests::blocked_worker_response_times_out_and_cannot_reuse_a_stale_ack ... ok
+2026-10-30T04:00:21.9532880Z test tests::failed_wait_restores_before_blocked_output_and_does_not_report_into_it ... ok
+2026-10-30T04:00:21.9682730Z test tests::blocked_final_report_cannot_delay_a_completed_network_recovery ... ok
+2026-10-30T04:00:21.9683309Z 
+2026-10-30T04:00:21.9683600Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-10-30T04:00:21.9683975Z 
+2026-10-30T04:00:21.9700174Z      Running tests\windows_fixture_sockets.rs (target\debug\deps\windows_fixture_sockets-6b42f8f12aa04c08.exe)
+2026-10-30T04:00:21.9849832Z 
+2026-10-30T04:00:21.9850362Z running 4 tests
+2026-10-30T04:00:21.9884202Z test ipv6_udp_fixture_clone_retains_nonblocking_receive ... ok
+2026-10-30T04:00:21.9897895Z test ipv4_udp_fixture_clone_retains_nonblocking_receive ... ok
+2026-10-30T04:00:23.9913448Z test ipv6_tcp_fixture_clone_and_accepted_stream_retain_nonblocking ... FAILED
+2026-10-30T04:00:24.0035278Z test ipv4_tcp_fixture_clone_and_accepted_stream_retain_nonblocking ... FAILED
+2026-10-30T04:00:24.0036365Z 
+2026-10-30T04:00:24.0036569Z failures:
+2026-10-30T04:00:24.0036767Z 
+2026-10-30T04:00:24.0037127Z ---- ipv6_tcp_fixture_clone_and_accepted_stream_retain_nonblocking stdout ----
+2026-10-30T04:00:24.0037597Z 
+2026-10-30T04:00:24.0038118Z thread 'ipv6_tcp_fixture_clone_and_accepted_stream_retain_nonblocking' (8420) panicked at crates\swirl-api\tests\windows_fixture_sockets.rs:75:5:
+2026-10-30T04:00:24.0039379Z ::1 cloned TCP listener empty accept: expected WouldBlock from the actual socket; result=Ok(()), elapsed=2.0018731s, wake_used=true, wake_error=None
+2026-10-30T04:00:24.0040238Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-10-30T04:00:24.0040649Z 
+2026-10-30T04:00:24.0041591Z ---- ipv4_tcp_fixture_clone_and_accepted_stream_retain_nonblocking stdout ----
+2026-10-30T04:00:24.0042235Z 
+2026-10-30T04:00:24.0042922Z thread 'ipv4_tcp_fixture_clone_and_accepted_stream_retain_nonblocking' (9064) panicked at crates\swirl-api\tests\windows_fixture_sockets.rs:75:5:
+2026-10-30T04:00:24.0044299Z 127.0.0.1 cloned TCP listener empty accept: expected WouldBlock from the actual socket; result=Ok(()), elapsed=2.0152516s, wake_used=true, wake_error=None
+2026-10-30T04:00:24.0045095Z 
+2026-10-30T04:00:24.0045179Z 
+2026-10-30T04:00:24.0045305Z failures:
+2026-10-30T04:00:24.0045787Z     ipv4_tcp_fixture_clone_and_accepted_stream_retain_nonblocking
+2026-10-30T04:00:24.0047119Z     ipv6_tcp_fixture_clone_and_accepted_stream_retain_nonblocking
+2026-10-30T04:00:24.0047553Z 
+2026-10-30T04:00:24.0047859Z test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
+2026-10-30T04:00:24.0048355Z 
+2026-10-30T04:00:24.0061621Z error: test failed, to rerun pass `-p swirl-api --test windows_fixture_sockets`
+2026-10-30T04:00:24.1082301Z ##[error]Process completed with exit code 1.
+2026-10-30T04:00:24.1349860Z Post job cleanup.
+2026-10-30T04:00:24.3035256Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-30T04:00:24.3367473Z git version 2.56.0.windows.2
+2026-10-30T04:00:24.3429442Z Temporarily overriding HOME='D:\a\_temp\86cbb176-e32d-47e5-b78b-93a4e6e09680' before making global git config changes
+2026-10-30T04:00:24.3430467Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-30T04:00:24.3438750Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Swirl\Swirl
+2026-10-30T04:00:24.3805288Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-30T04:00:24.4151887Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-30T04:00:24.9511993Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-30T04:00:24.9851368Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-30T04:00:25.4773752Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-30T04:00:25.5126639Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-30T04:00:26.0649943Z Cleaning up orphan processes
+2026-10-30T04:00:26.1444339Z Terminate orphan process: pid (8572) (vctip)
+2026-10-30T04:00:26.1571489Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

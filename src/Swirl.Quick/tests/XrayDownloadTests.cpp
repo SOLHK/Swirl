@@ -8,6 +8,8 @@
 #include <QPointer>
 #include <QSemaphore>
 #include <QSignalSpy>
+#include <QScopeGuard>
+#include <QElapsedTimer>
 #include <QSslCertificate>
 #include <QSslConfiguration>
 #include <QSslKey>
@@ -226,8 +228,8 @@ struct ImportFixture {
     bool manualSource = false;
     NodeImporter::Result committed;
     QStringList messages;
-    explicit ImportFixture(NodeImportService::SystemProxyResolver resolver={})
-        :service(&store,nullptr,{},60000,std::move(resolver)) {
+    explicit ImportFixture(NodeImportService::SystemProxyResolver resolver={},NodeImportService::DownloadRouteCommand route={})
+        :service(&store,nullptr,{},60000,std::move(resolver),std::move(route)) {
         // This observer checks the explicit confirmation boundary. Real DPAPI
         // persistence is tested separately by XrayImportTests/XrayStoreTests.
         service.setConfigurationApplier([this](const auto &result, const QString &source, bool, QString *) {
@@ -427,6 +429,74 @@ private slots:
         QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
     }
 #endif
+    void automaticSubscriptionRecoversThroughOnePhysicalRoute() {
+#ifndef Q_OS_WIN
+        QSKIP("Automatic physical-interface recovery is Windows-specific");
+#endif
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture physical(server.serverPort());QVERIFY(physical.listen(QHostAddress::LocalHost));
+        QTcpServer closed;QVERIFY(closed.listen(QHostAddress::LocalHost));const auto closedPort=closed.serverPort();closed.close();
+        std::atomic_int starts=0,stops=0;std::atomic_bool invalid=false;
+        ImportFixture import([closedPort](const auto &){return QList<QNetworkProxy>{QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",closedPort)};},
+            [&](const QJsonObject &request)->QJsonObject{
+                if(request.value("op")=="stop"){++stops;if(request.value("handle").toInteger()!=701)invalid=true;return {{"ok",true}};}
+                ++starts;if(request.value("host")!="subscription.example.invalid"||request.value("port")!=443)invalid=true;
+                return {{"ok",true},{"handle",701},{"port",int(physical.serverPort())},{"username","fixture"},{"password","fixture"}};
+            });
+        const auto url=ConnectProxyFixture::remoteUrl("/signed%2Fprofile");
+        QVERIFY(import.service.saveSubscription({},"automatic",url,360,false));
+        QCOMPARE(import.store.subscriptions().first().downloadRoute,QString("system"));
+        import.service.refreshSubscription(import.store.subscriptions().first().id);
+        QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),10000);
+        QCOMPARE(import.commits,1);QCOMPARE(starts.load(),1);QCOMPARE(stops.load(),1);QVERIFY(!invalid.load());
+        QCOMPARE(server.requests,1);QCOMPARE(physical.connections,1);
+        QCOMPARE(server.targets.first(),url.toEncoded(QUrl::RemoveScheme|QUrl::RemoveAuthority));
+        QVERIFY(!import.publicState().contains(Token.toUtf8()));
+    }
+    void automaticSubscriptionDoesNotRetrySecurityOrHttpFailures_data() {
+        QTest::addColumn<QString>("failure");
+        for(const auto &failure:{"tls","http-auth","redirect","oversized"})QTest::newRow(failure)<<QString::fromLatin1(failure);
+    }
+    void automaticSubscriptionDoesNotRetrySecurityOrHttpFailures() {
+        QFETCH(QString,failure);FixtureTrust trust(failure!="tls",true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[failure](QSslSocket *socket,const auto &){
+            if(failure=="redirect")HttpsFixture::reply(socket,{},302,"https://other.example.invalid/stolen");
+            else if(failure=="oversized")socket->write("HTTP/1.1 200 OK\r\nContent-Length: 4194305\r\n\r\n");
+            else HttpsFixture::reply(socket,{},401);
+        };
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        std::atomic_int routeCalls=0;
+        ImportFixture import([choice=proxy.proxy()](const auto &){return QList<QNetworkProxy>{choice};},
+            [&](const QJsonObject &)->QJsonObject{++routeCalls;return {{"ok",false}};});
+        QVERIFY(import.service.saveSubscription({},"automatic",ConnectProxyFixture::remoteUrl(),360,false));
+        import.service.refreshSubscription(import.store.subscriptions().first().id);
+        QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),10000);
+        QCOMPARE(routeCalls.load(),0);QCOMPARE(import.commits,0);QCOMPARE(proxy.connections,1);
+        QVERIFY(!import.publicState().contains(Token.toUtf8()));
+    }
+    void automaticSubscriptionBoundsBlockedDiscoveryAndRejectsItsLateResult() {
+#ifndef Q_OS_WIN
+        QSKIP("Automatic physical-interface recovery is Windows-specific");
+#endif
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture physical(server.serverPort()),late(server.serverPort());
+        QVERIFY(physical.listen(QHostAddress::LocalHost));QVERIFY(late.listen(QHostAddress::LocalHost));
+        auto release=std::make_shared<QSemaphore>();auto entered=std::make_shared<std::atomic_bool>(false);
+        const auto cleanup=qScopeGuard([release]{release->release();});std::atomic_int starts=0,stops=0;
+        ImportFixture import([release,entered,choice=late.proxy()](const auto &){
+                entered->store(true);release->acquire();return QList<QNetworkProxy>{choice};},
+            [&](const QJsonObject &request)->QJsonObject{
+                if(request.value("op")=="stop"){++stops;return {{"ok",true}};}
+                ++starts;return {{"ok",true},{"handle",702},{"port",int(physical.serverPort())},{"username","fixture"},{"password","fixture"}};
+            });
+        QVERIFY(import.service.saveSubscription({},"automatic",ConnectProxyFixture::remoteUrl(),360,false));
+        QElapsedTimer elapsed;elapsed.start();import.service.refreshSubscription(import.store.subscriptions().first().id);
+        QTRY_VERIFY_WITH_TIMEOUT(entered->load(),3000);QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),22000);
+        QCOMPARE(import.commits,1);QCOMPARE(starts.load(),1);QCOMPARE(stops.load(),1);QVERIFY(elapsed.elapsed()<25000);
+        release->release();QTest::qWait(100);QCOMPARE(late.connections,0);QCOMPARE(server.requests,1);
+    }
     void subscriptionRecoveryUsesExternalSystemProxyWhileCoreRuns() {
         FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
         server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};

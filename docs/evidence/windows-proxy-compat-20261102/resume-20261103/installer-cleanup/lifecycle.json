@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "installer_sha256": "082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b",
+  "scope": "Actual production NSIS isolated install, installed runtime and uninstall on a disposable Windows runner.",
+  "windows11_codex_desktop": "NOT_RUN",
+  "normal_user_installation": "NOT_RUN",
+  "isolated": true,
+  "installed_files": 1519,
+  "all_installed_hashes_verified": true,
+  "exact_installed_inventory": true,
+  "installed_exe_sha256": "d7581841f897133b397125da60c2cce228ba8e694bd1983e17f07414db6dea16",
+  "installed_rust_dll_sha256": "4ca6c9c9a1a56b65b1d3ba698fde70777bbf810abc2d9bbbd1b19dfd1d425f6a",
+  "installed_manifest_sha256": "95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003",
+  "rust_roundtrips_verified": true,
+  "tls_runtime_verified": true,
+  "installed_ui_pages": 61,
+  "runtime_storage_isolated": true,
+  "installer_exit_code": 0,
+  "uninstaller_exit_code": 0,
+  "install_directory_removed": false,
+  "installed_empty_directories": [
+    "qml/QtQml/DesignSupport",
+    "qml/QtQml/XmlListModel",
+    "qml/QtQuick/Controls/Native",
+    "qml/QtQuick/LocalStorage",
+    "qml/QtQuick/NativeStyle/controls",
+    "qml/QtQuick/NativeStyle/util",
+    "qml/QtQuick/Particles",
+    "qml/QtQuick/Shapes/DesignHelpers",
+    "qml/QtQuick/tooling",
+    "qml/QtQuick/VectorImage/Helpers"
+  ],
+  "remaining_installation_entries": 17,
+  "user_integration_unchanged": true,
+  "remaining_owned_processes": 0,
+  "fixture_removed": true,
+  "failure_diagnostics_preserved": false,
+  "forced_termination": false,
+  "processes": [
+    {
+      "name": "install",
+      "started_utc": "2026-11-02T16:56:25.0971814Z",
+      "elapsed_ms": 44358.243,
+      "exited": true,
+      "exit_code": 0
+    },
+    {
+      "name": "installed-rust",
+      "started_utc": "2026-11-02T16:57:10.4840068Z",
+      "elapsed_ms": 593.8846,
+      "exited": true,
+      "exit_code": 0
+    },
+    {
+      "name": "installed-tls",
+      "started_utc": "2026-11-02T16:57:11.0831063Z",
+      "elapsed_ms": 89.9104,
+      "exited": true,
+      "exit_code": 0
+    },
+    {
+      "name": "installed-ui",
+      "started_utc": "2026-11-02T16:57:11.1746682Z",
+      "elapsed_ms": 21256.2041,
+      "exited": true,
+      "exit_code": 0
+    },
+    {
+      "name": "uninstall",
+      "started_utc": "2026-11-02T16:57:32.8655159Z",
+      "elapsed_ms": 31090.6525,
+      "exited": true,
+      "exit_code": 0
+    }
+  ],
+  "success": false,
+  "error": "The actual production uninstaller left owned installation files behind."
+}

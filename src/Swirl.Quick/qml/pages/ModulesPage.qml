@@ -11,7 +11,7 @@ Item {
     readonly property Item motionTitle:pageHeader.titleItem
 property string selectedId:""
  readonly property var shownModules:extensionsProvider.modules.filter(function(row){return (row.name+" "+row.description).toLowerCase().indexOf(moduleSearch.text.trim().toLowerCase())>=0})
- SwirlAnimatedModel{id:animatedModules;source:page.shownModules;keyRole:"id"}
+ readonly property QtObject ownedAnimatedModules: SwirlAnimatedModel{id:animatedModules;source:page.shownModules;keyRole:"id"}
  ColumnLayout{anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
   SwirlPageHeader{id:pageHeader;Layout.fillWidth:true;title:qsTr("配置模块");description:qsTr("按顺序覆盖 DNS、规则与策略组，底部模块优先。");metadata:qsTr("停用全部模块后恢复基础配置")
    SwirlButton{objectName:"localModuleImport";text:qsTr("安装本地模块");primary:true;onClicked:moduleFile.open()}

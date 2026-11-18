@@ -13,20 +13,23 @@ SwirlDialog {
     property string errorMessage: ""
     property bool canSave: true
     property bool recoveryRequired: false
-    readonly property string sourceName: displayName.text
-    readonly property string sourceUrl: urlField.text.trim()
-    readonly property int intervalMinutes: [360, 720, 1440, 10080][interval.currentIndex]
-    readonly property bool autoUpdate: autoEnabled.checked
-    readonly property string formatHint: ["auto", "clash", "loon", "shadowrocket", "surge", "quantumult-x", "sing-box"][formatPreference.currentIndex]
+    property Item retainedContent: null
+    readonly property string sourceName: dialog.retainedContent ? displayName.text : ""
+    readonly property string sourceUrl: dialog.retainedContent ? urlField.text.trim() : ""
+    readonly property int intervalMinutes: [360, 720, 1440, 10080][dialog.retainedContent ? interval.currentIndex : 2]
+    readonly property bool autoUpdate: dialog.retainedContent ? autoEnabled.checked : true
+    readonly property string formatHint: ["auto", "clash", "loon", "shadowrocket", "surge", "quantumult-x", "sing-box"][dialog.retainedContent ? formatPreference.currentIndex : 0]
+    readonly property string downloadRoute: "system"
     signal saveRequested()
     signal recoveryRequested()
     objectName: "subscriptionDialog"
     title: sourceId.length ? qsTr("编辑订阅") : qsTr("添加订阅")
     dismissBlocked: pending
     height: Math.min(implicitHeight, parent ? parent.height - Theme.dp(30) : implicitHeight)
-    stateFingerprint: String(autoUpdate) + ":" + intervalMinutes + ":" + formatHint
+    stateFingerprint: String(autoUpdate) + ":" + intervalMinutes + ":" + formatHint + ":" + downloadRoute
 
     function edit(record, source) {
+        const mountedContent = dialog.contentItem
         sourceId = record ? record.id : ""
         displayName.text = record ? record.name : ""
         urlField.text = ""
@@ -38,9 +41,9 @@ SwirlDialog {
         pending = false
         if (source) SwirlMotion.noteTrigger(source)
         open()
-        Qt.callLater(function() { if (form.viewport) form.viewport.contentY = 0; displayName.forceActiveFocus() })
+        Qt.callLater(function() { if (mountedContent && form.viewport) form.viewport.contentY = 0; displayName.forceActiveFocus() })
     }
-    onClosed: urlField.text = ""
+    onClosed: if (dialog.retainedContent) urlField.text = ""
 
     function keyboardFocused(control) {
         return control.activeFocus && (control.focusReason === Qt.TabFocusReason
@@ -101,9 +104,10 @@ SwirlDialog {
             || focusReason === Qt.BacktabFocusReason || focusReason === Qt.ShortcutFocusReason)
         implicitHeight: Theme.dp(34)
         indicator: SwirlIcon {
-            name: "chevron-right"; size: Theme.dp(12); rotation: 90
+            name: "chevron-right"; size: Theme.dp(12); rotation: control.popupOpen ? 270 : 90
             x: Math.round(control.width - width - Theme.dp(10)); y: Math.round((control.height - height) / 2)
             color: Theme.muted
+            Behavior on rotation { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.switchDuration; easing.type: Easing.OutCubic } }
         }
         background: SwirlControlSurface {
             hovered:control.hovered
@@ -113,7 +117,7 @@ SwirlDialog {
         }
         delegate: ItemDelegate {
             id: option
-            SwirlPressMotion{}
+            readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
             required property int index
             objectName: "swirlComboOption-" + index
             width: ListView.view.width
@@ -144,6 +148,8 @@ SwirlDialog {
     }
 
     contentItem: ColumnLayout {
+        id: contentLayout
+        Component.onCompleted: dialog.retainedContent = contentLayout
         spacing: Theme.dp(16)
         PolicyFormScroll {
             id: form
@@ -178,6 +184,12 @@ SwirlDialog {
                         objectName: "subscriptionAutomaticImport"
                         Layout.fillWidth: true; wrapMode: Text.Wrap
                         text: qsTr("自动识别格式，只更新节点；完整配置需单独审阅。")
+                        color: Theme.muted; font.pixelSize: Theme.fontSize(12)
+                    }
+                    SwirlText {
+                        objectName: "subscriptionAutomaticNetwork"
+                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                        text: qsTr("自动选择可用网络更新订阅。")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(12)
                     }
                 }
@@ -217,7 +229,7 @@ SwirlDialog {
                                     y: Theme.dp(2); color: Theme.surface
                                     Behavior on thumbPosition { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.switchDuration; easing.type: Easing.OutCubic } }
                                 }
-                                Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
+                                Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
                             }
                         }
                     }

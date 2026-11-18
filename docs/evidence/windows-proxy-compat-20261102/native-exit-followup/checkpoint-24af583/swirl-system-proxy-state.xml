@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCase name="SystemProxyStateTests">
+  <Environment>
+    <QtVersion>6.12.0</QtVersion>
+    <QtBuild>Qt 6.12.0 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>
+    <QTestVersion>6.12.0</QTestVersion>
+  </Environment>
+  <TestFunction name="initTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0891"/>
+  </TestFunction>
+  <TestFunction name="guardReadinessWaitKeepsTheEventLoopResponsive">
+  <Message type="qinfo" file="" line="0">
+    <Description><![CDATA[Proxy readiness heartbeat: samples=32 maximum_gap_ms=19 elapsed_ms=359]]></Description>
+  </Message>
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="362.841"/>
+  </TestFunction>
+  <TestFunction name="guardTimeoutPreservesExternalProxyAndContinuesDispatching">
+  <Message type="qinfo" file="" line="0">
+    <Description><![CDATA[Proxy timeout heartbeat: samples=190 elapsed_ms=2048]]></Description>
+  </Message>
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="2048.79"/>
+  </TestFunction>
+  <TestFunction name="cancellationAndLateReadinessCannotAcquireAnOldRequest">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="62.9434"/>
+  </TestFunction>
+  <TestFunction name="staleEngineGenerationAndExternalChangesNeverReachTheWrite">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="125.632"/>
+  </TestFunction>
+  <TestFunction name="configuredProxyModes">
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[direct]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[manual]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[pac-url]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[automatic-detection]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[manual-and-automatic]]></DataTag>
+    </Incident>
+    <Duration msecs="0.3271"/>
+  </TestFunction>
+  <TestFunction name="invalidAutomaticConfigurationIsNotInferred">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.1046"/>
+  </TestFunction>
+  <TestFunction name="manualStores">
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[both-disabled]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[native-only-enabled]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[wininet-only-enabled]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[both-enabled]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[pac-is-not-manual]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[auto-detect-is-not-manual]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[native-nonzero-dword]]></DataTag>
+    </Incident>
+    <Duration msecs="0.4803"/>
+  </TestFunction>
+  <TestFunction name="unknownRegistryValues">
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[missing]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[absent]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[untyped-presence]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[wrong-type]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[string-type]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[fractional-type]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[null-data]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[short-dword]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[long-dword]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[invalid-base64]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[noncanonical-base64]]></DataTag>
+    </Incident>
+    <Incident type="pass" file="" line="0">
+      <DataTag><![CDATA[absent-with-stale-bytes]]></DataTag>
+    </Incident>
+    <Duration msecs="0.4695"/>
+  </TestFunction>
+  <TestFunction name="unknownSnapshotRemainsUnknown">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0985"/>
+  </TestFunction>
+  <TestFunction name="liveDiagnosticIsReadOnly">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="15.9651"/>
+  </TestFunction>
+  <TestFunction name="nativeRegistryReaderUsesIsolatedFixture">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.5465"/>
+  </TestFunction>
+  <TestFunction name="cleanupTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0196"/>
+  </TestFunction>
+  <Duration msecs="2619.39"/>
+</TestCase>

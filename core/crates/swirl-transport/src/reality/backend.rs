@@ -219,6 +219,13 @@ impl Construction {
 }
 
 thread_local! {
+    #[cfg_attr(
+        all(clippy, target_os = "windows", target_env = "gnu"),
+        expect(
+            clippy::missing_const_for_thread_local,
+            reason = "rust-clippy#17566 misreports already-const TLS initializers on Windows GNU"
+        )
+    )]
     static CONSTRUCTION: RefCell<Option<Construction>> = const { RefCell::new(None) };
 }
 

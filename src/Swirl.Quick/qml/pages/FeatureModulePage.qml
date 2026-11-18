@@ -7,7 +7,7 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    SwirlAnimatedModel {id:animatedRecords;source:page.records}
+    readonly property QtObject ownedAnimatedRecords: SwirlAnimatedModel {id:animatedRecords;source:page.records}
     property string moduleId:""
     readonly property Item motionSurface:detailPanel
     readonly property var heroTargets:({title:pageHeader.titleItem})
@@ -20,7 +20,7 @@ Item {
     property int editing:-1
     property bool componentReady:false
     property int revision:0
-    SwirlArcMotion {id:tabMotion;objectName:"moduleSectionMotion";targetX:page.tab*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion {id:tabMotion;parent:page;objectName:"moduleSectionMotion";targetX:page.tab*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     function exportCacheState() { return {settings:settings,records:records,tab:tab,dirty:dirty,savedAt:savedAt,editing:editing,revision:revision} }
     function restoreCacheState(value) { settings=value.settings;records=value.records;tab=value.tab;dirty=value.dirty;savedAt=value.savedAt;editing=value.editing;revision=value.revision }
     function restore() {

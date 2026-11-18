@@ -1,0 +1,22 @@
+{
+  "scope": "Linux PowerShell 7.4.13 package policy; Windows PowerShell 5.1 remains CI verification",
+  "source_head": "ae083d7f0dc73c5d34802d872d124a34fb4e465d",
+  "changed_file_sha256": {
+    "scripts/RustProductPackagePolicy.ps1": "7026f954515f4e0962c89514f8eb108033381b6f221d92f1bffce1f99f3cc754",
+    "scripts/Stage-WindowsRustProduct.ps1": "153e7914bfa2c61cdff411bac9cef297de9a871f35a18a0ebfcc3a339df21eb9",
+    "scripts/tests/Test-RustProductPackagePolicy.ps1": "d4919ccfee7be0e5be8881b52556c2388da66ad8326950c56a77ae6b393d35a5"
+  },
+  "negative_control": "prior behavior with no empty-directory normalization",
+  "negative_exit_code": 1,
+  "negative_expected_assertion": "exact nested and literal empty-directory list",
+  "patch_sha256": "1cc96fe32f65453b2d33fea1ddce9d86931736b60cb60d476b702ed561043a46",
+  "negative_expected_failure": true,
+  "positive_exit_code": 0,
+  "positive_assertions": {
+    "package": 31,
+    "release_cache": 20,
+    "final_manifest": 14,
+    "tls": 42,
+    "empty_stage": 12
+  }
+}

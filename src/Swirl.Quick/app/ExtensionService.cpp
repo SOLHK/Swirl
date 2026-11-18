@@ -11,19 +11,10 @@
 #include <QJsonArray>
 #include <QJsonParseError>
 #include <QUuid>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <wincrypt.h>
-#endif
+#include "DpapiDataProtection.h"
 namespace {
-QByteArray protect(QByteArray bytes,bool decrypt){
-#ifdef Q_OS_WIN
-    DATA_BLOB input{DWORD(bytes.size()),reinterpret_cast<BYTE *>(bytes.data())},output{};
-    const bool ok=decrypt?CryptUnprotectData(&input,nullptr,nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&output):CryptProtectData(&input,L"Swirl local extensions",nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&output);
-    if(!ok)return {};QByteArray result(reinterpret_cast<const char *>(output.pbData),output.cbData);SecureZeroMemory(output.pbData,output.cbData);LocalFree(output.pbData);return result;
-#else
-    Q_UNUSED(bytes);Q_UNUSED(decrypt);return {};
-#endif
+QByteArray protect(const QByteArray &bytes,bool decrypt){
+    return decrypt ? SwirlDpapi::unprotect(bytes) : SwirlDpapi::protect(bytes,L"Swirl local extensions");
 }
 bool enabled(const QVariantList &rows){for(const auto &row:rows)if(row.toMap().value("enabled").toBool())return true;return false;}
 }

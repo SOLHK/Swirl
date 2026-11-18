@@ -18,7 +18,7 @@ Item {
     readonly property var tabs:["Headers","Body","Query"]
     function updateBuffer(value){if(!componentReady||editorBuffers[tab]===value)return;var next=Object.assign({},editorBuffers);next[tab]=value;editorBuffers=next}
     Component.onCompleted:componentReady=true
-    SwirlArcMotion{id:tabMotion;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("断点");description:qsTr("查看暂停队列，准备请求编辑草稿。");metadata:qsTr("实时拦截未接入，当前不会暂停浏览器请求")

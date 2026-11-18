@@ -1,0 +1,491 @@
+{
+  "schema": "swirlvf-bounded-interpolation-assessment-v1",
+  "recorded_utc": "2026-11-01T18:16:59.662012+00:00",
+  "status": "FAIL_EXISTING_EXPANDED_SIMPLE_GLYF_PRECISION",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "source_bytes": 61473880,
+  "face_index": 0,
+  "source_unchanged": true,
+  "host": "macOS-26.5.1-arm64-arm-64bit",
+  "versions": {
+    "python": "3.12.16",
+    "fonttools": "4.61.1",
+    "numpy": "2.2.6"
+  },
+  "oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+  "code_sha256": {
+    "tools/rebuild.py": "1324d1385417b06b3f69b06127cfa881b7a056286327a269fd0747f3f2e0fade",
+    "tools/hvf_glyph_model.py": "8c2125d6b549750778566d4839f502415e12911d485da655e522d88066790a5f",
+    "tools/batch_geometry.py": "c19dba1eb7ef6441d0857a8dd1a41b26f55922ee4772b1de1dcf8fbe534892cb",
+    "tools/tangent_geometry.py": "dd7a4c3693e5e6926fcb624c4eee4436bb1eddfb76590abbc9403ad0d90c2472",
+    "tools/transform_geometry.py": "0fa342f921540024a18db6e67491912cb2a1204fef3cf10744d6ef4282f2dc2a"
+  },
+  "private_reproducibility": {
+    "assessment_script_sha256": "45fe94d2e49597de1e660bae4c108f26f15f52611b35e7cf72a8a8e10d4f7f08",
+    "grid_bound_script_sha256": "3bd71a1dc4b931a80b48cd6070239dd43ac404f512773519632110f6b4567aa6",
+    "assessment_receipt_sha256": "428cd87ba544ade9aded77d6b215da81d0b9b0ee57fe24152f1fdae9ce7c639d",
+    "grid_bound_receipt_sha256": "b4967f2caaf58831a7ad6a27f2b92aafac16e9850ba03c785ac3ba7676a37906",
+    "storage": "Scripts and private receipts retained outside repository; no proprietary glyph arrays or model files published."
+  },
+  "strict_outline_limit_source_units": 0.03125,
+  "physical_grid": {
+    "source_upem": 1028,
+    "model_multiplier": 15,
+    "target_upem": 15420
+  },
+  "training": {
+    "profile_27": {
+      "axis_nodes": [
+        -1,
+        0,
+        1
+      ],
+      "cartesian_count": 27
+    },
+    "profile_125": {
+      "axis_nodes": [
+        -1,
+        -0.5,
+        0,
+        0.5,
+        1
+      ],
+      "cartesian_count": 125
+    },
+    "profile_728": {
+      "axis_nodes": [
+        -1,
+        -0.75,
+        -0.5,
+        -0.25,
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "cartesian_count_before_frozen_holdout_exclusion": 729,
+      "excluded_training_node": [
+        0.5,
+        0.25,
+        -0.5
+      ],
+      "retained_training_count": 728,
+      "selection_predeclared_before_observation": true
+    }
+  },
+  "holdouts": {
+    "axis_order": [
+      "XWDT",
+      "XWGT",
+      "XHGT"
+    ],
+    "points": [
+      [
+        0.125,
+        -0.375,
+        0.625
+      ],
+      [
+        -0.6875,
+        0.8125,
+        -0.9375
+      ],
+      [
+        0.123456789,
+        -0.7654321,
+        0.3456789
+      ],
+      [
+        0.5,
+        0.25,
+        -0.5
+      ]
+    ],
+    "unchanged_from_existing_P7": true,
+    "removed_or_promoted": false
+  },
+  "counts": {
+    "selected_gids": [
+      2,
+      12,
+      1166,
+      19177
+    ],
+    "glyph_models_evaluated": 12,
+    "training_records_across_models": 3520,
+    "holdout_records_across_models": 48,
+    "successful_assessment_native_holdout_calls": 16,
+    "successful_assessment_native_default_calls": 3,
+    "earlier_attempt_native_calls_before_expected_holdout_collision_refusal": 4,
+    "native_comparisons_reused_across_profiles": true,
+    "complete_original_faces": 0,
+    "production_accepted_glyph_models": 0,
+    "fonts_generated": 0
+  },
+  "native_geometry": {
+    "holdouts_combined_passed": 16,
+    "holdouts_legacy_passed": 16,
+    "holdout_maximum_point_error": 3.410605131648481e-13,
+    "default_comparisons": [
+      {
+        "gid": 12,
+        "native_default_comparison": {
+          "legacy_passed": true,
+          "companion_called": false,
+          "combined_passed": true,
+          "maximum_point_error": 1.1368683772161603e-13,
+          "legacy_reason": null
+        }
+      },
+      {
+        "gid": 1166,
+        "native_default_comparison": {
+          "legacy_passed": false,
+          "companion_called": true,
+          "combined_passed": true,
+          "maximum_point_error": 2.2737367544323206e-13,
+          "legacy_reason": "segment_types_differ"
+        }
+      },
+      {
+        "gid": 19177,
+        "native_default_comparison": {
+          "legacy_passed": true,
+          "companion_called": false,
+          "combined_passed": true,
+          "maximum_point_error": 3.410605131648481e-13,
+          "legacy_reason": null
+        }
+      }
+    ],
+    "scope": "Apple HVF at explicit design coordinates, not CoreText user-axis, native-metric or target-font acceptance"
+  },
+  "models": [
+    {
+      "gid": 2,
+      "training_nodes": 27,
+      "tuples": 2,
+      "point_count": 0,
+      "default_integer_control_lower_bound": 0.0,
+      "unencoded_holdout_point_max": 0.0,
+      "encoded_point_max": 0.0,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 0
+    },
+    {
+      "gid": 2,
+      "training_nodes": 125,
+      "tuples": 4,
+      "point_count": 0,
+      "default_integer_control_lower_bound": 0.0,
+      "unencoded_holdout_point_max": 0.0,
+      "encoded_point_max": 0.0,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 0
+    },
+    {
+      "gid": 2,
+      "training_nodes": 728,
+      "tuples": 8,
+      "point_count": 0,
+      "default_integer_control_lower_bound": 0.0,
+      "unencoded_holdout_point_max": 0.0,
+      "encoded_point_max": 0.0,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.0,
+        "max_outline_error_bound_units": 0.0,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 0
+    },
+    {
+      "gid": 12,
+      "training_nodes": 27,
+      "tuples": 13,
+      "point_count": 26,
+      "default_integer_control_lower_bound": 0.022473611839910878,
+      "unencoded_holdout_point_max": 0.019333569120703942,
+      "encoded_point_max": 0.04359029836313155,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.04359029836313155,
+        "max_outline_error_bound_units": 0.04359029836313155,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.032603045701589194,
+        "max_outline_error_bound_units": 0.032603045701589194,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 14
+    },
+    {
+      "gid": 12,
+      "training_nodes": 125,
+      "tuples": 47,
+      "point_count": 26,
+      "default_integer_control_lower_bound": 0.022473611839910878,
+      "unencoded_holdout_point_max": 2.5421149729252077e-13,
+      "encoded_point_max": 0.04714045077148931,
+      "encoded_metric_max": 0.03333333333333333,
+      "training": {
+        "max_point_error_units": 0.04714045077148931,
+        "max_outline_error_bound_units": 0.04714045077148931,
+        "max_metric_error_units": 0.03333333333333333
+      },
+      "holdout": {
+        "max_point_error_units": 0.031093051147332667,
+        "max_outline_error_bound_units": 0.031093051147332667,
+        "max_metric_error_units": 0.025
+      },
+      "failed_samples": 93
+    },
+    {
+      "gid": 12,
+      "training_nodes": 728,
+      "tuples": 182,
+      "point_count": 26,
+      "default_integer_control_lower_bound": 0.022473611839910878,
+      "unencoded_holdout_point_max": 3.410605131648481e-13,
+      "encoded_point_max": 0.04713865104883138,
+      "encoded_metric_max": 0.03333333333333333,
+      "training": {
+        "max_point_error_units": 0.04713865104883138,
+        "max_outline_error_bound_units": 0.04713865104883138,
+        "max_metric_error_units": 0.03333333333333333
+      },
+      "holdout": {
+        "max_point_error_units": 0.036272741365042015,
+        "max_outline_error_bound_units": 0.036272741365042015,
+        "max_metric_error_units": 0.01866319444440402
+      },
+      "failed_samples": 573
+    },
+    {
+      "gid": 1166,
+      "training_nodes": 27,
+      "tuples": 26,
+      "point_count": 104,
+      "default_integer_control_lower_bound": 0.04491296736292629,
+      "unencoded_holdout_point_max": 15.943103824557335,
+      "encoded_point_max": 15.94437590306295,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.04634851228745748,
+        "max_outline_error_bound_units": 0.04634851228745748,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 15.94437590306295,
+        "max_outline_error_bound_units": 15.94437590306295,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 31
+    },
+    {
+      "gid": 1166,
+      "training_nodes": 125,
+      "tuples": 124,
+      "point_count": 104,
+      "default_integer_control_lower_bound": 0.04491296736292629,
+      "unencoded_holdout_point_max": 5.764363223103415,
+      "encoded_point_max": 5.765824030082283,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.046962581193870555,
+        "max_outline_error_bound_units": 0.046962581193870555,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 5.765824030082283,
+        "max_outline_error_bound_units": 5.765824030082283,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 129
+    },
+    {
+      "gid": 1166,
+      "training_nodes": 728,
+      "tuples": 727,
+      "point_count": 104,
+      "default_integer_control_lower_bound": 0.04491296736292629,
+      "unencoded_holdout_point_max": 0.13028589301075724,
+      "encoded_point_max": 0.14166120355915116,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.04703016118304068,
+        "max_outline_error_bound_units": 0.04703016118304068,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.14166120355915116,
+        "max_outline_error_bound_units": 0.14166120355915116,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 731
+    },
+    {
+      "gid": 19177,
+      "training_nodes": 27,
+      "tuples": 26,
+      "point_count": 238,
+      "default_integer_control_lower_bound": 0.04329219178708168,
+      "unencoded_holdout_point_max": 5.393267229087433,
+      "encoded_point_max": 5.403840164681962,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.04690696067086746,
+        "max_outline_error_bound_units": 0.04690696067086746,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 5.403840164681962,
+        "max_outline_error_bound_units": 5.403840164681962,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 31
+    },
+    {
+      "gid": 19177,
+      "training_nodes": 125,
+      "tuples": 124,
+      "point_count": 238,
+      "default_integer_control_lower_bound": 0.04329219178708168,
+      "unencoded_holdout_point_max": 1.182509213985772,
+      "encoded_point_max": 1.2029818240790702,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.047018387462790696,
+        "max_outline_error_bound_units": 0.047018387462790696,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 1.2029818240790702,
+        "max_outline_error_bound_units": 1.2029818240790702,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 129
+    },
+    {
+      "gid": 19177,
+      "training_nodes": 728,
+      "tuples": 727,
+      "point_count": 238,
+      "default_integer_control_lower_bound": 0.04329219178708168,
+      "unencoded_holdout_point_max": 0.7948779773044716,
+      "encoded_point_max": 0.8032796155077025,
+      "encoded_metric_max": 1.2126596023639043e-13,
+      "training": {
+        "max_point_error_units": 0.047018387462790696,
+        "max_outline_error_bound_units": 0.047018387462790696,
+        "max_metric_error_units": 0.0
+      },
+      "holdout": {
+        "max_point_error_units": 0.8032796155077025,
+        "max_outline_error_bound_units": 0.8032796155077025,
+        "max_metric_error_units": 1.2126596023639043e-13
+      },
+      "failed_samples": 732
+    }
+  ],
+  "default_grid_exhaustion": {
+    "scope": "expanded simple glyphs retaining original control point topology and no default composite transforms",
+    "checked_upem_min": 16,
+    "checked_upem_max": 16384,
+    "checked_upem_count": 16369,
+    "glyphs": [
+      {
+        "gid": 12,
+        "points": 24,
+        "best_legal_upem": 15678,
+        "best_nearest_integer_control_bound": 0.015645076551034184,
+        "acceptable_legal_upems": 199,
+        "native_default_comparison": {
+          "legacy_passed": true,
+          "companion_called": false,
+          "combined_passed": true,
+          "maximum_point_error": 1.1368683772161603e-13,
+          "legacy_reason": null
+        }
+      },
+      {
+        "gid": 1166,
+        "points": 98,
+        "best_legal_upem": 16122,
+        "best_nearest_integer_control_bound": 0.03513762517418712,
+        "acceptable_legal_upems": 0,
+        "native_default_comparison": {
+          "legacy_passed": false,
+          "companion_called": true,
+          "combined_passed": true,
+          "maximum_point_error": 2.2737367544323206e-13,
+          "legacy_reason": "segment_types_differ"
+        }
+      },
+      {
+        "gid": 19177,
+        "points": 220,
+        "best_legal_upem": 16111,
+        "best_nearest_integer_control_bound": 0.03904689602481032,
+        "acceptable_legal_upems": 0,
+        "native_default_comparison": {
+          "legacy_passed": true,
+          "companion_called": false,
+          "combined_passed": true,
+          "maximum_point_error": 3.410605131648481e-13,
+          "legacy_reason": null
+        }
+      }
+    ],
+    "combined": {
+      "points": 342,
+      "best_legal_upem": 16200,
+      "best_nearest_integer_control_bound": 0.04024334475741037,
+      "acceptable_legal_upems": 0
+    }
+  },
+  "interpretation": {
+    "unencoded_holdout_point_max": "VariationModel with unrounded floating coefficients, before integer glyf/gvar encoding; isolates sampled interpolation error.",
+    "encoded_point_max": "Existing reconstruct_glyph point/outline bound across all training and unchanged holdouts, divided by15.",
+    "metrics": "Existing SourceMetrics table references only. Native metric equivalence remains NOT_RUN.",
+    "default_lower_bound": "For each legal integer target UPEM U, compute max_p ||nearest_integer(p*U/1028)*1028/U-p||_2 at source default. This minimizes each retained control point independently in the expanded simple-glyf integer lattice.",
+    "scope_of_impossibility": "GIDs1166 and19177 each exceed1/32 for every U=16..16384 while retaining original simple-glyph control topology. Additional training nodes or different integer residual rounding cannot repair that default-lattice obstruction.",
+    "not_a_universal_impossibility": "This does not exclude fractional composite transforms, mathematically equivalent topology changes, or other standard OpenType representations. Those require a new implementation and native validation; none was accepted here.",
+    "nonlinearity": "Current HVF evaluator includes trigonometric rigid-transform powers and clamped/rational tangent geometry. gvar tuple evaluation is piecewise multi-affine in design coordinates. Denser finite fitting may reduce error but is not an exact continuous translation or proof.",
+    "decision": "No minimal production parameter or rounding fix justified. Retain failure gates and avoid a full47102-GID sweep of the same representation."
+  },
+  "preserved_failure": "An initial unfiltered9^3 grid hit an existing frozen holdout and was correctly rejected. The corrected diagnostic excludes that training node, retaining all four holdouts. No production node selector was changed.",
+  "font_generated": false,
+  "production_accepted": false,
+  "continuous_space_accepted": false,
+  "windows11_acceptance": "NOT_RUN",
+  "qt_swirl_acceptance": "NOT_RUN",
+  "private_payloads_published": false
+}

@@ -1,0 +1,42 @@
+{
+  "scope": "entrypoint and recursively found repository-local Python imports; unchanged files matched to run-start base commit, hashes recorded during ongoing soak, not claimed captured at start",
+  "recorded_at_utc": "2026-11-02T15:38:06.230876+00:00",
+  "base_commit": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "files": [
+    {
+      "path": "tools/tests/dns_peer.py",
+      "sha256": "c203008978659d99cecfea66b95255b894be82ee17d1aa6ba89eb27b01531ca7",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/loopback_ports.py",
+      "sha256": "5c4d3e9a4b54d89c1bb229c19487066c2d5b5cb5f83a845cc59e13aaa431109f",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/test_product_subscription_chain.py",
+      "sha256": "514958005776bba3b978499827d6032f77c0533376fa8c8efb585ee7eb2e1f04",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/test_proxy_stream_soak.py",
+      "sha256": "149ae1413cc2d3b91c1b003f9e5689a1a2bbd75c75288b512a94a712b28280b9",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/test_rust_core.py",
+      "sha256": "e4cf1c6bd71337d77532d8fcedf394e7297fe165591d36fac70a1d92332d49b1",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/test_shadowsocks.py",
+      "sha256": "214cee8e5f2edc400c0217c3f2e8ff131342b7a608552d2f5f345486d734fb70",
+      "byte_identical_to_base4048565": true
+    },
+    {
+      "path": "tools/tests/test_windows_proxy_compat.py",
+      "sha256": "2f5e2642cdd6f5fe3616cd4ee196f638b73dd6ae9b353a4cc85637f9d46ff44b",
+      "byte_identical_to_base4048565": true
+    }
+  ]
+}

@@ -1,0 +1,419 @@
+{
+  "schema": 1,
+  "checked_at_utc": "2026-11-02T16:28:46.484535+00:00",
+  "scope": "Final24af583 Windows2022 native proxy tests plus explicitly scoped realRust memory-adapter integration; not physical Windows11 Codex/provider acceptance",
+  "run_id": 41475106009,
+  "artifact_id": 13159068329,
+  "source": {
+    "head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+    "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "tree_sha": "13a24de79dbab26098059286a1c74b291ed23084",
+    "tree_equivalence_verified_from_git_objects": true,
+    "tracked_file_sha256": {
+      "src/Swirl.Quick/engine/SystemProxySession.cpp": "5a5aefed14daeab2dc5942e1b45a02a2e9dbca758c3e8422018e0497401227d4",
+      "src/Swirl.Quick/engine/EngineController.cpp": "586f7e204f2d883b3dd3218354f4f401f24b737ca3b7982578fe5c36c652d2c2",
+      "src/Swirl.Quick/tests/SystemProxyTests.cpp": "20393c0da1a0d51301c35ac1e45037d6460f9c98a4b0d878dc382b90a5b21dbd",
+      "src/Swirl.Quick/tests/SystemProxyStateTests.cpp": "d7bae1ab4adf8324e567f86a4ecd1bead6db054879a738ac6b38cff29f949ce4",
+      "src/Swirl.Quick/tests/PolicyConfigurationTests.cpp": "dbc00f428424848058d7428f2e63beedcc7d3abb5f569632f1aecaecf0566e4c",
+      "src/Swirl.Quick/tests/PolicyUiChecks.cpp": "9e4fad9563b9d3d6e7f3f4d2f59ee3b280e4e9fd294ae2daaa309050e998668c",
+      "src/Swirl.Quick/CMakeLists.txt": "267905fe70b712561f3e185ec664832d672df627beb0caa61365e62cbc54db16",
+      ".github/workflows/build-qt-quick-ui.yml": "50fe5c57c0cdfe201fa40fbff0c574d42f761e9124140d0512550f266d937f18"
+    }
+  },
+  "native_proxy_status": "PASS",
+  "suites": {
+    "state": {
+      "case": "SystemProxyStateTests",
+      "qt_version": "6.12.0",
+      "methods_including_init_cleanup": 13,
+      "pass_incidents": 34,
+      "body_data_rows": 32,
+      "failed": 0,
+      "skipped": 0,
+      "count_scope": "QTest pass incidents, including rows and init/cleanup; not a count of individual QVERIFY/QCOMPARE assertions.",
+      "methods": [
+        {
+          "method": "initTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "guardReadinessWaitKeepsTheEventLoopResponsive",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "guardTimeoutPreservesExternalProxyAndContinuesDispatching",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cancellationAndLateReadinessCannotAcquireAnOldRequest",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "staleEngineGenerationAndExternalChangesNeverReachTheWrite",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "configuredProxyModes",
+          "passed_data_tags": [
+            "direct",
+            "manual",
+            "pac-url",
+            "automatic-detection",
+            "manual-and-automatic"
+          ],
+          "pass_incidents": 5
+        },
+        {
+          "method": "invalidAutomaticConfigurationIsNotInferred",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "manualStores",
+          "passed_data_tags": [
+            "both-disabled",
+            "native-only-enabled",
+            "wininet-only-enabled",
+            "both-enabled",
+            "pac-is-not-manual",
+            "auto-detect-is-not-manual",
+            "native-nonzero-dword"
+          ],
+          "pass_incidents": 7
+        },
+        {
+          "method": "unknownRegistryValues",
+          "passed_data_tags": [
+            "missing",
+            "absent",
+            "untyped-presence",
+            "wrong-type",
+            "string-type",
+            "fractional-type",
+            "null-data",
+            "short-dword",
+            "long-dword",
+            "invalid-base64",
+            "noncanonical-base64",
+            "absent-with-stale-bytes"
+          ],
+          "pass_incidents": 12
+        },
+        {
+          "method": "unknownSnapshotRemainsUnknown",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "liveDiagnosticIsReadOnly",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "nativeRegistryReaderUsesIsolatedFixture",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cleanupTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        }
+      ],
+      "evidence": {
+        "path": "evidence/ci24af583/13159068329/build/swirl-quick/swirl-system-proxy-state.xml",
+        "bytes": 5345,
+        "sha256": "7deb9fef090afa808d4e0c59924ffe3dfa4a6c872323cfd67df9b730a678b673"
+      }
+    },
+    "recovery": {
+      "case": "ProxyTests",
+      "qt_version": "6.12.0",
+      "methods_including_init_cleanup": 14,
+      "pass_incidents": 15,
+      "body_data_rows": 13,
+      "failed": 0,
+      "skipped": 0,
+      "count_scope": "QTest pass incidents, including rows and init/cleanup; not a count of individual QVERIFY/QCOMPARE assertions.",
+      "methods": [
+        {
+          "method": "initTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "takeoverRestoresPacAndCustomBypass",
+          "passed_data_tags": [
+            "pac-only",
+            "manual-and-pac"
+          ],
+          "pass_incidents": 2
+        },
+        {
+          "method": "lateAcknowledgementFromReleasedGuardCannotReplaceTheNextSession",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "asynchronousTakeoverYieldsDuringJournalContentionAndCancelsSafely",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "explicitOffDisablesExternalAndOwnedProxy",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "currentUserRecovery",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "abruptOwnerExit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "registryOnlyExternalEdit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "restoreDistinctStoresAndAbsentValues",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "malformedRegistryDoesNotMutateSettings",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "inconsistentRepresentationsCannotLeavePartialSettings",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "legacyJournalRecoveryPreservesRegistry",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "abruptEngineExit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cleanupTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        }
+      ],
+      "evidence": {
+        "path": "evidence/ci24af583/13159068329/build/swirl-quick/swirl-system-proxy-recovery.xml",
+        "bytes": 2736,
+        "sha256": "d2d222c37c1159f852cbe4ab4536c6ec83bfbd66093947a4303567bb3b1e0085"
+      }
+    }
+  },
+  "critical_network": {
+    "tests": 10,
+    "failed": 0,
+    "skipped": 0,
+    "evidence": {
+      "path": "evidence/ci24af583/13159068329/build-evidence/critical-network.xml",
+      "bytes": 2108,
+      "sha256": "bc25c0417595b7024d7fc242586197967c8e51a840753196e4db20644355e487"
+    }
+  },
+  "registration": {
+    "run_serial": true,
+    "timeout_seconds": 45,
+    "disposable_runner_opt_in": true,
+    "test_command": [
+      "D:/a/Swirl/Swirl/build/swirl-quick/Release/SwirlSystemProxyTests.exe",
+      "-o",
+      "D:/a/Swirl/Swirl/build/swirl-quick/swirl-system-proxy-recovery.xml,xml",
+      "-o",
+      "-,txt"
+    ],
+    "evidence": {
+      "path": "evidence/ci24af583/13159068329/build-evidence/ctest-inventory.json",
+      "bytes": 43828,
+      "sha256": "90e837d6d288f28c75bea7c5025cdb1b9fcda40980946740866931052740de6a"
+    }
+  },
+  "verified_behaviors": [
+    "WinINet plus registry exact readback/restoration, including nonempty PAC-only and manual+PAC with custom bypass",
+    "Abrupt owner and engine-fixture termination restore original settings within unchanged5000ms budget",
+    "External complete and registry-only edits are preserved when Swirl releases ownership",
+    "Exact raw registry types/presence/bytes are restored; malformed and inconsistent writes leave no partial configuration",
+    "DPAPI journal fixture plaintext absence, readiness acknowledgement, late guard rejection and async cancellation",
+    "Diagnostic reads preserve live configuration; native registry reader uses isolated fixture"
+  ],
+  "winhttp": {
+    "scope": "Machine default returned by read-only WinHttpGetDefaultProxyConfiguration; not all advanced/per-user WinHTTP configuration.",
+    "exact_comparison": "accessType plus proxy/bypass strings and nullness, kept in memory",
+    "per_body_rows_with_init_cleanup": 13,
+    "additional_pac_owned_checks": 2,
+    "query_assertion_coverage_basis": "All13 body/data rows passed; source init/cleanup are QTest per-row hooks. XML does not contain a separate WinHTTP API call trace.",
+    "production_winhttp_mutation": false
+  },
+  "notifications": {
+    "scope": "notifyProxyChange calls BOTH InternetSetOptionW SETTINGS_CHANGED and REFRESH; apply returns true only if both succeeded and exact WinINet/registry readback matched. Native successful writes/restores execute this path; notification failure returns false after ownership-aware rollback.",
+    "api_invocation_success_verified_by_native_success_path": true,
+    "independent_third_party_notification_delivery_observed": false,
+    "third_party_cache_refresh_or_reconnection_observed": false
+  },
+  "listener_binding_integration": {
+    "ctest_suite": "swirl-policy-configuration",
+    "suite_passed": true,
+    "seconds": 6.71069,
+    "command": [
+      "D:/a/Swirl/Swirl/build/swirl-quick/Release/SwirlPolicyConfigurationTests.exe"
+    ],
+    "exact_port_method": "activityProxySwitchStartsSavedRustAndRestoresTheExternalProxy",
+    "individual_method_pass_record_observed": false,
+    "assertion_count_observed": null,
+    "scope": "Real RustCoreEngine plus per-instance memory system-proxy backend. Native recovery separately uses real Windows API with TCP fixture.",
+    "evidence_limit": "Unfiltered PolicyConfiguration suite execution and success observed; no per-method output. Exact port equality is enforced by audited committed source. Actual policy UI separately records nine successful ownership/cleanup checks and three restored sessions.",
+    "last_test_evidence": {
+      "path": "evidence/ci24af583/13159068329/build/swirl-quick/Testing/Temporary/LastTest.log",
+      "bytes": 19573,
+      "sha256": "a2e528973b6b33f10486000466ea2af4b0c9c95fbf05fdf9b8579ec03b19c6ef"
+    },
+    "ctest_evidence": {
+      "path": "evidence/ci24af583/13159068329/build-evidence/full-regression.xml",
+      "bytes": 6447,
+      "sha256": "27ee82012982c795d470f67ffdc9ceff9aecc1fc016ee200a6bb857f0352d19f"
+    }
+  },
+  "physical_windows11_codex_ab": "NOT_RUN",
+  "limitations": [
+    "This audit is not full workflow PASS or physical Windows11 desktop acceptance.",
+    "Native API recovery and real Rust/memory-adapter integration must not be described as a single tested native-to-public desktop path."
+  ],
+  "policy_ui_proxy_integration": {
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "whole_report_check_count": 537,
+    "whole_report_failures": 0,
+    "selected_required_checks": [
+      {
+        "name": "Policy UI acceptance has a per-instance system-proxy adapter before any user action",
+        "passed": true
+      },
+      {
+        "name": "Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership",
+        "passed": true
+      },
+      {
+        "name": "Activity takeover follows the healthy live Rust listener rather than a host proxy flag",
+        "passed": true
+      },
+      {
+        "name": "Queued event processing leaves Swirl stopped without a second proxy takeover",
+        "passed": true
+      },
+      {
+        "name": "Rapid-wing fixture uses an actual owned Rust session",
+        "passed": true
+      },
+      {
+        "name": "Rapid stop finishes runtime cleanup",
+        "passed": true
+      },
+      {
+        "name": "Reopening during contraction starts a new actual owned session",
+        "passed": true
+      },
+      {
+        "name": "Owned runtime and transaction finish before cleanup",
+        "passed": true
+      },
+      {
+        "name": "Cleanup preserves the isolated external proxy after releasing only Swirl ownership",
+        "passed": true
+      }
+    ],
+    "missing_required_checks": [],
+    "selected_pass_count": 9,
+    "system_proxy": {
+      "backend": "per-instance-memory",
+      "last_pid": 6764,
+      "last_port": 63483,
+      "restores": 3,
+      "takeovers": 3
+    },
+    "evidence": {
+      "path": "evidence/ci24af583/13159068329/build/swirl-quick/policy-evidence/policy-ui.json",
+      "bytes": 133769,
+      "sha256": "be9d09c31d2ced7fcb80ccaaf35045fad0974f5e954bc2f2c5377bc69ece2ae9"
+    },
+    "scope": "Real Rust runtime, controlled routing peers, actual UI and per-instance memory proxy backend. Does not modify native WinINet/registry.",
+    "asserted_complete_and_all_selected_passed": true
+  },
+  "artifact_zip": {
+    "path": "evidence/ci24af583/13159068329.zip",
+    "bytes": 32871588,
+    "sha256": "d800d9c2b23024f504de9af2406560ada4a86df11f45f84c500dd70a39436a26",
+    "api_digest_matched_by_ci_agent": true
+  },
+  "full_regression_observed": {
+    "tests": 22,
+    "failed": 0,
+    "skipped": 0,
+    "sha256": "27ee82012982c795d470f67ffdc9ceff9aecc1fc016ee200a6bb857f0352d19f"
+  }
+}

@@ -1,0 +1,110 @@
+   Compiling swirl-api v0.1.0 (D:\Codex\work\Swirl-native-tun-windows-isolated\core\crates\swirl-api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.09s
+     Running unittests examples\windows-tun-smoke.rs (D:/Codex/build/native-tun-isolated-gnu\debug\examples\windows_tun_smoke-28ce0a7cec337b55.exe)
+
+running 4 tests
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":0,"event":"begin","listener_port":55286,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":0,"event":"begin","listener_port":55285,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":0,"event":"begin","listener_port":55288,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":0,"event":"begin","listener_port":55287,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"event":"complete","listener_port":55286,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"event":"complete","listener_port":55287,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"event":"begin","listener_port":55287,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"event":"begin","listener_port":55286,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"event":"complete","listener_port":55285,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55287,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55286,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55285,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55287,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55287,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":11,"error":"远程主机强迫关闭了一个现有的连接。 (os error 10054)","event":"error","kind":"ConnectionReset","listener_port":55288,"os_error":10054,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55285,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55285,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55285,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55285,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"complete","listener_port":55285,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"begin","listener_port":55285,"phase":"validate_question","question_type":1}
+Wintun smoke: peer failure [DoT A/AAAA resolver]: 远程主机强迫关闭了一个现有的连接。 (os error 10054)
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55286,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"complete","listener_port":55286,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"begin","listener_port":55286,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":12,"event":"begin","listener_port":55287,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"complete","listener_port":55287,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"begin","listener_port":55287,"phase":"validate_question","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"complete","listener_port":55287,"phase":"validate_question","question_type":1}
+test windows::dns_fixture_tests::reset_before_first_question_still_fails_fixture ... ok
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"begin","listener_port":55287,"phase":"write_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"error":"unexpected DoT fixture question","event":"error","kind":"Other","listener_port":55285,"os_error":null,"phase":"validate_question","question_type":1}
+Wintun smoke: peer failure [DoT A/AAAA resolver]: unexpected DoT fixture question
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"complete","listener_port":55286,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55286,"phase":"validate_question","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":13,"event":"complete","listener_port":55287,"phase":"write_length","question_type":1}
+test windows::dns_fixture_tests::invalid_question_still_fails_fixture ... ok
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"complete","listener_port":55286,"phase":"validate_question","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55287,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55286,"phase":"write_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"complete","listener_port":55287,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"complete","listener_port":55286,"phase":"write_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55287,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"complete","listener_port":55287,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55287,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"begin","listener_port":55286,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":14,"event":"complete","listener_port":55286,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55286,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"complete","listener_port":55286,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55286,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"complete","listener_port":55287,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55287,"phase":"validate_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"complete","listener_port":55287,"phase":"validate_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55287,"phase":"read_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"error":"远程主机强迫关闭了一个现有的连接。 (os error 10054)","event":"error","kind":"ConnectionReset","listener_port":55286,"os_error":10054,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"complete","listener_port":55287,"phase":"read_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55287,"phase":"validate_question","question_type":28}
+Wintun smoke: peer failure [DoT A/AAAA resolver]: 远程主机强迫关闭了一个现有的连接。 (os error 10054)
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"complete","listener_port":55287,"phase":"validate_question","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":15,"event":"begin","listener_port":55287,"phase":"write_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"complete","listener_port":55287,"phase":"write_length","question_type":28}
+test windows::dns_fixture_tests::reset_after_only_first_reply_still_fails_fixture ... ok
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"begin","listener_port":55287,"phase":"write_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"complete","listener_port":55287,"phase":"write_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"begin","listener_port":55287,"phase":"flush_reply","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"complete","listener_port":55287,"phase":"flush_reply","question_type":28}
+DoT close regression: connecting second verified TLS DNS client
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"begin","listener_port":55287,"phase":"shutdown","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":1,"elapsed_ms":16,"event":"completed_peer_close","listener_port":55287,"os_error":10054,"phase":"shutdown"}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":0,"event":"begin","listener_port":55287,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"handshake","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"read_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"validate_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"read_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"validate_question","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"validate_question","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"write_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"write_length","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"complete","listener_port":55287,"phase":"write_body","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":2,"event":"begin","listener_port":55287,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"complete","listener_port":55287,"phase":"flush_reply","question_type":1}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"begin","listener_port":55287,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"complete","listener_port":55287,"phase":"read_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"begin","listener_port":55287,"phase":"validate_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"complete","listener_port":55287,"phase":"validate_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"begin","listener_port":55287,"phase":"read_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"complete","listener_port":55287,"phase":"read_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"begin","listener_port":55287,"phase":"validate_question","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"complete","listener_port":55287,"phase":"validate_question","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":3,"event":"begin","listener_port":55287,"phase":"write_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"complete","listener_port":55287,"phase":"write_length","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"begin","listener_port":55287,"phase":"write_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"complete","listener_port":55287,"phase":"write_body","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"begin","listener_port":55287,"phase":"flush_reply","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"complete","listener_port":55287,"phase":"flush_reply","question_type":28}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"begin","listener_port":55287,"phase":"shutdown","question_type":null}
+Wintun smoke: DoT fixture stage {"connection":2,"elapsed_ms":4,"event":"complete","listener_port":55287,"phase":"shutdown","question_type":null}
+test windows::dns_fixture_tests::completed_response_reset_preserves_next_dns_connection ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

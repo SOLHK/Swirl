@@ -9,11 +9,11 @@ ColumnLayout {
     required property var settingsPage
     readonly property string section: settingsPage.section
     readonly property var definitions: ({
-        "TUN": {summary: qsTr("当前版本尚未实现 TUN 虚拟网卡数据通路，无法接管系统全流量。"), rows: [
-            {name: qsTr("TUN 入口"), detail: qsTr("驱动、数据通路与流量回环防护尚未接入。"), kind: "toggle", runtime: "tun"},
-            {name: qsTr("网卡选择"), detail: qsTr("当前无法创建或选择 TUN 网卡。"), kind: "choice", values: [qsTr("尚未接入")]},
+        "TUN": {summary: qsTr("可在系统代理运行时开启 TUN；开启前确认管理员授权，切换期间连接可能短暂中断。"), rows: [
+            {name: qsTr("TUN 入口"), detail: qsTr("开关独立控制 TUN；关闭后恢复 Swirl 接管的网卡、路由和 DNS。"), kind: "toggle", runtime: "tun"},
+            {name: qsTr("网卡选择"), detail: qsTr("由 Swirl 创建和管理独立虚拟网卡。"), kind: "choice", values: ["Swirl Native TUN"]},
             {name: qsTr("路由排除"), detail: qsTr("尚未提供系统路由排除设置。"), kind: "toggle"},
-            {name: qsTr("网关 DNS"), detail: qsTr("尚未提供 TUN DNS 接管。"), kind: "toggle"}]},
+            {name: qsTr("加密 DNS"), detail: qsTr("默认使用加密 DNS，也可在 DNS 配置页自定义 DoH 或 DoT。"), kind: "choice", values: [qsTr("在 DNS 配置页管理")]}]},
         "DNS": {summary: qsTr("解析服务与本地映射可在 DNS 配置页管理。连接时由 Rust Core 校验实际支持的配置。"), rows: [
             {name: qsTr("解析器选择"), detail: qsTr("完整解析服务选项位于 DNS 配置页。"), kind: "choice", values: [qsTr("在 DNS 配置页管理")]},
             {name: qsTr("加密 DNS"), detail: qsTr("可在 DNS 配置页填写；保存不代表当前内核支持该传输。"), kind: "toggle"},
@@ -24,9 +24,9 @@ ColumnLayout {
             {name: qsTr("SOCKS 端口"), detail: qsTr("与 HTTP 共用本地监听。"), kind: "socks"},
             {name: qsTr("API 端口"), detail: qsTr("Rust Core 通过进程内接口通信。"), kind: "api"},
             {name: qsTr("端口冲突提醒"), detail: qsTr("独立提醒选项尚未接入；启动失败会保留真实错误。"), kind: "toggle"}]},
-        "系统集成": {summary: qsTr("系统代理接管由活动页管理。以下桌面集成选项尚未接入。"), rows: [
-            {name: qsTr("显示托盘图标"), detail: qsTr("尚未提供托盘开关。"), kind: "toggle"},
-            {name: qsTr("关闭窗口后保留托盘"), detail: qsTr("尚未提供后台驻留选项。"), kind: "toggle"},
+        "系统集成": {summary: qsTr("关闭窗口后继续在系统托盘运行，通过托盘菜单退出。"), rows: [
+            {name: qsTr("显示托盘图标"), detail: qsTr("运行时显示在 Windows 右下角通知区域。"), kind: "toggle", builtIn:true},
+            {name: qsTr("关闭窗口后保留托盘"), detail: qsTr("点击 × 隐藏窗口，托盘菜单中的“退出 Swirl”才结束程序。"), kind: "toggle", builtIn:true},
             {name: qsTr("桌面通知"), detail: qsTr("尚未接入 Windows 桌面通知。"), kind: "toggle"}]},
         "启动": {summary: qsTr("当前不提供开机自启或启动窗口偏好。以下选项不会更改 Windows 启动项。"), rows: [
             {name: qsTr("开机启动"), detail: qsTr("尚未接入 Windows 启动项。"), kind: "toggle"},
@@ -53,9 +53,18 @@ ColumnLayout {
             {name: qsTr("主要页面"), detail: qsTr("概览、节点、连接与检视。"), kind: "shortcut", value: "Ctrl+1 / 2 / 3 / 4"},
             {name: qsTr("侧栏展开与收起"), detail: qsTr("切换侧栏显示宽度。"), kind: "shortcut", value: "Ctrl+B"}]}
     })
+    readonly property string tunStatusText: engineController.tunRecoveryBusy ? qsTr("恢复中") : engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : engineController.tunBusy ? qsTr("切换中") : engineController.tunEnabled ? qsTr("已启用") : engineController.tunRequested ? qsTr("待启用") : engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+    readonly property string sectionError: section === "TUN" ? (engineController.routingError || engineController.networkConfigurationError) : engineController.networkConfigurationError
     readonly property var configuration: definitions[section] || {summary: "", rows: []}
     spacing: Theme.dp(10)
     SwirlText { Layout.fillWidth: true; text: pane.configuration.summary; color: Theme.muted; font.pixelSize: Theme.fontSize(13); wrapMode: Text.Wrap }
+    SettingsRowPane {
+        Layout.fillWidth: true
+        visible: pane.section === "TUN" && engineController.tunRecoveryRequired
+        title: qsTr("上次 TUN 网络需要恢复")
+        description: qsTr("恢复 Swirl 接管的网络设置并关闭 TUN，保留订阅和出口选择。")
+        SwirlButton { text: engineController.tunRecoveryBusy ? qsTr("恢复中") : qsTr("恢复 TUN 网络"); enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy; onClicked: AppState.requestTunEnabled(true) }
+    }
     SettingsRowPane {
         Layout.fillWidth: true
         visible: pane.section === "DNS"
@@ -64,7 +73,7 @@ ColumnLayout {
         SwirlButton { text: qsTr("打开 DNS 配置"); onClicked: AppState.navigate("dns") }
     }
     SettingsRowPane { Layout.fillWidth: true; visible: pane.section === "端口"; title: qsTr("当前监听状态"); description: engineController.activeProxyPort > 0 ? qsTr("127.0.0.1:%1").arg(engineController.activeProxyPort) : qsTr("引擎未监听本地端口"); SwirlStatusBadge { label: engineController.stateText; tone: engineController.apiHealthy ? "success" : "neutral" } }
-    SwirlText { Layout.fillWidth: true; visible: (pane.section === "TUN" || pane.section === "DNS" || pane.section === "端口") && engineController.networkConfigurationError.length > 0; text: engineController.networkConfigurationError; color: Theme.red; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
+    SwirlText { Layout.fillWidth: true; visible: (pane.section === "TUN" || pane.section === "DNS" || pane.section === "端口") && pane.sectionError.length > 0; text: pane.sectionError; textFormat: Text.PlainText; color: Theme.red; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
     Item { Layout.preferredHeight: Theme.dp(8) }
     Repeater {
         model: pane.configuration.rows
@@ -73,8 +82,23 @@ ColumnLayout {
             required property var modelData
             Layout.fillWidth: true
             title: modelData.name
-            description: modelData.detail
-            SwirlToggle { visible: setting.modelData.kind === "toggle"; enabled: false; checked: setting.modelData.runtime === "tun" ? engineController.tunEnabled : setting.modelData.builtIn === true; Accessible.name: setting.modelData.name }
+            description: modelData.runtime === "tun" ? qsTr("%1 · %2").arg(pane.tunStatusText).arg(modelData.detail) : modelData.detail
+            SwirlToggle {
+                visible: setting.modelData.kind === "toggle" && !(setting.modelData.runtime === "tun" && engineController.tunRequested && !engineController.tunEnabled && !engineController.tunRecoveryRequired)
+                enabled: setting.modelData.runtime === "tun" && engineController.tunSupported && !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryRequired && !engineController.tunRecoveryBusy
+                checked: setting.modelData.runtime === "tun" ? engineController.tunEnabled : setting.modelData.builtIn === true
+                onToggled: {
+                    AppState.requestTunEnabled(checked)
+                    checked = Qt.binding(function() { return engineController.tunEnabled })
+                }
+                Accessible.name: setting.modelData.name
+            }
+            SwirlButton {
+                visible: setting.modelData.runtime === "tun" && engineController.tunRequested && !engineController.tunEnabled && !engineController.tunRecoveryRequired
+                text: qsTr("取消待启用")
+                enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                onClicked: AppState.requestTunEnabled(false)
+            }
             SwirlComboBox { visible: setting.modelData.kind === "choice"; enabled: false; model: setting.modelData.values || []; Accessible.name: setting.modelData.name }
             SwirlTextField { visible: ["http", "socks", "api"].indexOf(setting.modelData.kind) >= 0; Layout.preferredWidth: Theme.dp(156); readOnly: true; text: setting.modelData.kind === "api" ? qsTr("无需端口") : String(engineController.proxyPort); Accessible.name: setting.modelData.name }
             SwirlButton { visible: setting.modelData.kind === "shortcut"; text: setting.modelData.value || ""; enabled: false; Accessible.name: setting.modelData.name }

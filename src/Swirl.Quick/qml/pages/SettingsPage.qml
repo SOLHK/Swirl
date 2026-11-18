@@ -99,7 +99,7 @@ FocusScope {
                 Keys.onUpPressed: page.moveCategory(-1)
                 Keys.onDownPressed: page.moveCategory(1)
                 ScrollBar.vertical: SwirlScrollBar {}
-                SwirlArcMotion {
+                readonly property Item ownedSelectionPath: SwirlArcMotion {
                     id: selectionPath
                     parent: categories.contentItem
                     targetX: 0
@@ -155,7 +155,7 @@ FocusScope {
                             verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
                         }
-                        SwirlInteractionMotion { id: feedback; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
+                        readonly property Item ownedFeedback: SwirlInteractionMotion { id: feedback; parent: category; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
                         Accessible.name: text
                     }
                 }
@@ -207,8 +207,8 @@ FocusScope {
                             function onVisibleChanged() { if (paneShell.initialized && !page.visible) { reveal.finish(); curve.settle() } }
                         }
                         Component.onCompleted: { initialized = true; if (selected && ready) { hasPresented = true; reveal.progress = 1; reveal.destination = 1 } else retarget() }
-                        SwirlArcMotion { id: curve; bend: Theme.dp(6); duration: SwirlMotion.pageDuration; motionEnabled: page.visible }
-                        SwirlTransitionCoordinator { id: reveal; duration: SwirlMotion.pageDuration }
+                        readonly property Item ownedCurve: SwirlArcMotion { id: curve; parent: paneShell; bend: Theme.dp(6); duration: SwirlMotion.pageDuration; motionEnabled: page.visible }
+                        readonly property Item ownedReveal: SwirlTransitionCoordinator { id: reveal; parent: paneShell; duration: SwirlMotion.pageDuration }
                         ScrollView {
                             id: options
                             anchors.fill: parent
@@ -219,9 +219,10 @@ FocusScope {
                             ScrollBar.vertical: SwirlScrollBar {}
                             ColumnLayout {
                                 width: options.availableWidth
-                                spacing: Theme.sectionGap
+                                spacing: paneShell.modelData === "关于 Swirl" ? Theme.dp(8) : Theme.sectionGap
                                 SwirlSectionTitle {
                                     Layout.fillWidth: true
+                                    visible: paneShell.modelData !== "关于 Swirl"
                                     title: paneShell.modelData
                                     description: paneShell.modelData === "常规" ? qsTr("可用设置会自动保存。") : paneShell.modelData === "字体" ? qsTr("预览后应用到整个界面。") : paneShell.modelData === "代理" ? qsTr("查看实际接管状态与连接诊断。") : ""
                                 }
@@ -232,14 +233,14 @@ FocusScope {
                                     asynchronous: true
                                     sourceComponent: paneShell.modelData === "常规" ? appearancePane : paneShell.modelData === "字体" ? fontPane : paneShell.modelData === "代理" ? proxyPane : paneShell.modelData === "关于 Swirl" ? aboutPane : capabilityPane
                                 }
-                                Item { Layout.preferredHeight: Theme.dp(24) }
+                                Item { Layout.preferredHeight: Theme.dp(paneShell.modelData === "关于 Swirl" ? 8 : 24) }
                             }
                         }
                         SwirlText { anchors.centerIn: parent; visible: paneShell.selected && !paneShell.ready; text: content.status === Loader.Error ? qsTr("无法加载此设置分区") : qsTr("正在准备设置…"); color: content.status === Loader.Error ? Theme.red : Theme.muted }
                         Component { id: appearancePane; SettingsAppearancePane { settingsPage: page } }
                         Component { id: fontPane; SwirlFontSettings {} }
                         Component { id: proxyPane; SettingsProxyPane { settingsPage: page } }
-                        Component { id: aboutPane; SettingsAboutPane { settingsPage: page } }
+                        Component { id: aboutPane; SettingsAboutPane { settingsPage: page; viewportHeight: options.availableHeight } }
                         Component { id: capabilityPane; SettingsCapabilityPane { settingsPage: ({section: paneShell.modelData}) } }
                     }
                 }

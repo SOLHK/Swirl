@@ -1,0 +1,11 @@
+********* Start testing of PolicyFormScrollLocal *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 11.5.0 20240719 (Red Hat 11.5.0-5)), ubuntu 24.04
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::initTestCase()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::test_externalFocusDoesNotScrollTheForm()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::test_focusRevealsLastField()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::test_unfocusedManualScrollIsPreserved()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::test_viewportResizeKeepsFocusedFieldVisible()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::test_viewportResizeRevealsBeforeReturningToEventLoop()
+PASS   : PolicyFormScrollLocal::PolicyFormScroll::cleanupTestCase()
+Totals: 7 passed, 0 failed, 0 skipped, 0 blacklisted, 252ms
+********* Finished testing of PolicyFormScrollLocal *********

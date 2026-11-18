@@ -6,8 +6,21 @@ import "../controls"
 Item {
     id: canvas
     property var targetWindow: Window.window
+    property var composition: backdrop
     property Item glassSurface: null
     property bool glassSampled: false
+    property real ribbonProgress: 0
+    property real ribbonStrength: 1
+    readonly property Item mainWingItem: visual
+    function mapWingPoint(target, x, y) { return visual.mapMasterPoint(target, x, y) }
+    function featherSource(target, side, lane) {
+        return (side === "right" ? echo : visual).featherSource(target, lane)
+    }
+    function ribbonWaypoints(target, side, lane) {
+        const source = side === "right" ? echo : visual
+        return [source.routePoint(target, "root", lane), source.routePoint(target, "shoulder", lane),
+            source.routePoint(target, "tip", lane), source.routePoint(target, "gap", lane)]
+    }
     readonly property Item decorationSource: decoration
     // Kept for callers which inspect the material, but the clear sidebar never
     // replaces any part of the original vector scene with a captured texture.
@@ -25,6 +38,12 @@ Item {
     property bool firstFramePresented: false
     property real progress: 0
 
+    function finishEntrance() {
+        visibleDelay.stop()
+        entrance.stop()
+        entranceConsumed = true
+        progress = 1
+    }
     function startEntrance() {
         if (!presenting || entranceConsumed) return
         entranceConsumed = true
@@ -63,11 +82,11 @@ Item {
         property: "progress"
         from: 0
         to: 1
-        duration: SwirlMotion.ms(2100)
+        duration: SwirlMotion.ms(1240)
         paused: entrance.running && !canvas.presenting
     }
 
-    SwirlGlassMaterial { anchors.fill: parent; targetWindow: canvas.targetWindow }
+    SwirlGlassMaterial { anchors.fill: parent; targetWindow: canvas.targetWindow; composition: canvas.composition }
     Item {
         id: decoration
         objectName: "workspaceWingDecoration"
@@ -77,22 +96,38 @@ Item {
         Item {
             id: footprint
             objectName: "apecWingFootprint"
-            // A single right-facing fan enters from beyond the lower-left edge.
-            // Its fixed artboard is uniformly scaled; the window crops the root.
-            width: Math.max(canvas.width * 1.08, canvas.height * 1.52)
-            height: width * 0.625
-            x: canvas.width - width - Theme.dp(20)
-            y: canvas.height - height + Theme.dp(8)
+            // The rising outer shoulders remain visible through the clear sidebar;
+            // the curved spine continues beneath the lower card row.
+            readonly property real corridor: canvas.glassSurface ? canvas.glassBounds.x + canvas.glassBounds.width : Theme.sidebarWidth
+            width: Math.min(canvas.width * 0.40, canvas.height * 0.65,
+                Math.max(Theme.dp(280), corridor * 1.48))
+            height: width * 580 / 880
+            x: -Theme.dp(8)
+            y: canvas.height - height + Theme.dp(4)
             SwirlWingAnimation {
                 id: visual
                 objectName: "apecWingVisual"
                 anchors.fill: parent
                 largeWing: true
                 progress: canvas.progress
-                // The gradient already carries per-colour alpha. Keep the
-                // original vector equally legible inside and outside the pane.
-                opacity: Theme.wingOpacity
+                ribbonProgress: canvas.presenting ? canvas.ribbonProgress : 0
+                ribbonStrength: canvas.ribbonStrength
+                opacity: 1
             }
+        }
+        SwirlWingAnimation {
+            id: echo
+            objectName: "workspaceWingEcho"
+            width: Math.min(Theme.dp(260), canvas.width * 0.27)
+            height: width * 130 / 540
+            x: canvas.width - width + Theme.dp(2)
+            y: 0
+            largeWing: true
+            echoWing: true
+            progress: canvas.progress
+            ribbonProgress: canvas.presenting ? canvas.ribbonProgress : 0
+            ribbonStrength: canvas.ribbonStrength
+            opacity: Theme.dark ? 0.62 : 0.56
         }
     }
 }

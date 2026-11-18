@@ -18,20 +18,24 @@ Item {
     property var mutationOwner: null
     property var providerIdsBeforeSave: []
     property string mutationMessage: ""
+    property bool mutationFailed: false
     property var lastMutationCompletion: ({requestId: "", success: false})
     readonly property bool mutationPending: mutationSubmitting || mutationRequestId.length > 0
     readonly property bool editable: !mutationPending && !engineController.policyBusy && !engineController.imports.busy && !engineController.imports.hasPreview
     readonly property var providers: engineController.imports.providers
+    readonly property string activeSourceId: engineController.activeSubscriptionId
+    readonly property bool sourceSelected: engineController.subscriptionScopeEnabled
     readonly property string searchQuery: search.text.trim().toLowerCase()
     readonly property var listed: providers.filter(function(record) {
         return String(record.name).toLowerCase().indexOf(page.searchQuery) >= 0 && (page.filterIndex === 0 || (page.filterIndex === 1 ? record.status === "更新失败" : record.enabled))
     })
     readonly property int totalNodes: providers.reduce((total, record) => total + Number(record.nodes), 0)
     readonly property string operationMessage: mutationMessage || engineController.imports.message
+    readonly property bool operationFailed: mutationMessage.length ? mutationFailed : providers.some(record => Boolean(record.error) && record.error === engineController.imports.message)
 
     function edit(record, source) {
         if (!editable) return
-        mutationMessage = ""
+        mutationMessage = ""; mutationFailed = false
         addDialog.edit(record, source)
     }
     function finishMutation(success) {
@@ -39,6 +43,7 @@ Item {
         mutationSubmitting = false; mutationRequestId = ""; mutationOwner = null; mutationKind = ""; mutationSourceId = ""; providerIdsBeforeSave = []
         if (owner) owner.pending = false
         if (!success) {
+            mutationFailed = true
             mutationMessage = engineController.policyError || engineController.imports.message || qsTr("目录变更未能完成，请检查状态后重试。")
             if (owner && owner.errorMessage !== undefined) owner.errorMessage = mutationMessage
             return
@@ -46,11 +51,16 @@ Item {
         let savedId = source
         if (kind === "save" && !savedId.length) {
             const added = providers.filter(provider => before.indexOf(provider.id) < 0)
-            if (added.length !== 1) { mutationMessage = qsTr("来源已保存，但无法确认新增标识；请先检查列表再更新。"); return }
+            if (added.length !== 1) { mutationFailed = true; mutationMessage = qsTr("来源已保存，但无法确认新增标识；请先检查列表再更新。"); return }
             savedId = String(added[0].id)
         }
+        mutationFailed = false
         if (owner) { owner.markSaved(); owner.close() }
         if (kind === "save") engineController.imports.refreshSubscription(savedId)
+        if (kind === "select") {
+            const provider = providers.find(record => record.id === source)
+            mutationMessage = qsTr("已使用「%1」。请在策略页选择该来源的出口。").arg(provider ? provider.name : qsTr("独立导入"))
+        }
     }
     function completeMutation(requestId, success) {
         if (!mutationRequestId.length || String(requestId) !== mutationRequestId) return
@@ -66,18 +76,18 @@ Item {
         else if (!engineController.policyBusy && String((engineController.policyReceipt || {}).request_id) === mutationRequestId) completeMutation(mutationRequestId, true)
     }
     function beginMutation(kind, source, owner) {
-        mutationMessage = ""; mutationKind = kind; mutationSourceId = String(source || ""); mutationOwner = owner
+        mutationMessage = ""; mutationFailed = false; mutationKind = kind; mutationSourceId = String(source || ""); mutationOwner = owner
         providerIdsBeforeSave = providers.map(provider => provider.id); mutationSubmitting = true
         if (owner) owner.pending = true
     }
     function saveSource() {
         const v2 = engineController.policyV2Active
         beginMutation("save", addDialog.sourceId, addDialog)
-        trackMutation(engineController.imports.saveSubscription(addDialog.sourceId, addDialog.sourceName, addDialog.sourceUrl, addDialog.intervalMinutes, addDialog.autoUpdate, addDialog.formatHint), v2)
+        trackMutation(engineController.imports.saveSubscription(addDialog.sourceId, addDialog.sourceName, addDialog.sourceUrl, addDialog.intervalMinutes, addDialog.autoUpdate, addDialog.formatHint, "", addDialog.downloadRoute), v2)
     }
     function confirmDelete(record, source) {
         if (!editable) return
-        mutationMessage = ""; deleteDialog.recordId = record.id; deleteDialog.recordName = record.name; deleteDialog.nodeCount = record.nodes
+        mutationMessage = ""; mutationFailed = false; deleteDialog.recordId = record.id; deleteDialog.recordName = record.name; deleteDialog.nodeCount = record.nodes
         if (source) SwirlMotion.noteTrigger(source)
         deleteDialog.open()
     }
@@ -85,6 +95,12 @@ Item {
         const v2 = engineController.policyV2Active
         beginMutation("delete", deleteDialog.recordId, deleteDialog)
         trackMutation(engineController.imports.removeSubscription(deleteDialog.recordId), v2)
+    }
+    function selectSource(id) {
+        if (!editable || (sourceSelected && activeSourceId === id)) return
+        beginMutation("select", id, null)
+        mutationMessage = qsTr("正在切换来源并撤销原来源的连接…")
+        trackMutation(engineController.selectSubscription(id), true)
     }
     function removeLegacy() {
         const v2 = engineController.policyV2Active
@@ -104,12 +120,12 @@ Item {
     }
 
     Shortcut { sequences: [StandardKey.Find]; enabled: AppState.currentPage === "subscriptions" && !addDialog.visible && !deleteDialog.visible && !reviewDialog.visible && !operationDialog.visible && !legacyDialog.visible; onActivated: { search.forceActiveFocus(); search.selectAll() } }
-    SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
+    readonly property QtObject ownedSubscriptionModel: SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: Theme.pagePadding; spacing: Theme.dp(14)
         SwirlPageHeader {
             id:subscriptionHeading;Layout.fillWidth:true;title:qsTr("订阅来源")
-            description:qsTr("管理更新节奏与来源节点，保留每次操作的结果。")
+            description:qsTr("选择使用的订阅，节点列表与代理出口仅使用该来源。")
             metadata:qsTr("%1 个来源，%2 个节点").arg(page.providers.length).arg(page.totalNodes)
             SubscriptionAction {objectName:"refreshAllSubscriptions";text:qsTr("更新全部");iconName:"refresh-source";enabled:page.editable&&page.providers.length>0;onClicked:engineController.imports.refreshAll()}
             SubscriptionAction {id:add;objectName:"addSubscription";text:qsTr("添加订阅");solid:true;iconName:"plus";enabled:page.editable;onClicked:page.edit(null,add)}
@@ -120,17 +136,25 @@ Item {
             SwirlSegmentedControl {objectName:"subscriptionFilter";Layout.preferredWidth:Theme.dp(234);Layout.preferredHeight:Theme.dp(34);options:[qsTr("全部"),qsTr("更新失败"),qsTr("自动更新")];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
         }
         RowLayout {
+            Layout.fillWidth: true; spacing: Theme.dp(8)
+            SwirlText {
+                Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12)
+                text: page.sourceSelected ? qsTr("当前使用：%1").arg(page.activeSourceId.length ? (page.providers.find(record => record.id === page.activeSourceId) || {}).name || qsTr("来源已删除，请重新选择") : qsTr("独立导入")) : qsTr("选择一条订阅后，只显示并使用该订阅的节点。")
+            }
+            SubscriptionAction { objectName: "useIndependentNodes"; text: qsTr("独立导入"); selected: page.sourceSelected && !page.activeSourceId.length; enabled: page.editable; onClicked: page.selectSource("") }
+        }
+        RowLayout {
             Layout.fillWidth: true; visible: engineController.imports.legacyNodeCount > 0; spacing: Theme.dp(8)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("%1 个历史节点归属待确认，已保留。").arg(engineController.imports.legacyNodeCount); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SubscriptionAction { objectName: "reviewLegacyNodes"; text: qsTr("查看"); onClicked: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「历史未归属」查看。")) } }
-            SubscriptionAction { objectName: "cleanLegacyNodes"; text: qsTr("清理"); danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; legacyDialog.open() } }
+            SubscriptionAction { objectName: "cleanLegacyNodes"; text: qsTr("清理"); danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; page.mutationFailed = false; legacyDialog.open() } }
         }
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
             SwirlText { text: qsTr("订阅来源"); leftPadding: Theme.dp(8); Layout.fillWidth: true; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { text: qsTr("节点"); Layout.preferredWidth: Theme.dp(48); horizontalAlignment: Text.AlignRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            Item { Layout.preferredWidth: Theme.dp(88) }
+            SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(subscriptionList.width < Theme.dp(560) ? 84 : 126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            Item { Layout.preferredWidth: Theme.dp(190) }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.border }
         Item {
@@ -148,6 +172,7 @@ Item {
                     required property var entry
                     record: entry; width: Math.floor(subscriptionList.width)
                     expanded: page.expandedId === record.id
+                    activeSubscription: page.sourceSelected && page.activeSourceId === record.id
                     editable: page.editable; refreshable: page.editable
                     ListView.onPooled: { settle(); visible = false }
                     ListView.onReused: { visible = true; settle() }
@@ -156,7 +181,8 @@ Item {
                     onEditRequested: source => page.edit(record, source)
                     onDeleteRequested: source => page.confirmDelete(record, source)
                     onReviewRequested: source => page.reviewSource(record, source)
-                    onNodesRequested: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「%1」查看。").arg(record.name)) }
+                    onUseRequested: page.selectSource(String(record.id))
+                    onNodesRequested: { if (page.sourceSelected && page.activeSourceId !== record.id) { page.mutationFailed = true; page.mutationMessage = qsTr("请先使用「%1」，再查看该订阅的节点。").arg(record.name) } else AppState.navigate("proxies") }
                 }
             }
             ColumnLayout {
@@ -172,12 +198,12 @@ Item {
             SwirlText {
                 objectName: "subscriptionOperationMessage"; Layout.fillWidth: true
                 text: page.operationMessage || qsTr("自动更新只维护当前来源的节点；完整配置需要单独审阅。"); textFormat: Text.PlainText; elide: Text.ElideRight
-                color: page.mutationMessage.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
+                color: page.operationFailed ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
             }
             SubscriptionAction { visible:page.operationMessage.length>0; text: qsTr("详情"); onClicked: operationDialog.open() }
         }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedOperationDialog: SwirlDialog {
         id: operationDialog; ownerItem: page; title: qsTr("最近操作详情"); guardChanges: false
         contentItem: ColumnLayout {
             spacing: Theme.dp(16)
@@ -188,8 +214,8 @@ Item {
             SubscriptionAction { Layout.alignment: Qt.AlignRight; text: qsTr("关闭"); solid: true; onClicked: operationDialog.close() }
         }
     }
-    SubscriptionDialog { id: addDialog; ownerItem: page; canSave: !engineController.policyBusy && !engineController.imports.busy; recoveryRequired: engineController.policyApplyState === "reconciling"; onSaveRequested: page.saveSource(); onRecoveryRequested: engineController.recoverPolicyConfiguration() }
-    ConfigurationReviewDialog {
+    readonly property SubscriptionDialog retainedAddDialog: SubscriptionDialog { id: addDialog; ownerItem: page; canSave: !engineController.policyBusy && !engineController.imports.busy; recoveryRequired: engineController.policyApplyState === "reconciling"; onSaveRequested: page.saveSource(); onRecoveryRequested: engineController.recoverPolicyConfiguration() }
+    readonly property ConfigurationReviewDialog retainedReviewDialog: ConfigurationReviewDialog {
         id: reviewDialog; ownerItem: page
         canSubmit: !engineController.policyBusy && !engineController.imports.busy
         recoveryRequired: engineController.policyApplyState === "reconciling"
@@ -198,12 +224,12 @@ Item {
         onRecoveryRequested: engineController.recoverPolicyConfiguration()
         onReviewAgainRequested: { engineController.imports.reviewConfiguration(String(review.sourceId || "")); showReview(engineController.imports.configurationReview) }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedDeleteDialog: SwirlDialog {
         id: deleteDialog
         ownerItem: page; title: qsTr("删除订阅？"); property string recordId: ""; property string recordName: ""; property int nodeCount: 0; property bool pending: false
         guardChanges: false; dismissBlocked: pending
-        ColumnLayout {
-            width: parent.width; spacing: Theme.dp(12)
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(12)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("删除「%1」及其 %2 个所属节点。").arg(deleteDialog.recordName).arg(deleteDialog.nodeCount); textFormat: Text.PlainText; color: Theme.text }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("相关连接将断开。引用这些节点的策略将显示出口失效，需重新分配；不会自动改为直连。手动节点和历史未归属节点保留。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (deleteDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
@@ -215,12 +241,12 @@ Item {
             }
         }
     }
-    SwirlDialog {
+    readonly property SwirlDialog retainedLegacyDialog: SwirlDialog {
         id: legacyDialog
         ownerItem: page; objectName: "legacyNodesDialog"; title: qsTr("清理历史未归属节点？"); property bool pending: false
         guardChanges: false; dismissBlocked: pending
-        ColumnLayout {
-            width: parent.width; spacing: Theme.dp(12)
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(12)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("将删除来源缺失的 %1 个历史节点，其中可能包含旧版手动节点。请先检查并备份；此操作不能撤销。明确归属的手动节点和现有订阅保持不变。").arg(engineController.imports.legacyNodeCount); color: Theme.text }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (legacyDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
             RowLayout {

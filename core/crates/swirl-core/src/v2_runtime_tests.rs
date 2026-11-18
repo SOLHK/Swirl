@@ -177,6 +177,527 @@ fn wait(mut predicate: impl FnMut() -> bool) {
         thread::yield_now();
     }
 }
+
+fn socks5_failure(address: SocketAddr, host: &str) -> Vec<u8> {
+    let mut client = StdStream::connect(address).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client.write_all(&[5, 1, 0]).unwrap();
+    let mut method = [0; 2];
+    client.read_exact(&mut method).unwrap();
+    assert_eq!(method, [5, 0]);
+    let mut request = vec![5, 1, 0, 3, u8::try_from(host.len()).unwrap()];
+    request.extend_from_slice(host.as_bytes());
+    request.extend_from_slice(&443u16.to_be_bytes());
+    client.write_all(&request).unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    response
+}
+
+fn dns_peer(answers: Vec<IpAddr>, dual: bool) -> (SocketAddr, thread::JoinHandle<()>) {
+    let dns = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let dns_address = dns.local_addr().unwrap();
+    dns.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
+    let dns_server = thread::spawn(move || {
+        for _ in 0..if dual { 2 } else { 1 } {
+            let mut buffer = [0; 512];
+            let (size, peer) = dns.recv_from(&mut buffer).unwrap();
+            let mut response = buffer[..size].to_vec();
+            let kind = u16::from_be_bytes([response[size - 4], response[size - 3]]);
+            assert!(kind == 1 || (dual && kind == 28));
+            response[2..4].copy_from_slice(&[0x81, 0x80]);
+            let records: Vec<_> = answers
+                .iter()
+                .copied()
+                .filter(|ip| ip.is_ipv4() == (kind == 1))
+                .collect();
+            response[6..8].copy_from_slice(&(records.len() as u16).to_be_bytes());
+            for address in records {
+                response.extend_from_slice(&[0xc0, 0x0c]);
+                response.extend_from_slice(&kind.to_be_bytes());
+                response.extend_from_slice(&[0, 1, 0, 0, 0, 60]);
+                let bytes = match address {
+                    IpAddr::V4(ip) => ip.octets().to_vec(),
+                    IpAddr::V6(ip) => ip.octets().to_vec(),
+                };
+                response.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
+                response.extend_from_slice(&bytes);
+            }
+            dns.send_to(&response, peer).unwrap();
+        }
+    });
+    (dns_address, dns_server)
+}
+
+// Bind the usable endpoint to an address present on every supported runner.
+// macOS does not assign every address in 127/8 to lo0, so the unreachable DNS
+// candidate must not require binding a non-default loopback alias.
+fn direct_dns_fallback(ipv6: bool) {
+    use swirl_subscription::DnsQueryFamily;
+
+    // Reserve the refused candidate without listening. An ephemeral port on
+    // 127.0.0.1 can already have a listener on 127.0.0.2 in a parallel test.
+    // macOS normally has no 127.0.0.2 alias; AddrNotAvailable itself makes that
+    // candidate unusable, without changing the machine's interface setup.
+    let (listener, _refused_socket) = (0..32)
+        .find_map(|_| {
+            let listener = StdListener::bind(if ipv6 { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
+            let unavailable =
+                SocketAddr::from(([127, 0, 0, 2], listener.local_addr().unwrap().port()));
+            let socket = tokio::net::TcpSocket::new_v4().unwrap();
+            match socket.bind(unavailable) {
+                Ok(()) => Some((listener, Some(socket))),
+                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => None,
+                Err(error) if error.kind() == std::io::ErrorKind::AddrNotAvailable => {
+                    Some((listener, None))
+                }
+                Err(error) => panic!("reserve refused DNS candidate: {error}"),
+            }
+        })
+        .expect("reserve a usable and a refused endpoint on the same port");
+    let live = listener.local_addr().unwrap();
+    let port = live.port();
+    let unavailable: SocketAddr = format!("127.0.0.2:{port}").parse().unwrap();
+    let unavailable_error = StdStream::connect_timeout(&unavailable, Duration::from_millis(250))
+        .expect_err("the first DNS candidate must not accept connections");
+    eprintln!("first DNS candidate: {unavailable_error:?}");
+    listener.set_nonblocking(true).unwrap();
+    let origin = thread::spawn(move || {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async move {
+            let listener = TcpListener::from_std(listener).unwrap();
+            let (mut stream, _) = timeout(Duration::from_secs(4), listener.accept())
+                .await
+                .unwrap()
+                .unwrap();
+            let mut request = Vec::new();
+            timeout(Duration::from_secs(4), stream.read_to_end(&mut request))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(request, b"request-after-fallback");
+            stream
+                .write_all(b"response-after-half-close")
+                .await
+                .unwrap();
+            stream.shutdown().await.unwrap();
+        });
+    });
+    let (dns_address, dns_server) = dns_peer(vec![unavailable.ip(), live.ip()], ipv6);
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: if ipv6 {
+            DnsQueryFamily::Dual
+        } else {
+            DnsQueryFamily::Ipv4Only
+        },
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let mut client = StdStream::connect(core.address()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    write!(client, "CONNECT fallback.fixture.invalid:{port} HTTP/1.1\r\nHost: fallback.fixture.invalid:{port}\r\n\r\n").unwrap();
+    assert!(
+        header(&mut client)
+            .expect("v2 must try a route-equivalent DNS answer after an unusable first candidate")
+            .starts_with(b"HTTP/1.1 200")
+    );
+    client.write_all(b"request-after-fallback").unwrap();
+    client.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert_eq!(response, b"response-after-half-close");
+    origin.join().unwrap();
+    dns_server.join().unwrap();
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+}
+
+#[test]
+fn direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy() {
+    direct_dns_fallback(false);
+}
+
+#[test]
+fn direct_dns_falls_back_across_address_families_without_disabling_ipv6() {
+    direct_dns_fallback(true);
+}
+
+#[test]
+fn dns_listener_port_rejection_does_not_recursively_accept_connections() {
+    let (dns_address, dns_server) = dns_peer(
+        vec!["127.0.0.2".parse().unwrap(), "127.0.0.1".parse().unwrap()],
+        false,
+    );
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: swirl_subscription::DnsQueryFamily::Ipv4Only,
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let port = core.address().port();
+    let mut client = StdStream::connect(core.address()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    write!(
+        client,
+        "CONNECT loop.fixture.invalid:{port} HTTP/1.1\r\nHost: loop.fixture.invalid:{port}\r\n\r\n"
+    )
+    .unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert_eq!(
+        response,
+        b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+    assert_eq!(core.shared.accepted.load(Ordering::Acquire), 1);
+    assert_eq!(*core.shared.last_error.lock().unwrap(), "ProxyLoop");
+    dns_server.join().unwrap();
+    core.stop();
+}
+
+#[test]
+fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let refused = tokio::net::TcpSocket::new_v4().unwrap();
+    refused.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    // A bound-but-not-listening TCP socket refuses SYNs on Linux, but macOS
+    // drops them while its existing TCB remains CLOSED. Keep ownership of the
+    // port and exercise that platform's actual failure within an explicit test
+    // budget, rather than racing to reuse a closed ephemeral port or extending
+    // the client's read timeout beyond the production default handshake limit.
+    let dial_budget = Duration::from_millis(250);
+    let native_error = StdStream::connect_timeout(&refused.local_addr().unwrap(), dial_budget)
+        .expect_err("the owned TCP endpoint must not accept connections");
+    let expected_dial_error = match native_error.kind() {
+        std::io::ErrorKind::ConnectionRefused => "UpstreamConnectionRefused",
+        std::io::ErrorKind::TimedOut => "UpstreamTcpTimeout",
+        other => panic!("unexpected bound-only endpoint failure: {other:?}: {native_error}"),
+    };
+    eprintln!("bound-only TCP endpoint: {native_error:?}; core must report {expected_dial_error}");
+    for rejected in [true, false] {
+        let mut candidate = config(&a, &b, A, true);
+        candidate.limits.handshake_timeout_ms = dial_budget.as_millis() as u64;
+        if rejected {
+            candidate.policy.mode = Mode::Rule;
+            candidate
+                .policy
+                .service_policies
+                .push(swirl_subscription::v2::ServicePolicy {
+                    id: "30000000-0000-4000-8000-000000000001".into(),
+                    name: "Rejected fixture".into(),
+                    enabled: true,
+                    priority: 0,
+                    domains: vec![swirl_subscription::v2::DomainMatch::Domain {
+                        value: "target.fixture.invalid".into(),
+                    }],
+                    target: Target::Reject {},
+                    catalog_key: None,
+                    catalog_version: None,
+                });
+        } else {
+            candidate.nodes[0].outbound = Outbound::HttpConnect {
+                host: "127.0.0.1".into(),
+                port: refused.local_addr().unwrap().port(),
+                auth: None,
+                tls: None,
+            };
+        }
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        for request in [
+            b"CONNECT target.fixture.invalid:443 HTTP/1.0\r\n\r\n".as_slice(),
+            b"CONNECT target.fixture.invalid:443 HTTP/1.1\r\nHost: target.fixture.invalid:443\r\n\r\n",
+            b"GET http://target.fixture.invalid/ HTTP/1.1\r\nHost: target.fixture.invalid\r\n\r\n",
+            // Rejected in routing itself, before selecting an outbound.
+            b"CONNECT 0.0.0.0:443 HTTP/1.1\r\nHost: 0.0.0.0:443\r\n\r\n",
+        ] {
+            let mut client = StdStream::connect(core.address()).unwrap();
+            client.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
+            client.write_all(request).unwrap();
+            let mut response = Vec::new();
+            client.read_to_end(&mut response).unwrap_or_else(|error| {
+                panic!(
+                    "failure response was not completed: rejected={rejected}, request={:?}, core_error={}, read_error={error}",
+                    String::from_utf8_lossy(request),
+                    *core.shared.last_error.lock().unwrap(),
+                )
+            });
+            assert_eq!(response, b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+            assert_eq!(
+                *core.shared.last_error.lock().unwrap(),
+                if request.starts_with(b"CONNECT 0.0.0.0:") {
+                    "InvalidTarget"
+                } else if rejected {
+                    "RouteRejected"
+                } else {
+                    expected_dial_error
+                }
+            );
+        }
+        let response = socks5_failure(core.address(), "target.fixture.invalid");
+        // RFC 1928 section 6: policy denial is not a refused TCP connection.
+        // A timeout has no dedicated REP value and must not be reported as
+        // TTL expired or connection refused.
+        let expected_reply = if rejected {
+            2
+        } else if expected_dial_error == "UpstreamConnectionRefused" {
+            5
+        } else {
+            1
+        };
+        assert_eq!(response, [5, expected_reply, 0, 1, 0, 0, 0, 0, 0, 0]);
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(
+            *core.shared.last_error.lock().unwrap(),
+            if rejected {
+                "RouteRejected"
+            } else {
+                expected_dial_error
+            }
+        );
+        assert_eq!(
+            socks5_failure(core.address(), "0.0.0.0"),
+            [5, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+            "an invalid target is a general failure, not an unsupported address type"
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), "InvalidTarget");
+        core.stop();
+    }
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn socks5_unsupported_address_type_replies_before_routing_and_closes() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut core = Core::start(config(&a, &b, A, true), STORE.into(), 1, START.into()).unwrap();
+    for address_type in [2, 255] {
+        let mut client = StdStream::connect(core.address()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        client.write_all(&[5, 1, 0]).unwrap();
+        let mut method = [0; 2];
+        client.read_exact(&mut method).unwrap();
+        assert_eq!(method, [5, 0]);
+        // No guessed address length or payload is needed after an explicitly
+        // unsupported ATYP. The server already knows the precise REP reason.
+        client.write_all(&[5, 1, 0, address_type]).unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).unwrap();
+        assert_eq!(response, [5, 8, 0, 1, 0, 0, 0, 0, 0, 0]);
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), "AddressType");
+    }
+    assert_eq!(core.shared.failed.load(Ordering::Acquire), 2);
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+}
+
+#[test]
+fn socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy() {
+    let (dns_address, dns_server) = dns_peer(vec![], false);
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: swirl_subscription::DnsQueryFamily::Ipv4Only,
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    assert_eq!(
+        socks5_failure(core.address(), "missing.fixture.invalid"),
+        [5, 4, 0, 1, 0, 0, 0, 0, 0, 0]
+    );
+    wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+    assert_eq!(*core.shared.last_error.lock().unwrap(), "DnsEmpty");
+    assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+    dns_server.join().unwrap();
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+}
+
+#[test]
+fn socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry() {
+    for rejected in [true, false] {
+        let listener = StdListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let peer = thread::spawn(move || {
+            let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(async move {
+                timeout(Duration::from_secs(4), async move {
+                    let listener = TcpListener::from_std(listener).unwrap();
+                    let (mut stream, _) = listener.accept().await.unwrap();
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        assert!(request.len() < 4096);
+                        request.push(stream.read_u8().await.unwrap());
+                    }
+                    assert_eq!(request, b"CONNECT target.fixture.invalid:443 HTTP/1.1\r\nHost: target.fixture.invalid:443\r\n\r\n");
+                    if rejected {
+                        // Neither this upstream challenge nor its body may be
+                        // copied to the inbound SOCKS client.
+                        stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"fixture-private\"\r\nContent-Length: 7\r\n\r\nprivate").await.unwrap();
+                    } else {
+                        let mut payload = Vec::new();
+                        stream.read_to_end(&mut payload).await.unwrap();
+                        assert!(payload.is_empty());
+                    }
+                })
+                .await
+                .expect("upstream failure fixture exceeded its deadline");
+            });
+        });
+        let a = Peer::new(b'A');
+        let b = Peer::new(b'B');
+        let mut candidate = config(&a, &b, A, true);
+        if !rejected {
+            // Only the deliberately silent peer needs a short negative-test
+            // budget; a scheduled 407 response keeps the normal product limit.
+            candidate.limits.handshake_timeout_ms = 250;
+        }
+        candidate.nodes[0].outbound = Outbound::HttpConnect {
+            host: address.ip().to_string(),
+            port: address.port(),
+            auth: None,
+            tls: None,
+        };
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        assert_eq!(
+            socks5_failure(core.address(), "target.fixture.invalid"),
+            [5, 1, 0, 1, 0, 0, 0, 0, 0, 0]
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(
+            *core.shared.last_error.lock().unwrap(),
+            if rejected {
+                "UpstreamRejected"
+            } else {
+                "UpstreamProtocolTimeout"
+            }
+        );
+        assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+        peer.join().unwrap();
+        assert_eq!(a.connections.load(Ordering::Acquire), 0);
+        assert_eq!(b.connections.load(Ordering::Acquire), 0);
+        core.stop();
+    }
+}
+
+#[test]
+fn an_established_tunnel_error_never_appends_an_http_failure_response() {
+    // VLESS reads its response prefix lazily after CONNECT has succeeded. Use
+    // both an invalid prefix and a truncated one to exercise actual stream
+    // errors without a TLS fixture or treating an ordinary TCP EOF as failure.
+    for (prefix, expected_error) in [
+        (vec![1, 0], "StreamInvalidData"),
+        (vec![0], "StreamUnexpectedEof"),
+    ] {
+        let listener = StdListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let (release, after_success) = std::sync::mpsc::channel();
+        let peer = thread::spawn(move || {
+            let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(async move {
+                let listener = TcpListener::from_std(listener).unwrap();
+                let (mut stream, _) = timeout(Duration::from_secs(4), listener.accept())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let mut request = [0; 23];
+                timeout(Duration::from_secs(4), stream.read_exact(&mut request))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(request[0], 0);
+                assert_eq!(
+                    &request[1..17],
+                    &[
+                        0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+                        0xdd, 0xee, 0xff
+                    ]
+                );
+                assert_eq!(&request[17..22], &[0, 1, 0, 80, 2]);
+                let mut host = vec![0; usize::from(request[22])];
+                timeout(Duration::from_secs(4), stream.read_exact(&mut host))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(host, b"target.fixture.invalid");
+                // The client explicitly confirms receipt of the complete 200
+                // before the peer causes the upstream reader to fail.
+                after_success.recv_timeout(Duration::from_secs(4)).unwrap();
+                stream.write_all(&prefix).await.unwrap();
+                stream.shutdown().await.unwrap();
+            });
+        });
+        let a = Peer::new(b'A');
+        let b = Peer::new(b'B');
+        let mut candidate = config(&a, &b, A, true);
+        candidate.nodes[0].outbound = Outbound::Vless {
+            host: address.ip().to_string(),
+            port: address.port(),
+            uuid: "00112233-4455-6677-8899-aabbccddeeff".into(),
+            tls: None,
+            websocket: None,
+            reality: None,
+            flow: None,
+            transport: None,
+            udp: false,
+        };
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        let mut client = connect(core.address());
+        release.send(()).unwrap();
+        let mut tail = Vec::new();
+        client.read_to_end(&mut tail).unwrap();
+        assert!(
+            tail.is_empty(),
+            "no HTTP error may follow an established tunnel"
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), expected_error);
+        peer.join().unwrap();
+        core.stop();
+    }
+}
 fn prepared(
     core: &Core,
     candidate: RuntimeConfig,
@@ -907,6 +1428,15 @@ fn udp_new_destination_waits_for_receipt_old_destination_stays_pinned_and_catalo
 
 #[test]
 fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_plaintext_fallback() {
+    dns_transport_roundtrip(false);
+}
+
+#[test]
+fn native_dns_uses_selected_proxy_verified_tls_without_direct_or_plaintext_fallback() {
+    dns_transport_roundtrip(true);
+}
+
+fn dns_transport_roundtrip(native_ingress: bool) {
     use base64::Engine;
     use swirl_subscription::{DnsQueryFamily, DnsTlsServer, Tls};
     use tokio_rustls::{
@@ -1028,12 +1558,25 @@ fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_pla
             }],
         };
         let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
-        let plan = core.shared.live.lock().unwrap().plan.clone();
-        let resolved = core.runtime.as_ref().unwrap().block_on(classify(
-            &plan,
-            "classified.fixture.invalid",
-            443,
-        ));
+        let resolved = if native_ingress {
+            let dispatcher = core.flow_dispatcher().unwrap();
+            core.runtime
+                .as_ref()
+                .unwrap()
+                .block_on(dispatcher.resolve_dns(
+                    "classified.fixture.invalid",
+                    443,
+                    "192.0.2.2:12000".parse().unwrap(),
+                ))
+        } else {
+            let plan = core.shared.live.lock().unwrap().plan.clone();
+            core.runtime.as_ref().unwrap().block_on(classify(
+                &plan,
+                "classified.fixture.invalid",
+                443,
+                None,
+            ))
+        };
         if trusted_name {
             assert_eq!(resolved.unwrap(), vec!["203.0.113.9:443".parse().unwrap()]);
             assert_eq!(observed.load(Ordering::Acquire), 1);
@@ -1052,4 +1595,138 @@ fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_pla
         peer.join().unwrap();
         core.stop();
     }
+}
+
+fn native_dns_fixture(mut candidate: RuntimeConfig) -> RuntimeConfig {
+    candidate.dns.tls_servers = vec![swirl_subscription::DnsTlsServer {
+        address: "192.0.2.1:853".parse().unwrap(),
+        tls: swirl_subscription::Tls {
+            server_name: "dns.fixture.invalid".into(),
+            alpn: vec![],
+            ca_der_base64: None,
+        },
+        https_path: None,
+    }];
+    candidate
+}
+
+#[test]
+fn native_tcp_reuses_proxy_policy_admission_pinning_and_catalogue_revocation() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let initial = native_dns_fixture(config(&a, &b, A, true));
+    let candidate = native_dns_fixture(config(&a, &b, B, false));
+    let mut core = Core::start(initial, STORE.into(), 1, START.into()).unwrap();
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let open = |dispatcher: FlowDispatcher| async move {
+        let (mut client, incoming) = tokio::io::duplex(1024);
+        let relay = tokio::spawn(async move {
+            dispatcher
+                .relay_tcp(
+                    incoming,
+                    "192.0.2.2:12000".parse().unwrap(),
+                    NetworkTarget {
+                        host: "target.fixture.invalid".into(),
+                        port: 80,
+                    },
+                )
+                .await
+        });
+        client.write_all(b"ping").await.unwrap();
+        (client, relay)
+    };
+    let (mut old_client, old_relay) = runtime.block_on(open(dispatcher.clone()));
+    runtime.block_on(async {
+        let mut response = [0; 6];
+        old_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"A:ping");
+    });
+    let plan = prepared(&core, candidate.clone(), REQUEST, 1, 2, 1, vec![]);
+    activated(&core, &plan, REQUEST, 1, 2);
+    let (mut new_client, new_relay) = runtime.block_on(open(dispatcher));
+    wait(|| core.shared.waiting.load(Ordering::Acquire) == 1);
+    assert_eq!(b.requests.load(Ordering::Acquire), 0);
+    finished(&core, &plan, REQUEST, 2);
+    runtime.block_on(async {
+        let mut response = [0; 6];
+        new_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"B:ping");
+        old_client.write_all(b"old1").await.unwrap();
+        old_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"A:old1");
+    });
+    let revoke = prepared(&core, candidate, REQUEST3, 2, 3, 2, vec![A.into()]);
+    activated(&core, &revoke, REQUEST3, 2, 3);
+    finished(&core, &revoke, REQUEST3, 3);
+    runtime.block_on(async {
+        assert_eq!(old_client.read(&mut [0; 1]).await.unwrap(), 0);
+        assert_eq!(old_relay.await.unwrap(), Err("SessionRevoked"));
+        let mut response = [0; 6];
+        new_client.write_all(b"new2").await.unwrap();
+        new_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"B:new2");
+        drop(new_client);
+        new_relay.await.unwrap().unwrap();
+    });
+    assert_eq!(a.requests.load(Ordering::Acquire), 2);
+    assert_eq!(b.requests.load(Ordering::Acquire), 2);
+    core.stop();
+}
+
+#[test]
+fn native_udp_reuses_shadowsocks_outbound_and_revokes_an_idle_session() {
+    let a = DatagramPeer::new(b'A');
+    let b = DatagramPeer::new(b'B');
+    let dummy_a = Peer::new(b'A');
+    let dummy_b = Peer::new(b'B');
+    let mut initial = native_dns_fixture(config(&dummy_a, &dummy_b, A, true));
+    initial.nodes = vec![a.node(A), b.node(B)];
+    let mut candidate = initial.clone();
+    candidate.nodes = vec![b.node(B)];
+    candidate.policy.default_policy.target = Target::Node { id: B.into() };
+    let mut core = Core::start(initial, STORE.into(), 1, START.into()).unwrap();
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let mut flow = runtime.block_on(async {
+        let mut flow = dispatcher
+            .open_udp(
+                "192.0.2.2:12000".parse().unwrap(),
+                NetworkTarget {
+                    host: "target.fixture.invalid".into(),
+                    port: 80,
+                },
+            )
+            .await
+            .unwrap();
+        flow.send(b"udp1").await.unwrap();
+        let mut response = [0; 64];
+        let size = timeout(Duration::from_secs(3), flow.recv(&mut response))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&response[..size], b"A:udp1");
+        flow
+    });
+    let plan = prepared(&core, candidate, REQUEST, 1, 2, 1, vec![A.into()]);
+    activated(&core, &plan, REQUEST, 1, 2);
+    // No send/recv future is polled by the caller here: the owned worker must
+    // observe cancellation itself and release the real revocation barrier.
+    finished(&core, &plan, REQUEST, 2);
+    assert_eq!(core.snapshot().unwrap()["active"], 0);
+    runtime.block_on(async {
+        assert_eq!(flow.recv(&mut [0; 64]).await, Err("SessionRevoked"));
+        assert_eq!(flow.send(b"must-not-replay").await, Err("SessionRevoked"));
+    });
+    assert_eq!(a.packets.load(Ordering::Acquire), 1);
+    assert_eq!(b.packets.load(Ordering::Acquire), 0);
+    core.stop();
 }

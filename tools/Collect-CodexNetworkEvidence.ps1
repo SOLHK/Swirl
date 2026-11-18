@@ -1,28 +1,29 @@
-param([Parameter(Mandatory=$true)][string]$OutputPath,[string]$CodexLogDirectory)
+param([Parameter(Mandatory=$true)][string]$OutputPath,[string]$CodexLogDirectory,
+    [ValidateSet('Clash','Swirl','Baseline')][string]$ComparisonLabel='Baseline',
+    [string]$SwirlExecutablePath)
 $ErrorActionPreference='Stop'
 # Read-only inventory. Never dumps command lines, environment blocks, tokens,
 # browser storage or request bodies. No Set-* network calls or cache flushes.
-function EndpointSummary([string]$Value) {
-    if([string]::IsNullOrWhiteSpace($Value)){return $null}
-    try{$uri=[uri]$Value;if($uri.IsAbsoluteUri){return @{scheme=$uri.Scheme;host=$uri.Host;port=$uri.Port;credentialsPresent=!!$uri.UserInfo}}}catch{}
-    return @{configured=$true;format='not a URI; value omitted'}
-}
+Import-Module (Join-Path $PSScriptRoot 'CodexNetworkEvidence.psm1') -Force
 $processes=Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CreationDate
 $selected=@($processes | Where-Object {
-    $_.Name -match '^(codex|Swirl.*|.*mihomo.*|msedge|chrome)\.exe$' -or
+    $_.Name -match '^(codex|ChatGPT|Code|Swirl.*|.*clash.*|.*mihomo.*|msedge|chrome)\.exe$' -or
     $_.ExecutablePath -match '\\OpenAI\.Codex_[^\\]+\\app\\'
 })
-$ids=@($selected.ProcessId)
+$ids=@($selected | ForEach-Object {$_.ProcessId})
 $inventory=@($selected | ForEach-Object {
-    [pscustomobject]@{pid=$_.ProcessId;parent=$_.ParentProcessId;name=$_.Name;path=$_.ExecutablePath;created=$_.CreationDate;
+    [pscustomobject]@{pid=$_.ProcessId;parent=$_.ParentProcessId;name=$_.Name;created=$_.CreationDate;fileVersion=(Get-EvidenceFileVersion $_.ExecutablePath);
         role=if($_.ExecutablePath -match '\\OpenAI\\Codex\\bin\\'){'Codex CLI or app-server; launch mode uninspected'}elseif($_.ExecutablePath -match '\\OpenAI\.Codex_'){'Codex desktop process'}elseif($_.Name -match '^(msedge|chrome)\.exe$'){'browser process'}else{'proxy or helper'}}
 })
 $tcp=@(Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object OwningProcess -in $ids | Select-Object OwningProcess,State,LocalAddress,LocalPort,RemoteAddress,RemotePort)
 $settings=Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
-$proxy=@{enabled=$settings.ProxyEnable;server=$settings.ProxyServer;pacConfigured=!!$settings.AutoConfigURL}
+$proxy=@{enabled=$settings.ProxyEnable;proxy=(ConvertTo-ProxyMapEvidence $settings.ProxyServer);
+    bypass=(ConvertTo-ProxyBypassEvidence $settings.ProxyOverride);pacConfigured=!!$settings.AutoConfigURL}
+$nativeProxy=Get-WindowsNativeProxyEvidence
 $environment=@(foreach($scope in @('Process','User','Machine')){foreach($name in @('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY')){
     $value=[Environment]::GetEnvironmentVariable($name,$scope)
-    [pscustomobject]@{scope=$scope;name=$name;configured=!!$value;endpoint=if($name -ne 'NO_PROXY'){EndpointSummary $value}else{$null}}
+    [pscustomobject]@{scope=$scope;name=$name;configured=!!$value;endpoint=if($name -ne 'NO_PROXY'){ConvertTo-ProxyEndpointEvidence $value}else{$null};
+        bypass=if($name -eq 'NO_PROXY'){ConvertTo-ProxyBypassEvidence $value}else{$null}}
 }})
 $certificates=@(foreach($scope in @('Process','User','Machine')){foreach($name in @('SSL_CERT_FILE','SSL_CERT_DIR','CODEX_CA_CERTIFICATE','NODE_EXTRA_CA_CERTS')){
     $value=[Environment]::GetEnvironmentVariable($name,$scope)
@@ -39,8 +40,17 @@ if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'CodexLogSummary.psm1')) {
     $logDirectories=if ($CodexLogDirectory) { @($CodexLogDirectory) } else { @(Get-CodexLogDirectories) }
     $codexLogSummary=Get-CodexLogSummary -LogDirectory $logDirectories
 }
-$report=@{timestamp=(Get-Date).ToString('o');processes=$inventory;tcp=$tcp;windowsProxy=$proxy;winHttp=(netsh winhttp show proxy | Out-String).Trim();environment=$environment;certificateEnvironment=$certificates;tunCandidates=$interfaces;dnsCache=$dns;codexExistingLogSummary=$codexLogSummary;
-    limitations=@('Process environment is the collector environment, not an inspection of already-running Codex processes.','TCP endpoints do not reveal encrypted WebSocket or SSE contents.','A TUN adapter name is a candidate, not proof of effective routing.','A loopback proxy connection and a TUN interface can coexist without proving a loop.')}
+$swirlPaths=@(@($selected | Where-Object Name -eq 'Swirl.exe' | ForEach-Object ExecutablePath)+@($SwirlExecutablePath) | Where-Object {$_} | Sort-Object -Unique)
+$swirlPackages=@($swirlPaths | ForEach-Object {Get-SwirlPackageEvidence $_})
+$codexPackages=@(Get-AppxPackage -Name OpenAI.Codex -ErrorAction SilentlyContinue | ForEach-Object {
+    if ([string]$_.Version -match '\A[0-9]+(?:\.[0-9]+){1,3}\z') { @{version=[string]$_.Version} }
+})
+$report=@{schema=2;timestamp=(Get-Date).ToString('o');comparisonLabel=$ComparisonLabel;osVersion=[Environment]::OSVersion.Version.ToString();
+    processes=$inventory;tcp=$tcp;windowsProxy=$proxy;nativeWindowsProxy=$nativeProxy;environment=$environment;certificateEnvironment=$certificates;
+    swirlPackages=$swirlPackages;codexPackages=$codexPackages;tunCandidates=$interfaces;dnsCache=$dns;codexExistingLogSummary=$codexLogSummary;
+    limitations=@('Comparison labels are user-supplied; equal node parameters, DNS, routing, network and exit IP still require independent verification.',
+        'Version and manifest fields describe files on disk, not an already-loaded executable or DLL.',
+        'Process environment is the collector environment, not an inspection of already-running Codex processes.','TCP endpoints do not reveal encrypted WebSocket or SSE contents.','A TUN adapter name is a candidate, not proof of effective routing.','A loopback proxy connection and a TUN interface can coexist without proving a loop.')}
 $destination=[IO.Path]::GetFullPath($OutputPath)
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))|Out-Null
 $report|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $destination -Encoding utf8

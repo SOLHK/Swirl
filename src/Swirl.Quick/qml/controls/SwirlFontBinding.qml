@@ -14,6 +14,7 @@ QtObject {
     property string textRole: "body"
     property bool preview: false
     property bool fitWidth: false
+    property real availableWidth: target ? target.width : 0
     property real naturalWidth: 0
     property var fontWindow: target && target.Window ? target.Window.window : null
     readonly property real logicalDpi: fontWindow ? fontWindow.FontDisplayContext.logicalDpi : 96
@@ -56,7 +57,7 @@ QtObject {
             : Theme.variableAxesFor(target.font, logicalDpi, devicePixelRatio, textRole)
         if (fitWidth && !preview) {
             const fit = Theme.fittedText(target.font, target.text, logicalDpi,
-                devicePixelRatio, textRole, target.width, resolvedAxes.wdth)
+                devicePixelRatio, textRole, availableWidth, resolvedAxes.wdth)
             naturalWidth = fit.naturalWidth
             next = fit.axes
         } else {
@@ -103,4 +104,5 @@ QtObject {
     onFontWindowChanged: if (initialized && fontWindow) binding.scheduleRefresh()
     Component.onCompleted: { initialized = true; scheduleRefresh() }
     Component.onDestruction: initialized = false
+    onAvailableWidthChanged: if (initialized && fitWidth) scheduleRefresh()
 }

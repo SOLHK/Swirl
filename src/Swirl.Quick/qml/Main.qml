@@ -8,6 +8,7 @@ import "components"
 import "controls"
 import "pages"
 ApplicationWindow {
+    property bool previewProfile:false
     id:window
     readonly property var engineControllerContext: engineController
     readonly property var systemProviderContext: systemProvider
@@ -27,7 +28,7 @@ ApplicationWindow {
     minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
-    SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
     palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
@@ -97,7 +98,12 @@ ApplicationWindow {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
             glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
+            ribbonProgress: pageLoader.item && pageLoader.item.ribbonTourProgress !== undefined ? pageLoader.item.ribbonTourProgress : 1
+            ribbonStrength: pageLoader.item && pageLoader.item.ribbonTourStrength !== undefined ? pageLoader.item.ribbonTourStrength : 0
         }
+
+        Item { id: ribbonBackLayer; anchors.fill: parent; Accessible.ignored: true }
+        Item { id: ribbonFrontLayer; anchors.fill: parent; z: 80; Accessible.ignored: true }
 
         Binding { target: SwirlProxyWingMotion; property: "windowVisible"; value: window.visible && window.visibility !== Window.Minimized }
 
@@ -111,22 +117,53 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource;previewProfile:window.previewProfile }
         SwirlWindowControls {
-            id:windowControls;objectName:"windowControls";z:70
+            id:windowControls;objectName:"windowControls";z:90
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
             targetWindow:window
         }
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-(AppState.currentPage==="activity"?0:Theme.dp(12)); height:parent.height
             RowLayout {
-                id:toolbar; z:1; visible:AppState.currentPage==="activity"; x:Theme.pagePadding+Theme.dp(7); y:Theme.dp(9); width:parent.width-x-windowControls.width-Theme.dp(16); height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"success":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
-                Item {Layout.fillWidth:true}
-                SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
-
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:engineController.tunEnabled?"TUN · 已开":"TUN · 未开启";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"当前 Rust Core 暂不支持 TUN 模式"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
-
+                id: toolbar
+                z: 1; visible: AppState.currentPage === "activity"
+                x: Theme.pagePadding; y: Theme.dp(9)
+                width: parent.width - x - windowControls.width - Theme.dp(20)
+                height: Theme.dp(32); spacing: Theme.dp(10)
+                SwirlStatusCapsule {
+                    objectName: "eventsCapsule"
+                    visible: toolbar.width >= Theme.dp(530)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    label: systemProvider.eventCount > 0 ? qsTr("%1 个事件").arg(systemProvider.eventCount) : qsTr("暂无事件")
+                    tone: systemProvider.eventCount > 0 ? "success" : "neutral"
+                    detail: qsTr("查看事件与活动记录")
+                    onClicked: AppState.navigate("logs")
+                }
+                Item { Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(16) }
+                SwirlSystemProxyCapsule {
+                    id: proxyCapsule; objectName: "proxyCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    controller: engineController
+                }
+                SwirlStatusCapsule {
+                    id: tunCapsule; objectName: "tunCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    label: engineController.tunRecoveryBusy ? qsTr("TUN · 恢复中") : engineController.tunRecoveryRequired ? qsTr("TUN · 需恢复") : engineController.tunBusy ? qsTr("TUN · 切换中") : engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 取消待启用") : qsTr("TUN · 未开启")
+                    detail: engineController.routingError || (engineController.tunRecoveryBusy
+                        ? qsTr("正在恢复上次 TUN 接管的网络设置。") : engineController.tunRecoveryRequired
+                        ? qsTr("点击请求管理员授权，恢复上次 TUN 接管的网络设置。") : engineController.tunBusy
+                        ? qsTr("正在切换 TUN 模式，请稍候。") : engineController.tunEnabled
+                        ? qsTr("TUN 模式已开启，点击关闭；系统代理保持原选择。") : engineController.tunRequested ? qsTr("TUN 尚未运行，点击取消待启用；之后可使用普通代理。") : engineController.tunSupported ? qsTr("点击查看 TUN 管理员授权说明。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
+                    tone: engineController.tunRecoveryRequired ? "warning" : engineController.tunEnabled ? "success" : "neutral"
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: AppState.requestTunEnabled(engineController.tunRecoveryRequired || !(engineController.tunEnabled || engineController.tunRequested))
+                }
+                OutboundModeControl {
+                    id: outboundModeControl
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    engineController: window.engineControllerContext
+                }
             }
             SwirlButton {
                 id:settingsBack
@@ -143,7 +180,13 @@ ApplicationWindow {
             }
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
+                // Finish creating policies in one turn so its QML members stay live through initialization.
+                incubateRoutes: routeKey !== "policies"
                 id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:0; x:Theme.dp(0); y:AppState.currentPage==="activity"?Theme.dp(12):Theme.dp(48); width:parent.width; height:parent.height-y-Theme.dp(12)
+                onRouteFailed:(failedRoute,fallbackRoute)=>{
+                    if(AppState.currentPage===failedRoute){if(AppState.canGoBack)AppState.goBack();else if(fallbackRoute.length)AppState.navigate(fallbackRoute)}
+                    AppState.notice(qsTr("无法加载此页面，请重试。"))
+                }
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :
@@ -210,6 +253,51 @@ ApplicationWindow {
     function persistExitDrafts(){
         const loader=pageLoader.pages["dns"]
         if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
+    }
+    Connections {
+        target: AppState
+        function onTunAuthorizationRequested(recovery) {
+            tunAuthorization.recovery = recovery
+            tunAuthorization.open()
+        }
+    }
+    Connections {
+        target: engineController
+        function onTunRecoveryFinished(success, message) { AppState.notice(message) }
+    }
+    SwirlDialog {
+        id: tunAuthorization
+        objectName: "tunAuthorizationDialog"
+        ownerItem: window.contentItem
+        property bool recovery: false
+        title: recovery ? qsTr("恢复 TUN 网络") : qsTr("开启 TUN 模式")
+        guardChanges: false
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(16)
+            SwirlText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: tunAuthorization.recovery
+                    ? qsTr("继续后将请求 Windows 管理员授权，恢复 Swirl 接管的网卡、路由和 DNS，并关闭已保存的 TUN 开关。订阅和出口选择会保留；无法确认的资源会保留恢复记录并报告原因。")
+                    : qsTr("TUN 会使用虚拟网卡接管流量。继续后 Windows 将请求管理员授权；切换期间连接可能短暂中断，授权失败会尝试恢复原模式。取消此对话会保留当前连接。")
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: Theme.compactGap
+                SwirlButton { objectName: "cancelTunAuthorization"; text: qsTr("取消"); onClicked: tunAuthorization.close() }
+                SwirlButton {
+                    objectName: "confirmTunAuthorization"
+                    text: tunAuthorization.recovery ? qsTr("授权并恢复") : qsTr("授权并开启")
+                    primary: true
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: {
+                        tunAuthorization.close()
+                        const accepted = tunAuthorization.recovery ? engineController.recoverTunNetwork() : engineController.setTunEnabled(true)
+                        if (!accepted) AppState.notice(engineController.routingError || engineController.policyError || engineController.error)
+                    }
+                }
+            }
+        }
     }
     function openRewriteEditor(kind,title){
         rewriteRulesLoader.requestedKind=kind
@@ -278,7 +366,7 @@ ApplicationWindow {
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
-    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
+    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:{if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return;AppState.goBack()} }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+2"; onActivated:AppState.navigate("proxies") }
@@ -286,7 +374,7 @@ ApplicationWindow {
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
+        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext; ribbonBack: ribbonBackLayer; ribbonFront: ribbonFrontLayer; proxyAnchor: proxyCapsule; toolbarItems: [proxyCapsule, tunCapsule, outboundModeControl]; sidebarAnchor: sidebar.glassSurface; wingScene: appSceneBackdrop; sceneRevision: window.width + window.height + window.actualSidebarWidth; sceneSettled: AppState.currentPage === "activity" && !pageLoader.moving && !pageLoader.pendingGrab } }
         Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
     Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }
     Component { id:externalTools; ExternalToolsPage {} }
@@ -321,7 +409,8 @@ ApplicationWindow {
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
-    SwirlShellOutline {
+    readonly property Item ownedWindowOutline: SwirlShellOutline {
+        parent:window.contentItem
         objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
         anchors.fill:parent;z:998
         radius:window.shellRadius

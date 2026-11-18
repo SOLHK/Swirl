@@ -73,4 +73,10 @@ inline void initializeQmlCache(const QString &revision, const QString &flavor) {
     // Keep old versions intact so switching back to an earlier build is safe.
     qputenv("QML_DISK_CACHE_PATH", cache.toUtf8());
 }
+inline QString persistentPreviewDirectory() {
+    // Keep interactive preview data independently of executable/version/cache.
+    const auto path=writableLocation(QStandardPaths::AppLocalDataLocation)+QStringLiteral("/interactive-preview");
+    if(!QDir().mkpath(path))invalidTestRoot();
+    return path;
+}
 }

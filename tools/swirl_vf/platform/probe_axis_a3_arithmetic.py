@@ -25,6 +25,7 @@ from axis_a3_arithmetic_cases import (ALL_MODELS, FRESH_SEED, MODEL_DESCRIPTIONS
                                      NEW_MODELS, arithmetic_cases, arithmetic_mappings)
 from axis_a3_arithmetic_harness import MODES, check_entry_audit, diagnostic_failure, make_harness
 from axis_a3_default_omission import classify_default_omission
+from probe_axis_a3_construction import compare_records
 from probe_axis_a3_hvar import metric_residuals
 from probe_axis_a3_identity_avar import metric_summary
 from probe_axis_anchor import (EXPECTED, LIMIT, METRIC_GIDS, TAGS, BatchGeometry,
@@ -38,7 +39,17 @@ from probe_axis_anchor import (EXPECTED, LIMIT, METRIC_GIDS, TAGS, BatchGeometry
 STATUS = "COMPLETED_NATIVE_A3_ARITHMETIC_DIAGNOSIS_NOT_ACCEPTANCE"
 
 
-def run(source, output):
+def run(source, output, *, case_factory=arithmetic_cases, mapping_factory=arithmetic_mappings,
+        model_names=ALL_MODELS, new_model_names=NEW_MODELS,
+        model_descriptions=MODEL_DESCRIPTIONS, fresh_seed=FRESH_SEED,
+        status=STATUS, report_context=None, compare_replay_geometry=False,
+        design_input_factory=None):
+    """Run a predeclared A3 experiment with the same frozen native protocol.
+
+    Defaults reproduce the original arithmetic experiment. A separate A3 driver
+    can supply independently frozen cases/models; it cannot alter the native
+    constructor, source identity checks, readback guard or acceptance flags.
+    """
     require(not output.exists() and source.resolve() != output.resolve(), "new_report_path_required")
     require(source.stat().st_size == 61473880 and hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED,
             "exact_original_source_required")
@@ -52,8 +63,10 @@ def run(source, output):
         "independent_processes_do_not_claim_system_cache_reset": True,
         "HVF_geometry_references_cached_by_face_gid_and_design": True,
         "metric_limit_font_units": LIMIT, "outline_limit_font_units": LIMIT,
-        "fresh_holdout_seed": FRESH_SEED, "model_descriptions": MODEL_DESCRIPTIONS,
+        "fresh_holdout_seed": fresh_seed, "model_descriptions": model_descriptions,
         "native_processes": [], "native_HVF_unique_calls": 0, "modes": []}
+    if report_context is not None:
+        report["experiment_context"] = report_context
     output.parent.mkdir(parents=True, exist_ok=True)
 
     def save():
@@ -69,9 +82,9 @@ def run(source, output):
             axes = {face: {a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in font["fvar"].axes}
                     for face, font in enumerate(fonts)}
             records = {face: axis_records(font) for face, font in enumerate(fonts)}
-            cases = arithmetic_cases(axes)
+            cases = case_factory(axes)
             plans = [declare_readback(case["location"]) for case in cases]
-            models = [arithmetic_mappings(fonts[case["face_index"]], records[case["face_index"]], case["location"])
+            models = [mapping_factory(fonts[case["face_index"]], records[case["face_index"]], case["location"])
                       for case in cases]
             gids = sorted(set(METRIC_GIDS) | {19177})
             report.update(user_positions=len(cases), unique_face_locations=len({
@@ -89,6 +102,11 @@ def run(source, output):
                 cases=[{**case, "binary64_bits": bits(case["location"]), "declared_models": mapping,
                     "predeclared_replay": {tag: plan["canonical"] for tag, plan in declaration.items()}}
                     for case, mapping, declaration in zip(cases, models, plans)])
+            if design_input_factory is not None:
+                for frozen, case in zip(report["cases"], cases):
+                    face = case["face_index"]
+                    frozen["declared_design_inputs"] = design_input_factory(
+                        fonts[face], records[face], case["location"])
             root = Path(directory)
             swift, binary, hvf_binary = root / "arithmetic.swift", root / "arithmetic", root / "hvf_oracle"
             code = Path(__file__).with_name("coretext_extract.swift").read_text()
@@ -120,8 +138,10 @@ def run(source, output):
                     "opposite_order_mismatches": [], "replay_batch_checks": 0,
                     "replay_failed_batches": 0, "replay_failures": [], "default_omission_checks": [],
                     "models": {name: {"horizontal_metrics": metric_stats(), "portable_geometry": control_stats(),
-                                      "native_HVF_geometry": control_stats()} for name in ALL_MODELS},
+                                      "native_HVF_geometry": control_stats()} for name in model_names},
                     "observations": []}
+                if compare_replay_geometry:
+                    mr["original_replay_comparisons"] = []
                 report["modes"].append(mr)
                 for order in ("forward", "reverse"):
                     log = root / f"{mode}-{order}.log"
@@ -147,6 +167,9 @@ def run(source, output):
                             replay_id = str(oracle.sequence)
                             request_plan.append({"request_id": replay_id, "face_index": face, "location": canonical})
                             audit = replay_audit(identities[face], point, observed, replay, plans[index])
+                            if compare_replay_geometry:
+                                mr["original_replay_comparisons"].append({"case_label": case["label"],
+                                    "face_index": face, "order": order, **compare_records(observed, replay)})
                             mr["replay_batch_checks"] += 1
                             if audit["status"] != "PASS_FINITE_REPLAY":
                                 mr["replay_failed_batches"] += 1
@@ -214,11 +237,11 @@ def run(source, output):
                             rows[index]["model_checks"][name]["portable_geometry"].append({"glyph_id": gid, **comparison})
                     report["active_context"] = {"mode": mode, "stage": "references", "face_index": face}
                     save()
-                mr["metric_exactness_by_cohort"] = {name: metric_summary(mr["observations"], name) for name in ALL_MODELS}
-                mr["status"] = STATUS
+                mr["metric_exactness_by_cohort"] = {name: metric_summary(mr["observations"], name) for name in model_names}
+                mr["status"] = status
                 save()
-                print(json.dumps({"mode": mode, "status": STATUS, "user_positions": len(cases),
-                    "new_models": {name: mr["models"][name]["horizontal_metrics"] for name in NEW_MODELS},
+                print(json.dumps({"mode": mode, "status": status, "user_positions": len(cases),
+                    "new_models": {name: mr["models"][name]["horizontal_metrics"] for name in new_model_names},
                     "replay_failed_batches": mr["replay_failed_batches"]}), flush=True)
             require(hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED, "original_source_changed")
             actual = sum(p["summary"]["successful_glyph_count"] for p in report["native_processes"])
@@ -226,10 +249,10 @@ def run(source, output):
             report.update(source_unchanged=True, actual_native_records=actual,
                 actual_constructor_entry_records=sum(p["constructor_entry_records"] for p in report["native_processes"]),
                 actual_opposite_order_pairs=sum(m["opposite_order_pairs"] for m in report["modes"]),
-                actual_replay_batches=sum(m["replay_batch_checks"] for m in report["modes"]), status=STATUS)
+                actual_replay_batches=sum(m["replay_batch_checks"] for m in report["modes"]), status=status)
             report.pop("active_context", None)
     except Exception as error:
-        report.update(status="FAILED_A3_ARITHMETIC_DIAGNOSIS_NOT_ACCEPTANCE", **diagnostic_failure(error))
+        report.update(status=status.replace("COMPLETED_NATIVE_", "FAILED_"), **diagnostic_failure(error))
         save()
         raise RuntimeError("A3 arithmetic diagnosis failed; safe checkpoint retained") from None
     save()

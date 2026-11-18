@@ -1,0 +1,702 @@
+{
+  "scope": "continued dual-core experiments; not full-font acceptance",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "limit_source_units": 0.03125,
+  "parent_commit": "91c2b760a4d1c2ab20e1841c96a6cb070fa950ba",
+  "previous_native_CI": {
+    "run": "https://github.com/SOLHK/Swirl/actions/runs/41456397729",
+    "merge_checkout": "049d32062a8d10ae09b3f6d082e39a8517755843",
+    "overall": "FAIL",
+    "reason": "Unchanged strict raw metrics and nested CFF2 blend gates remain failed.",
+    "new_constant_origin_step": "PASS on CoreText, Windows Server 2022, Windows Server 2025, Windows 11 ARM64; authored controls only",
+    "Win11_x64_original_font": "NOT_RUN",
+    "Qt_authored_run": "https://github.com/SOLHK/Swirl/actions/runs/41456397784",
+    "Qt_authored_status": "PASS"
+  },
+  "variable_XY_origin_local": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "status": "PASS_AUTHORED_LAYOUT_ONLY",
+    "HarfBuzz": {
+      "observations": 56,
+      "maximum_placement_error": 0.007323242187510459
+    },
+    "layout": {
+      "default/ltr": {
+        "checks": 7,
+        "max_X_error": 0.0,
+        "max_Y_error": 0.0,
+        "max_Y_change": 0.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 0
+      },
+      "default/ttb": {
+        "checks": 7,
+        "max_X_error": 0.00027343749999886313,
+        "max_Y_error": 0.00016113281249729994,
+        "max_Y_change": 52.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 7
+      },
+      "enabled/ltr": {
+        "checks": 7,
+        "max_X_error": 0.0,
+        "max_Y_error": 0.0,
+        "max_Y_change": 0.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 0
+      },
+      "enabled/ttb": {
+        "checks": 7,
+        "max_X_error": 0.00027343749999886313,
+        "max_Y_error": 0.00016113281249729994,
+        "max_Y_change": 52.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 7
+      },
+      "disabled/ltr": {
+        "checks": 7,
+        "max_X_error": 0.0,
+        "max_Y_error": 0.0,
+        "max_Y_change": 0.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 0
+      },
+      "disabled/ttb": {
+        "checks": 7,
+        "max_X_error": 0.0,
+        "max_Y_error": 0.0,
+        "max_Y_change": 0.0,
+        "raw_metrics_unchanged": true,
+        "base_advances_unchanged": true,
+        "positioned_advance_vectors_changed": 0
+      }
+    },
+    "processes": [
+      {
+        "variant": "source",
+        "sha256": "bf56536472a35d48ca48c3b150fa5600f54aa939dd4b9883c7e23eb1129651b1",
+        "exit_code": 0,
+        "observations": 42
+      },
+      {
+        "variant": "compensated",
+        "sha256": "94154503fb758671858740c7aa1a34f83742ac91100f727d56c66e1be51bfa98",
+        "exit_code": 0,
+        "observations": 42
+      }
+    ],
+    "required_layout_groups": [
+      "default/ltr",
+      "default/ttb",
+      "enabled/ttb",
+      "disabled/ltr",
+      "disabled/ttb"
+    ],
+    "raw_API_equivalence": "FAIL_BY_CONSTRUCTION",
+    "source_acceptance": "NOT_RUN"
+  },
+  "coupled_feature_condition_local": {
+    "scope": "authored_condition_capability_only",
+    "native": "coretext",
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "source_glyph_acceptance": "NOT_RUN",
+    "format2_is_published_Microsoft_OpenType_condition": false,
+    "controls": {
+      "axis_range": {
+        "sha256": "9e2a1ebcb5a0eadfbcf630cb69aa12c571863166f49df376e41d13544ad6196d",
+        "points": [
+          [
+            -1.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            -1.0,
+            0.0
+          ],
+          [
+            -1.0,
+            -1.0,
+            1.0
+          ],
+          [
+            -1.0,
+            0.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          [
+            -1.0,
+            1.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            1.0,
+            0.0
+          ],
+          [
+            -1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          [
+            0.0,
+            -1.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0,
+            -1.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            1.0,
+            -1.0,
+            0.0
+          ],
+          [
+            1.0,
+            -1.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.0,
+            -1.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            -1.0
+          ],
+          [
+            1.0,
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.125,
+            0.3,
+            0.125
+          ],
+          [
+            0.1240234375,
+            0.3,
+            0.125
+          ],
+          [
+            0.1259765625,
+            0.3,
+            0.125
+          ],
+          [
+            0.5,
+            -0.2,
+            -0.5
+          ],
+          [
+            -0.5,
+            0.2,
+            0.9
+          ]
+        ],
+        "expected_gids": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          2,
+          2,
+          2,
+          7,
+          2
+        ],
+        "HarfBuzz_gids": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          2,
+          2,
+          2,
+          7,
+          2
+        ],
+        "HarfBuzz_mismatches": 0,
+        "native_gids": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          2,
+          2,
+          2,
+          7,
+          2
+        ],
+        "native_mismatches": 0,
+        "status": "SUPPORTED_ON_CONTROL_ONLY"
+      },
+      "coupled_value": {
+        "sha256": "14f26392b1dd9b682945e1c242c9982b94409d24d4d9b347afdb4184541094fa",
+        "points": [
+          [
+            -1.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            -1.0,
+            0.0
+          ],
+          [
+            -1.0,
+            -1.0,
+            1.0
+          ],
+          [
+            -1.0,
+            0.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            1.0
+          ],
+          [
+            -1.0,
+            1.0,
+            -1.0
+          ],
+          [
+            -1.0,
+            1.0,
+            0.0
+          ],
+          [
+            -1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          [
+            0.0,
+            -1.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0,
+            -1.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            -1.0,
+            -1.0
+          ],
+          [
+            1.0,
+            -1.0,
+            0.0
+          ],
+          [
+            1.0,
+            -1.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.0,
+            -1.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            -1.0
+          ],
+          [
+            1.0,
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            0.125,
+            0.3,
+            0.125
+          ],
+          [
+            0.1240234375,
+            0.3,
+            0.125
+          ],
+          [
+            0.1259765625,
+            0.3,
+            0.125
+          ],
+          [
+            0.5,
+            -0.2,
+            -0.5
+          ],
+          [
+            -0.5,
+            0.2,
+            0.9
+          ]
+        ],
+        "expected_gids": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          7,
+          2,
+          2,
+          7,
+          2,
+          2,
+          7,
+          2,
+          7,
+          7,
+          2,
+          7,
+          7,
+          2,
+          7,
+          7,
+          2,
+          2,
+          7,
+          2,
+          7
+        ],
+        "HarfBuzz_gids": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          7,
+          2,
+          2,
+          7,
+          2,
+          2,
+          7,
+          2,
+          7,
+          7,
+          2,
+          7,
+          7,
+          2,
+          7,
+          7,
+          2,
+          2,
+          7,
+          2,
+          7
+        ],
+        "HarfBuzz_mismatches": 0,
+        "native_gids": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "native_mismatches": 21,
+        "status": "CONDITION_NOT_SUPPORTED"
+      }
+    }
+  },
+  "native_pending": {
+    "variable_XY_DirectWrite": "NOT_RUN",
+    "feature_condition_CI": "NOT_RUN"
+  },
+  "layout_vs_visual": {
+    "CoreText_raster": "Measured at finite pixel resolution; 1/32 FUnit visual equality NOT_ESTABLISHED",
+    "DirectWrite_constant_placed_ink_geometry": "PASS; not pixel raster equality",
+    "raw_metrics": "Independent source vertical origin cannot be equated to width/2 by placement correction."
+  },
+  "three_dimensional_approximation": {
+    "1166": {
+      "gid": 1166,
+      "patches": 1500,
+      "max_probe_error": 0.1911883702967642,
+      "max_holdout_error": 0.23268982155134263,
+      "failures": 121,
+      "held": 512,
+      "seconds": 915.8525848340068,
+      "grid": [
+        3,
+        9,
+        5
+      ],
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890"
+    },
+    "19177": {
+      "status": "RUNNING; private coefficients checkpointed"
+    }
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2",
+    "https://github.com/harfbuzz/boring-expansion-spec/blob/main/ConditionTree.md",
+    "https://developer.apple.com/documentation/coretext/ctrungetbaseadvancesandorigins(_:_:_:_:)"
+  ],
+  "production_accepted": false,
+  "implementation_sha256": {
+    "tools/swirl_vf/platform/experiment_origin_compensation.py": "3bbe39c150530b920aa146847f3b1016359351f2c7d0fac6fb5c9c30e2ad99c9",
+    "tools/swirl_vf/platform/probe_feature_conditions.py": "b4aa3a8c93d1d3f15bc146be025aa1b904d368b9fece3d533a46ba7456020d00",
+    "tools/swirl_vf/tests/test_origin_compensation.py": "3d87501886164fde22b7fc0d228ca608c9029fc5cac4debe467544d9a82ce298",
+    "tools/swirl_vf/tests/test_feature_conditions.py": "c2e1c85e8b2d365e2195b72e3a6ae002518c2ab0b8e770d2217d1a6aed598fdf",
+    ".github/workflows/swirl-vf.yml": "6f8cea46adb86561b76682a0064dcd7f726a29e1d8c47ce46ea5c24fc3039135"
+  },
+  "regression": {
+    "command": "python -m unittest discover -s tools/swirl_vf/tests",
+    "tests_run": 956,
+    "passed": 949,
+    "skipped": 7,
+    "exit_code": 0,
+    "seconds": 47.37
+  }
+}

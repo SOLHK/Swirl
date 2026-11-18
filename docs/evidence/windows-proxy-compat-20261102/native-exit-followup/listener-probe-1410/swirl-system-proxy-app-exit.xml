@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCase name="SystemProxyExitTests">
+  <Environment>
+    <QtVersion>6.12.0</QtVersion>
+    <QtBuild>Qt 6.12.0 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>
+    <QTestVersion>6.12.0</QTestVersion>
+  </Environment>
+  <TestFunction name="initTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.0493"/>
+  </TestFunction>
+  <TestFunction name="ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.3655"/>
+  </TestFunction>
+  <TestFunction name="normalApplicationExitRestoresOwnedProxy">
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="304">
+      <DataTag><![CDATA[pac-only]]></DataTag>
+      <Description><![CDATA['listenerRefusesConnections(quint16(port))' returned FALSE. (The real Rust listener remained reachable after normal application exit.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="304">
+      <DataTag><![CDATA[manual-and-pac]]></DataTag>
+      <Description><![CDATA['listenerRefusesConnections(quint16(port))' returned FALSE. (The real Rust listener remained reachable after normal application exit.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="304">
+      <DataTag><![CDATA[pac-only-external-edit]]></DataTag>
+      <Description><![CDATA['listenerRefusesConnections(quint16(port))' returned FALSE. (The real Rust listener remained reachable after normal application exit.)]]></Description>
+    </Incident>
+    <Incident type="fail" file="D:\a\Swirl\Swirl\src\Swirl.Quick\tests\SystemProxyExitTests.cpp" line="304">
+      <DataTag><![CDATA[manual-and-pac-external-edit]]></DataTag>
+      <Description><![CDATA['listenerRefusesConnections(quint16(port))' returned FALSE. (The real Rust listener remained reachable after normal application exit.)]]></Description>
+    </Incident>
+    <Duration msecs="13794.8"/>
+  </TestFunction>
+  <TestFunction name="cleanupTestCase">
+    <Incident type="pass" file="" line="0" />
+    <Duration msecs="0.027"/>
+  </TestFunction>
+  <Duration msecs="13796.2"/>
+</TestCase>

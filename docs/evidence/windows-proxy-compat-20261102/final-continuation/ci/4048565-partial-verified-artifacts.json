@@ -1,0 +1,248 @@
+[
+  {
+    "id": 13153806746,
+    "name": "Swirl-Proxy-Compatibility-Linux-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "e7614d71bb3cc5da1f3ea50c83317a91d6b831da3fab3a7eb7660ffe66430e0b",
+    "soak": {
+      "platform": "linux",
+      "observed_stream_seconds": 120.022593,
+      "connections": 8,
+      "expected_events_per_connection": 121,
+      "binary_sha256": "a68e2e5eac240fa4816028cde839fa5184aa5d28ab3b20ee55aec6c83eebd9b3",
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 5688,
+        "download": 88810,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "passed": true,
+      "errors": [],
+      "client_origin_equal": true,
+      "events": 968,
+      "clean_closure": true
+    }
+  },
+  {
+    "id": 13153264739,
+    "name": "Swirl-Proxy-Compatibility-Windows-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "c0d9b68990c26ea7c3826c94794d4f59fe14ca07f17d74308c9d06c8ae061297",
+    "soak": {
+      "platform": "win32",
+      "observed_stream_seconds": 120.025732,
+      "connections": 8,
+      "expected_events_per_connection": 121,
+      "binary_sha256": "fc86d67a17521bf18759decac48b18a99fcad95ecdff8dac3f2aa04fffeb7127",
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97494,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "passed": true,
+      "errors": [],
+      "client_origin_equal": true,
+      "events": 968,
+      "clean_closure": true
+    }
+  },
+  {
+    "id": 13154876765,
+    "name": "qt-network-linux-6.10.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "55e4b28d2ff56c6506adf6088a3e84393828608ce4d648ba6c987cc1201b8cef",
+    "xml": [
+      {
+        "file": "13154876765/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13154717031,
+    "name": "qt-network-mac-6.11.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "93b49cca2bf1ac35dbfcd546c8a7bfa9469f59ce03b129318a6dda8a635ef0e1",
+    "xml": [
+      {
+        "file": "13154717031/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13154327983,
+    "name": "qt-network-mac-6.10.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "a1b8771eb832a75321c47ca32b46d28f146fb105b9f61935ed9f9cd98078e86f",
+    "xml": [
+      {
+        "file": "13154327983/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13154147412,
+    "name": "qt-network-linux-6.11.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "f17f5c4e1aec73a7b6b38368052dc894227aeef562dcfe82c7f6e21283457b4a",
+    "xml": [
+      {
+        "file": "13154147412/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13153807404,
+    "name": "qt-network-windows-6.10.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "15f721350c26657704ff71d7deb9eb7673fd021b9da265eb451147bb7f101689",
+    "xml": [
+      {
+        "file": "13153807404/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13153757520,
+    "name": "qt-network-windows-6.11.3-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "7a1c49b2d40e729a0c4c4546bf052eee518668f80d7106af2946e298e1700f65",
+    "xml": [
+      {
+        "file": "13153757520/qt-network-policy.xml",
+        "case": "QtNetworkPolicyTests",
+        "incidents": {
+          "pass": 11
+        },
+        "functions": 11,
+        "passed_functions": [
+          "initTestCase",
+          "unprotectedClientNegotiatesHttp2PositiveControl",
+          "policyOverridesExplicitHttp2AndDirectOptions",
+          "subscriptionHttpsDownloadsAndParsesOverHttp1",
+          "subscriptionHttpsRedirectsStayOnHttp1",
+          "subscriptionCrossOriginRedirectIsRejectedBeforeTls",
+          "cleartextSubscriptionIgnoresH2cEnvironment",
+          "subscriptionStillRejectsUntrustedTls",
+          "subscriptionStillRejectsHttpsDowngrade",
+          "shutdownCancelsHangingHttp1Download",
+          "cleanupTestCase"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13155366272,
+    "name": "Swirl-Proxy-Compatibility-macOS-8762af6086f5b04249f94d7a97d7773cf3805858-1",
+    "sha256": "101e67b61666d3ac1e65bcdf10688d586713a255482f4deb673585b902363cdc",
+    "soak": {
+      "platform": "darwin",
+      "observed_stream_seconds": 120.16839,
+      "connections": 8,
+      "expected_events_per_connection": 121,
+      "binary_sha256": "56f98dffa6a90ed76b436424d273bf533708429d06a7c72f66b31a930d407296",
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97504,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "passed": true,
+      "errors": [],
+      "client_origin_equal": true,
+      "events": 968,
+      "clean_closure": true
+    }
+  }
+]

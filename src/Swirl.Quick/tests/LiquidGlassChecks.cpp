@@ -9,6 +9,8 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QScreen>
+#include <QMap>
+#include <algorithm>
 #include <functional>
 
 int runLiquidGlassChecks(QQuickWindow *window, const QString &directory)
@@ -50,7 +52,7 @@ int runLiquidGlassChecks(QQuickWindow *window, const QString &directory)
         for (const auto id : ids) if (id.toString() != "external") routes.append(id.toString());
         routes.removeDuplicates();
     }
-    QRectF lightCard;
+    QMap<QString,QRectF> lightCards;
     for (const auto theme : {QString("Light"), QString("Dark")}) {
         eval("Theme.mode='" + theme + "'");
         for (const auto &route : routes) {
@@ -64,14 +66,37 @@ int runLiquidGlassChecks(QQuickWindow *window, const QString &directory)
             captures.append(QJsonObject{{"file",file},{"dpr",window->devicePixelRatio()},
                 {"width",shot.width()},{"height",shot.height()}});
             if (route == "activity") {
-                auto card = button("internetDiagnosticCard");
-                auto traffic = button("activityTrafficCard");
-                check("two content cards retain their 276 DIP height", card && traffic && card->height()==276 && traffic->height()==276);
-                if (card && traffic) {
-                    const QRectF bounds(card->mapToScene(QPointF()),card->size());
-                    if (theme=="Light") lightCard=bounds;
-                    else check("theme preserves card position and size",bounds==lightCard);
-                    check("cards use standard opaque content material",card->property("color").value<QColor>().alpha()==255 && traffic->property("color").value<QColor>().alpha()==255);
+                // The accepted five-card layout replaces the historical two
+                // fixed-height cards. Keep every actual surface and its layout
+                // invariant across themes, including the compact reading order.
+                const QStringList names{"activityStatusCard","activityTrafficCard","activitySourcesCard","activityDiagnosticCard","activityConnectionsCard"};
+                QList<QQuickItem *> cards;
+                for(const auto &name:names){
+                    auto *card=button(name);cards.append(card);
+                    check(name+" retains a readable opaque surface",card && card->width()>=240 && card->height()>=130
+                        &&card->property("color").value<QColor>().alpha()==255);
+                    if(!card)continue;
+                    const auto bounds=card->mapRectToScene(card->boundingRect());
+                    if(theme=="Light")lightCards.insert(name,bounds);
+                    else check(name+" preserves position and size across themes",lightCards.contains(name)&&bounds==lightCards.value(name));
+                }
+                if(std::all_of(cards.cbegin(),cards.cend(),[](auto *card){return card!=nullptr;})){
+                    auto *page=button("activityPage");
+                    check("live activity layout remains present",page!=nullptr);
+                    const bool wide=page&&page->property("wide").toBool();
+                    const auto bounds=[&](int i){return cards[i]->mapRectToScene(cards[i]->boundingRect());};
+                    if(wide){
+                        check("five-card paired rows retain their proportions",qAbs(bounds(0).top()-bounds(1).top())<1
+                            &&qAbs(cards[0]->height()-cards[1]->height())<1
+                            &&qAbs(bounds(2).top()-bounds(3).top())<1&&qAbs(bounds(2).bottom()-bounds(4).bottom())<1
+                            &&qAbs(cards[0]->width()/(cards[0]->width()+cards[1]->width())-5.0/12)<0.03
+                            &&qAbs(cards[2]->width()/(cards[2]->width()+cards[3]->width())-7.0/12)<0.03);
+                    }else{
+                        bool ordered=true;
+                        for(int i=1;i<cards.size();++i)ordered=ordered&&bounds(i).top()>bounds(i-1).bottom()
+                            &&qAbs(bounds(i).left()-bounds(i-1).left())<1&&qAbs(cards[i]->width()-cards[i-1]->width())<1;
+                        check("compact appearance keeps all five readable cards in order",ordered);
+                    }
                 }
                 const auto controls = button("windowControls");
                 const auto tun = button("tunCapsule");

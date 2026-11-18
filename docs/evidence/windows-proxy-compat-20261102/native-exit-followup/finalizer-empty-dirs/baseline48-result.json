@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "test_sha256": "04f104a618510104c575c60041a1ef2980b8253545a581b27e77bf418aba407a",
+  "production_commit": "48caea558f616c6d9b958345b4c71956fe038564",
+  "finalizer_sha256": "40663c69c2729d07e230d7c19197e4e26b8052493dcec0c89bd3b1d863f7963d",
+  "expected_failure": "Final packaging accepted the native empty-directory uninstall regression",
+  "expected_failure_observed": true
+}

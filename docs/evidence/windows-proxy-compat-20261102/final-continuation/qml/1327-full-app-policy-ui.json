@@ -1,0 +1,2764 @@
+{
+    "captures": [
+        {
+            "height": 760,
+            "name": "empty-service",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 760,
+            "name": "empty-groups",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 672,
+            "name": "minimum-default-picker",
+            "saved": true,
+            "width": 760
+        },
+        {
+            "height": 672,
+            "name": "minimum-metric-geometry-fixture",
+            "saved": true,
+            "width": 760
+        },
+        {
+            "height": 760,
+            "name": "populated-service",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 760,
+            "name": "target-picker",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 760,
+            "name": "group-editor",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 760,
+            "name": "populated-groups",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 760,
+            "name": "proxy-off-wing-hidden",
+            "saved": true,
+            "width": 1080
+        },
+        {
+            "height": 672,
+            "name": "rapid-proxy-final-wing-hidden",
+            "saved": true,
+            "width": 760
+        }
+    ],
+    "checks": [
+        {
+            "name": "Policy UI acceptance has a per-instance system-proxy adapter before any user action",
+            "passed": true
+        },
+        {
+            "name": "An external proxy starts enabled while Swirl remains stopped and unowned",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "An external host proxy never displays Swirl's small wing",
+            "passed": true
+        },
+        {
+            "name": "Controlled real proxy peers and HTTP origin start",
+            "passed": true
+        },
+        {
+            "name": "Setup stores isolated node A",
+            "passed": true
+        },
+        {
+            "name": "Setup stores isolated authenticated node B",
+            "passed": true
+        },
+        {
+            "name": "Exactly two isolated nodes exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real policy page settles",
+            "passed": true
+        },
+        {
+            "name": "Configuration completion signal is observable",
+            "passed": true
+        },
+        {
+            "name": "Policy configuration has no separate connection control",
+            "passed": true
+        },
+        {
+            "name": "The controlled empty-state captures contain no fabricated policies or groups",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: empty-service",
+            "passed": true
+        },
+        {
+            "name": "Service count and Chinese section title share their actual text baselines",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: empty-groups",
+            "passed": true
+        },
+        {
+            "name": "Policy group count and Chinese section title share their actual text baselines",
+            "passed": true
+        },
+        {
+            "name": "Creation card has a visible neutral surface and contained rounded plus action: manual",
+            "passed": true
+        },
+        {
+            "name": "Creation card has a visible neutral surface and contained rounded plus action: url_test",
+            "passed": true
+        },
+        {
+            "name": "Creation card has a visible neutral surface and contained rounded plus action: fallback",
+            "passed": true
+        },
+        {
+            "name": "Creation card has a visible neutral surface and contained rounded plus action: load_balance",
+            "passed": true
+        },
+        {
+            "name": "All four strategy actions retain equal dimensions and a separated two-column grid",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: createPolicyGroup-manual",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type entry opens its real strategy editor: manual",
+            "passed": true
+        },
+        {
+            "name": "Opening a strategy type does not invent or commit a group",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: selectPolicyGroupMember-0",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type creation receives a real durable receipt: manual",
+            "passed": true
+        },
+        {
+            "name": "The selected type and actual candidate are stored without starting a runtime",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-6103cf7e-cd19-4855-916c-586132ba48a0",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unreferenced preset fixture is deleted through its actual menu",
+            "passed": true
+        },
+        {
+            "name": "Deleting the controlled group restores the real empty-state entry points",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: createPolicyGroup-url_test",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type entry opens its real strategy editor: url_test",
+            "passed": true
+        },
+        {
+            "name": "Opening a strategy type does not invent or commit a group",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type creation receives a real durable receipt: url_test",
+            "passed": true
+        },
+        {
+            "name": "The selected type and actual candidate are stored without starting a runtime",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-0b70d23f-2ff7-42a9-9ba7-704f60b14ad8",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unreferenced preset fixture is deleted through its actual menu",
+            "passed": true
+        },
+        {
+            "name": "Deleting the controlled group restores the real empty-state entry points",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: createPolicyGroup-fallback",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type entry opens its real strategy editor: fallback",
+            "passed": true
+        },
+        {
+            "name": "Opening a strategy type does not invent or commit a group",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type creation receives a real durable receipt: fallback",
+            "passed": true
+        },
+        {
+            "name": "The selected type and actual candidate are stored without starting a runtime",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-e1514923-7eef-4c13-9f15-a8a977b0f195",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unreferenced preset fixture is deleted through its actual menu",
+            "passed": true
+        },
+        {
+            "name": "Deleting the controlled group restores the real empty-state entry points",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: createPolicyGroup-load_balance",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type entry opens its real strategy editor: load_balance",
+            "passed": true
+        },
+        {
+            "name": "Opening a strategy type does not invent or commit a group",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Empty-state type creation receives a real durable receipt: load_balance",
+            "passed": true
+        },
+        {
+            "name": "The selected type and actual candidate are stored without starting a runtime",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-64a62e15-c983-4d14-b462-60d744008b44",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unreferenced preset fixture is deleted through its actual menu",
+            "passed": true
+        },
+        {
+            "name": "Deleting the controlled group restores the real empty-state entry points",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Application process matching is truthfully unavailable",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: defaultPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Default proxy target picker excludes DIRECT",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Default node A is durably saved through real input",
+            "passed": true
+        },
+        {
+            "name": "Permanent default policy holds stable identity and selected node",
+            "passed": true
+        },
+        {
+            "name": "Default routing shows the configured node and its real configuration source",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row",
+            "passed": true
+        },
+        {
+            "name": "Default picker retains a visible button surface before hover",
+            "passed": true
+        },
+        {
+            "name": "Keyboard activation opens and settles the real default exit picker at minimum window size",
+            "passed": true
+        },
+        {
+            "name": "Keyboard cancellation targets the settled picker scene's focused editor",
+            "passed": true
+        },
+        {
+            "name": "Cancelling the keyboard-opened picker changes no policy or saved revision",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: minimum-default-picker",
+            "passed": true
+        },
+        {
+            "name": "Offline save never claims an applied runtime revision",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Native combo popup opens: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlComboOption-1",
+            "passed": true
+        },
+        {
+            "name": "Native combo choice releases its popup: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Native combo selection is committed: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Global mode is saved through the real mode control",
+            "passed": true
+        },
+        {
+            "name": "Dedicated mixed proxy and control ports are reserved",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Native page settles for user input: activity",
+            "passed": true
+        },
+        {
+            "name": "An external proxy leaves all five complete Activity feathers hidden, unmorphed and idle",
+            "passed": true
+        },
+        {
+            "name": "Activity keeps the complete proxy action and external ownership explanation available before starting Swirl",
+            "passed": true
+        },
+        {
+            "name": "Temporary geometry-only metric fixture binds to the actual Activity text items",
+            "passed": true
+        },
+        {
+            "name": "Geometry fixture 176 and ms share an actual text baseline at minimum window size",
+            "passed": true
+        },
+        {
+            "name": "Geometry-only INTERNET and Chinese caption wraps within the actual minimum-width diagnostic card",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: minimum-metric-geometry-fixture",
+            "passed": true
+        },
+        {
+            "name": "Removing metric geometry fixtures restores the production text binding",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "External proxy status dot and complete label form one centered, contained toolbar group",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: proxyCapsule",
+            "passed": true
+        },
+        {
+            "name": "Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership",
+            "passed": true
+        },
+        {
+            "name": "Activity takeover follows the healthy live Rust listener rather than a host proxy flag",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Actual proxy ownership finishes the shared small-wing expansion",
+            "passed": true
+        },
+        {
+            "name": "Actual proxy ownership completes all five whole feathers and agrees with the live Activity runtime status",
+            "passed": true
+        },
+        {
+            "name": "Actual startup continuously colors the status dot, preserves toolbar geometry and exposes complete ownership details",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Native page settles for user input: policies",
+            "passed": true
+        },
+        {
+            "name": "Policy wing preserves the Activity proxy animation state",
+            "passed": true
+        },
+        {
+            "name": "Live receipt reports the actual runtime epoch",
+            "passed": true
+        },
+        {
+            "name": "Global default A reaches origin through A, without direct bypass",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: defaultPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-f677e38e-4aaa-4848-8c03-16b2d289c1be",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Running default change receives a real commit and apply receipt",
+            "passed": true
+        },
+        {
+            "name": "Hot default switch preserves runtime epoch and matches saved/applied revisions",
+            "passed": true
+        },
+        {
+            "name": "New requests after the acknowledged default switch use B",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unsupported application matching cannot be selected in the service form",
+            "passed": true
+        },
+        {
+            "name": "Field exists: servicePolicyName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Field exists: serviceDomainValue",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addServiceDomain",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: saveServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Service policy is committed from its real form",
+            "passed": true
+        },
+        {
+            "name": "New service receives a stable UUID",
+            "passed": true
+        },
+        {
+            "name": "Saved service exposes its actual target and configuration source without opening an editor",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: populated-service",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Native combo popup opens: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlComboOption-0",
+            "passed": true
+        },
+        {
+            "name": "Native combo choice releases its popup: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Native combo selection is committed: routingModePicker",
+            "passed": true
+        },
+        {
+            "name": "Rule mode is acknowledged before service routing checks",
+            "passed": true
+        },
+        {
+            "name": "Unclassified rule traffic uses the default B",
+            "passed": true
+        },
+        {
+            "name": "Configured dedicated service uses A while ordinary traffic stays on B",
+            "passed": true
+        },
+        {
+            "name": "Necessary local traffic actually reaches the origin DIRECT",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Field exists: servicePolicyName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Field exists: serviceDomainValue",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addServiceDomain",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-f677e38e-4aaa-4848-8c03-16b2d289c1be",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: saveServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Actual core overlap winner is shown before saving a conflicting service",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: saveServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Explicit conflict review confirms the same candidate",
+            "passed": true
+        },
+        {
+            "name": "Declared priority wins over implicit more-specific domain guessing",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyMore-4532b9fd-afe0-45c5-9f35-dae8d0f74a15",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Explicit service priority move is acknowledged",
+            "passed": true
+        },
+        {
+            "name": "Moving the child policy earlier changes its actual route to B",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyMore-4532b9fd-afe0-45c5-9f35-dae8d0f74a15",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-3",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Overlapping service removal is acknowledged",
+            "passed": true
+        },
+        {
+            "name": "Removing the child restores its parent service A without direct bypass",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyEnabled-cef8df85-ce0c-49cd-b82c-39d81f935cf1",
+            "passed": true
+        },
+        {
+            "name": "Disabling a service is committed before showing its disabled state",
+            "passed": true
+        },
+        {
+            "name": "Disabled service falls through to the configured default B",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyEnabled-cef8df85-ce0c-49cd-b82c-39d81f935cf1",
+            "passed": true
+        },
+        {
+            "name": "Re-enabling a service is committed",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: target-picker",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-f677e38e-4aaa-4848-8c03-16b2d289c1be",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: selectPolicyGroupMember-0",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: group-editor",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Manual strategy group is committed through real form input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyTarget-group-e2bdf76b-d1f5-4658-bc4a-1ab17791270d",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: selectPolicyGroupMember-0",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Manual strategy group is committed through real form input",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: defaultPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyTarget-group-b88bb0d3-df52-430c-bebf-61e47ef58cda",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Default policy accepts an explicitly selected nested group",
+            "passed": true
+        },
+        {
+            "name": "Default resolves two manual group levels to the actual A peer",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupChoose-e2bdf76b-d1f5-4658-bc4a-1ab17791270d",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-f677e38e-4aaa-4848-8c03-16b2d289c1be",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Nested manual member change is acknowledged",
+            "passed": true
+        },
+        {
+            "name": "Nested manual change moves new default traffic to B",
+            "passed": true
+        },
+        {
+            "name": "Dedicated A service remains independent of the nested default B",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroup-e2bdf76b-d1f5-4658-bc4a-1ab17791270d",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "A group is excluded from its own candidate picker",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyTarget-group-b88bb0d3-df52-430c-bebf-61e47ef58cda",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Core cycle error keeps the draft open and committed group unchanged",
+            "passed": true
+        },
+        {
+            "name": "Esc detects member-only draft changes",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: discardChangesConfirm",
+            "passed": true
+        },
+        {
+            "name": "Rejected cyclic draft never changes the actual route",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-b88bb0d3-df52-430c-bebf-61e47ef58cda",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Deleting a group referenced by default is refused and retains both groups",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: cancelDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Cancelled deletion releases its modal grab before the connection control",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: populated-groups",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Native page settles for user input: activity",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: proxyCapsule",
+            "passed": true
+        },
+        {
+            "name": "Activity master switch stops its owned Rust runtime and releases its proxy ownership",
+            "passed": true
+        },
+        {
+            "name": "Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off",
+            "passed": true
+        },
+        {
+            "name": "Queued event processing leaves Swirl stopped without a second proxy takeover",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Actual proxy shutdown fully retires the last small feather",
+            "passed": true
+        },
+        {
+            "name": "Actual proxy shutdown hides and resets all five complete Activity feathers without residual flight",
+            "passed": true
+        },
+        {
+            "name": "Actual shutdown continuously restores the neutral dot and centered external-proxy action, then remains idle",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: proxy-off-wing-hidden",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Native page settles for user input: policies",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo popup opens: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlComboOption-1",
+            "passed": true
+        },
+        {
+            "name": "Native combo choice releases its popup: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo selection is committed: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupAdvanced",
+            "passed": true
+        },
+        {
+            "name": "Advanced failure threshold exposes the core default",
+            "passed": true
+        },
+        {
+            "name": "Keyboard focus reveals the last advanced field at minimum window size",
+            "passed": false
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Automatic strategy and advanced values are saved offline",
+            "passed": true
+        },
+        {
+            "name": "Committed strategy and probe values match the selected type",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo popup opens: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlComboOption-2",
+            "passed": true
+        },
+        {
+            "name": "Native combo choice releases its popup: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo selection is committed: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupAdvanced",
+            "passed": true
+        },
+        {
+            "name": "Advanced failure threshold exposes the core default",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Automatic strategy and advanced values are saved offline",
+            "passed": true
+        },
+        {
+            "name": "Committed strategy and probe values match the selected type",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Field exists: policyGroupName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo popup opens: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlComboOption-3",
+            "passed": true
+        },
+        {
+            "name": "Native combo choice releases its popup: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Native combo selection is committed: policyGroupType",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: addPolicyGroupMember",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyNode-56457e1f-c3b0-4dbb-af5c-fec23aa21c40",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmPolicyTarget",
+            "passed": true
+        },
+        {
+            "name": "Target picker releases its modal grab after actual completion",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupAdvanced",
+            "passed": true
+        },
+        {
+            "name": "Advanced failure threshold exposes the core default",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: savePolicyGroup",
+            "passed": true
+        },
+        {
+            "name": "Automatic strategy and advanced values are saved offline",
+            "passed": true
+        },
+        {
+            "name": "Committed strategy and probe values match the selected type",
+            "passed": true
+        },
+        {
+            "name": "All four strategy types and nested groups remain stored",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Default policy remains permanent after all CRUD operations",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicy-cef8df85-ce0c-49cd-b82c-39d81f935cf1",
+            "passed": true
+        },
+        {
+            "name": "Field exists: servicePolicyName",
+            "passed": true
+        },
+        {
+            "name": "Keyboard fixture contains only ASCII input",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: saveServicePolicy",
+            "passed": true
+        },
+        {
+            "name": "Editing a service is saved through the same committed transaction",
+            "passed": true
+        },
+        {
+            "name": "Service rename preserves its stable identity",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: servicePolicyMore-cef8df85-ce0c-49cd-b82c-39d81f935cf1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-3",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unreferenced service deletion is committed",
+            "passed": true
+        },
+        {
+            "name": "Service deletion removes its stored record without deleting default",
+            "passed": true
+        },
+        {
+            "name": "Policy tabs exist",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Real segmented input selects requested policy tab",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: policyGroupMore-d84d70bc-534d-4471-a3a5-1f2d993363d9",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: swirlContextOption-1",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: confirmDeletePolicy",
+            "passed": true
+        },
+        {
+            "name": "Unused strategy group deletion is committed",
+            "passed": true
+        },
+        {
+            "name": "Deleting an unused group retains all unrelated references",
+            "passed": true
+        },
+        {
+            "name": "Real policy completion signals accompany accepted transactions",
+            "passed": true
+        },
+        {
+            "name": "Unsupported TUN is rejected before any platform mutation",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Activity mode is reachable after policy edits",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "The complete mode label, leading icon and menu indicator share one reachable toolbar control with common padding and height",
+            "passed": true
+        },
+        {
+            "name": "The complete mode name remains visible without style padding or elision",
+            "passed": true
+        },
+        {
+            "name": "Activity value starts from the controller's acknowledged mode",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: activityOutboundMode",
+            "passed": true
+        },
+        {
+            "name": "Activity facts row opens the native three-mode menu",
+            "passed": true
+        },
+        {
+            "name": "Activity mode menu stays inside the minimum-width window",
+            "passed": true
+        },
+        {
+            "name": "Esc closes the mode menu, restores focus and changes no route",
+            "passed": true
+        },
+        {
+            "name": "Focused mode value keeps the shared flat toolbar surface and pill curvature without a blue frame",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: activityOutboundMode",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: activityMode-global",
+            "passed": true
+        },
+        {
+            "name": "Activity global choice receives the real durable configuration receipt",
+            "passed": true
+        },
+        {
+            "name": "Activity mode keeps its prior value while the real transaction is pending",
+            "passed": true
+        },
+        {
+            "name": "Offline activity mode save never claims live network application",
+            "passed": true
+        },
+        {
+            "name": "Activity updates only after matching completion and labels next-connection scope",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: activityOutboundMode",
+            "passed": true
+        },
+        {
+            "name": "Input is reachable: activityMode-rule",
+            "passed": true
+        },
+        {
+            "name": "Activity mode can switch back using the same native menu",
+            "passed": true
+        },
+        {
+            "name": "Activity return choice follows the committed controller mode",
+            "passed": true
+        },
+        {
+            "name": "Mode selection releases the menu before returning to the activity facts",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Activity transfer uses its independently sized content surface",
+            "passed": true
+        },
+        {
+            "name": "Activity diagnostics retain an opaque independent card with the shared five-card curvature",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Light mode uses the shared neutral white canvas and readable card palette",
+            "passed": true
+        },
+        {
+            "name": "Rapid-wing fixture uses an actual owned Rust session",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Rapid stop interrupts a visibly partial feather expansion",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Actual proxy reversal preserves the current wing frame",
+            "passed": true
+        },
+        {
+            "name": "Rapid stop finishes runtime cleanup",
+            "passed": true
+        },
+        {
+            "name": "Reopening during contraction starts a new actual owned session",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Interrupted contraction resumes through partial feather frames",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "QML expression is valid",
+            "passed": true
+        },
+        {
+            "name": "Rapid repeated reversal settles closed without a stuck animation",
+            "passed": true
+        },
+        {
+            "name": "Rapid actual proxy reversal resets all five whole Activity feathers and stops their animation",
+            "passed": true
+        },
+        {
+            "name": "Actual owned Qt window capture is saved: rapid-proxy-final-wing-hidden",
+            "passed": true
+        },
+        {
+            "name": "Owned runtime and transaction finish before cleanup",
+            "passed": true
+        },
+        {
+            "name": "Cleanup preserves the isolated external proxy after releasing only Swirl ownership",
+            "passed": true
+        }
+    ],
+    "failures": 1,
+    "minimum_advanced_focus": {
+        "actualWaitMs": 124.1596,
+        "afterWait": {
+            "activeFocusName": "policyProbeTolerance",
+            "field": {
+                "activeFocus": true,
+                "ancestors": [
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "policyProbeTolerance",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 32,
+                            "width": 484,
+                            "x": 198,
+                            "y": 593
+                        },
+                        "type": "SwirlTextField_QMLTYPE_93"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 272,
+                            "width": 604,
+                            "x": 78,
+                            "y": 353
+                        },
+                        "type": "QQuickGridLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 366,
+                            "width": 604,
+                            "x": 78,
+                            "y": 285
+                        },
+                        "type": "PolicyProbeSettings_QMLTYPE_148"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 366,
+                            "width": 604,
+                            "x": 78,
+                            "y": 285
+                        },
+                        "type": "QQuickLoader"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 644,
+                            "width": 604,
+                            "x": 78,
+                            "y": 7
+                        },
+                        "type": "QQuickColumnLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 644,
+                            "width": 604,
+                            "x": 78,
+                            "y": 7
+                        },
+                        "type": "QQuickItem"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": false,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 499,
+                            "width": 604,
+                            "x": 78,
+                            "y": 88
+                        },
+                        "type": "QQuickFlickable"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": false,
+                        "objectName": "policyGroupForm",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 499,
+                            "width": 604,
+                            "x": 78,
+                            "y": 88
+                        },
+                        "type": "PolicyFormScroll_QMLTYPE_145"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 543,
+                            "width": 604,
+                            "x": 78,
+                            "y": 88
+                        },
+                        "type": "QQuickColumnLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "PolicyGroupDialog",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 636,
+                            "width": 650,
+                            "x": 55,
+                            "y": 18
+                        },
+                        "type": "QQuickPopupItem"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 672,
+                            "width": 760,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "type": "QQuickOverlay"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": true,
+                        "objectName": "Main",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 672,
+                            "width": 760,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "type": "QQuickRootItem"
+                    }
+                ],
+                "centerX": 440,
+                "centerY": 609,
+                "effectiveOpacity": 1,
+                "enabled": true,
+                "sameWindow": true,
+                "sceneRect": {
+                    "height": 32,
+                    "width": 484,
+                    "x": 198,
+                    "y": 593
+                },
+                "visible": true
+            },
+            "fieldPresent": true,
+            "form": {
+                "availableHeight": 499,
+                "bodyHeight": 644,
+                "bodyImplicitHeight": 644,
+                "bodyPresent": true,
+                "contentHeight": 644,
+                "contentY": 81,
+                "sceneRect": {
+                    "height": 499,
+                    "width": 604,
+                    "x": 78,
+                    "y": 88
+                },
+                "viewportHeight": 499,
+                "viewportPresent": true
+            },
+            "minimumHeight": 672,
+            "minimumWidth": 760,
+            "windowHeight": 672,
+            "windowWidth": 760
+        },
+        "beforeResize": {
+            "activeFocusName": "policyGroupAdvanced",
+            "field": {
+                "activeFocus": false,
+                "ancestors": [
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "policyProbeTolerance",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 32,
+                            "width": 484,
+                            "x": 358,
+                            "y": 696
+                        },
+                        "type": "SwirlTextField_QMLTYPE_93"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 272,
+                            "width": 604,
+                            "x": 238,
+                            "y": 456
+                        },
+                        "type": "QQuickGridLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 366,
+                            "width": 604,
+                            "x": 238,
+                            "y": 388
+                        },
+                        "type": "PolicyProbeSettings_QMLTYPE_148"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 366,
+                            "width": 604,
+                            "x": 238,
+                            "y": 388
+                        },
+                        "type": "QQuickLoader"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 644,
+                            "width": 604,
+                            "x": 238,
+                            "y": 110
+                        },
+                        "type": "QQuickColumnLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 644,
+                            "width": 604,
+                            "x": 238,
+                            "y": 110
+                        },
+                        "type": "QQuickItem"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": false,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 543,
+                            "width": 604,
+                            "x": 238,
+                            "y": 110
+                        },
+                        "type": "QQuickFlickable"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": false,
+                        "objectName": "policyGroupForm",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 543,
+                            "width": 604,
+                            "x": 238,
+                            "y": 110
+                        },
+                        "type": "PolicyFormScroll_QMLTYPE_145"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": false,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 587,
+                            "width": 604,
+                            "x": 238,
+                            "y": 110
+                        },
+                        "type": "QQuickColumnLayout"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "PolicyGroupDialog",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 680,
+                            "width": 650,
+                            "x": 215,
+                            "y": 40
+                        },
+                        "type": "QQuickPopupItem"
+                    },
+                    {
+                        "clip": false,
+                        "containsFieldCenter": true,
+                        "objectName": "",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 760,
+                            "width": 1080,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "type": "QQuickOverlay"
+                    },
+                    {
+                        "clip": true,
+                        "containsFieldCenter": true,
+                        "objectName": "Main",
+                        "opacity": 1,
+                        "sceneRect": {
+                            "height": 760,
+                            "width": 1080,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "type": "QQuickRootItem"
+                    }
+                ],
+                "centerX": 600,
+                "centerY": 712,
+                "effectiveOpacity": 1,
+                "enabled": true,
+                "sameWindow": true,
+                "sceneRect": {
+                    "height": 32,
+                    "width": 484,
+                    "x": 358,
+                    "y": 696
+                },
+                "visible": true
+            },
+            "fieldPresent": true,
+            "form": {
+                "availableHeight": 543,
+                "bodyHeight": 644,
+                "bodyImplicitHeight": 644,
+                "bodyPresent": true,
+                "contentHeight": 644,
+                "contentY": 0,
+                "sceneRect": {
+                    "height": 543,
+                    "width": 604,
+                    "x": 238,
+                    "y": 110
+                },
+                "viewportHeight": 543,
+                "viewportPresent": true
+            },
+            "minimumHeight": 672,
+            "minimumWidth": 760,
+            "windowHeight": 760,
+            "windowWidth": 1080
+        },
+        "reachable": false,
+        "requestedWaitMs": 120
+    },
+    "minimum_default_picker": {
+        "chevron": {
+            "ancestorClips": [
+                {
+                    "objectName": "",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "pageLoader",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "Main",
+                    "sceneRect": {
+                        "height": 672,
+                        "width": 760,
+                        "x": 0,
+                        "y": 0
+                    }
+                }
+            ],
+            "effectiveOpacity": 1,
+            "enabled": true,
+            "height": 18,
+            "implicitHeight": 18,
+            "implicitWidth": 18,
+            "present": true,
+            "reachable": true,
+            "rotation": 90,
+            "rowRect": {
+                "height": 18,
+                "width": 18,
+                "x": 258,
+                "y": 15
+            },
+            "scale": 1,
+            "sceneRect": {
+                "height": 18,
+                "width": 18,
+                "x": 666,
+                "y": 317
+            },
+            "visible": true,
+            "width": 18
+        },
+        "conditions": {
+            "chevronContained": true,
+            "chevronExactSize": true,
+            "chevronLegible": true,
+            "chevronPointsDown": true,
+            "hintComplete": true,
+            "hintContained": true,
+            "hintUntruncated": true,
+            "hintWidthFits": true
+        },
+        "dpr": 1,
+        "expectedChevronDp": 18,
+        "hint": {
+            "ancestorClips": [
+                {
+                    "objectName": "",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "pageLoader",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "Main",
+                    "sceneRect": {
+                        "height": 672,
+                        "width": 760,
+                        "x": 0,
+                        "y": 0
+                    }
+                }
+            ],
+            "effectiveOpacity": 1,
+            "enabled": true,
+            "height": 16,
+            "implicitHeight": 16,
+            "implicitWidth": 48,
+            "present": true,
+            "reachable": true,
+            "rotation": 0,
+            "rowRect": {
+                "height": 16,
+                "width": 48,
+                "x": 200,
+                "y": 16
+            },
+            "scale": 1,
+            "sceneRect": {
+                "height": 16,
+                "width": 48,
+                "x": 608,
+                "y": 318
+            },
+            "text": "更换出口",
+            "truncated": false,
+            "visible": true,
+            "width": 48
+        },
+        "minimumChevronDp": 16,
+        "row": {
+            "ancestorClips": [
+                {
+                    "objectName": "",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "pageLoader",
+                    "sceneRect": {
+                        "height": 612,
+                        "width": 540,
+                        "x": 208,
+                        "y": 48
+                    }
+                },
+                {
+                    "objectName": "Main",
+                    "sceneRect": {
+                        "height": 672,
+                        "width": 760,
+                        "x": 0,
+                        "y": 0
+                    }
+                }
+            ],
+            "effectiveOpacity": 1,
+            "enabled": true,
+            "height": 48,
+            "implicitHeight": 32,
+            "implicitWidth": 113,
+            "present": true,
+            "reachable": true,
+            "rotation": 0,
+            "rowRect": {
+                "height": 48,
+                "width": 300,
+                "x": 0,
+                "y": 0
+            },
+            "scale": 1,
+            "sceneRect": {
+                "height": 48,
+                "width": 300,
+                "x": 408,
+                "y": 302
+            },
+            "visible": true,
+            "width": 300
+        },
+        "windowHeight": 672,
+        "windowWidth": 760
+    },
+    "scope": "Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations.",
+    "source_sha": "139f8d5d4e0d4cad8f7502389719c606eb2636f2",
+    "system_proxy": {
+        "backend": "per-instance-memory",
+        "last_pid": 7548,
+        "last_port": 63764,
+        "restores": 3,
+        "takeovers": 3
+    }
+}

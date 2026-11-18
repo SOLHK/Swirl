@@ -1,0 +1,1029 @@
+{
+  "tested_commit": "66842eee3d3a7292a95d1d7c551fbba9bb157e61",
+  "ci_checkout": "62125c8ffd0e7f4c3d80bf815c12311fef2cb8a1",
+  "native_run": 41406577699,
+  "strict_native_gate": "FAIL",
+  "production_accepted": false,
+  "windows": [
+    {
+      "artifact_id": 13123009862,
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "cases": [
+        {
+          "variant": "flat",
+          "native_exit_code": 0,
+          "font_sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+          "bytes": 5092,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_emulated": false,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_standalone",
+          "native_exit_code": 0,
+          "font_sha256": "69014315b2e4b04d46796843844681a2e7fd58a2c49f3b1bbeb884acdd664ecf",
+          "bytes": 2952,
+          "native_architecture": {
+            "process_emulated": false,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10
+          ]
+        },
+        {
+          "variant": "flat_stat",
+          "native_exit_code": 0,
+          "font_sha256": "fc93fc4bac4806853375fea01f6bd9cf0d8e316a60b2885b0ca27179230c39ab",
+          "bytes": 5168,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_fdselect",
+          "native_exit_code": 0,
+          "font_sha256": "accf2fee15f2c3ee3e077c7427eec1f98b573adfbd22a085c3bfc54866c89047",
+          "bytes": 5108,
+          "native_architecture": {
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "native_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "9a740c8256945a90508c580a1aacc2ae0a97d6b5020f2076f7e3f8ff208ae956",
+          "bytes": 5092,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": false,
+            "query_succeeded": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "a15e50851bd81b0ba130d682039f03ef32ae916876d978e23fbec6a849e7bd75",
+          "bytes": 5084,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_emulated": false,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_post3",
+          "native_exit_code": 0,
+          "font_sha256": "f30feeb3424a0171db201f3fb46a21230102754116538f624d16b517a22ec7c1",
+          "bytes": 5076,
+          "native_architecture": {
+            "process_emulated": false,
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "native_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored",
+          "native_exit_code": 1,
+          "font_sha256": "f5b9957a95928e7de530c0e54936a7f5791a5fff27955363d2b546d8caad3c67",
+          "bytes": 5772,
+          "native_architecture": {
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "compact",
+          "native_exit_code": 0,
+          "font_sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+          "bytes": 6164,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "e7e6a50765ad619becc90c39b7a2cf9119c4be8075a714c780d81a52999efafc",
+          "bytes": 4028,
+          "native_architecture": {
+            "process_emulated": false,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_default",
+          "native_exit_code": 1,
+          "font_sha256": "23844272ce2a3af1f6bff65b25502997eb462e5311833b411c0f0436859ee552",
+          "bytes": 5540,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta",
+          "native_exit_code": 1,
+          "font_sha256": "3d6d0c0544886d44d374d9a230a2b0f473e897cc7d705fb442237d058f680223",
+          "bytes": 16740,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "process_emulated": false,
+            "native_machine": 34404
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "4f676b0d198fcb981f44c7aef6e78bd5885ff583e63d406c50db83562a7eb02e",
+          "bytes": 6324,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "flat_regions_64",
+          "native_exit_code": 0,
+          "font_sha256": "1fc66190634e9104edd1629abe563cfa1738fc5fc335442f016d627a1f4e4be3",
+          "bytes": 7228,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": false,
+            "query_succeeded": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_192",
+          "native_exit_code": 0,
+          "font_sha256": "4a6bd6ddf204201fc5a91bb87a8b1a7a35e9701773ac2c0d4c626d3f4195663b",
+          "bytes": 14396,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": false,
+            "process_machine": 0,
+            "native_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_506",
+          "native_exit_code": 0,
+          "font_sha256": "6d7720f9afc394c3201219727f4d946989aa9565659a1db41efdd3b438906edf",
+          "bytes": 31980,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_long",
+          "native_exit_code": 0,
+          "font_sha256": "f88e2ca26e5612089e9a91dd7ac14f63cba72f6500452366ea9080e0cf0320a0",
+          "bytes": 299492,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": false,
+            "native_machine": 34404,
+            "query_succeeded": true
+          },
+          "default_points_per_face": [
+            5120,
+            5120
+          ]
+        },
+        {
+          "variant": "flat_subr_blend",
+          "native_exit_code": 0,
+          "font_sha256": "3b1913954735c9751caa4a35e96c11bdbfc0cdbe1b17ae17c51a2a0a65addbfe",
+          "bytes": 5116,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_emulated": false,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "nested_subr_blend",
+          "native_exit_code": 1,
+          "font_sha256": "ecc84360b59706aff7cc8bae6eab70d22ebdb99df80267ec220b488945e01157",
+          "bytes": 5580,
+          "native_architecture": {
+            "process_machine": 0,
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "query_succeeded": true
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "artifact_id": 13123907810,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "cases": [
+        {
+          "variant": "flat",
+          "native_exit_code": 0,
+          "font_sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+          "bytes": 5092,
+          "native_architecture": {
+            "query_succeeded": true,
+            "native_machine": 43620,
+            "process_machine": 0,
+            "process_emulated": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_standalone",
+          "native_exit_code": 0,
+          "font_sha256": "69014315b2e4b04d46796843844681a2e7fd58a2c49f3b1bbeb884acdd664ecf",
+          "bytes": 2952,
+          "native_architecture": {
+            "native_machine": 43620,
+            "compiled_machine": 34404,
+            "process_emulated": true,
+            "process_machine": 0,
+            "query_succeeded": true
+          },
+          "default_points_per_face": [
+            10
+          ]
+        },
+        {
+          "variant": "flat_stat",
+          "native_exit_code": 0,
+          "font_sha256": "fc93fc4bac4806853375fea01f6bd9cf0d8e316a60b2885b0ca27179230c39ab",
+          "bytes": 5168,
+          "native_architecture": {
+            "process_emulated": true,
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "native_machine": 43620
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_fdselect",
+          "native_exit_code": 0,
+          "font_sha256": "accf2fee15f2c3ee3e077c7427eec1f98b573adfbd22a085c3bfc54866c89047",
+          "bytes": 5108,
+          "native_architecture": {
+            "process_machine": 0,
+            "query_succeeded": true,
+            "native_machine": 43620,
+            "compiled_machine": 34404,
+            "process_emulated": true
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "9a740c8256945a90508c580a1aacc2ae0a97d6b5020f2076f7e3f8ff208ae956",
+          "bytes": 5092,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "native_machine": 43620,
+            "process_emulated": true
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "a15e50851bd81b0ba130d682039f03ef32ae916876d978e23fbec6a849e7bd75",
+          "bytes": 5084,
+          "native_architecture": {
+            "process_emulated": true,
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "native_machine": 43620,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_post3",
+          "native_exit_code": 0,
+          "font_sha256": "f30feeb3424a0171db201f3fb46a21230102754116538f624d16b517a22ec7c1",
+          "bytes": 5076,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": true,
+            "query_succeeded": true,
+            "native_machine": 43620
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored",
+          "native_exit_code": 1,
+          "font_sha256": "f5b9957a95928e7de530c0e54936a7f5791a5fff27955363d2b546d8caad3c67",
+          "bytes": 5772,
+          "native_architecture": {
+            "process_machine": 0,
+            "process_emulated": true,
+            "native_machine": 43620,
+            "compiled_machine": 34404,
+            "query_succeeded": true
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "compact",
+          "native_exit_code": 0,
+          "font_sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+          "bytes": 6164,
+          "native_architecture": {
+            "native_machine": 43620,
+            "process_emulated": true,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "e7e6a50765ad619becc90c39b7a2cf9119c4be8075a714c780d81a52999efafc",
+          "bytes": 4028,
+          "native_architecture": {
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "process_emulated": true,
+            "native_machine": 43620,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_default",
+          "native_exit_code": 1,
+          "font_sha256": "23844272ce2a3af1f6bff65b25502997eb462e5311833b411c0f0436859ee552",
+          "bytes": 5540,
+          "native_architecture": {
+            "native_machine": 43620,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": true
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta",
+          "native_exit_code": 1,
+          "font_sha256": "3d6d0c0544886d44d374d9a230a2b0f473e897cc7d705fb442237d058f680223",
+          "bytes": 16740,
+          "native_architecture": {
+            "query_succeeded": true,
+            "native_machine": 43620,
+            "compiled_machine": 34404,
+            "process_emulated": true,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "4f676b0d198fcb981f44c7aef6e78bd5885ff583e63d406c50db83562a7eb02e",
+          "bytes": 6324,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_emulated": true,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "native_machine": 43620
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "flat_regions_64",
+          "native_exit_code": 0,
+          "font_sha256": "1fc66190634e9104edd1629abe563cfa1738fc5fc335442f016d627a1f4e4be3",
+          "bytes": 7228,
+          "native_architecture": {
+            "native_machine": 43620,
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "query_succeeded": true,
+            "process_emulated": true
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_192",
+          "native_exit_code": 0,
+          "font_sha256": "4a6bd6ddf204201fc5a91bb87a8b1a7a35e9701773ac2c0d4c626d3f4195663b",
+          "bytes": 14396,
+          "native_architecture": {
+            "process_emulated": true,
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "native_machine": 43620,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_506",
+          "native_exit_code": 0,
+          "font_sha256": "6d7720f9afc394c3201219727f4d946989aa9565659a1db41efdd3b438906edf",
+          "bytes": 31980,
+          "native_architecture": {
+            "process_machine": 0,
+            "process_emulated": true,
+            "native_machine": 43620,
+            "query_succeeded": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_long",
+          "native_exit_code": 0,
+          "font_sha256": "f88e2ca26e5612089e9a91dd7ac14f63cba72f6500452366ea9080e0cf0320a0",
+          "bytes": 299492,
+          "native_architecture": {
+            "process_emulated": true,
+            "query_succeeded": true,
+            "native_machine": 43620,
+            "process_machine": 0,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            5120,
+            5120
+          ]
+        },
+        {
+          "variant": "flat_subr_blend",
+          "native_exit_code": 0,
+          "font_sha256": "3b1913954735c9751caa4a35e96c11bdbfc0cdbe1b17ae17c51a2a0a65addbfe",
+          "bytes": 5116,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": true,
+            "process_machine": 0,
+            "native_machine": 43620
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "nested_subr_blend",
+          "native_exit_code": 1,
+          "font_sha256": "ecc84360b59706aff7cc8bae6eab70d22ebdb99df80267ec220b488945e01157",
+          "bytes": 5580,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 43620,
+            "process_emulated": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "artifact_id": 13124021131,
+      "platform": "Windows-2022Server-10.0.20348-SP0",
+      "cases": [
+        {
+          "variant": "flat",
+          "native_exit_code": 0,
+          "font_sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+          "bytes": 5092,
+          "native_architecture": {
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_standalone",
+          "native_exit_code": 0,
+          "font_sha256": "69014315b2e4b04d46796843844681a2e7fd58a2c49f3b1bbeb884acdd664ecf",
+          "bytes": 2952,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10
+          ]
+        },
+        {
+          "variant": "flat_stat",
+          "native_exit_code": 0,
+          "font_sha256": "fc93fc4bac4806853375fea01f6bd9cf0d8e316a60b2885b0ca27179230c39ab",
+          "bytes": 5168,
+          "native_architecture": {
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_emulated": false,
+            "process_machine": 0,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_fdselect",
+          "native_exit_code": 0,
+          "font_sha256": "accf2fee15f2c3ee3e077c7427eec1f98b573adfbd22a085c3bfc54866c89047",
+          "bytes": 5108,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false,
+            "native_machine": 34404,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_private_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "9a740c8256945a90508c580a1aacc2ae0a97d6b5020f2076f7e3f8ff208ae956",
+          "bytes": 5092,
+          "native_architecture": {
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_default_vsindex",
+          "native_exit_code": 0,
+          "font_sha256": "a15e50851bd81b0ba130d682039f03ef32ae916876d978e23fbec6a849e7bd75",
+          "bytes": 5084,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "process_emulated": false,
+            "query_succeeded": true,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_post3",
+          "native_exit_code": 0,
+          "font_sha256": "f30feeb3424a0171db201f3fb46a21230102754116538f624d16b517a22ec7c1",
+          "bytes": 5076,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored",
+          "native_exit_code": 1,
+          "font_sha256": "f5b9957a95928e7de530c0e54936a7f5791a5fff27955363d2b546d8caad3c67",
+          "bytes": 5772,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "query_succeeded": true,
+            "native_machine": 34404,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "compact",
+          "native_exit_code": 0,
+          "font_sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+          "bytes": 6164,
+          "native_architecture": {
+            "query_succeeded": true,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "factored_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "e7e6a50765ad619becc90c39b7a2cf9119c4be8075a714c780d81a52999efafc",
+          "bytes": 4028,
+          "native_architecture": {
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_default",
+          "native_exit_code": 1,
+          "font_sha256": "23844272ce2a3af1f6bff65b25502997eb462e5311833b411c0f0436859ee552",
+          "bytes": 5540,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "process_machine": 0,
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta",
+          "native_exit_code": 1,
+          "font_sha256": "3d6d0c0544886d44d374d9a230a2b0f473e897cc7d705fb442237d058f680223",
+          "bytes": 16740,
+          "native_architecture": {
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "nested_delta_sparse",
+          "native_exit_code": 1,
+          "font_sha256": "4f676b0d198fcb981f44c7aef6e78bd5885ff583e63d406c50db83562a7eb02e",
+          "bytes": 6324,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        },
+        {
+          "variant": "flat_regions_64",
+          "native_exit_code": 0,
+          "font_sha256": "1fc66190634e9104edd1629abe563cfa1738fc5fc335442f016d627a1f4e4be3",
+          "bytes": 7228,
+          "native_architecture": {
+            "process_machine": 0,
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "native_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_192",
+          "native_exit_code": 0,
+          "font_sha256": "4a6bd6ddf204201fc5a91bb87a8b1a7a35e9701773ac2c0d4c626d3f4195663b",
+          "bytes": 14396,
+          "native_architecture": {
+            "native_machine": 34404,
+            "compiled_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_regions_506",
+          "native_exit_code": 0,
+          "font_sha256": "6d7720f9afc394c3201219727f4d946989aa9565659a1db41efdd3b438906edf",
+          "bytes": 31980,
+          "native_architecture": {
+            "native_machine": 34404,
+            "process_machine": 0,
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "query_succeeded": true
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "flat_long",
+          "native_exit_code": 0,
+          "font_sha256": "f88e2ca26e5612089e9a91dd7ac14f63cba72f6500452366ea9080e0cf0320a0",
+          "bytes": 299492,
+          "native_architecture": {
+            "compiled_machine": 34404,
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false
+          },
+          "default_points_per_face": [
+            5120,
+            5120
+          ]
+        },
+        {
+          "variant": "flat_subr_blend",
+          "native_exit_code": 0,
+          "font_sha256": "3b1913954735c9751caa4a35e96c11bdbfc0cdbe1b17ae17c51a2a0a65addbfe",
+          "bytes": 5116,
+          "native_architecture": {
+            "native_machine": 34404,
+            "query_succeeded": true,
+            "process_machine": 0,
+            "process_emulated": false,
+            "compiled_machine": 34404
+          },
+          "default_points_per_face": [
+            10,
+            10
+          ]
+        },
+        {
+          "variant": "nested_subr_blend",
+          "native_exit_code": 1,
+          "font_sha256": "ecc84360b59706aff7cc8bae6eab70d22ebdb99df80267ec220b488945e01157",
+          "bytes": 5580,
+          "native_architecture": {
+            "query_succeeded": true,
+            "compiled_machine": 34404,
+            "process_emulated": false,
+            "native_machine": 34404,
+            "process_machine": 0
+          },
+          "default_points_per_face": [
+            4,
+            4
+          ]
+        }
+      ]
+    }
+  ],
+  "local_qt_long": {
+    "status": "PASS_AUTHORED_QT_SCOPE",
+    "qt": "6.12.0",
+    "qpa": "offscreen",
+    "font_sha256": "f88e2ca26e5612089e9a91dd7ac14f63cba72f6500452366ea9080e0cf0320a0",
+    "axis_cases": 12,
+    "path_elements": [
+      3584
+    ],
+    "raster_count": 60,
+    "qml_captures": 2,
+    "physical_DPI": "NOT_RUN"
+  },
+  "native_artifacts": [
+    {
+      "id": 13123009862,
+      "bytes": 3748390,
+      "sha256": "d7ffd538e8acde008ff1a1554e3752fdbee3b45d0423f37c2838ed2bf4e1ec92"
+    },
+    {
+      "id": 13123907810,
+      "bytes": 3748554,
+      "sha256": "6306e08af3187e8a7dc6194b08c9e3541054deb6e3fb879436cb653e96c5f10b"
+    },
+    {
+      "id": 13124021131,
+      "bytes": 3748077,
+      "sha256": "8ab592cc91c03ac6409c6fe9d276f4e8f8a4127ad1a4c9826e5948a9d2576a14"
+    },
+    {
+      "id": 13124045638,
+      "bytes": 1628062,
+      "sha256": "d9e73496759b87bf53c9aa176a6b206d7b646629af31b52e703d4ab3b575a46e"
+    }
+  ],
+  "next_coordinate_comparison": "NOT_RUN_AT_CHECKPOINT"
+}

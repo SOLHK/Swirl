@@ -3,6 +3,8 @@ name = "swirl-core"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+[features]
+native-tun = ["dep:swirl-tun", "dep:smoltcp"]
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
@@ -14,8 +16,14 @@ swirl-dns.workspace = true
 swirl-routing.workspace = true
 swirl-protocol.workspace = true
 swirl-transport.workspace = true
+swirl-tun = { workspace = true, optional = true }
+# Used directly by native-tun feature tests. Cargo dev-dependencies cannot be
+# feature-gated; keeping this optional preserves the default Core MSRV/graph.
+# This is the same locked smoltcp already provided by swirl-tun, not another stack.
+smoltcp = { version = "=0.14.0", optional = true, default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp"] }
 [dev-dependencies]
 base64.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 tokio-rustls.workspace = true
 [lints]
 workspace = true

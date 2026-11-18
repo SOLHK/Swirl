@@ -1,5 +1,12 @@
 * text=auto eol=lf
 *.png binary
 *.ico binary
+# Upstream patch signatures/hashes include unified-diff context blank lines.
+tools/patches/CVE-2026-116337-qtbase-6.12-*.diff -text -whitespace
+tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff -text -whitespace
 # Captured command output is retained byte-for-byte, including blank log lines.
 docs/evidence/** -whitespace
+# Continuation evidence hashes identify the original captured bytes, including CRLF.
+docs/evidence/windows-proxy-compat-20261102/final-continuation/** -text
+docs/evidence/windows-proxy-compat-20261102/native-exit-followup/** -text
+docs/evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/** -text

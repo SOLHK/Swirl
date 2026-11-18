@@ -12,14 +12,15 @@ static int recordInteractionSequence(QQuickWindow *window,const QString &directo
     auto wait=[](int ms){QEventLoop loop;QTimer::singleShot(ms,&loop,&QEventLoop::quit);loop.exec();};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *found=find(child,name))return found;return nullptr;};
     window->resize(1100,760);window->show();eval("Theme.mode='Light';Theme.reduceMotion=false;AppState.navigate('activity')");wait(500);
-    auto *source=find(window->contentItem(),"activityUpload");if(!source)return 2;
-    qmlEngine(window)->rootContext()->setContextProperty("motionRecordingSource",source);
+    auto *source=find(window->contentItem(),"activityTrafficDetails");if(!source)return 2;
+    const auto click=[&](QQuickItem *control){if(control)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
+        control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
     int failures=0;QJsonArray timestamps;QElapsedTimer captureClock;captureClock.start();
     for(int frame=0;frame<120;++frame){
-        if(frame==5||frame==20)eval("SwirlMotion.navigateFrom(motionRecordingSource,'traffic','uploadRate')");
-        if(frame==9||frame==40)eval("SwirlMotion.returnToHub(null)");
-        if(frame==55||frame==63)eval("proxyPanel.toggle()");
-        if(frame==59||frame==82)eval("proxyPanel.requestDismiss()");
+        if(frame==5||frame==20)click(source);
+        if(frame==9||frame==40)QTest::keyClick(window,Qt::Key_Escape);
+        if(frame==55||frame==63)click(find(window->contentItem(),"activityOutboundMode"));
+        if(frame==59||frame==82)QTest::keyClick(window,Qt::Key_Escape);
         if(frame>=90&&frame<112&&frame%2==0){const QStringList routes={"overview","processes","gateway","policies","rules","capture","tls","rewrite","featurehub","activity","overview"};eval("AppState.navigate('"+routes[(frame-90)/2]+"')");}
         wait(33);
         timestamps.append(captureClock.nsecsElapsed()/1e6);
@@ -33,7 +34,9 @@ static int runScrollBench(QQuickWindow *window, const QString &output) {
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);return e.evaluate();};
     auto wait=[](int ms){QEventLoop loop;QTimer::singleShot(ms,&loop,&QEventLoop::quit);loop.exec();};
     window->resize(800,672);window->show();
-    eval("Theme.reduceMotion=false;Theme.mode='Light';AppState.navigate('activity')");wait(700);eval("pageLoader.item.diagnosticOpen=true");wait(200);
+    // The compact five-card overview already scrolls. It has no diagnosticOpen
+    // toggle; keep wheel input on the actual overview rather than a removed rail.
+    eval("Theme.reduceMotion=false;Theme.mode='Light';AppState.navigate('activity')");wait(900);
     const bool live=qEnvironmentVariableIsSet("SWIRL_SCROLL_LIVE");
     auto *controller=qobject_cast<EngineController *>(qmlEngine(window)->rootContext()->contextProperty("engineController").value<QObject *>());
     ControlledNetwork peers;QNetworkAccessManager client;QTimer traffic;int successfulRequests=0;

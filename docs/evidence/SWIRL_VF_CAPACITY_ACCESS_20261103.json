@@ -1,0 +1,87 @@
+{
+  "capacity": {
+    "total_source_glyphs": 47102,
+    "nonempty_source_glyphs": 47097,
+    "minimum_cells_per_nonempty_glyph": 8,
+    "maxp_numGlyphs_limit": 65535,
+    "aliasing_base_to_one_patch_glyph_lower_bound": 376781,
+    "retaining_original_base_plus_all_patches_glyph_count": 423878,
+    "capacity_fits_even_with_base_aliasing": false,
+    "assumptions": [
+      "Current compiler starts with eight octants and emits one distinct glyph per cell.",
+      "Every nonempty source glyph is retained; no cross-source glyph aliasing is assumed."
+    ],
+    "conclusion_scope": "Current patch-per-glyph architecture only; other OpenType representations are not ruled out.",
+    "projected_full_font_bytes": null,
+    "projected_full_font_compile_seconds": null
+  },
+  "CFF2_variation_store": [
+    {
+      "gid": 1166,
+      "variation_store_payload_bytes": 212832,
+      "uint16_length_field": 65535
+    },
+    {
+      "gid": 19177,
+      "variation_store_payload_bytes": 142354,
+      "uint16_length_field": 65535
+    }
+  ],
+  "subset_controls": [
+    {
+      "scope": "subset_and_mutable_instance_preservation_only",
+      "seed": 2026110823,
+      "samples": 512,
+      "input_sha256": "85d2e74c6d106f9af20719154343f00c2cdbf5696c4652c8af019a37dcef8f4a",
+      "input_bytes": 5276,
+      "CoreText": "NOT_RUN",
+      "production_accepted": false,
+      "original_source_accuracy": false,
+      "passed": true,
+      "original_glyphs": 11,
+      "subset_glyphs": 10,
+      "subset_seconds": 0.015433084015967324,
+      "output_bytes": 4580,
+      "output_sha256": "6cd2c5dfc9e8277b383e68dc06e0ba3caadf2af96be27b78ac0640294c07e447",
+      "HarfBuzz": {
+        "observations": 512,
+        "failures": 0,
+        "max_error": 0.0,
+        "topology_failures": 0,
+        "exact_outline_mismatches": 0,
+        "advance_mismatches": 0,
+        "mutable_cache_mismatches": 0
+      },
+      "seconds": 0.09593558401684277,
+      "peak_rss_bytes": 55476224
+    },
+    {
+      "scope": "subset_and_mutable_instance_preservation_only",
+      "seed": 2026110823,
+      "samples": 512,
+      "input_sha256": "cfa0f945937673161835e923d01eb04cfc731862aad918316c0d2e51765a7a90",
+      "input_bytes": 20575616,
+      "CoreText": "NOT_RUN",
+      "production_accepted": false,
+      "original_source_accuracy": false,
+      "passed": true,
+      "original_glyphs": 2051,
+      "subset_glyphs": 2050,
+      "subset_seconds": 138.4523972920142,
+      "output_bytes": 20573692,
+      "output_sha256": "49fe83280e2225f97bdc165a343de960953c1fa9983ac2313162a62f284e8efa",
+      "HarfBuzz": {
+        "observations": 512,
+        "failures": 0,
+        "max_error": 0.0,
+        "topology_failures": 0,
+        "exact_outline_mismatches": 0,
+        "advance_mismatches": 0,
+        "mutable_cache_mismatches": 0
+      },
+      "seconds": 140.94833775001462,
+      "peak_rss_bytes": 632815616
+    }
+  ],
+  "production_accepted": false
+}

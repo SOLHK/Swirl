@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "role": "Immutable completed 24af583 checkpoint before additional native full-process normal-exit acceptance",
+  "verified_at_utc": "2026-11-02T16:40:33Z",
+  "head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "tree_sha": "13a24de79dbab26098059286a1c74b291ed23084",
+  "core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "workflow_results": [
+    {
+      "id": 41475106025,
+      "name": "Validate Qt-only source tree",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106025"
+    },
+    {
+      "id": 41475106061,
+      "name": "Policy form viewport regression",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106061"
+    },
+    {
+      "id": 41475106009,
+      "name": "Build Swirl Qt Quick UI (Preview)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009"
+    },
+    {
+      "id": 41475106022,
+      "name": "Qt HTTP client security",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106022"
+    },
+    {
+      "id": 41475106020,
+      "name": "Swirl Rust Core",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106020"
+    }
+  ],
+  "engine_artifact": {
+    "id": 13159068329,
+    "zip_sha256": "d800d9c2b23024f504de9af2406560ada4a86df11f45f84c500dd70a39436a26",
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009/artifacts/13159068329"
+  },
+  "normal_full_process_exit_gap": {
+    "status": "PENDING",
+    "covered_at_checkpoint": "Explicit release and separate guard/crash recovery; real Rust UI integration uses a memory proxy adapter.",
+    "not_yet_established": "A real Swirl process holds native WinINet/registry proxy ownership while real Rust runs, exits normally through its actual application lifecycle, and restores exact prior state.",
+    "later_candidate_tests_and_ci": "PENDING; no success claimed from this checkpoint"
+  },
+  "physical_windows11_codex_clash_swirl_ab": "NOT_RUN",
+  "merge_to_test": "NOT_AUTHORIZED_BY_CHECKPOINT_RESULTS",
+  "preservation": "All ten selected evidence files copied byte-for-byte. Derived summaries are labeled as such. No binaries, complete environment logs, or signed download URLs are included. This index does not hash itself.",
+  "files": [
+    {
+      "path": "fullqt-verified-summary.json",
+      "bytes": 22816,
+      "sha256": "02cc1fa66c7d4007bac7e652136512ade8ddc2d227adeef10527ad403a9f080b",
+      "kind": "derived_verified_summary",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": null,
+        "artifact_member_or_auditor_file": "fullqt-verified-summary.json"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 0,
+      "lf_count": 711,
+      "scope": "Verified full Qt, production Release, actual NSIS payload, source identity and scoped DPR results; copied verbatim."
+    },
+    {
+      "path": "security-verified-summary.json",
+      "bytes": 10574,
+      "sha256": "22281d641579b12eb383b5e04b036416fe862320adff9bcc7e774c1894de3cd3",
+      "kind": "derived_verified_summary",
+      "source": {
+        "workflow_run": 41475106022,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106022",
+        "artifact_id": null,
+        "artifact_member_or_auditor_file": "security-verified-summary.json"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 0,
+      "lf_count": 271,
+      "scope": "Verified seven security jobs; five actual first-attempt jobs and two actual same-source macOS retries."
+    },
+    {
+      "path": "rust-validated-summary.json",
+      "bytes": 13916,
+      "sha256": "ab943e7bb0b3c4a1b6428c54cde082b6dd3e3897ce6d0eb92ebbc8a45a4e3355",
+      "kind": "derived_verified_summary",
+      "source": {
+        "workflow_run": 41475106020,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106020",
+        "artifact_id": null,
+        "artifact_member_or_auditor_file": "rust/validated-checkpoint-24af583.json"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 0,
+      "lf_count": 396,
+      "scope": "Validated 16:37 Rust checkpoint; embedded 15:49 core/soak linkage snapshot is preserved unchanged."
+    },
+    {
+      "path": "native-system-proxy-summary.json",
+      "bytes": 14788,
+      "sha256": "b0b38de8d41622076f0fafa4f10395380d7e463dc2b23c9459fceb1f442e50bb",
+      "kind": "derived_verified_summary",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "system-proxy-summary.json"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 0,
+      "lf_count": 419,
+      "scope": "Native API suites and separate real-Rust memory-adapter integration; not held-proxy normal full-process exit acceptance."
+    },
+    {
+      "path": "policy-ui.json",
+      "bytes": 133769,
+      "sha256": "be9d09c31d2ced7fcb80ccaaf35045fad0974f5e954bc2f2c5377bc69ece2ae9",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build/swirl-quick/policy-evidence/policy-ui.json"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 0,
+      "lf_count": 4225,
+      "scope": "537 actual full-application checks; native window/rendering and real Rust, per-instance memory system-proxy adapter."
+    },
+    {
+      "path": "swirl-system-proxy-state.xml",
+      "bytes": 5345,
+      "sha256": "7deb9fef090afa808d4e0c59924ffe3dfa4a6c872323cfd67df9b730a678b673",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build/swirl-quick/swirl-system-proxy-state.xml"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 136,
+      "lf_count": 136,
+      "scope": "34 QTest pass incidents including data rows and init/cleanup; no failure or skip."
+    },
+    {
+      "path": "swirl-system-proxy-recovery.xml",
+      "bytes": 2736,
+      "sha256": "d2d222c37c1159f852cbe4ab4536c6ec83bfbd66093947a4303567bb3b1e0085",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build/swirl-quick/swirl-system-proxy-recovery.xml"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 70,
+      "lf_count": 70,
+      "scope": "15 QTest pass incidents including both PAC data rows and init/cleanup; no failure or skip."
+    },
+    {
+      "path": "critical-ui.xml",
+      "bytes": 1588,
+      "sha256": "d86409fca36801d6432c980333035f0c597a22ce62eb7233368004734c17f01f",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build-evidence/critical-ui.xml"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 47,
+      "lf_count": 47,
+      "scope": "Nine critical UI CTest cases; zero failed, skipped or disabled."
+    },
+    {
+      "path": "critical-network.xml",
+      "bytes": 2108,
+      "sha256": "bc25c0417595b7024d7fc242586197967c8e51a840753196e4db20644355e487",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build-evidence/critical-network.xml"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 57,
+      "lf_count": 57,
+      "scope": "Ten critical network/security CTest cases; zero failed, skipped or disabled."
+    },
+    {
+      "path": "full-regression.xml",
+      "bytes": 6447,
+      "sha256": "27ee82012982c795d470f67ffdc9ceff9aecc1fc016ee200a6bb857f0352d19f",
+      "kind": "raw_artifact_member",
+      "source": {
+        "workflow_run": 41475106009,
+        "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+        "artifact_id": 13159068329,
+        "artifact_member_or_auditor_file": "build-evidence/full-regression.xml"
+      },
+      "copy_method": "byte-for-byte; no newline conversion",
+      "crlf_count": 143,
+      "lf_count": 143,
+      "scope": "Twenty-two remaining CTest cases; zero failed, skipped or disabled."
+    }
+  ]
+}

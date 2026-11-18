@@ -10,17 +10,23 @@
 namespace {
 constexpr std::array<qreal, 5> dprs{1, 1.25, 1.5, 1.75, 2};
 
-// Independent reference copied from WindowsBackdrop.cpp before integration.
-// Keep the original contour, coverage, offset and rounding. The sole skip guard
-// below defines tiny-body behavior where the literal old loop did not terminate.
-qreal legacyRoundedDistance(qreal x, qreal y, qreal width, qreal height, qreal radius) {
+// Independent full-image reference for the accepted UI_0232 contour. Normalize
+// its 2.5-power implicit function by the analytic gradient so corner coverage
+// and shadow falloff use the same edge metric as the visible surfaces. Keep
+// this reference independent of SwirlContour and of the cached slice renderer.
+qreal referenceContourDistance(qreal x, qreal y, qreal width, qreal height, qreal radius) {
+    radius = qBound<qreal>(0, radius, qMin(width, height) / 2);
     const qreal dx = std::abs(x - width / 2) - (width / 2 - radius);
     const qreal dy = std::abs(y - height / 2) - (height / 2 - radius);
-    return std::pow(std::pow(qMax<qreal>(dx, 0), 2.5) + std::pow(qMax<qreal>(dy, 0), 2.5), 0.4)
-        + qMin(qMax(dx, dy), qreal(0)) - radius;
+    const qreal positiveX = qMax<qreal>(dx, 0), positiveY = qMax<qreal>(dy, 0);
+    const qreal cornerNorm = std::pow(std::pow(positiveX, 2.5) + std::pow(positiveY, 2.5), 0.4);
+    const qreal implicit = cornerNorm + qMin(qMax(dx, dy), qreal(0)) - radius;
+    const qreal gradientLength = cornerNorm > 0.0001
+        ? std::hypot(std::pow(positiveX / cornerNorm, 1.5), std::pow(positiveY / cornerNorm, 1.5)) : 1;
+    return implicit / qMax(gradientLength, qreal(0.001));
 }
 
-QImage legacyShadowImage(QSize body, qreal radius, qreal dpr, bool active) {
+QImage referenceShadowImage(QSize body, qreal radius, qreal dpr, bool active) {
     const int padding = qCeil(20 * dpr);
     const qreal sigma = 6.0 * dpr, offset = 2.5 * dpr;
     const qreal strength = active ? 0.22 : 0.14;
@@ -46,11 +52,11 @@ QImage legacyShadowImage(QSize body, qreal radius, qreal dpr, bool active) {
                 && localY >= 0 && localY < body.height()) continue;
             if (localY >= radius && localY < body.height() - radius
                 && localX >= 0 && localX < body.width()) continue;
-            const qreal edge = legacyRoundedDistance(localX, localY, body.width(), body.height(), radius);
+            const qreal edge = referenceContourDistance(localX, localY, body.width(), body.height(), radius);
             if (edge <= -0.5) continue;
             const qreal t = qBound<qreal>(0, edge + 0.5, 1);
             const qreal coverage = t * t * (3 - 2 * t);
-            const qreal distance = qMax<qreal>(0, legacyRoundedDistance(localX, localY - offset, body.width(), body.height(), radius));
+            const qreal distance = qMax<qreal>(0, referenceContourDistance(localX, localY - offset, body.width(), body.height(), radius));
             const int alpha = qRound(255 * strength * coverage * std::exp(-distance * distance / (2 * sigma * sigma)));
             row[x] = qRgba(0, 0, 0, alpha);
         }
@@ -98,7 +104,7 @@ void addPixelRow(const QString &name, QSize body, qreal radius, qreal dpr, bool 
 class WindowShadowRendererTests final : public QObject {
     Q_OBJECT
 private slots:
-    void windowSizesMatchLegacy_data() {
+    void windowSizesMatchContour_data() {
         addPixelColumns();
         const std::array<QSize, 10> logicalSizes{
             QSize(914, 672), QSize(1100, 860), QSize(1100, 760), QSize(760, 672),
@@ -114,9 +120,9 @@ private slots:
         }
     }
 
-    void windowSizesMatchLegacy() {
+    void windowSizesMatchContour() {
         QFETCH(QSize, body); QFETCH(qreal, radius); QFETCH(qreal, dpr); QFETCH(bool, active);
-        const QString difference = compareLegacy(body, radius, dpr, active);
+        const QString difference = compareContour(body, radius, dpr, active);
         QVERIFY2(difference.isEmpty(), qPrintable(difference));
     }
 
@@ -140,7 +146,7 @@ private slots:
 
     void smallAndSliceBoundarySizesMatchContour() {
         QFETCH(QSize, body); QFETCH(qreal, radius); QFETCH(qreal, dpr); QFETCH(bool, active);
-        const QString difference = compareLegacy(body, radius, dpr, active);
+        const QString difference = compareContour(body, radius, dpr, active);
         QVERIFY2(difference.isEmpty(), qPrintable(difference));
     }
 
@@ -150,7 +156,7 @@ private slots:
         const qreal dpr = 1.5, radius = 14 * dpr;
         const int padding = qCeil(20 * dpr);
         for (bool active : {false, true}) {
-            const auto expected = legacyShadowImage(body, radius, dpr, active);
+            const auto expected = referenceShadowImage(body, radius, dpr, active);
             const auto actual = renderer.render(body, radius, dpr, active);
             const QString difference = pixelDifference(expected, actual);
             QVERIFY2(difference.isEmpty(), qPrintable(difference));
@@ -250,10 +256,10 @@ private slots:
     }
 
 private:
-    QString compareLegacy(QSize body, qreal radius, qreal dpr, bool active) {
+    QString compareContour(QSize body, qreal radius, qreal dpr, bool active) {
         QElapsedTimer timer;
         timer.start();
-        const auto expected = legacyShadowImage(body, radius, dpr, active);
+        const auto expected = referenceShadowImage(body, radius, dpr, active);
         m_referenceNs += timer.nsecsElapsed();
         timer.restart();
         const auto actual = m_renderer.render(body, radius, dpr, active);

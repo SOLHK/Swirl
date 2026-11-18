@@ -10,10 +10,8 @@ use std::{
     task::Poll,
 };
 use swirl_dns::Resolver;
-use tokio::{
-    net::TcpStream,
-    time::{Duration, Instant, sleep_until, timeout_at},
-};
+use swirl_transport::TcpConnection;
+use tokio::time::{Duration, Instant, sleep_until, timeout_at};
 
 const ATTEMPT_DELAY: Duration = Duration::from_millis(250);
 const PENDING_LIMIT: usize = 2;
@@ -119,7 +117,7 @@ pub async fn diagnose_tcp(
             Phase::Resolution,
             resolver.resolve(&target.host, target.port),
         ),
-        TcpStream::connect,
+        swirl_transport::connect_tcp,
     )
     .await;
     if let Ok(stream) = result {
@@ -197,7 +195,7 @@ pub(super) async fn connect_tcp(
     resolver: &Resolver,
     target: &Target,
     deadline: Instant,
-) -> Result<TcpStream> {
+) -> Result<TcpConnection> {
     // Resolver returns a literal unchanged, including a route-pinned address.
     // Never re-resolve the original hostname or consult another route here.
     let addresses = within(
@@ -225,10 +223,13 @@ pub async fn connect_direct_resolved(
     Ok(Box::new(connect_tcp_addresses(addresses, deadline).await?))
 }
 
-async fn connect_tcp_addresses(addresses: Vec<SocketAddr>, deadline: Instant) -> Result<TcpStream> {
+async fn connect_tcp_addresses(
+    addresses: Vec<SocketAddr>,
+    deadline: Instant,
+) -> Result<TcpConnection> {
     let stream = timing::measure(
         Phase::TcpDial,
-        dial_addresses(addresses, deadline, TcpStream::connect),
+        dial_addresses(addresses, deadline, swirl_transport::connect_tcp),
     )
     .await?;
     stream.set_nodelay(true).map_err(|_| "SocketOptions")?;
@@ -269,9 +270,10 @@ fn tcp_failure_code(error: &io::Error) -> &'static str {
         io::ErrorKind::ConnectionReset => "UpstreamConnectionReset",
         io::ErrorKind::ConnectionAborted => "UpstreamConnectionAborted",
         io::ErrorKind::TimedOut => "UpstreamTcpTimeout",
-        io::ErrorKind::NetworkUnreachable
-        | io::ErrorKind::HostUnreachable
-        | io::ErrorKind::NetworkDown => "UpstreamNetworkUnreachable",
+        io::ErrorKind::NetworkUnreachable | io::ErrorKind::NetworkDown => {
+            "UpstreamNetworkUnreachable"
+        }
+        io::ErrorKind::HostUnreachable => "UpstreamHostUnreachable",
         io::ErrorKind::PermissionDenied => "UpstreamPermissionDenied",
         _ => "UpstreamConnectFailed",
     }
@@ -634,7 +636,7 @@ mod tests {
                 listener.local_addr().unwrap(),
             ],
             Instant::now() + Duration::from_secs(3),
-            TcpStream::connect,
+            swirl_transport::connect_tcp,
         )
         .await
         .unwrap();

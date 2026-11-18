@@ -250,7 +250,10 @@ async fn exchange(
     let tcp = transport
         .connect(server.address)
         .await
-        .map_err(|_| "DnsHttpsConnect")?;
+        .map_err(|error| match error {
+            "DnsEndpointForbidden" => "DnsEndpointForbidden",
+            _ => "DnsHttpsConnect",
+        })?;
     let mut stream: BoxStream = secure(tcp, &server.tls)
         .await
         .map_err(|_| "DnsHttpsVerificationOrHandshake")?;

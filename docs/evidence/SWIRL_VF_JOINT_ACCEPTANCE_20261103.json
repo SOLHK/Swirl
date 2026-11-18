@@ -1,0 +1,332 @@
+{
+  "status": "PASS_SAMPLED_NATIVE_TARGETS",
+  "limit_source_font_units": 0.03125,
+  "both_target_sampled_native_acceptance": true,
+  "production_release_accepted": false,
+  "algorithm_commit": "1164335027da9cccfefedb0f81d88b863a0c95eb",
+  "environment": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "fontTools": "4.61.1",
+    "harfbuzz": "14.6.0"
+  },
+  "targets": {
+    "1166": {
+      "gid": 1166,
+      "face": 0,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "candidate_sha256": "1854e6363a256c2afd568149f9980752638107d1d387018582cae0420be09d23",
+      "seed": 2026110445,
+      "scope": "selected_source_glyph_native_shaping",
+      "training_samples_consumed": 0,
+      "continuous_space_proof": false,
+      "unique_user_positions": 3134,
+      "positions_certifiably_disjoint_from_training_grid": 3078,
+      "independent_random_triples": 2048,
+      "engines": {
+        "CoreText": {
+          "observations": 3153,
+          "max_error": 0.02583148555841653,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.012224448897768525,
+          "max_advance_vs_unrounded_tables": 0.012224448897768525
+        },
+        "HarfBuzz": {
+          "observations": 3153,
+          "max_error": 0.023699382671840616,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.0,
+          "max_advance_vs_unrounded_tables": 0.5070541082164937
+        },
+        "fontTools": {
+          "observations": 271,
+          "max_error": 0.01839123266798431,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.00608466933863383,
+          "max_advance_vs_unrounded_tables": 0.00608466933863383
+        }
+      },
+      "observations": 3153,
+      "categories": {
+        "boundary": 125,
+        "single": 192,
+        "dual": 192,
+        "triple": 2048,
+        "branch_axis_zero": 42,
+        "branch_tangent_lower": 21,
+        "branch_tangent_upper": 21,
+        "previous_dense_holdout": 128,
+        "region_seam": 384
+      },
+      "input_sampling": "nearest stable decimal4 from fixed three-point stencil, before native execution",
+      "arbitrary_binary64_transport_certified": false,
+      "native_summary": {
+        "exact_axis_readback": true,
+        "font_sha256": "1854e6363a256c2afd568149f9980752638107d1d387018582cae0420be09d23",
+        "request_count": 3153,
+        "run_tables_verified": true,
+        "type": "summary"
+      },
+      "passed": true,
+      "source_unchanged": true,
+      "candidate_unchanged": true,
+      "artifacts_sha256": {
+        "manifest.json": "9491a0bc0022d0aae4ca3e10dcbffec7372db1018e93882d411f7e8f2da946ab",
+        "source-plan.json": "12001a6e64e428cd188cb532f4192571a2a4bf48a24c07c35a111aa7557cbe91",
+        "coretext.jsonl": "930276556d98ba224bf0b3bd6f279175ebfabd1c6ab862c90eba4dfd444bdc78",
+        "hvf.jsonl": "fe8f04beb0f2f0d74208addbacd0e91f8473e9cff244342b0bf0dee9a71f898d",
+        "coretext_joint_layout": "a243b333bf3bdb7081e2633f21b6e83482c82c12bea58a1c4710ff62ffdc425c"
+      },
+      "refinement_sample_exclusion": {
+        "protocol": "dyadic midpoint cells, eighth-grid and quarter-grid nodes, 64-point local jitter stencils, axial midlines and all body diagonals",
+        "local_stencil_seeds": [
+          2026110379,
+          2026110423
+        ],
+        "observations": 3153,
+        "excluded_from_declared_fit_and_refinement_families": 2836,
+        "random_triples": 2048,
+        "random_triples_excluded": 2048,
+        "source_plan_sha256": "12001a6e64e428cd188cb532f4192571a2a4bf48a24c07c35a111aa7557cbe91",
+        "scope": "declared_midpoint_protocol_only_not_source_aligned_atlas"
+      },
+      "encoding": {
+        "tensor_cells": 2048,
+        "axis_power_cells": 0,
+        "maximum_operand_stack": 165,
+        "actual_regions": 59582,
+        "expression_pool": {
+          "shared_expressions": 32768,
+          "drawing_chunks": 0,
+          "maximum_added_subroutine_depth": 1,
+          "encoded_program_bytes": 53808186,
+          "maximum_main_bytes": 36237,
+          "maximum_subroutine_bytes": 338
+        },
+        "refitted_samples": 0
+      },
+      "candidate_bytes": 62247684,
+      "build_code_sha256": {
+        "reencode_joint_candidate.py": "a41be3b203f62ca225a681a1e33cd088c3dcca498aa8160aaa1552fb2eff1c4b",
+        "joint_hoi.py": "98b79a0c0e512035b65c91a52e93c00109d96846d163752f855bb573877076b2",
+        "joint_polynomial.py": "73a442cd0741c8b958efe17f5a9dc2b541adba82f6c3ed6b63157041197c8c21",
+        "cff2_geometry.py": "70379ccbcd865cc28813d242934b3a4efc9e356b27e4b2544334ef697a1f5d27",
+        "cff2_subroutines.py": "d355dbbb48927c2ef66a9900da8859f283f7d9f91b2c96d68a452fc3bbb95a64",
+        "cff2_expression_pool.py": "b5b6af36ab0a096e199a8c45c793ba2e937a757b9ebd73fc28b221e91f8053df"
+      },
+      "shared_interface_probe": {
+        "scope": "native_shared_normalized_coordinate_patch_continuity",
+        "limit": 0.03125,
+        "seed": 2026110447,
+        "pairs": 256,
+        "candidate_sha256": "1854e6363a256c2afd568149f9980752638107d1d387018582cae0420be09d23",
+        "engines": {
+          "HarfBuzz": {
+            "observations": 256,
+            "failures": 0,
+            "max_jump": 0.017333984375
+          },
+          "fontTools": {
+            "observations": 256,
+            "failures": 0,
+            "max_jump": 0.0173026644901118
+          }
+        },
+        "passed": true,
+        "observations_sha256": "189ae14fea81ed3c68f74cd7767dc6c1fc89ae73206cd899a55f68458d2673e1"
+      },
+      "private_report_sha256": "a43c8c736b86d84032d97f4162e169937e2e4c7d7c0f6586cb8cec64d3eeb816"
+    },
+    "19177": {
+      "gid": 19177,
+      "face": 0,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "candidate_sha256": "3e92ed74b5307cb400d691d9b19f2052cb207cb719cac0934046d109df02a8cf",
+      "seed": 2026110445,
+      "scope": "selected_source_glyph_native_shaping",
+      "training_samples_consumed": 0,
+      "continuous_space_proof": false,
+      "unique_user_positions": 3108,
+      "positions_certifiably_disjoint_from_training_grid": 3048,
+      "independent_random_triples": 2048,
+      "engines": {
+        "CoreText": {
+          "observations": 3123,
+          "max_error": 0.016495875619197124,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.012224448897768525,
+          "max_advance_vs_unrounded_tables": 0.012224448897768525
+        },
+        "HarfBuzz": {
+          "observations": 3123,
+          "max_error": 0.014905942891881773,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.0,
+          "max_advance_vs_unrounded_tables": 0.5070541082164937
+        },
+        "fontTools": {
+          "observations": 269,
+          "max_error": 0.011886939909894723,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "advance_failures": 0,
+          "max_advance_error": 0.006082947144250284,
+          "max_advance_vs_unrounded_tables": 0.006082947144250284
+        }
+      },
+      "observations": 3123,
+      "categories": {
+        "boundary": 125,
+        "single": 192,
+        "dual": 192,
+        "triple": 2048,
+        "branch_axis_zero": 30,
+        "branch_tangent_lower": 9,
+        "branch_tangent_upper": 15,
+        "previous_dense_holdout": 128,
+        "region_seam": 384
+      },
+      "input_sampling": "nearest stable decimal4 from fixed three-point stencil, before native execution",
+      "arbitrary_binary64_transport_certified": false,
+      "native_summary": {
+        "exact_axis_readback": true,
+        "font_sha256": "3e92ed74b5307cb400d691d9b19f2052cb207cb719cac0934046d109df02a8cf",
+        "request_count": 3123,
+        "run_tables_verified": true,
+        "type": "summary"
+      },
+      "passed": true,
+      "source_unchanged": true,
+      "candidate_unchanged": true,
+      "artifacts_sha256": {
+        "manifest.json": "b893a84d0d6053e76dbd6a56a7532c7e27bab4fd84d33153a6140f81f6bda37d",
+        "source-plan.json": "4cb76da2b42029466f79f5f63e3b6067a60686d321f8dadc533c4ac3f80f5922",
+        "coretext.jsonl": "a2305c83d25d3f3c4a46e0c83358e7680caac719f248e0eb6ebeee4320ac3034",
+        "hvf.jsonl": "8a38bbfc5708157d34144e290b8a56a2d9b444dda1070e9b558f1cde1eabd159",
+        "coretext_joint_layout": "a243b333bf3bdb7081e2633f21b6e83482c82c12bea58a1c4710ff62ffdc425c"
+      },
+      "refinement_sample_exclusion": {
+        "protocol": "declared_midpoint_refinement_only",
+        "local_stencil_seeds": [
+          2026110379,
+          2026110423
+        ],
+        "observations_excluded": 2806,
+        "random_triples_excluded": 2048,
+        "includes_analytic_chord_contacts": true,
+        "source_aligned_atlas_covered": false
+      },
+      "encoding": {
+        "maximum_operand_stack": 197,
+        "cff2_regions": 43444,
+        "local_glyphs": 4096,
+        "global_subroutines": 35302,
+        "polynomial_encoding": "hoi",
+        "share_expressions": true,
+        "expression_pool": {
+          "shared_expressions": 32768,
+          "drawing_chunks": 2534,
+          "maximum_added_subroutine_depth": 2,
+          "encoded_program_bytes": 247806571,
+          "maximum_main_bytes": 65517,
+          "maximum_subroutine_bytes": 65535
+        }
+      },
+      "source_field_recheck": {
+        "cells": 4096,
+        "max_error": 0.014163574455631,
+        "input_archives_sha256": {
+          "cells.npz": "a53ad1571d4e9dc34eb903b4250c6f7463c156594d142ebfe8338cc60a9e4ac9",
+          "parameters.npz": "20325da605afaea02c28ae16d08f359cbafc9156375dd3b228f579c7701911ea"
+        },
+        "parameter_regions": 4062
+      },
+      "candidate_bytes": 256080332,
+      "build_code_sha256": {
+        "serialize_joint_fields.py": "5bf16e611d08a69fc9c976efaecc1c0d5e0d7f657ca077e6938733e8a9c749f9",
+        "joint_projection_font.py": "77cb8fbfdd497a90a555e57a77fa7d7259743bb792439e94c52c0e08d33412fc",
+        "joint_hoi.py": "0a9ff8670d2e0de5e97cecb1d9fc26a9f9934bbc6572031c5cf62d53f1c52e63",
+        "joint_polynomial.py": "73a442cd0741c8b958efe17f5a9dc2b541adba82f6c3ed6b63157041197c8c21",
+        "sparse_projection.py": "eccf764402c0ae5e341df7d361a2eef705a2b9fa8b7dcdde24284501104256d9",
+        "cff2_geometry.py": "70379ccbcd865cc28813d242934b3a4efc9e356b27e4b2544334ef697a1f5d27",
+        "cff2_expression_pool.py": "b5b6af36ab0a096e199a8c45c793ba2e937a757b9ebd73fc28b221e91f8053df",
+        "cff2_subroutines.py": "d355dbbb48927c2ef66a9900da8859f283f7d9f91b2c96d68a452fc3bbb95a64"
+      },
+      "shared_interface_probe": {
+        "scope": "native_shared_normalized_coordinate_patch_continuity",
+        "limit": 0.03125,
+        "seed": 2026110447,
+        "pairs": 256,
+        "candidate_sha256": "3e92ed74b5307cb400d691d9b19f2052cb207cb719cac0934046d109df02a8cf",
+        "engines": {
+          "HarfBuzz": {
+            "observations": 256,
+            "failures": 0,
+            "max_jump": 0.00665283203125
+          },
+          "fontTools": {
+            "observations": 256,
+            "failures": 0,
+            "max_jump": 0.006635054330675127
+          }
+        },
+        "passed": true,
+        "observations_sha256": "6090433b69b0418ba65699822e7b01212eab03fb7a080b509cb8efb0b28d89cd"
+      },
+      "private_report_sha256": "3d532c7db80d19e3ad9eacfe80b765ce7e6dabeb1b5234e5584537d410416f93"
+    }
+  },
+  "regression": {
+    "executed": 1021,
+    "passed": 1014,
+    "skipped": 7,
+    "failed": 0,
+    "parser_audits_passed": 6,
+    "remote_CI_claimed": false,
+    "log_sha256": "45b3ed65e25b1ba6fffdc6c436f8dcb5d3290a281cad76c17087b0cc334c79c6",
+    "audit_log_sha256": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d",
+    "skips": {
+      "Linux_native_API_specific": 5,
+      "separate_native_integration_gate": 2
+    }
+  },
+  "advance_reference": {
+    "CoreText": "unrounded original-source metric tables",
+    "fontTools": "unrounded original-source metric tables",
+    "HarfBuzz": "original-source HarfBuzz at identical user coordinates; additional unrounded-table discrepancy retained"
+  },
+  "limits": [
+    "Empirical acceptance at the listed fixed-seed samples, not a continuous-space error proof.",
+    "One-source-glyph research fonts selected by standard required GSUB shaping; direct access to the unselected base GID is outside this scope.",
+    "Three independent physical axes plus hidden computational axes that must remain at their defaults.",
+    "Predeclared fractional decimal4 user inputs with exact native readback; arbitrary binary64 transport is not certified.",
+    "Midpoint sampling-family exclusion covers the declared grids, jitter seeds and analytic chord contacts; it does not cover arbitrary source-aligned atlases.",
+    "Common-normalized-coordinate seam comparisons supplement, and do not replace, physical-coordinate source acceptance.",
+    "Large candidate sizes remain unsuitable evidence for full-font scalability or release.",
+    "HarfBuzz matches original engine advances, not ideal unrounded advances at 1/32 FUnit."
+  ],
+  "retained_failed_experiments": [
+    "Original dense coefficient-only models and their conditional lower bounds.",
+    "VARC native topology controls.",
+    "how2avar2 rotation at the stricter unquantized reference threshold.",
+    "Arbitrary-binary64 native transport and incomplete-hidden-axis control requests.",
+    "Dense CFF2 single-drawing byte-limit controls.",
+    "TTC memory measurement contaminated by process-global interning; timestamp recalculation in face-order mutation fixture."
+  ]
+}

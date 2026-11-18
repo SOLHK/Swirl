@@ -23,3 +23,9 @@ core/target/
 *.ttc
 *.otf
 *.ttf
+
+# Private source fonts, extracted geometry and native test output.
+/private/
+/output/
+*.npz
+*.npy

@@ -1,0 +1,22 @@
+{
+  "identity": {
+    "condition_access_matches": true,
+    "normal_principal_matches": true,
+    "only_change_notify_privilege": true,
+    "restricted_principal_matches": true,
+    "session_zero": true
+  },
+  "loopback_tcp_baseline": true,
+  "nonce": "49eb7e56c9fe46099679e38c792bafaa",
+  "ok": true,
+  "profile": {
+    "admin_deny_only": false,
+    "admin_enabled": false,
+    "elevated": false,
+    "enabled_privileges": 1,
+    "integrity_rid": 12288,
+    "restricted": true,
+    "unexpected_enabled_privileges": 0
+  },
+  "source_sha": "255208f528aa4cd642f6aff27ca10c4d9f989e33"
+}

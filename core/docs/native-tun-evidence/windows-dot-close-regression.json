@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows 11 controlled loopback TLS regression",
+  "base_development_sha": "d1bdea073ed63a21dd7761e1265ad5fac6a04791",
+  "fix_commit": "b5bb0ad536c5d1786e6eceb15923aee843d43fb9",
+  "tested_example_sha256": "70537036d1e029a61e635371d2135928ded0036ad5214ba1303b7cc4ec4ce090",
+  "windows": "Microsoft Windows 11 Home Insider Preview Chinese 10.0.29698 build 29698",
+  "machine_type": "Lenovo 83NN physical workstation, ordinary medium-integrity process",
+  "rustc": "1.99.1 (58cf8f9c3 2026-10-13) x86_64-pc-windows-gnu",
+  "cargo": "1.99.1 (5f94df478 2026-08-27)",
+  "working_directory": "core",
+  "red_command": "cargo test --locked --offline -p swirl-api --example windows-tun-smoke completed_response_reset_preserves_next_dns_connection -- --nocapture",
+  "red_source": "Base source plus synchronized real TLS/RST test hook; original shutdown error propagation retained.",
+  "red_result": {"passed": 0, "failed": 1, "ignored": 0, "filtered": 2, "shutdown_os_error": 10054, "next_tls_connection_failed": true},
+  "green_command": "cargo test --locked --offline -p swirl-api --example windows-tun-smoke -- --nocapture",
+  "green_result": {"passed": 4, "failed": 0, "ignored": 0, "filtered": 0, "next_tls_dns_connection_passed": true, "early_reset_still_rejected": true, "single_reply_reset_still_rejected": true, "invalid_question_still_rejected": true},
+  "system_network_modified": false,
+  "wintun_loaded": false,
+  "wfp_opened": false,
+  "full_windows_11_tun_acceptance": false,
+  "historical_0494abe_failure_reclassified": false,
+  "files": [
+    {"path": "windows-dot-close-red.log", "sha256": "cd75f35798a5e0a49f1e696fada20e0cae29241b1d0ea9aa83ba9acdbf6052cd", "normalization": "none"},
+    {"path": "windows-dot-close-green.log", "sha256": "50705ad3555114777f4d1fba1d0618694f642ed97d5c7267f048e21eb3a90b9a", "normalization": "none"}
+  ]
+}

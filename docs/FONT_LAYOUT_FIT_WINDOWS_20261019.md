@@ -5,28 +5,57 @@ Only font code, shared font controls, and their tests are changed. Private font
 files, fingerprints, user state, screenshots and local machine evidence remain
 outside the public repository in the user's requested evidence directory.
 
+The opening source identity describes the original layout stage. The current
+W1-B solver, QML scope, exact Windows CI evidence and remaining physical checks
+are recorded in [W1-B validation](FONT_SMART_WIDTH_W1B_VALIDATION.md). Historical
+Windows/private-font observations below are not new W1-B physical acceptance.
+
 ## Layout fitting
 
 `FontAxisPolicy` retains its natural-width contract for general text. The opt-in
 `FontManager::fittedText` bridge measures actual advances at real `wdth`
-coordinates for single-line button, navigation and page-title labels. It retains
+coordinates for eligible single-line button, navigation, page-title, large-title
+and label roles. It retains
 the existing design weight, font size, hinting and every unrelated axis.
 
-`SwirlText` enables fitting only for eliding, unwrapped labels directly inside
-Qt Quick Layouts. Layout.preferredWidth publishes the natural advance, so the
+`SwirlText` enables fitting for eliding, unwrapped NativeRendering labels directly
+inside Qt Quick Layouts, or an explicit `fitInFixedWidth` control whose available
+width is owned independently of its text. Layout.preferredWidth publishes the
+natural advance plus left/right padding, so the
 compressed font cannot reduce its parent's preferred size and feed back into
 its own available width. Explicit caller layout constraints still take priority.
-Body text, editors, rich text, numbers, non-layout text, and the shared animated
-hero title keep natural width. Unvisited controls are not claimed as inspected.
+The bridge subtracts that padding from the space available to glyph advances.
+Body text, editors, rich/multi-line text, data-role numeric values, unconstrained
+text and the shared animated hero title keep natural width. No blanket ellipsis
+rule is added. Ordinary labels containing numbers still follow their label role.
+Unvisited controls are not claimed as inspected.
 
-There are five 2% coordinate steps, bounded by the real axis minimum and 90% of
-the design default. The actual advance must decrease before a step is used;
-outline-only width axes remain at their default. The entry/release margin is
-four logical pixels, with a two-pixel hold band between steps. Text still uses
+`FontWidthFit.h` now samples ten coordinates over the actual permitted interval,
+bounded by the real axis minimum and 90% of the design default. Float coordinates
+are rounded into that interval and duplicates are not measured twice. Each new
+or historical candidate must improve the actual advance by more than 0.5 logical
+pixels and retain at least 85% of the natural advance. These 90%/85% limits are
+retained provisional product choices, not typography standards or evidence of
+per-font readability. Outline-only width axes remain at their default.
+
+All candidates are checked before accepting history; a blocked neighbour does
+not imply monotonic behaviour elsewhere. The sampled candidate nearest the
+default that fits is preferred. Without a fitting candidate, a safe improvement
+may still be used; without any safe improvement, the default is retained. This
+is a bounded approximation, not a global optimum over an arbitrary variable
+font. An unsampled narrow valley can be missed. Equal hinted advances may select
+a coordinate closer to the default than the minimum coordinate.
+
+The original entry/release margin remains four logical pixels, with a two-pixel
+hold band. The entry margin deliberately does not react to every small overflow,
+and the release margin can retain a previous narrow setting near the boundary.
+Text still uses
 its original ellipsis, wrapping and clipping rules; a label that cannot fit
 within the bounded compression still elides. There is no scale transform or
 font-size reduction. Measurement caching is limited to 256 entries and is
-invalidated on font database changes. No file is read during layout fitting.
+invalidated on font database changes. The bridge uses existing metadata and Qt
+font objects without adding a font-file parser or per-page resource I/O; cold
+Qt font-engine work is not claimed to be free of internal file access.
 
 Advanced manual mode remains exact and bypasses fitting. The existing per-family
 automatic/manual persistence and optical-size policy are unchanged. HGHT remains

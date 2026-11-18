@@ -10,7 +10,7 @@ Item {
     readonly property bool compact:workspace.width<Theme.dp(680)
     property bool waterfallOpen:true
     property bool componentReady:false
-    SwirlTransitionCoordinator{id:waterfallMotion;progress:1;destination:1}
+    readonly property Item ownedWaterfallMotion: SwirlTransitionCoordinator{id:waterfallMotion;parent:page;progress:1;destination:1}
     onWaterfallOpenChanged:if(componentReady)waterfallMotion.moveTo(waterfallOpen?1:0)
     Component.onCompleted:componentReady=true
     Connections{target:page.componentReady?page:null;function onVisibleChanged(){if(!page.visible)waterfallMotion.finish()}}

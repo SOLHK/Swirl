@@ -10,8 +10,12 @@
 #include <QQueue>
 #include <functional>
 #include <optional>
+#include <memory>
 
 class QNetworkReply;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+class PrivateUiQuotaSession;
+#endif
 class NodeImportService final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantList providers READ providers NOTIFY changed)
@@ -25,8 +29,10 @@ class NodeImportService final : public QObject {
     Q_PROPERTY(QVariantMap configurationReview READ configurationReview NOTIFY changed)
 public:
     using SystemProxyResolver=std::function<QList<QNetworkProxy>(const QNetworkProxyQuery &)>;
+    using DownloadRouteCommand=std::function<QJsonObject(const QJsonObject &)>;
     explicit NodeImportService(NodeStore *store,QObject *parent=nullptr,
-        std::function<qint64()> clock={}, int pollIntervalMs=60000,SystemProxyResolver systemProxies={});
+        std::function<qint64()> clock={}, int pollIntervalMs=60000,SystemProxyResolver systemProxies={},DownloadRouteCommand downloadRoute={});
+    ~NodeImportService() override;
     QVariantList providers() const;
     bool busy() const { return m_busy; }
     QString message() const { return m_message; }
@@ -52,7 +58,7 @@ public:
     Q_INVOKABLE void importNodesOnlyClipboard();
     Q_INVOKABLE void importNodesOnlyFile(const QUrl &file);
     Q_INVOKABLE void importNodesOnlyUrl(const QUrl &url);
-    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={});
+    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={},const QString &downloadRoute={});
     Q_INVOKABLE bool removeSubscription(const QString &id);
     Q_INVOKABLE bool cleanLegacyNodes();
     Q_INVOKABLE void refreshSubscription(const QString &id);
@@ -75,15 +81,39 @@ public:
     // recovery. It must never force downloads through the selected node.
     void setDownloadProxy(int port);
     void rememberOwnedProxyPort(int port);
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    // Read-only observations. QML cannot construct or install the capability.
+    QVariantMap privateUiImportEvidence() const;
+#endif
 signals:
     void changed();
     void nodesApplied();
     // Fixed request metadata only; never emit URLs, response bodies or headers.
     void downloadDiagnostic(const QString &message);
 private:
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    friend class PrivateUiQuotaSession;
+    struct PrivateUiImportCapability {
+        QUrl url;
+        QByteArray ca,bodyDigest;
+        quint16 proxyPort=0;
+        std::function<bool()> guardActive;
+        bool revoked=false,started=false,tlsVerified=false,responseVerified=false;
+        int requests=0,httpStatus=0;
+        qint64 responseBytes=0;
+    };
+    std::unique_ptr<PrivateUiImportCapability> m_privateUiImport;
+    QString m_privateUiImportFailure;
+    bool privateUiImportAllowed(const QUrl &);
+    void privateUiImportReject(const char *);
+#endif
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);
+    bool automaticDownloadRoute(const QUrl &url) const;
+    bool tryPhysicalDownload(const QUrl &url,int redirects);
+    void downloadPhysical(const QUrl &url,int redirects);
+    void stopDownloadRoute();
     void startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies);
     void parseText(const QString &text,const QString &origin,bool nodesOnly);
     void startFile(const QUrl &file,bool nodesOnly);
@@ -106,13 +136,16 @@ private:
     bool m_configurationReviewDismissed=false;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
-    QTimer m_timer,m_deadline;
+    QTimer m_timer,m_deadline,m_autoRouteDeadline;
     QQueue<QString> m_queue;
     QHash<QString,QString> m_errors;
     QSet<QString> m_cancelled;
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
     SystemProxyResolver m_systemProxyResolver;
+    DownloadRouteCommand m_downloadRouteCommand;
+    struct DownloadRouteLease;
+    std::shared_ptr<DownloadRouteLease> m_downloadRoute;
     QString m_message,m_source,m_formatHint="auto";
     QString m_appliedMode,m_applicationNotice;
     QString m_importSource;
@@ -125,6 +158,9 @@ private:
     bool m_busy=false,m_shuttingDown=false;
     bool m_downloadTimedOut=false;
     bool m_compatibilityRequest=false;
+    bool m_autoPhysicalAttempt=false;
+    QUrl m_routeUrl;
+    int m_routeRedirects=0;
     int m_downloadAttempts=0;
     QUrl m_downloadUrl;
     bool m_committing=false;

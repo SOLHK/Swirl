@@ -58,7 +58,7 @@ class LayoutAdmissionTests(unittest.TestCase):
     def test_indirect_gpos_store_is_rejected_before_glyph_sampling(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            source, output, report = root/'input.ttc', root/'Swirl-VF.ttc', root/'report.json'
+            source, output, report = root/'input.ttc', root/'SwirlVF.ttc', root/'report.json'
             layout_fixture(source, variable=True)
             before = source.read_bytes()
             oracle = OriginalAnalyticOracle(source)
@@ -78,7 +78,7 @@ class LayoutAdmissionTests(unittest.TestCase):
     def test_static_gdef_is_retained_and_still_admitted(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            source, output, report = root/'input.ttc', root/'Swirl-VF.ttc', root/'report.json'
+            source, output, report = root/'input.ttc', root/'SwirlVF.ttc', root/'report.json'
             layout_fixture(source, variable=False)
             before = source.read_bytes()
             oracle = OriginalAnalyticOracle(source)

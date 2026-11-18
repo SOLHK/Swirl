@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "base_commit": "48caea558f616c6d9b958345b4c71956fe038564",
+  "files": {
+    "scripts/Finalize-WindowsRustProduct.ps1": "b277e2b371621f278392f5545697f18e2ecd342e878612837a2ff6ff9ae64d7e",
+    "scripts/tests/Test-RustProductPackagePolicy.ps1": "04f104a618510104c575c60041a1ef2980b8253545a581b27e77bf418aba407a"
+  },
+  "scope": "Full real PowerShell package policy suite, with actual Finalize entry-point rejection and post-stage success. Linux PowerShell7; native Windows CI still required."
+}

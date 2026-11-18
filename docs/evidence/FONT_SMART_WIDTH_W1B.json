@@ -1,0 +1,2479 @@
+{
+  "schema": 1,
+  "evidenceKind": "W1-B verified public CI and local test extract",
+  "scope": "W1 smart width only; no W2/HGHT optimization/Apple conversion/core changes",
+  "repository": "https://github.com/SOLHK/Swirl",
+  "branch": "work/vf-smart-width-w1",
+  "initialRefs": {
+    "integration": "6b9628e6a9a5a864e5a7e210cd916868804564c8",
+    "w1": "134298b2ea9576b6bccd6c60592e89b7d5e6c6e1",
+    "mergeBase": "50d2a8e8bac702abb2cdc0212f43953b8b78ffef",
+    "w1Ahead": 4,
+    "w1Behind": 2
+  },
+  "verifiedHistoricalCommits": [
+    "6bc2faef3bfa2463151d3d78e85e7043671d11bd",
+    "5e06537bf8ef83f99b5eef33d87d255a135a9993",
+    "c9fb34a6fcf86ad9f2f4cd49351a4eb065d6b871",
+    "134298b2ea9576b6bccd6c60592e89b7d5e6c6e1"
+  ],
+  "newCommitsBeforeEvidence": [
+    {
+      "sha": "127e9fc229bc090cebdb2710745bc78486261900",
+      "subject": "test(font): require width fitting on native Windows backend",
+      "files": [
+        "src/Swirl.Quick/CMakeLists.txt",
+        "tools/SummarizeFontTests.py",
+        "tools/tests/test_font_ci_reports.py"
+      ]
+    },
+    {
+      "sha": "82541d4033dc444697a0786192cdcd3e7960629f",
+      "subject": "fix(font): validate bounded width fitting and constrained QML labels",
+      "files": [
+        "docs/FONT_AUTOMATION_QML_COVERAGE.md",
+        "src/Swirl.Quick/CMakeLists.txt",
+        "src/Swirl.Quick/app/FontManager.cpp",
+        "src/Swirl.Quick/app/FontManager.h",
+        "src/Swirl.Quick/app/FontWidthFit.h",
+        "src/Swirl.Quick/qml/components/SwirlListRow.qml",
+        "src/Swirl.Quick/qml/components/SwirlMetricCard.qml",
+        "src/Swirl.Quick/qml/components/SwirlWindowTitleBar.qml",
+        "src/Swirl.Quick/qml/controls/SwirlComboBox.qml",
+        "src/Swirl.Quick/qml/controls/SwirlDataTable.qml",
+        "src/Swirl.Quick/qml/controls/SwirlDialog.qml",
+        "src/Swirl.Quick/qml/controls/SwirlFontBinding.qml",
+        "src/Swirl.Quick/qml/controls/SwirlText.qml",
+        "src/Swirl.Quick/qml/pages/GatewayPage.qml",
+        "src/Swirl.Quick/tests/FontQmlChecks.h",
+        "src/Swirl.Quick/tests/FontTests.cpp",
+        "src/Swirl.Quick/tests/FontWidthChecks.h",
+        "src/Swirl.Quick/tests/FontWidthSolverChecks.h",
+        "src/Swirl.Quick/tests/generate_font_metadata_fixtures.py",
+        "tools/SummarizeFontTests.py",
+        "tools/tests/test_font_ci_reports.py"
+      ]
+    },
+    {
+      "sha": "a64f1d0de47fb5eb82246356dcc4a8200a787499",
+      "subject": "fix(font): enforce single-line fitting for direct callers",
+      "files": [
+        "src/Swirl.Quick/app/FontManager.cpp",
+        "src/Swirl.Quick/tests/FontWidthChecks.h"
+      ]
+    },
+    {
+      "sha": "eb8249b96732949b5449d6882e1b5abc8a8d426e",
+      "subject": "test(font): cover hinted width plateaus and strict axis endpoints",
+      "files": [
+        "src/Swirl.Quick/tests/FontWidthChecks.h"
+      ]
+    },
+    {
+      "sha": "11ea18336b3176616672a004ad2a71e17ed65dc6",
+      "subject": "docs(font): record native width gates and simulated scale limits",
+      "files": [
+        "docs/FONT_SYSTEM_CI.md"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "id": 39471340589,
+      "sha": "134298b2ea9576b6bccd6c60592e89b7d5e6c6e1",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39471340589",
+      "createdAt": "2026-10-20T18:02:54Z",
+      "updatedAt": "2026-10-20T18:15:47Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 62,
+        "fail": 0,
+        "skip": 9
+      }
+    },
+    {
+      "id": 39474297331,
+      "sha": "127e9fc229bc090cebdb2710745bc78486261900",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39474297331",
+      "createdAt": "2026-10-20T18:23:27Z",
+      "updatedAt": "2026-10-20T18:36:24Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 63,
+        "fail": 0,
+        "skip": 9
+      }
+    },
+    {
+      "id": 39476067462,
+      "sha": "82541d4033dc444697a0786192cdcd3e7960629f",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39476067462",
+      "createdAt": "2026-10-20T18:35:24Z",
+      "updatedAt": "2026-10-20T18:39:45Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 79,
+        "fail": 4,
+        "skip": 9
+      }
+    },
+    {
+      "id": 39476884151,
+      "sha": "a64f1d0de47fb5eb82246356dcc4a8200a787499",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39476884151",
+      "createdAt": "2026-10-20T18:40:59Z",
+      "updatedAt": "2026-10-20T18:44:45Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 79,
+        "fail": 4,
+        "skip": 9
+      }
+    },
+    {
+      "id": 39477546182,
+      "sha": "eb8249b96732949b5449d6882e1b5abc8a8d426e",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39477546182",
+      "createdAt": "2026-10-20T18:45:34Z",
+      "updatedAt": "2026-10-20T18:49:31Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 83,
+        "fail": 0,
+        "skip": 9
+      }
+    },
+    {
+      "id": 39477948417,
+      "sha": "11ea18336b3176616672a004ad2a71e17ed65dc6",
+      "branch": "work/vf-smart-width-w1",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39477948417",
+      "createdAt": "2026-10-20T18:48:23Z",
+      "updatedAt": "2026-10-20T19:06:39Z",
+      "runAttempt": 1,
+      "event": "push",
+      "name": "Font system Windows Qt 6.10.3",
+      "countsExcludingLifecycle": {
+        "pass": 83,
+        "fail": 0,
+        "skip": 9
+      }
+    }
+  ],
+  "failedWindowsEvidence": [
+    {
+      "runId": 39476067462,
+      "source": "decoded GitHub Actions job log",
+      "fullLogSha256": "c287028b69c3ec4b106332fe8ab00034a99f1659365b991ef1b47c1110755eb2",
+      "exactFailureExtract": [
+        "2026-10-20T18:39:12.2953048Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:39:12.2955529Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:39:12.2958044Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:39:12.2960782Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:39:24.5919618Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:39:24.5920740Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:39:24.5921616Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:39:24.5922429Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:39:32.1484780Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:39:32.1486265Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:39:32.1487565Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:39:32.1488798Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:39:39.6168471Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:39:39.6170043Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:39:39.6171519Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:39:39.6172395Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location"
+      ],
+      "distinctCauseCount": 1,
+      "failedExecutions": 4,
+      "applicationBuild": "skipped",
+      "fontSmoke": "skipped"
+    },
+    {
+      "runId": 39476884151,
+      "source": "decoded GitHub Actions job log",
+      "fullLogSha256": "022982e413010bbacceed12b0ad24178d89ae0dceb674492605dc68f3a532aa3",
+      "exactFailureExtract": [
+        "2026-10-20T18:44:12.8460461Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:44:12.8463103Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:44:12.8465282Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:44:12.8468198Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:44:25.2654730Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:44:25.2655582Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:44:25.2656235Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:44:25.2657007Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:44:32.6812461Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:44:32.6813911Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:44:32.6815376Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:44:32.6816313Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location",
+        "2026-10-20T18:44:40.1802967Z FAIL!  : FontTests::automaticWidthNonmonotonicFonts() Compared doubles are not the same (fuzzy compare)",
+        "2026-10-20T18:44:40.1804100Z    Actual   (minimum.value(\"axes\").toMap().value(\"wdth\").toDouble()): 96.40000152587891 (0x1.81999a0000000p+6)",
+        "2026-10-20T18:44:40.1805007Z    Expected (96.)                                                   : 96 (0x1.8000000000000p+6)",
+        "2026-10-20T18:44:40.1806388Z D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontWidthChecks.h(127) : failure location"
+      ],
+      "distinctCauseCount": 1,
+      "failedExecutions": 4,
+      "applicationBuild": "skipped",
+      "fontSmoke": "skipped"
+    }
+  ],
+  "finalWindows": {
+    "checkedAt": "2026-10-20T19:08:16.897Z",
+    "run": {
+      "id": 39477948417,
+      "sha": "11ea18336b3176616672a004ad2a71e17ed65dc6",
+      "branch": "work/vf-smart-width-w1",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39477948417",
+      "createdAt": "2026-10-20T18:48:23Z",
+      "updatedAt": "2026-10-20T19:06:39Z",
+      "runAttempt": 1
+    },
+    "job": {
+      "id": 118819263872,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39477948417/job/118819263872",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-10-20T18:49:34Z",
+      "completedAt": "2026-10-20T19:06:38Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:35Z",
+          "completedAt": "2026-10-20T18:49:39Z"
+        },
+        {
+          "name": "Check out the exact triggering source",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:39Z",
+          "completedAt": "2026-10-20T18:49:47Z"
+        },
+        {
+          "name": "Record source identity",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:47Z",
+          "completedAt": "2026-10-20T18:49:48Z"
+        },
+        {
+          "name": "Set up fixture generator",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:48Z",
+          "completedAt": "2026-10-20T18:49:48Z"
+        },
+        {
+          "name": "Generate original non-private font fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:48Z",
+          "completedAt": "2026-10-20T18:49:56Z"
+        },
+        {
+          "name": "Install matching Qt MSVC SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:49:56Z",
+          "completedAt": "2026-10-20T18:50:45Z"
+        },
+        {
+          "name": "Configure independent font targets",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:50:45Z",
+          "completedAt": "2026-10-20T18:51:06Z"
+        },
+        {
+          "name": "Build independent font tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:51:06Z",
+          "completedAt": "2026-10-20T18:52:17Z"
+        },
+        {
+          "name": "Run all registered font checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:52:17Z",
+          "completedAt": "2026-10-20T18:52:56Z"
+        },
+        {
+          "name": "Report individual passes, failures, and skips",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:52:56Z",
+          "completedAt": "2026-10-20T18:52:57Z"
+        },
+        {
+          "name": "Compile the complete application when requested",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T18:52:57Z",
+          "completedAt": "2026-10-20T19:06:06Z"
+        },
+        {
+          "name": "Run isolated font navigation smoke in the complete application",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:06Z",
+          "completedAt": "2026-10-20T19:06:34Z"
+        },
+        {
+          "name": "Record actual stage outcomes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:34Z",
+          "completedAt": "2026-10-20T19:06:34Z"
+        },
+        {
+          "name": "Upload whitelisted build and test evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:34Z",
+          "completedAt": "2026-10-20T19:06:35Z"
+        },
+        {
+          "name": "Post Install matching Qt MSVC SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:35Z",
+          "completedAt": "2026-10-20T19:06:35Z"
+        },
+        {
+          "name": "Post Set up fixture generator",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:35Z",
+          "completedAt": "2026-10-20T19:06:35Z"
+        },
+        {
+          "name": "Post Check out the exact triggering source",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:35Z",
+          "completedAt": "2026-10-20T19:06:37Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-20T19:06:37Z",
+          "completedAt": "2026-10-20T19:06:37Z"
+        }
+      ]
+    },
+    "artifact": {
+      "id": 12290372611,
+      "name": "Swirl-Font-Evidence-11ea18336b3176616672a004ad2a71e17ed65dc6-1",
+      "size": 25237,
+      "digest": "sha256:46bee2b7cd4de6ef7050d391a79df5311523a47a5dc357fe2d75c3c857294e72",
+      "createdAt": "2026-10-20T19:06:35Z",
+      "expiresAt": "2026-10-27T19:06:34Z",
+      "expired": false
+    },
+    "artifactDigestVerified": true,
+    "source": {
+      "runAttempt": "1",
+      "ref": "refs/heads/work/vf-smart-width-w1",
+      "refresh240HzVerified": false,
+      "qtArchitecture": "win64_msvc2022_64",
+      "commit": "11ea18336b3176616672a004ad2a71e17ed65dc6",
+      "runId": "39477948417",
+      "runner": "windows-2022",
+      "qtRequested": "6.10.3",
+      "physicalDpiVerified": false,
+      "nativeRendererRequested": "D3D11 WARP"
+    },
+    "toolchain": {
+      "Qt": "6.10.3",
+      "Compiler": "MSVC",
+      "CompilerVersion": "19.44.35229.0",
+      "Generator": "Visual Studio 17 2022",
+      "GeneratorPlatform": "x64",
+      "PointerSize": "8",
+      "CxxStandard": "23",
+      "QtMkspec": "win32-msvc"
+    },
+    "stages": {
+      "qt": "success",
+      "fontSmoke": "success",
+      "applicationBuild": "success",
+      "fontCTest": "success",
+      "configure": "success",
+      "fontReport": "success",
+      "fontBuild": "success"
+    },
+    "ctest": {
+      "pass": 5,
+      "fail": 0,
+      "seconds": 38.74
+    },
+    "qtest": {
+      "schema": 1,
+      "countsExcludingLifecycle": {
+        "pass": 83,
+        "fail": 0,
+        "skip": 9
+      },
+      "errors": [],
+      "cases": [
+        {
+          "report": "font-selection.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "defaultSelectionAndPersistence",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "importKeepsOriginalFile",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "importOptionalPingFangUiCollection",
+          "data": "",
+          "status": "skip",
+          "description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalVariableAxesAndLivePreview",
+          "data": "",
+          "status": "skip",
+          "description": "Local-only variable font fixture not supplied",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRestartRead",
+          "data": "",
+          "status": "skip",
+          "description": "Only run as the independent restoration child",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRenderMatrix",
+          "data": "",
+          "status": "skip",
+          "description": "Local-only matrix requires fixture and evidence directory",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalNativePointSizes",
+          "data": "",
+          "status": "skip",
+          "description": "Local Windows font fixture required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalMetadataReplacement",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "malformedImportPreservesState",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalPaintedPreviewAxes",
+          "data": "",
+          "status": "skip",
+          "description": "Local font fixture required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRasterQualityMatrix",
+          "data": "",
+          "status": "skip",
+          "description": "An authorized local font and local evidence directory are required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalCffImport",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticAxesRespectDesignAndDpi",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "manualProfilesAndAutomaticRestore",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticProfilesRestartAcrossProcess",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "legacyAxisSettingsArePreserved",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticAxesProduceRealGlyphsAndFallback",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontCachesAreBoundedAndStable",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "displayContextHasBoundedLifecycle",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "qmlLiveAutomaticFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "qmlWidthControls",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontDisplayContextLifetime",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewFontResourcesInvalidateRaster",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewWindowMetricsAndIdleStability",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewRepeatedAxesReuseResources",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthUsesRealAdvances",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "widthSolverRejectsUnsafeHistory",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "widthSolverBoundsAndNonmonotonic",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthNonmonotonicFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthShaping",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthCacheAndResize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalPhysicalFontIdentity",
+          "data": "",
+          "status": "skip",
+          "description": "Local source font and evidence path required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontInspectionRejectsUnsupportedAndInvalidVariations",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "startupRejectsUnsupportedFontAndCorruptCache",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "localSwirlCollectionUsesPhysicalFaces",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "customAxesChangeRealGlyphsAtMixedCoordinates",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "physicalIdentityRejectsMissingAndChangedOutlineTables",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "nativeGlyphsHaveNoColourFringes",
+          "data": "",
+          "status": "skip",
+          "description": "Requires the native Windows platform",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "ordinaryFontsReceiveNoAxes",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "designerDefaultsArePreserved",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "minimum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "thin",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "intermediate",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "body",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "medium",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "demibold",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "bold",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "maximum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "designWeightsClampToActualFontRange",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points-priority",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points-high-dpi",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "logical-pixels",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "fractional-dpr",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "retina-dpr",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "logical-dpi-change",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "72-logical-dpi",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "below-minimum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "above-maximum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "unknown-size",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidOpticalInputsKeepDefault",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "heightAndWidthNeverEmulateOpticalSize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "manualCoordinatesAreExactAndClamped",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "customWidthAndHiddenHeightPreserveSourceCoordinates",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidManualValuesKeepDesignerDefaults",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "automaticIgnoresPersistedManualOverrides",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "axesNeverLeakToAnotherFont",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "automaticDoesNotMaskQtItalicSelection",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidMetadataIsExcluded",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "duplicateAxesAreRejectedIndependentlyOfOrder",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "fixedAxisRangeIsValid",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "rolesAndNamesNeverInventFontProfiles",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "nativeGlyphsHaveNoColourFringes",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "previewRepeatedAxesReuseResources",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "automaticWidthUsesRealAdvances",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "automaticWidthNonmonotonicFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "automaticWidthShaping",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "automaticWidthCacheAndResize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "qmlWidthControls",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "localSwirlCollectionUsesPhysicalFaces",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "customAxesChangeRealGlyphsAtMixedCoordinates",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "physicalIdentityRejectsMissingAndChangedOutlineTables",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-native-raster.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "automaticWidthUsesRealAdvances",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "automaticWidthNonmonotonicFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "automaticWidthShaping",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "automaticWidthCacheAndResize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "qmlWidthControls",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-125.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "automaticWidthUsesRealAdvances",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "automaticWidthNonmonotonicFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "automaticWidthShaping",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "automaticWidthCacheAndResize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "qmlWidthControls",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-width-simulated-200.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        }
+      ],
+      "physicalDpiVerified": false,
+      "refresh240HzVerified": false
+    },
+    "suiteCounts": {
+      "font-axis-policy.xml": {
+        "counts": {
+          "pass": 34,
+          "fail": 0,
+          "skip": 0
+        },
+        "issues": []
+      },
+      "font-native-raster.xml": {
+        "counts": {
+          "pass": 10,
+          "fail": 0,
+          "skip": 0
+        },
+        "issues": []
+      },
+      "font-selection.xml": {
+        "counts": {
+          "pass": 29,
+          "fail": 0,
+          "skip": 9
+        },
+        "issues": [
+          {
+            "function": "importOptionalPingFangUiCollection",
+            "status": "skip",
+            "data": "",
+            "description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"
+          },
+          {
+            "function": "optionalVariableAxesAndLivePreview",
+            "status": "skip",
+            "data": "",
+            "description": "Local-only variable font fixture not supplied"
+          },
+          {
+            "function": "optionalRestartRead",
+            "status": "skip",
+            "data": "",
+            "description": "Only run as the independent restoration child"
+          },
+          {
+            "function": "optionalRenderMatrix",
+            "status": "skip",
+            "data": "",
+            "description": "Local-only matrix requires fixture and evidence directory"
+          },
+          {
+            "function": "optionalNativePointSizes",
+            "status": "skip",
+            "data": "",
+            "description": "Local Windows font fixture required"
+          },
+          {
+            "function": "optionalPaintedPreviewAxes",
+            "status": "skip",
+            "data": "",
+            "description": "Local font fixture required"
+          },
+          {
+            "function": "optionalRasterQualityMatrix",
+            "status": "skip",
+            "data": "",
+            "description": "An authorized local font and local evidence directory are required"
+          },
+          {
+            "function": "optionalPhysicalFontIdentity",
+            "status": "skip",
+            "data": "",
+            "description": "Local source font and evidence path required"
+          },
+          {
+            "function": "nativeGlyphsHaveNoColourFringes",
+            "status": "skip",
+            "data": "",
+            "description": "Requires the native Windows platform"
+          }
+        ]
+      },
+      "font-width-simulated-125.xml": {
+        "counts": {
+          "pass": 5,
+          "fail": 0,
+          "skip": 0
+        },
+        "issues": []
+      },
+      "font-width-simulated-200.xml": {
+        "counts": {
+          "pass": 5,
+          "fail": 0,
+          "skip": 0
+        },
+        "issues": []
+      }
+    },
+    "measuredMessages": {
+      "font-axis-policy.xml": [],
+      "font-native-raster.xml": [
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthShaping",
+          "message": "Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels."
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.8 p95Us= 49.9"
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement."
+        },
+        {
+          "function": "qmlWidthControls",
+          "message": "W1 width QML environment {\"QT_SCALE_FACTOR\":\"\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":1}"
+        }
+      ],
+      "font-selection.xml": [
+        {
+          "function": "qmlWidthControls",
+          "message": "W1 width QML environment {\"QT_SCALE_FACTOR\":\"\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"offscreen\",\"windowDpr\":1}"
+        },
+        {
+          "function": "previewWindowMetricsAndIdleStability",
+          "message": "Preview checks used real font registration and same-screen metrics; the DPR notification was simulated, not a physical display/DPI switch."
+        },
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthShaping",
+          "message": "Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels."
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache benchmark: Qt= 6.10.3 platform= offscreen coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.1 p95Us= 29.1"
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement."
+        }
+      ],
+      "font-width-simulated-125.xml": [
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthShaping",
+          "message": "Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels."
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.3 p95Us= 31.1"
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement."
+        },
+        {
+          "function": "qmlWidthControls",
+          "message": "W1 width QML environment {\"QT_SCALE_FACTOR\":\"1.25\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":1.25}"
+        }
+      ],
+      "font-width-simulated-200.xml": [
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthNonmonotonicFonts",
+          "message": "Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4"
+        },
+        {
+          "function": "automaticWidthShaping",
+          "message": "Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels."
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.8 p95Us= 29.4"
+        },
+        {
+          "function": "automaticWidthCacheAndResize",
+          "message": "Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement."
+        },
+        {
+          "function": "qmlWidthControls",
+          "message": "W1 width QML environment {\"QT_SCALE_FACTOR\":\"2\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":2}"
+        }
+      ]
+    },
+    "smoke": {
+      "navigationRequests": 61,
+      "readyRoutes": 61,
+      "font": "Swirl Automation Probe",
+      "exitCode": 0,
+      "observedRequestEntries": 61,
+      "uniqueRouteKeys": 60,
+      "physicalVisualAcceptance": false
+    },
+    "rawQtXml": {
+      "font-axis-policy.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"FontAxisPolicyTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0844\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"ordinaryFontsReceiveNoAxes\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1231\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"designerDefaultsArePreserved\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1585\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qtWeightUsesOpenTypeScale\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[minimum]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[thin]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[intermediate]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[body]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[medium]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[demibold]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[bold]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[maximum]]></DataTag>\r\n    </Incident>\r\n    <Duration msecs=\"0.3231\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"designWeightsClampToActualFontRange\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0788\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"opticalSizeUsesPoints\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[points]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[points-priority]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[points-high-dpi]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[logical-pixels]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[fractional-dpr]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[retina-dpr]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[logical-dpi-change]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[72-logical-dpi]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[below-minimum]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[above-maximum]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[unknown-size]]></DataTag>\r\n    </Incident>\r\n    <Duration msecs=\"0.5581\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"invalidOpticalInputsKeepDefault\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1678\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"heightAndWidthNeverEmulateOpticalSize\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0979\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"manualCoordinatesAreExactAndClamped\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0809\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"customWidthAndHiddenHeightPreserveSourceCoordinates\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1852\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"invalidManualValuesKeepDesignerDefaults\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1247\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticIgnoresPersistedManualOverrides\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1356\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"axesNeverLeakToAnotherFont\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0502\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticDoesNotMaskQtItalicSelection\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0642\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"invalidMetadataIsExcluded\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0904\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"duplicateAxesAreRejectedIndependentlyOfOrder\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0731\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fixedAxisRangeIsValid\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0536\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"rolesAndNamesNeverInventFontProfiles\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.2403\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0249\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"4.8316\"/>\r\n</TestCase>\r\n",
+      "font-native-raster.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"FontTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1612\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nativeGlyphsHaveNoColourFringes\">\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: threaded render loop]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Creating QRhi with backend D3D11 for window 0x250750ef480 (wflags 0x1)\r\n  Graphics API debug/validation layers: 0\r\n  Debug markers: 0\r\n  Timestamps: 0\r\n  Prefer software device: 1\r\n  Shader/pipeline cache collection: 1]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: FLIP_* swapchain supported = true, ALLOW_TEARING supported = true, use legacy (non-FLIP) model = false, max frame latency = 2]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 0: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x0)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 1: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x2)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general:   using this adapter]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Created QRhi 0x25075109170 for window 0x250750ef480]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: MSAA sample count for the swapchain is 1. Alpha channel requested = no.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: rhi texture atlas dimensions: 512x512]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Total time spent on pipeline creation during the lifetime of the QRhi 0x25075109170 was 0 ms]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3398.31\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"previewRepeatedAxesReuseResources\">\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Creating QRhi with backend D3D11 for window 0xc198bfea10 (wflags 0x1)\r\n  Graphics API debug/validation layers: 0\r\n  Debug markers: 0\r\n  Timestamps: 0\r\n  Prefer software device: 1\r\n  Shader/pipeline cache collection: 1]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: FLIP_* swapchain supported = true, ALLOW_TEARING supported = true, use legacy (non-FLIP) model = false, max frame latency = 2]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 0: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x0)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 1: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x2)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general:   using this adapter]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Created QRhi 0x2507a80e380 for window 0xc198bfea10]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: MSAA sample count for the swapchain is 1. Alpha channel requested = no.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: rhi texture atlas dimensions: 512x512]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Preview resource regression backend 4 RHI texture-reuse assertion executed true ; CPU and image checks do not establish Windows private-byte or physical-refresh acceptance.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Total time spent on pipeline creation during the lifetime of the QRhi 0x2507a80e380 was 0 ms]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"572.461\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthUsesRealAdvances\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"326.924\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthNonmonotonicFonts\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"91.7301\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthShaping\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1209.99\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthCacheAndResize\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.8 p95Us= 49.9]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"529.584\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qmlWidthControls\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[W1 width QML environment {\"QT_SCALE_FACTOR\":\"\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":1}]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Creating QRhi with backend D3D11 for window 0x25000e515a0 (wflags 0x1)\r\n  Graphics API debug/validation layers: 0\r\n  Debug markers: 0\r\n  Timestamps: 0\r\n  Prefer software device: 1\r\n  Shader/pipeline cache collection: 1]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: FLIP_* swapchain supported = true, ALLOW_TEARING supported = true, use legacy (non-FLIP) model = false, max frame latency = 2]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 0: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x0)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 1: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x2)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general:   using this adapter]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Created QRhi 0x250019119d0 for window 0x25000e515a0]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: MSAA sample count for the swapchain is 1. Alpha channel requested = no.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: rhi texture atlas dimensions: 1024x1024]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Total time spent on pipeline creation during the lifetime of the QRhi 0x250019119d0 was 0 ms]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"5465.07\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"localSwirlCollectionUsesPhysicalFaces\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"79.1653\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"customAxesChangeRealGlyphsAtMixedCoordinates\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"65.2965\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"physicalIdentityRejectsMissingAndChangedOutlineTables\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"359.295\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0131\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"12099.2\"/>\r\n</TestCase>\r\n",
+      "font-selection.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"FontTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1319\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"defaultSelectionAndPersistence\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"118.957\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"importKeepsOriginalFile\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"297.173\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"importOptionalPingFangUiCollection\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"86\">\r\n      <Description><![CDATA[Set SWIRL_TEST_TTC to test a local PingFang UI collection]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0784\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalVariableAxesAndLivePreview\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"200\">\r\n      <Description><![CDATA[Local-only variable font fixture not supplied]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.1032\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalRestartRead\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"293\">\r\n      <Description><![CDATA[Only run as the independent restoration child]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0725\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalRenderMatrix\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"306\">\r\n      <Description><![CDATA[Local-only matrix requires fixture and evidence directory]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0887\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalNativePointSizes\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"375\">\r\n      <Description><![CDATA[Local Windows font fixture required]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0994\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalMetadataReplacement\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"65.3519\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"malformedImportPreservesState\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"23.9026\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalPaintedPreviewAxes\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"464\">\r\n      <Description><![CDATA[Local font fixture required]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0764\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalRasterQualityMatrix\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontRasterQualityChecks.h\" line=\"15\">\r\n      <Description><![CDATA[An authorized local font and local evidence directory are required]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.095\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalCffImport\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"39.6198\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticAxesRespectDesignAndDpi\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"47.4048\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"manualProfilesAndAutomaticRestore\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"378.139\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticProfilesRestartAcrossProcess\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"173.425\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"legacyAxisSettingsArePreserved\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"58.7865\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticAxesProduceRealGlyphsAndFallback\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"85.5167\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fontCachesAreBoundedAndStable\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"74.6204\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"displayContextHasBoundedLifecycle\">\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Loading backend software]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.8009\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qmlLiveAutomaticFonts\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1505.37\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qmlWidthControls\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[W1 width QML environment {\"QT_SCALE_FACTOR\":\"\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"offscreen\",\"windowDpr\":1}]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"5180.4\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fontDisplayContextLifetime\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.3376\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"previewFontResourcesInvalidateRaster\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"545.259\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"previewWindowMetricsAndIdleStability\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Preview checks used real font registration and same-screen metrics; the DPR notification was simulated, not a physical display/DPI switch.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"752.404\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"previewRepeatedAxesReuseResources\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Preview resource regression backend 1 RHI texture-reuse assertion executed false ; CPU and image checks do not establish Windows private-byte or physical-refresh acceptance.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"583.798\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthUsesRealAdvances\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"102.824\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"widthSolverRejectsUnsafeHistory\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.6798\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"widthSolverBoundsAndNonmonotonic\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1208\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthNonmonotonicFonts\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"103.379\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthShaping\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"743.796\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthCacheAndResize\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache benchmark: Qt= 6.10.3 platform= offscreen coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.1 p95Us= 29.1]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"128.579\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"optionalPhysicalFontIdentity\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontSourceChecks.h\" line=\"7\">\r\n      <Description><![CDATA[Local source font and evidence path required]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.1006\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fontInspectionRejectsUnsupportedAndInvalidVariations\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"43.571\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"startupRejectsUnsupportedFontAndCorruptCache\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"69.3427\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"localSwirlCollectionUsesPhysicalFaces\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"76.8687\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"customAxesChangeRealGlyphsAtMixedCoordinates\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"51.5211\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"physicalIdentityRejectsMissingAndChangedOutlineTables\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"121.557\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nativeGlyphsHaveNoColourFringes\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\FontTests.cpp\" line=\"158\">\r\n      <Description><![CDATA[Requires the native Windows platform]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0436\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0126\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"11376.3\"/>\r\n</TestCase>\r\n",
+      "font-width-simulated-125.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"FontTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1342\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthUsesRealAdvances\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"321.903\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthNonmonotonicFonts\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"94.8203\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthShaping\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1210.5\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthCacheAndResize\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.3 p95Us= 31.1]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"527.007\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qmlWidthControls\">\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: threaded render loop]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[W1 width QML environment {\"QT_SCALE_FACTOR\":\"1.25\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":1.25}]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Creating QRhi with backend D3D11 for window 0x1eca9acc4f0 (wflags 0x1)\r\n  Graphics API debug/validation layers: 0\r\n  Debug markers: 0\r\n  Timestamps: 0\r\n  Prefer software device: 1\r\n  Shader/pipeline cache collection: 1]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: FLIP_* swapchain supported = true, ALLOW_TEARING supported = true, use legacy (non-FLIP) model = false, max frame latency = 2]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 0: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x0)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 1: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x2)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general:   using this adapter]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Created QRhi 0x1eca80ed350 for window 0x1eca9acc4f0]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: MSAA sample count for the swapchain is 1. Alpha channel requested = no.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: rhi texture atlas dimensions: 1024x1024]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Total time spent on pipeline creation during the lifetime of the QRhi 0x1eca80ed350 was 0 ms]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"5222.29\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0145\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"7377.74\"/>\r\n</TestCase>\r\n",
+      "font-width-simulated-200.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"FontTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1063\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthUsesRealAdvances\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"384.92\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthNonmonotonicFonts\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"104.729\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthShaping\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width shaping: real QTextLayout comparisons= 96 plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1195.81\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"automaticWidthCacheAndResize\">\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache benchmark: Qt= 6.10.3 platform= windows coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 28.8 p95Us= 29.4]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[Width cache remains <=256 entries after 350 distinct texts; add/remove invalidation checked. This is not an RSS leak measurement.]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"534.62\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"qmlWidthControls\">\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: threaded render loop]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qinfo\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[W1 width QML environment {\"QT_SCALE_FACTOR\":\"2\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"windows\",\"windowDpr\":2}]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Using sg animation driver]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Animation Driver: using vsync: 15.63 ms]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Creating QRhi with backend D3D11 for window 0x20789c24d80 (wflags 0x1)\r\n  Graphics API debug/validation layers: 0\r\n  Debug markers: 0\r\n  Timestamps: 0\r\n  Prefer software device: 1\r\n  Shader/pipeline cache collection: 1]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: FLIP_* swapchain supported = true, ALLOW_TEARING supported = true, use legacy (non-FLIP) model = false, max frame latency = 2]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 0: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x0)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general: Adapter 1: 'Microsoft Basic Render Driver' (vendor 0x1414 device 0x8C flags 0x2)]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.rhi.general:   using this adapter]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Created QRhi 0x2078b895f50 for window 0x20789c24d80]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: MSAA sample count for the swapchain is 1. Alpha channel requested = no.]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: rhi texture atlas dimensions: 2048x1024]]></Description>\r\n  </Message>\r\n  <Message type=\"qdebug\" file=\"\" line=\"0\">\r\n    <Description><![CDATA[qt.scenegraph.general: Total time spent on pipeline creation during the lifetime of the QRhi 0x2078b895f50 was 0 ms]]></Description>\r\n  </Message>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"5267.4\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0296\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"7488.67\"/>\r\n</TestCase>\r\n"
+    },
+    "rawQtXmlSha256": {
+      "font-axis-policy.xml": "24da4070b9c416b324964d62ad6968c2e35b3ca8ae05fffc53ead55e45e48e90",
+      "font-native-raster.xml": "e0bf1f39d1f7640fc7def1d65cba2ee655cae4c1927d2fa46e9e0c68e84560f0",
+      "font-selection.xml": "98f07d3b75abe9f314461b0c7966096c79eaf65593d8ecf84c5920fb6c67fc59",
+      "font-width-simulated-125.xml": "e2313a9be28df4c2d96d8adfe5edfae6f6037aeac84f46426124147fecb57f40",
+      "font-width-simulated-200.xml": "dd910acefcdf83150227e4f96eabf36be090b53c2e3794cd438af87cfde9a85b"
+    },
+    "ctestLog": "Internal ctest changing into directory: D:/a/Swirl/Swirl/build/swirl-font-tests\nTest project D:/a/Swirl/Swirl/build/swirl-font-tests\n    Start 1: swirl-font-selection\n1/5 Test #1: swirl-font-selection .............   Passed   11.48 sec\n    Start 2: swirl-font-axis-policy\n2/5 Test #2: swirl-font-axis-policy ...........   Passed    0.02 sec\n    Start 3: swirl-font-native-raster\n3/5 Test #3: swirl-font-native-raster .........   Passed   12.22 sec\n    Start 4: swirl-font-width-simulated-125\n4/5 Test #4: swirl-font-width-simulated-125 ...   Passed    7.43 sec\n    Start 5: swirl-font-width-simulated-200\n5/5 Test #5: swirl-font-width-simulated-200 ...   Passed    7.55 sec\n\n100% tests passed, 0 tests failed out of 5\n\nLabel Time Summary:\nfonts    =  38.70 sec*proc (5 tests)\n\nTotal Test time (real) =  38.74 sec\n",
+    "fontSmokeDiagnosticsSha256": "d76485b70f0ca624ff6e0736ffbe660d60477ede7c91cd291ab19fd7992279b8",
+    "fullJobLogSha256": "6bfc19bbeee2135041343f969ca614c51e5918063fe99a3aa3262fc1409b78e9",
+    "rawQtXmlEncoding": "UTF-8; original line endings and any BOM preserved; encoding each JSON string as UTF-8 reproduces its recorded SHA-256."
+  },
+  "localQt": {
+    "sourceSha": "eb8249b96732949b5449d6882e1b5abc8a8d426e",
+    "platform": "Linux x86_64 / offscreen / software",
+    "qtVersion": "6.10.3",
+    "compiler": "GCC 13.3.0",
+    "buildType": "Release",
+    "ctest": {
+      "pass": 2,
+      "fail": 0,
+      "seconds": 9.25
+    },
+    "qtest": {
+      "schema": 1,
+      "countsExcludingLifecycle": {
+        "pass": 63,
+        "fail": 0,
+        "skip": 9
+      },
+      "errors": [],
+      "cases": [
+        {
+          "report": "font-selection.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "defaultSelectionAndPersistence",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "importKeepsOriginalFile",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "importOptionalPingFangUiCollection",
+          "data": "",
+          "status": "skip",
+          "description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalVariableAxesAndLivePreview",
+          "data": "",
+          "status": "skip",
+          "description": "Local-only variable font fixture not supplied",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRestartRead",
+          "data": "",
+          "status": "skip",
+          "description": "Only run as the independent restoration child",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRenderMatrix",
+          "data": "",
+          "status": "skip",
+          "description": "Local-only matrix requires fixture and evidence directory",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalNativePointSizes",
+          "data": "",
+          "status": "skip",
+          "description": "Local Windows font fixture required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalMetadataReplacement",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "malformedImportPreservesState",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalPaintedPreviewAxes",
+          "data": "",
+          "status": "skip",
+          "description": "Local font fixture required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalRasterQualityMatrix",
+          "data": "",
+          "status": "skip",
+          "description": "An authorized local font and local evidence directory are required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalCffImport",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticAxesRespectDesignAndDpi",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "manualProfilesAndAutomaticRestore",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticProfilesRestartAcrossProcess",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "legacyAxisSettingsArePreserved",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticAxesProduceRealGlyphsAndFallback",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontCachesAreBoundedAndStable",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "displayContextHasBoundedLifecycle",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "qmlLiveAutomaticFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "qmlWidthControls",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontDisplayContextLifetime",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewFontResourcesInvalidateRaster",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewWindowMetricsAndIdleStability",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "previewRepeatedAxesReuseResources",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthUsesRealAdvances",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "widthSolverRejectsUnsafeHistory",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "widthSolverBoundsAndNonmonotonic",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthNonmonotonicFonts",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthShaping",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "automaticWidthCacheAndResize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "optionalPhysicalFontIdentity",
+          "data": "",
+          "status": "skip",
+          "description": "Local source font and evidence path required",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "fontInspectionRejectsUnsupportedAndInvalidVariations",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "startupRejectsUnsupportedFontAndCorruptCache",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "localSwirlCollectionUsesPhysicalFaces",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "customAxesChangeRealGlyphsAtMixedCoordinates",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "physicalIdentityRejectsMissingAndChangedOutlineTables",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "nativeGlyphsHaveNoColourFringes",
+          "data": "",
+          "status": "skip",
+          "description": "Requires the native Windows platform",
+          "lifecycle": false
+        },
+        {
+          "report": "font-selection.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "initTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "ordinaryFontsReceiveNoAxes",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "designerDefaultsArePreserved",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "minimum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "thin",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "intermediate",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "body",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "medium",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "demibold",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "bold",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "qtWeightUsesOpenTypeScale",
+          "data": "maximum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "designWeightsClampToActualFontRange",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points-priority",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "points-high-dpi",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "logical-pixels",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "fractional-dpr",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "retina-dpr",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "logical-dpi-change",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "72-logical-dpi",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "below-minimum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "above-maximum",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "opticalSizeUsesPoints",
+          "data": "unknown-size",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidOpticalInputsKeepDefault",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "heightAndWidthNeverEmulateOpticalSize",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "manualCoordinatesAreExactAndClamped",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "customWidthAndHiddenHeightPreserveSourceCoordinates",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidManualValuesKeepDesignerDefaults",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "automaticIgnoresPersistedManualOverrides",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "axesNeverLeakToAnotherFont",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "automaticDoesNotMaskQtItalicSelection",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "invalidMetadataIsExcluded",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "duplicateAxesAreRejectedIndependentlyOfOrder",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "fixedAxisRangeIsValid",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "rolesAndNamesNeverInventFontProfiles",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": false
+        },
+        {
+          "report": "font-axis-policy.xml",
+          "function": "cleanupTestCase",
+          "data": "",
+          "status": "pass",
+          "description": "",
+          "lifecycle": true
+        }
+      ],
+      "physicalDpiVerified": false,
+      "refresh240HzVerified": false
+    },
+    "measuredMessages": [
+      "QINFO  : FontTests::qmlWidthControls() W1 width QML environment {\"QT_SCALE_FACTOR\":\"\",\"logicalDpi\":96,\"physicalScreenVerified\":false,\"platform\":\"offscreen\",\"windowDpr\":1}",
+      "QINFO  : FontTests::automaticWidthNonmonotonicFonts() Asymmetric width: pixels=50 hint= QFont::PreferDefaultHinting at96= 231.875 at96.4= 235.125 selected= 96",
+      "QINFO  : FontTests::automaticWidthNonmonotonicFonts() Asymmetric width: pixels=50 hint= QFont::PreferFullHinting at96= 232 at96.4= 232 selected= 96.4",
+      "QINFO  : FontTests::automaticWidthCacheAndResize() Width cache benchmark: Qt= 6.10.3 platform= offscreen coldRealMeasurements= 11 warmResizeCalls=400 warmRealMeasurements=0 medianUs= 10.826 p95Us= 11.538"
+    ],
+    "qtestReportSha256": "54b657530e8a65bbf8ed983bc35224484f3b7f0d2820833b6302a3419b96afdd",
+    "lastTestLogSha256": "ef582f3f92014b201e17b1132d9f5c5d1ec497d4c8d5d63615ded6de3ddb5434"
+  },
+  "isolatedCostProbe": {
+    "scope": "Solve + real Qt metrics/QImage/cache; excludes full FontManager metadata/profile dispatch and QML/layout/draw",
+    "firstRun": [
+      {
+        "architecture": "x86_64",
+        "coldDefinition": "application measurement cache empty; shared Qt font-engine cache primed",
+        "dpi": 96,
+        "family": "Swirl Width Probe",
+        "fixture": "/tmp/swirl-w1-fixtures/automation-width.ttf",
+        "kernel": "6.18.55",
+        "pixelSize": 24,
+        "platform": "offscreen",
+        "qtVersion": "6.10.3",
+        "scope": "isolated solve + QImage device + QFont/text/DPI QCache; excludes FontManager metadata/profile dispatch and QML",
+        "weight": 500
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.687,
+        "naturalWidth": 128,
+        "p95Us": 5.769,
+        "round": 1,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 7.971,
+        "naturalWidth": 128,
+        "p95Us": 12.148,
+        "round": 1,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 7.982,
+        "naturalWidth": 128,
+        "p95Us": 8.663,
+        "round": 2,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.527,
+        "naturalWidth": 128,
+        "p95Us": 4.657,
+        "round": 2,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.527,
+        "naturalWidth": 128,
+        "p95Us": 4.617,
+        "round": 3,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.092,
+        "naturalWidth": 128,
+        "p95Us": 13.56,
+        "round": 3,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 7.932,
+        "naturalWidth": 128,
+        "p95Us": 8.412,
+        "round": 4,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.627,
+        "naturalWidth": 128,
+        "p95Us": 4.747,
+        "round": 4,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.517,
+        "naturalWidth": 128,
+        "p95Us": 4.607,
+        "round": 5,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.223,
+        "naturalWidth": 128,
+        "p95Us": 8.643,
+        "round": 5,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      }
+    ],
+    "reproductionRun": [
+      {
+        "architecture": "x86_64",
+        "coldDefinition": "application measurement cache empty; shared Qt font-engine cache primed",
+        "dpi": 96,
+        "family": "Swirl Width Probe",
+        "fixture": "/tmp/swirl-w1-fixtures/automation-width.ttf",
+        "kernel": "6.18.55",
+        "pixelSize": 24,
+        "platform": "offscreen",
+        "qtVersion": "6.10.3",
+        "scope": "isolated solve + QImage device + QFont/text/DPI QCache; excludes FontManager metadata/profile dispatch and QML",
+        "weight": 500
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.737,
+        "naturalWidth": 128,
+        "p95Us": 4.857,
+        "round": 1,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.262,
+        "naturalWidth": 128,
+        "p95Us": 8.794,
+        "round": 1,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.272,
+        "naturalWidth": 128,
+        "p95Us": 8.413,
+        "round": 2,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.707,
+        "naturalWidth": 128,
+        "p95Us": 4.797,
+        "round": 2,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.757,
+        "naturalWidth": 128,
+        "p95Us": 4.887,
+        "round": 3,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.272,
+        "naturalWidth": 128,
+        "p95Us": 8.824,
+        "round": 3,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.232,
+        "naturalWidth": 128,
+        "p95Us": 8.482,
+        "round": 4,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.667,
+        "naturalWidth": 128,
+        "p95Us": 4.788,
+        "round": 4,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "old-50d2a8e8-five-step",
+        "axisChecksum": 37080,
+        "cacheEntries": 6,
+        "coldAxis": 90,
+        "coldRealMeasurements": 6,
+        "medianUs": 4.576,
+        "naturalWidth": 128,
+        "p95Us": 4.647,
+        "round": 5,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      },
+      {
+        "algorithm": "current-ten-step",
+        "axisChecksum": 37576,
+        "cacheEntries": 11,
+        "coldAxis": 92,
+        "coldRealMeasurements": 11,
+        "medianUs": 8.132,
+        "naturalWidth": 128,
+        "p95Us": 8.323,
+        "round": 5,
+        "warmRealMeasurements": 0,
+        "warmResizeCalls": 400
+      }
+    ],
+    "executedSourceText": {
+      "probe.cpp": "#include <QGuiApplication>\n#include <QFontDatabase>\n#include <QFontMetricsF>\n#include <QFontInfo>\n#include <QCache>\n#include <QDataStream>\n#include <QIODevice>\n#include <QImage>\n#include <QElapsedTimer>\n#include <QJsonDocument>\n#include <QJsonObject>\n#include <QSysInfo>\n#include <iostream>\n#include <vector>\n#include <algorithm>\n#include <cmath>\n#include \"/workspace/scratch/422e6ae9ec51/Swirl/src/Swirl.Quick/app/FontWidthFit.h\"\n#include \"old-solve.h\"\n\ntemplate<class Solve>\nvoid benchmark(const char *name,int round,const QFont &baseFont,Solve solve)\n{\n    QCache<QByteArray,qreal> cache(256);\n    quint64 measurements=0;\n    const QString text=\"AAAAAAAA\";\n    const double dpi=96.;\n    double natural=0.;\n    const auto invoke=[&](double available,double previous){\n        QImage device(1,1,QImage::Format_ARGB32_Premultiplied);\n        device.setDotsPerMeterX(qRound(dpi/.0254));\n        device.setDotsPerMeterY(qRound(dpi/.0254));\n        const auto advance=[&](const QFont &font){\n            QByteArray key;QDataStream stream(&key,QIODevice::WriteOnly);\n            stream<<font<<text<<dpi;\n            if(const auto *cached=cache.object(key))return *cached;\n            ++measurements;\n            const qreal width=QFontMetricsF(font,&device).horizontalAdvance(text);\n            cache.insert(key,new qreal(width));\n            return width;\n        };\n        natural=advance(baseFont);\n        const auto at=[&](double coordinate){\n            auto font=baseFont;\n            font.setVariableAxis(QFont::Tag(\"wdth\"),float(coordinate));\n            return advance(font);\n        };\n        return solve(natural,available,previous,at);\n    };\n    const double coldAxis=invoke(1.,100.);\n    const auto coldMeasurements=measurements;\n    double previous=coldAxis;\n    std::vector<qint64> durations;durations.reserve(400);\n    double checksum=0.;\n    for(int i=0;i<400;++i){\n        const int phase=i%100;\n        const double available=natural*(.5+(phase<50?phase:100-phase)*.012);\n        QElapsedTimer timer;timer.start();\n        previous=invoke(available,previous);\n        durations.push_back(timer.nsecsElapsed());\n        if(!std::isfinite(previous)||previous<90.||previous>100.)std::abort();\n        checksum+=previous;\n    }\n    std::sort(durations.begin(),durations.end());\n    QJsonObject result{{\"algorithm\",QString::fromLatin1(name)},{\"round\",round},\n        {\"naturalWidth\",natural},{\"coldRealMeasurements\",qint64(coldMeasurements)},\n        {\"coldAxis\",coldAxis},{\"warmResizeCalls\",400},\n        {\"warmRealMeasurements\",qint64(measurements-coldMeasurements)},\n        {\"cacheEntries\",cache.size()},{\"medianUs\",durations[200]/1000.},\n        {\"p95Us\",durations[380]/1000.},{\"axisChecksum\",checksum}};\n    std::cout<<QJsonDocument(result).toJson(QJsonDocument::Compact).constData()<<'\\n';\n}\n\nint main(int argc,char **argv)\n{\n    QGuiApplication app(argc,argv);\n    if(argc!=2)return 2;\n    const int id=QFontDatabase::addApplicationFont(QString::fromLocal8Bit(argv[1]));\n    const auto families=QFontDatabase::applicationFontFamilies(id);\n    if(id<0||families.isEmpty())return 3;\n    QFont font(families.first());font.setPixelSize(24);font.setWeight(QFont::Medium);\n    font.setHintingPreference(QFont::PreferFullHinting);font.setStyleStrategy(QFont::PreferAntialias);\n    font.clearVariableAxes();font.setVariableAxis(QFont::Tag(\"wght\"),500.f);\n    font.setVariableAxis(QFont::Tag(\"wdth\"),100.f);\n    if(QFontInfo(font).variableAxes().size()!=2)return 4;\n    QJsonObject environment{{\"qtVersion\",qVersion()},{\"platform\",QGuiApplication::platformName()},\n        {\"kernel\",QSysInfo::kernelVersion()},{\"architecture\",QSysInfo::currentCpuArchitecture()},\n        {\"family\",font.family()},{\"pixelSize\",24},{\"weight\",500},{\"dpi\",96},\n        {\"fixture\",QString::fromLocal8Bit(argv[1])},\n        {\"scope\",\"isolated solve + QImage device + QFont/text/DPI QCache; excludes FontManager metadata/profile dispatch and QML\"},\n        {\"coldDefinition\",\"application measurement cache empty; shared Qt font-engine cache primed\"}};\n    std::cout<<QJsonDocument(environment).toJson(QJsonDocument::Compact).constData()<<'\\n';\n    // Prime shared Qt engines equally; cold below refers only to each new,\n    // empty application measurement cache, not the OS or Qt engine caches.\n    for(int coordinate=90;coordinate<=100;++coordinate){\n        auto sample=font;sample.setVariableAxis(QFont::Tag(\"wdth\"),float(coordinate));\n        if(QFontMetricsF(sample).horizontalAdvance(\"AAAAAAAA\")<=0)return 5;\n    }\n    const auto old=[](double natural,double available,double previous,auto measure){\n        return oldSolve(75.,100.,natural,available,previous,measure);\n    };\n    const auto current=[](double natural,double available,double previous,auto measure){\n        return FontWidthFit::solve(75.,100.,125.,natural,available,previous,measure);\n    };\n    for(int round=1;round<=5;++round){\n        if(round%2){benchmark(\"old-50d2a8e8-five-step\",round,font,old);benchmark(\"current-ten-step\",round,font,current);}\n        else{benchmark(\"current-ten-step\",round,font,current);benchmark(\"old-50d2a8e8-five-step\",round,font,old);}\n    }\n}\n",
+      "old-solve.h": "// Extracted from Swirl commit 50d2a8e8bac702abb2cdc0212f43953b8b78ffef; map returns replaced by coordinate returns.\ntemplate<class Measure>\ndouble oldSolve(double axisMinimum,double normal,double natural,double availableWidth,double previousWidth,Measure widthAt)\n{\n    // At most 10% of the designer's width coordinate; legal ranges can narrow\n    // this further. A non-percent or nonpositive custom default is not guessed.\n    if(normal<=0)return normal;\n    const double minimum=qMax(axisMinimum,normal*.90);\n    if(minimum>=normal)return normal;\n    const bool wasNarrow=std::isfinite(previousWidth)&&previousWidth>=minimum&&previousWidth<normal;\n    // Four logical pixels to enter/leave fitting, two pixels inside each band.\n    // Small layout jitter therefore keeps the previous coordinate.\n    if((!wasNarrow&&natural<=availableWidth+4)||(wasNarrow&&natural<=availableWidth-4))return normal;\n    if(wasNarrow){\n        const auto current=widthAt(previousWidth);\n        const auto wider=qMin(normal,previousWidth+normal*.02);\n        if(current<=availableWidth+2&&widthAt(wider)>availableWidth-2)return previousWidth;\n    }\n    double chosen=normal;\n    for(int step=1;step<=5;++step){\n        const double candidate=qMax(minimum,normal*(1.-step*.02));\n        const double width=widthAt(candidate);\n        // Some fonts expose wdth but keep advances invariant. Do not claim a\n        // layout fit or distort their outlines when they offer no useful space.\n        if(width<natural-.5)chosen=candidate;\n        if(width<=availableWidth-2||candidate==minimum)break;\n    }\n    return chosen;\n}\n",
+      "reproduce.py": "#!/usr/bin/env python3\n\"\"\"Read-only repo probe: extracts Swirl's historical solver, builds and runs.\"\"\"\nimport os\nimport pathlib\nimport shlex\nimport subprocess\n\nrepo = pathlib.Path('/workspace/scratch/422e6ae9ec51/Swirl')\nwork = pathlib.Path(__file__).resolve().parent\nkit = pathlib.Path('/tmp/swirl-w1-qt/6.10.3/gcc_64')\nfixture = pathlib.Path('/tmp/swirl-w1-fixtures/automation-width.ttf')\nsha = '50d2a8e8bac702abb2cdc0212f43953b8b78ffef'\nold = subprocess.check_output(['git', 'show', sha + ':src/Swirl.Quick/app/FontManager.cpp'], cwd=repo, text=True)\nstart = old.index('    // At most 10% of the designer\\'s width coordinate;')\nend = old.index('    if(chosen<normal){axes[\"wdth\"]', start)\ncore = old[start:end]\ncore = core.replace('widthAxis.value(\"minimum\").toDouble()', 'axisMinimum')\ncore = '\\n'.join(line for line in core.splitlines() if 'auto widthAt=' not in line) + '\\n'\ncore = core.replace('{axes[\"wdth\"]=previousWidth;result[\"axes\"]=axes;result[\"fitted\"]=true;return result;}', 'return previousWidth;')\ncore = core.replace('return result;', 'return normal;')\nheader = ('// Extracted from Swirl commit ' + sha + '; map returns replaced by coordinate returns.\\n'\n          'template<class Measure>\\n'\n          'double oldSolve(double axisMinimum,double normal,double natural,double availableWidth,double previousWidth,Measure widthAt)\\n'\n          '{\\n' + core + '    return chosen;\\n}\\n')\n(work / 'old-solve.h').write_text(header)\ncmd = ['g++', '-std=c++23', '-O2', '-DNDEBUG', '-Wall', '-Wextra', '-Werror', str(work / 'probe.cpp'),\n       '-I' + str(kit / 'include'), '-I' + str(kit / 'include/QtCore'), '-I' + str(kit / 'include/QtGui'),\n       '-L' + str(kit / 'lib'), '-Wl,-rpath,' + str(kit / 'lib'), '-lQt6Gui', '-lQt6Core',\n       '-o', str(work / 'probe')]\nprint(shlex.join(cmd), flush=True)\nsubprocess.run(cmd, check=True)\nenv = dict(os.environ, QT_QPA_PLATFORM='offscreen',\n           LD_LIBRARY_PATH=str(kit / 'lib') + ':/tmp/swirl-w1-deps/usr/lib/x86_64-linux-gnu')\nrun = subprocess.run([str(work / 'probe'), str(fixture)], env=env, text=True, capture_output=True, check=True)\nprint(run.stdout, end='')\nprint(run.stderr, end='')\n(work / 'reproduced-results.jsonl').write_text(run.stdout)\n"
+    },
+    "sourcePathNote": "Absolute paths record this executed temporary environment; change them for a different machine. No application or repository source is rewritten by the probe.",
+    "fixtureSha256": "9dba4906fc5d70e76a456226ed438a9a98bd173c24a31b9eaecff4ca9a9488a4",
+    "helperSha256": "8b6e8ebb1c756449cf49b801952b9ecdf1d524cd25f3ee726e2a21d0cbe27d52"
+  },
+  "physicalAcceptance": {
+    "windows11MachineAccessible": false,
+    "userDDriveAccessed": false,
+    "actualSystemScale125": false,
+    "actualSystemScale200": false,
+    "mixedDpiMonitorMigration": false,
+    "privatePingFangGlyphQuality": false,
+    "physical240Hz": false,
+    "humanReadability": false,
+    "longRunningRssMeasured": false
+  },
+  "claims": {
+    "globalOptimality": false,
+    "solver": "bounded approximation over up to 10 candidate samples plus history",
+    "minimumAdvanceRatio": 0.85,
+    "minimumAxisRatio": 0.9,
+    "thresholdBasis": "retained provisional product choices, not universal readability standards",
+    "widthCacheEntryLimit": 256,
+    "wholeUiPerformanceMeasured": false,
+    "qmlSourceFiles": 92,
+    "swirlTextSourceUsages": 386,
+    "sourceCountsAreVisualPassRate": false,
+    "gatewaySpecificPopupOpenedByTargetedTest": false
+  },
+  "finalVerifiedIntegrationHead": "6b9628e6a9a5a864e5a7e210cd916868804564c8",
+  "integrationOnlyCommits": [
+    "b266022ef291ffd1429a467ed201b2c80975c0ce",
+    "6b9628e6a9a5a864e5a7e210cd916868804564c8"
+  ],
+  "evidenceCommitChangesProductionCode": false
+}

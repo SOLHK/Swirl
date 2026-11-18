@@ -1,0 +1,3473 @@
+{
+  "scope": "lossless optional bias-107 dictionary extension with fresh complete native acceptance",
+  "maximum_helpers": 1239,
+  "default_helpers": 215,
+  "rows": [
+    {
+      "gid": 1166,
+      "compression": {
+        "local_helpers": 1239,
+        "structural_helpers": 564,
+        "literal_helpers": 675,
+        "expected_payload_savings": 29648786,
+        "maximum_original_operations": 119001,
+        "maximum_compressed_operations": 146163,
+        "maximum_operand_stack_bound": 53,
+        "maximum_subroutine_depth": 3,
+        "exact_expanded_bytes_verified": true,
+        "coefficients_changed": 0,
+        "operation_limit": 200000,
+        "local_call_bytes": null,
+        "minimum_local_call_bytes": 2,
+        "maximum_local_call_bytes": 3,
+        "local_subroutine_bias": 107,
+        "global_subroutine_indices_unchanged": true,
+        "input_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+        "candidate_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+        "input_bytes": 58178796,
+        "candidate_bytes": 28532496,
+        "load_seconds": 0.06801941597950645,
+        "compression_seconds": 31.686521124996943,
+        "save_seconds": 0.5225048340216745,
+        "seconds": 32.320173165993765,
+        "peak_rss_bytes": 377864192,
+        "all_non_CFF2_tables_unchanged": true,
+        "native_verification": "NOT_RUN",
+        "production_accepted": false
+      },
+      "native_acceptance": {
+        "seed": 2026110861,
+        "font_bytes": 28532496,
+        "candidate_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+        "atlas_sha256": "fc3ab1e478a301d74874b7a5caea04b57b490a9ab113f47cec859e050abc3b1d",
+        "parameter_archive_sha256": "f80cd356e5f6314125a5b7074b442c740237322baccc25c10e19ddee9e294553",
+        "observations": 24713,
+        "strict_independent_native_passed": true,
+        "sampled_geometry_passed": true,
+        "acceptance_scope": "joint_post_avar_q_geometry_and_reported_metrics",
+        "independence": {
+          "proven": true,
+          "observations": 24713,
+          "unique_positions": 21724,
+          "overlapping_observations": 327,
+          "unique_independent_positions": 21649,
+          "duplicate_observations": 2989
+        },
+        "engines": {
+          "CoreText": {
+            "observations": 24713,
+            "independent_observations": 21649,
+            "max_error": 0.02046283257447156,
+            "independent_max_error": 0.02046283257447156,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0015368259658220425,
+            "max_advance_error": 0.01984000000004471,
+            "advance_failures": 0
+          },
+          "HarfBuzz": {
+            "observations": 24713,
+            "independent_observations": 21649,
+            "max_error": 0.0183381932573532,
+            "independent_max_error": 0.0183381932573532,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.002099428612668118,
+            "max_advance_error": 0.0,
+            "advance_failures": 0
+          },
+          "fontTools": {
+            "observations": 512,
+            "independent_observations": 438,
+            "max_error": 0.020435461375896444,
+            "independent_max_error": 0.020435461375896444,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.001602512292586867,
+            "max_advance_error": 0.006080520415821411,
+            "advance_failures": 0
+          }
+        },
+        "original_user_axis_equivalence": false,
+        "candidate_segment_maps_conformant": false,
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 1166
+        },
+        "categories": {
+          "boundary_grid": 125,
+          "single": 192,
+          "dual": 192,
+          "triple_random": 4096,
+          "branch_axis_zero": 33,
+          "branch_tangent_lower": 18,
+          "branch_tangent_upper": 18,
+          "branch_wide_axis_zero": 688,
+          "branch_wide_tangent_upper": 12,
+          "branch_wide_tangent_lower": 12,
+          "patch_seam": 640,
+          "exact_physical_regression": 18687
+        },
+        "source_oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+        "coretext_oracle_sha256": "1e68e5fb4931441312ebee80cbcf2c2e83809070b118e33893b4ee2412c6ffbd",
+        "verifier_sha256": "6acd68aed18ff013ff46a4163b020b6e7fd32c49e50a10d84e924ecba6b5b8dc",
+        "os": "macOS-26.5.1-arm64-arm-64bit",
+        "harfbuzz": "14.6.0",
+        "private_report_sha256": "1cfa49ee1aecf396c51d2be57111f1e6982d70c8555005f3b97a61950df9883b"
+      },
+      "before_after": {
+        "identical_physical_requests": 24713,
+        "exact_CoreText_paths_and_advances": 24713,
+        "CoreText_path_mismatches": 0,
+        "identical_all_engine_per_observation_verdicts": 24713,
+        "new_native_and_source_observations": true
+      },
+      "native_performance": {
+        "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+        "font_bytes": 28532496,
+        "seed": 2026110723,
+        "samples": 128,
+        "repetitions": 3,
+        "cold_processes": true,
+        "OS_file_cache_controlled": false,
+        "production_accepted": false,
+        "accuracy_acceptance": false,
+        "engines": {
+          "HarfBuzz": [
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.006509165978059173,
+              "graphics_load_seconds": 0.004824290983378887,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.044426750944694504,
+                    "minimum_seconds": 0.0001739579893182963,
+                    "p50_seconds": 0.0001893125008791685,
+                    "p95_seconds": 0.0004358312318800017
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.00765329014393501,
+                    "minimum_seconds": 3.2079988159239292e-06,
+                    "p50_seconds": 2.8062495402991772e-05,
+                    "p95_seconds": 9.29585381527431e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.043558870936976746,
+                    "minimum_seconds": 9.05419874470681e-05,
+                    "p50_seconds": 0.0002924169966718182,
+                    "p95_seconds": 0.000671020956360735
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04034250293625519,
+                    "minimum_seconds": 0.0001722089946269989,
+                    "p50_seconds": 0.00019058349425904453,
+                    "p95_seconds": 0.0007892813518992613
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0026992490456905216,
+                    "minimum_seconds": 1.6669800970703363e-06,
+                    "p50_seconds": 1.6083489754237235e-05,
+                    "p95_seconds": 4.243125295033677e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.045012793998466805,
+                    "minimum_seconds": 9.316601790487766e-05,
+                    "p50_seconds": 0.0002886044967453927,
+                    "p95_seconds": 0.0007165915463701822
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "peak_rss_bytes": 112852992
+            },
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.003848749998724088,
+              "graphics_load_seconds": 0.0074291659984737635,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04563845484517515,
+                    "minimum_seconds": 0.00017345900414511561,
+                    "p50_seconds": 0.00019516650354489684,
+                    "p95_seconds": 0.0004438624149770475
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0055035379773471504,
+                    "minimum_seconds": 4.542001988738775e-06,
+                    "p50_seconds": 3.1479503377340734e-05,
+                    "p95_seconds": 8.792663575150072e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.05659421387827024,
+                    "minimum_seconds": 9.295897325500846e-05,
+                    "p50_seconds": 0.0003221875085728243,
+                    "p95_seconds": 0.0009617606570827761
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04357800105935894,
+                    "minimum_seconds": 0.00017358400509692729,
+                    "p50_seconds": 0.0001846664963522926,
+                    "p95_seconds": 0.00042508123733568936
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0021426611056085676,
+                    "minimum_seconds": 2.375018084421754e-06,
+                    "p50_seconds": 1.4041492249816656e-05,
+                    "p95_seconds": 3.7508443347178394e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.03743487593601458,
+                    "minimum_seconds": 9.074999252334237e-05,
+                    "p50_seconds": 0.00025943751097656786,
+                    "p95_seconds": 0.0005056313602835869
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "peak_rss_bytes": 112787456
+            },
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.0033722080115694553,
+              "graphics_load_seconds": 0.005653625004924834,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.03128200123319402,
+                    "minimum_seconds": 0.00017449998995289207,
+                    "p50_seconds": 0.00018743750115390867,
+                    "p95_seconds": 0.00044895221362821746
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.004726579878479242,
+                    "minimum_seconds": 2.874992787837982e-06,
+                    "p50_seconds": 2.62079993262887e-05,
+                    "p95_seconds": 9.635175956645979e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04365816307836212,
+                    "minimum_seconds": 0.00010408301022835076,
+                    "p50_seconds": 0.0002808959980029613,
+                    "p95_seconds": 0.0006560495487065052
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.029639789048815146,
+                    "minimum_seconds": 0.00017195800319314003,
+                    "p50_seconds": 0.00018487501074559987,
+                    "p95_seconds": 0.00041146019357256585
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0022109987039584666,
+                    "minimum_seconds": 2.167013008147478e-06,
+                    "p50_seconds": 1.4478995581157506e-05,
+                    "p95_seconds": 4.532675957307219e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04015408697887324,
+                    "minimum_seconds": 9.079198935069144e-05,
+                    "p50_seconds": 0.0002608955110190436,
+                    "p95_seconds": 0.0006242710514925418
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "peak_rss_bytes": 112607232
+            }
+          ],
+          "CoreText": [
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "graphics_load_seconds": 0.010980541992466897,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.109387752978364,
+                    "minimum_seconds": 0.0001057499903254211,
+                    "p50_seconds": 0.00023347900423686951,
+                    "p95_seconds": 0.004066135863831728
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.02762991827330552,
+                    "minimum_seconds": 4.495901521295309e-05,
+                    "p50_seconds": 0.000173937005456537,
+                    "p95_seconds": 0.00042528749909251926
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.1339939190656878,
+                    "minimum_seconds": 0.0004051669966429472,
+                    "p50_seconds": 0.000576062491745688,
+                    "p95_seconds": 0.0032311523027601635
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.06520604525576346,
+                    "minimum_seconds": 0.00010558401118032634,
+                    "p50_seconds": 0.00019579200306907296,
+                    "p95_seconds": 0.0018645331132574935
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.027386955043766648,
+                    "minimum_seconds": 4.641601117327809e-05,
+                    "p50_seconds": 0.00016056200547609478,
+                    "p95_seconds": 0.00044231710926396757
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.11716687303851359,
+                    "minimum_seconds": 0.0004080829967278987,
+                    "p50_seconds": 0.0006493954861070961,
+                    "p95_seconds": 0.00236054540873738
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 55476224,
+              "read_seconds": 0.004846208990784362,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            },
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "graphics_load_seconds": 0.0029614579980261624,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.06493596773361787,
+                    "minimum_seconds": 0.00011491699842736125,
+                    "p50_seconds": 0.00015687501581851393,
+                    "p95_seconds": 0.0027865313415532
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.02124591314350255,
+                    "minimum_seconds": 4.429201362654567e-05,
+                    "p50_seconds": 0.00014656198618467897,
+                    "p95_seconds": 0.0003659682100987992
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.09199953789357096,
+                    "minimum_seconds": 0.0004154999915044755,
+                    "p50_seconds": 0.00045356199552770704,
+                    "p95_seconds": 0.0020918458583764708
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.07282862404827029,
+                    "minimum_seconds": 0.00011333299335092306,
+                    "p50_seconds": 0.00020391651196405292,
+                    "p95_seconds": 0.002127503856900147
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.02508824970573187,
+                    "minimum_seconds": 4.5042019337415695e-05,
+                    "p50_seconds": 0.00016062500071711838,
+                    "p95_seconds": 0.00042727104446385036
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.1086083751579281,
+                    "minimum_seconds": 0.0004167500010225922,
+                    "p50_seconds": 0.0006436670082621276,
+                    "p95_seconds": 0.0018068647041218347
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 55459840,
+              "read_seconds": 0.004410624998854473,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            },
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+              "graphics_load_seconds": 0.008563499985029921,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.11943558024358936,
+                    "minimum_seconds": 0.00013033300638198853,
+                    "p50_seconds": 0.0006579165055882186,
+                    "p95_seconds": 0.002912406816903967
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.02757033286616206,
+                    "minimum_seconds": 4.504199023358524e-05,
+                    "p50_seconds": 0.0001678334956523031,
+                    "p95_seconds": 0.0004961749975336714
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.1528303361556027,
+                    "minimum_seconds": 0.0004192909982521087,
+                    "p50_seconds": 0.001090104502509348,
+                    "p95_seconds": 0.002503868854546453
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.07272437500068918,
+                    "minimum_seconds": 0.00010129201109521091,
+                    "p50_seconds": 0.0001811459951568395,
+                    "p95_seconds": 0.002461087392293848
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.027428575151134282,
+                    "minimum_seconds": 4.716601688414812e-05,
+                    "p50_seconds": 0.00017381251382175833,
+                    "p95_seconds": 0.00044351434771670005
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.11748412408633158,
+                    "minimum_seconds": 0.00039770800503902137,
+                    "p50_seconds": 0.0004929165006615222,
+                    "p95_seconds": 0.0031139084647293174
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 55427072,
+              "read_seconds": 0.006215291999978945,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            }
+          ]
+        }
+      },
+      "profile": {
+        "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+        "file_bytes": 28532496,
+        "tables": {
+          "head": 54,
+          "hhea": 36,
+          "maxp": 6,
+          "OS/2": 96,
+          "hmtx": 4104,
+          "cmap": 60,
+          "name": 1233,
+          "post": 32,
+          "CFF2": 27085736,
+          "GSUB": 134646,
+          "HVAR": 1617,
+          "STAT": 108,
+          "avar": 1300110,
+          "fvar": 236,
+          "vhea": 36,
+          "vmtx": 4104
+        },
+        "glyphs": 2051,
+        "axes": 11,
+        "flagged_hidden_axes": 10,
+        "computational_axes": 8,
+        "cff2_regions": 2499,
+        "cff2_data_sets": 2049,
+        "cff2_variation_store_payload_bytes": 212832,
+        "cff2_variation_store_length_sentinel": true,
+        "avar2_regions": 14442,
+        "font_dicts": 1,
+        "program_categories": {
+          "main": {
+            "count": 2051,
+            "bytes": 25221896,
+            "maximum_bytes": 29187
+          },
+          "global": {
+            "count": 32780,
+            "bytes": 1516105,
+            "maximum_bytes": 22291
+          },
+          "local": {
+            "count": 1239,
+            "bytes": 25795,
+            "maximum_bytes": 128
+          }
+        },
+        "cff2_program_payload_bytes": 26763796,
+        "cff2_other_bytes": 321940,
+        "seconds": 0.48657425001147203,
+        "peak_rss_bytes": 150421504
+      },
+      "sequential_same_host_performance": {
+        "original": {
+          "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+          "font_bytes": 58178796,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.005644582997774705,
+                "graphics_load_seconds": 0.004062457999680191,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021748623956227675,
+                      "minimum_seconds": 0.00016212501213885844,
+                      "p50_seconds": 0.00016993800818454474,
+                      "p95_seconds": 0.00017863356915768234
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0028296667733229697,
+                      "minimum_seconds": 2.1249870769679546e-06,
+                      "p50_seconds": 1.9083483493886888e-05,
+                      "p95_seconds": 5.003290716558693e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.023548917000880465,
+                      "minimum_seconds": 7.995899068191648e-05,
+                      "p50_seconds": 0.00018104199261870235,
+                      "p95_seconds": 0.0002842789443093352
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021559252112638205,
+                      "minimum_seconds": 0.00016112500452436507,
+                      "p50_seconds": 0.0001679170090937987,
+                      "p95_seconds": 0.0001772994379280135
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0014435008051805198,
+                      "minimum_seconds": 1.2080126907676458e-06,
+                      "p50_seconds": 1.0896008461713791e-05,
+                      "p95_seconds": 2.2792014351580293e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.022803664847742766,
+                      "minimum_seconds": 6.558399763889611e-05,
+                      "p50_seconds": 0.00017504149582237005,
+                      "p95_seconds": 0.00027741028898162765
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "peak_rss_bytes": 171933696
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.005575874994974583,
+                "graphics_load_seconds": 0.0038538340013474226,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021753369102953002,
+                      "minimum_seconds": 0.00016204197891056538,
+                      "p50_seconds": 0.0001694790116744116,
+                      "p95_seconds": 0.00018036873661912977
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0030075832328293473,
+                      "minimum_seconds": 2.207991201430559e-06,
+                      "p50_seconds": 2.0021499949507415e-05,
+                      "p95_seconds": 5.07647171616554e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.023544455732917413,
+                      "minimum_seconds": 8.083300781436265e-05,
+                      "p50_seconds": 0.00018345801800023764,
+                      "p95_seconds": 0.0002855851853382773
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021556994965067133,
+                      "minimum_seconds": 0.00016120800864882767,
+                      "p50_seconds": 0.00016818750009406358,
+                      "p95_seconds": 0.00017625669861445203
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001421205175574869,
+                      "minimum_seconds": 1.3750104699283838e-06,
+                      "p50_seconds": 1.062550290953368e-05,
+                      "p95_seconds": 2.2704494767822322e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.022587039798963815,
+                      "minimum_seconds": 7.437501335516572e-05,
+                      "p50_seconds": 0.00017337498138658702,
+                      "p95_seconds": 0.0002794436542899348
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "peak_rss_bytes": 171950080
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.0058148330135736614,
+                "graphics_load_seconds": 0.003845083003398031,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02174020907841623,
+                      "minimum_seconds": 0.00016220798715949059,
+                      "p50_seconds": 0.00016958298510871828,
+                      "p95_seconds": 0.00017898925871122627
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.00316291514900513,
+                      "minimum_seconds": 2.04198295250535e-06,
+                      "p50_seconds": 2.1709012798964977e-05,
+                      "p95_seconds": 5.219155136728657e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02366849614190869,
+                      "minimum_seconds": 7.579199154861271e-05,
+                      "p50_seconds": 0.00018577100127004087,
+                      "p95_seconds": 0.0002904460576246492
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02162354689789936,
+                      "minimum_seconds": 0.0001612920023035258,
+                      "p50_seconds": 0.0001685625029494986,
+                      "p95_seconds": 0.0001777629411662929
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.00149521094863303,
+                      "minimum_seconds": 1.5840050764381886e-06,
+                      "p50_seconds": 1.1416996130719781e-05,
+                      "p95_seconds": 2.2772800002712755e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02267621093778871,
+                      "minimum_seconds": 6.583399954251945e-05,
+                      "p50_seconds": 0.0001746249763527885,
+                      "p95_seconds": 0.00027880835841642687
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "peak_rss_bytes": 171966464
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "graphics_load_seconds": 0.0017376249888911843,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.018162495020078495,
+                      "minimum_seconds": 0.00011083399294875562,
+                      "p50_seconds": 0.00011879150406457484,
+                      "p95_seconds": 0.00014692896511405703
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.012198209064081311,
+                      "minimum_seconds": 3.320901305414736e-05,
+                      "p50_seconds": 9.379199764225632e-05,
+                      "p95_seconds": 0.00015276634367182847
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05457949606352486,
+                      "minimum_seconds": 0.0003911249805241823,
+                      "p50_seconds": 0.0004098965000594035,
+                      "p95_seconds": 0.0004464852958335541
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01436533487867564,
+                      "minimum_seconds": 0.00010716600809246302,
+                      "p50_seconds": 0.00011164549505338073,
+                      "p95_seconds": 0.0001183459477033466
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01196778891608119,
+                      "minimum_seconds": 3.274998744018376e-05,
+                      "p50_seconds": 9.152099664788693e-05,
+                      "p95_seconds": 0.00014970165939303114
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05202859203564003,
+                      "minimum_seconds": 0.0003897080023307353,
+                      "p50_seconds": 0.0004052084987051785,
+                      "p95_seconds": 0.00042457225936232135
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 84869120,
+                "read_seconds": 0.005935541994404048,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "graphics_load_seconds": 0.0017416249902453274,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017731289961375296,
+                      "minimum_seconds": 0.00011045899009332061,
+                      "p50_seconds": 0.00011689549137372524,
+                      "p95_seconds": 0.00014495834911940612
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.012100413878215477,
+                      "minimum_seconds": 3.2791984267532825e-05,
+                      "p50_seconds": 9.160400077234954e-05,
+                      "p95_seconds": 0.0001516248914413154
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05271467016427778,
+                      "minimum_seconds": 0.0003904170007444918,
+                      "p50_seconds": 0.000404479491407983,
+                      "p95_seconds": 0.00043187959527131166
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014499000302748755,
+                      "minimum_seconds": 0.00010679199476726353,
+                      "p50_seconds": 0.00011254199489485472,
+                      "p95_seconds": 0.00011867895373143255
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.012031670921714976,
+                      "minimum_seconds": 3.295901115052402e-05,
+                      "p50_seconds": 9.26040083868429e-05,
+                      "p95_seconds": 0.00014993180084275082
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052318121888674796,
+                      "minimum_seconds": 0.0003897909773513675,
+                      "p50_seconds": 0.00040647899731993675,
+                      "p95_seconds": 0.000428475190710742
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 84869120,
+                "read_seconds": 0.005656833993270993,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+                "graphics_load_seconds": 0.001979833992663771,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01797379582421854,
+                      "minimum_seconds": 0.00011054199421778321,
+                      "p50_seconds": 0.00012014599633403122,
+                      "p95_seconds": 0.0001320812662015669
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.012108871043892577,
+                      "minimum_seconds": 3.258298966102302e-05,
+                      "p50_seconds": 9.210400457959622e-05,
+                      "p95_seconds": 0.00015236699255183336
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05279983105720021,
+                      "minimum_seconds": 0.000391999987186864,
+                      "p50_seconds": 0.00040662499668542296,
+                      "p95_seconds": 0.00042521645955275746
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014672291988972574,
+                      "minimum_seconds": 0.00010699999984353781,
+                      "p50_seconds": 0.0001129795127781108,
+                      "p95_seconds": 0.00012762290134560317
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.012034050101647153,
+                      "minimum_seconds": 3.383299917913973e-05,
+                      "p50_seconds": 9.427100303582847e-05,
+                      "p95_seconds": 0.00015005853638285768
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052370673016412184,
+                      "minimum_seconds": 0.0003885409969370812,
+                      "p50_seconds": 0.0004080210055690259,
+                      "p95_seconds": 0.00043041490425821394
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 84869120,
+                "read_seconds": 0.00560045798192732,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        },
+        "extended": {
+          "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+          "font_bytes": 28532496,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.002761708019534126,
+                "graphics_load_seconds": 0.002058166021015495,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021762789838248864,
+                      "minimum_seconds": 0.00016229200991801918,
+                      "p50_seconds": 0.00016956249601207674,
+                      "p95_seconds": 0.0001790436464943923
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.002843460242729634,
+                      "minimum_seconds": 2.1249870769679546e-06,
+                      "p50_seconds": 1.9062499632127583e-05,
+                      "p95_seconds": 4.378968296805396e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.029870249913074076,
+                      "minimum_seconds": 8.862500544637442e-05,
+                      "p50_seconds": 0.00023383350344374776,
+                      "p95_seconds": 0.000359678955283016
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02161475087632425,
+                      "minimum_seconds": 0.00016154098557308316,
+                      "p50_seconds": 0.00016872950072865933,
+                      "p95_seconds": 0.00017895209457492454
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0015010820934548974,
+                      "minimum_seconds": 1.2500095181167126e-06,
+                      "p50_seconds": 1.0958494385704398e-05,
+                      "p95_seconds": 2.3522786796092985e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.028939114941749722,
+                      "minimum_seconds": 8.145900210365653e-05,
+                      "p50_seconds": 0.00022762500157114118,
+                      "p95_seconds": 0.0003498329999274574
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "peak_rss_bytes": 112738304
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.002802208997309208,
+                "graphics_load_seconds": 0.002063542022369802,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021703881095163524,
+                      "minimum_seconds": 0.00016204200801439583,
+                      "p50_seconds": 0.00016914600564632565,
+                      "p95_seconds": 0.00017799585621105506
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0030184990318957716,
+                      "minimum_seconds": 2.00001522898674e-06,
+                      "p50_seconds": 1.9833503756672144e-05,
+                      "p95_seconds": 4.753759276354683e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.029492372093955055,
+                      "minimum_seconds": 8.279198664240539e-05,
+                      "p50_seconds": 0.00022895850997883826,
+                      "p95_seconds": 0.0003572164379875175
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021645669010467827,
+                      "minimum_seconds": 0.0001612920023035258,
+                      "p50_seconds": 0.00016872900596354157,
+                      "p95_seconds": 0.00018005184538196772
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0014757190365344286,
+                      "minimum_seconds": 1.166015863418579e-06,
+                      "p50_seconds": 1.0625008144415915e-05,
+                      "p95_seconds": 2.287258394062519e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.028778042818885297,
+                      "minimum_seconds": 8.05000017862767e-05,
+                      "p50_seconds": 0.00022606299899052829,
+                      "p95_seconds": 0.0003458063438301906
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "peak_rss_bytes": 112721920
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.002817750006215647,
+                "graphics_load_seconds": 0.0019673749920912087,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021716630057198927,
+                      "minimum_seconds": 0.00016220798715949059,
+                      "p50_seconds": 0.0001693745143711567,
+                      "p95_seconds": 0.0001798522993340157
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.003013954818015918,
+                      "minimum_seconds": 2.1659943740814924e-06,
+                      "p50_seconds": 2.03334930120036e-05,
+                      "p95_seconds": 4.947489942423999e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02994255011435598,
+                      "minimum_seconds": 8.241698378697038e-05,
+                      "p50_seconds": 0.00023127050371840596,
+                      "p95_seconds": 0.000360089803871233
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021605126792564988,
+                      "minimum_seconds": 0.0001613750064279884,
+                      "p50_seconds": 0.00016831248649396002,
+                      "p95_seconds": 0.0001777478857547976
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0014663342444691807,
+                      "minimum_seconds": 1.4580145943909883e-06,
+                      "p50_seconds": 1.1312498827464879e-05,
+                      "p95_seconds": 2.2687696036882697e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02882840600796044,
+                      "minimum_seconds": 8.05000017862767e-05,
+                      "p50_seconds": 0.00022750001517124474,
+                      "p95_seconds": 0.0003448291477980092
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "peak_rss_bytes": 112738304
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "graphics_load_seconds": 0.0019797499990090728,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017999792093178257,
+                      "minimum_seconds": 0.0001110419980250299,
+                      "p50_seconds": 0.00011975050438195467,
+                      "p95_seconds": 0.00013218770473031328
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.016305371071211994,
+                      "minimum_seconds": 4.4500018702819943e-05,
+                      "p50_seconds": 0.00012622898793779314,
+                      "p95_seconds": 0.00019660634279716757
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052941163012292236,
+                      "minimum_seconds": 0.0003895419940818101,
+                      "p50_seconds": 0.0004070000140927732,
+                      "p95_seconds": 0.0004256794083630666
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014580708055291325,
+                      "minimum_seconds": 0.00010774997645057738,
+                      "p50_seconds": 0.0001134790072683245,
+                      "p95_seconds": 0.00012016469263471663
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.016224331106059253,
+                      "minimum_seconds": 4.374998388811946e-05,
+                      "p50_seconds": 0.00012547899677883834,
+                      "p95_seconds": 0.00019587105489335952
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05231453917804174,
+                      "minimum_seconds": 0.0003905000048689544,
+                      "p50_seconds": 0.00040791649371385574,
+                      "p95_seconds": 0.0004208420985378325
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 55230464,
+                "read_seconds": 0.002962708007544279,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "graphics_load_seconds": 0.0018451670184731483,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01767379615921527,
+                      "minimum_seconds": 0.00011150000500492752,
+                      "p50_seconds": 0.00011741701746359468,
+                      "p95_seconds": 0.00013731645012740045
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01626732904696837,
+                      "minimum_seconds": 4.462499055080116e-05,
+                      "p50_seconds": 0.0001257084950339049,
+                      "p95_seconds": 0.00019757104892050844
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052557459159288555,
+                      "minimum_seconds": 0.00039350002771243453,
+                      "p50_seconds": 0.0004041460051666945,
+                      "p95_seconds": 0.00042358914943179115
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014429204951738939,
+                      "minimum_seconds": 0.00010695899254642427,
+                      "p50_seconds": 0.00011156201071571559,
+                      "p95_seconds": 0.00011995449749520048
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.016232955997111276,
+                      "minimum_seconds": 4.31660155300051e-05,
+                      "p50_seconds": 0.000126520506455563,
+                      "p95_seconds": 0.0001956898035132326
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0523452949419152,
+                      "minimum_seconds": 0.00038791599217802286,
+                      "p50_seconds": 0.0004084370011696592,
+                      "p95_seconds": 0.00042671644187066706
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 55230464,
+                "read_seconds": 0.0028357910050544888,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+                "graphics_load_seconds": 0.001859417010564357,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01806766612571664,
+                      "minimum_seconds": 0.00011175000690855086,
+                      "p50_seconds": 0.0001196879893541336,
+                      "p95_seconds": 0.00013486873940564688
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0163531290309038,
+                      "minimum_seconds": 4.479099879972637e-05,
+                      "p50_seconds": 0.0001259580021724105,
+                      "p95_seconds": 0.0001971499077626504
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05290262377820909,
+                      "minimum_seconds": 0.0003892080276273191,
+                      "p50_seconds": 0.0004075830220244825,
+                      "p95_seconds": 0.0004255494553945027
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01448075394728221,
+                      "minimum_seconds": 0.00010762500460259616,
+                      "p50_seconds": 0.0001121045061154291,
+                      "p95_seconds": 0.00011973509390372782
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.016279247240163386,
+                      "minimum_seconds": 4.258297849446535e-05,
+                      "p50_seconds": 0.00012585399963427335,
+                      "p95_seconds": 0.00019802280585281548
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05250408494612202,
+                      "minimum_seconds": 0.00038891698932275176,
+                      "p50_seconds": 0.0004095834883628413,
+                      "p95_seconds": 0.00042394025076646357
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 55230464,
+                "read_seconds": 0.0027457079850137234,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        },
+        "default": {
+          "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+          "font_bytes": 32200320,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.0032218749984167516,
+                "graphics_load_seconds": 0.0022440000029746443,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02175737207289785,
+                      "minimum_seconds": 0.00016216599033214152,
+                      "p50_seconds": 0.000169771010405384,
+                      "p95_seconds": 0.0001787686545867473
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.002889959898311645,
+                      "minimum_seconds": 2.1249870769679546e-06,
+                      "p50_seconds": 2.010450407397002e-05,
+                      "p95_seconds": 4.659385449485853e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.028679927985649556,
+                      "minimum_seconds": 8.333299774676561e-05,
+                      "p50_seconds": 0.00022156299382913858,
+                      "p95_seconds": 0.0003538129545631817
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021565623726928607,
+                      "minimum_seconds": 0.00016145900008268654,
+                      "p50_seconds": 0.00016793802205938846,
+                      "p95_seconds": 0.00017697938747005538
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001440627092961222,
+                      "minimum_seconds": 1.3750104699283838e-06,
+                      "p50_seconds": 1.0916497558355331e-05,
+                      "p95_seconds": 2.2939797781873493e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02734815704752691,
+                      "minimum_seconds": 7.737500709481537e-05,
+                      "p50_seconds": 0.00021541700698435307,
+                      "p95_seconds": 0.0003314123037853278
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "peak_rss_bytes": 120045568
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.0032901670201681554,
+                "graphics_load_seconds": 0.002431959001114592,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02179208112647757,
+                      "minimum_seconds": 0.0001618750102352351,
+                      "p50_seconds": 0.00016987499839160591,
+                      "p95_seconds": 0.00018008365877904
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0031509609834756702,
+                      "minimum_seconds": 2.1250161807984114e-06,
+                      "p50_seconds": 2.2541993530467153e-05,
+                      "p95_seconds": 5.061030824435875e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02819433098193258,
+                      "minimum_seconds": 7.808298687450588e-05,
+                      "p50_seconds": 0.00022112499573267996,
+                      "p95_seconds": 0.0003405057184863835
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02159545788890682,
+                      "minimum_seconds": 0.00016150000737980008,
+                      "p50_seconds": 0.0001687500043772161,
+                      "p95_seconds": 0.00017649649817030877
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0014842140953987837,
+                      "minimum_seconds": 1.2500095181167126e-06,
+                      "p50_seconds": 1.1374999303370714e-05,
+                      "p95_seconds": 2.320625208085403e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.027412496972829103,
+                      "minimum_seconds": 7.658300455659628e-05,
+                      "p50_seconds": 0.00021345849381759763,
+                      "p95_seconds": 0.0003317522918223403
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "peak_rss_bytes": 120061952
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.0033094579994212836,
+                "graphics_load_seconds": 0.0024662089999765158,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02175032685045153,
+                      "minimum_seconds": 0.0001619999820832163,
+                      "p50_seconds": 0.00016960399807430804,
+                      "p95_seconds": 0.00017985625163419172
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0029174190713092685,
+                      "minimum_seconds": 2.207991201430559e-06,
+                      "p50_seconds": 1.960400550160557e-05,
+                      "p95_seconds": 4.918345512123776e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.028085498022846878,
+                      "minimum_seconds": 8.349999552592635e-05,
+                      "p50_seconds": 0.000220458023250103,
+                      "p95_seconds": 0.00033623311173869297
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021646831883117557,
+                      "minimum_seconds": 0.0001613750064279884,
+                      "p50_seconds": 0.00016850051179062575,
+                      "p95_seconds": 0.00017842684319475667
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0015786240401212126,
+                      "minimum_seconds": 1.2500095181167126e-06,
+                      "p50_seconds": 1.164599962066859e-05,
+                      "p95_seconds": 2.545625902712345e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.027502375043695793,
+                      "minimum_seconds": 7.645899313502014e-05,
+                      "p50_seconds": 0.00021308350551407784,
+                      "p95_seconds": 0.0003369472527992911
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "peak_rss_bytes": 120045568
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "graphics_load_seconds": 0.00201424999977462,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.018202619976364076,
+                      "minimum_seconds": 0.0001111250021494925,
+                      "p50_seconds": 0.00012106250505894423,
+                      "p95_seconds": 0.00013816196005791425
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.015072208130732179,
+                      "minimum_seconds": 4.1332998080179095e-05,
+                      "p50_seconds": 0.00011768750846385956,
+                      "p95_seconds": 0.00018567685037851328
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05311692084069364,
+                      "minimum_seconds": 0.00038720801239833236,
+                      "p50_seconds": 0.0004090000002179295,
+                      "p95_seconds": 0.00042996261327061803
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014518459123792127,
+                      "minimum_seconds": 0.00010712500079534948,
+                      "p50_seconds": 0.00011189548240508884,
+                      "p95_seconds": 0.00012212050205562264
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.015071710949996486,
+                      "minimum_seconds": 4.012498538941145e-05,
+                      "p50_seconds": 0.0001168750022770837,
+                      "p95_seconds": 0.00018191690614912656
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052155254961689934,
+                      "minimum_seconds": 0.00038891599979251623,
+                      "p50_seconds": 0.0004063960077473894,
+                      "p95_seconds": 0.0004252686398103833
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 58900480,
+                "read_seconds": 0.0032325839856639504,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "graphics_load_seconds": 0.0018334170163143426,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017792086146073416,
+                      "minimum_seconds": 0.00011100000119768083,
+                      "p50_seconds": 0.00011906250438187271,
+                      "p95_seconds": 0.00013360614975681527
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.015123334858799353,
+                      "minimum_seconds": 4.2041006963700056e-05,
+                      "p50_seconds": 0.00011733299470506608,
+                      "p95_seconds": 0.00018187489913543681
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05314883578103036,
+                      "minimum_seconds": 0.0003906250058207661,
+                      "p50_seconds": 0.00040945850196294487,
+                      "p95_seconds": 0.00042799199582077563
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014446166052948684,
+                      "minimum_seconds": 0.00010725000174716115,
+                      "p50_seconds": 0.00011206199997104704,
+                      "p95_seconds": 0.00011902730184374378
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.015024541964521632,
+                      "minimum_seconds": 3.9292004657909274e-05,
+                      "p50_seconds": 0.00011752100544981658,
+                      "p95_seconds": 0.00018249199929414313
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052194418967701495,
+                      "minimum_seconds": 0.000389833003282547,
+                      "p50_seconds": 0.0004073335148859769,
+                      "p95_seconds": 0.00042347039852757006
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 58900480,
+                "read_seconds": 0.003061374998651445,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+                "graphics_load_seconds": 0.00190862498129718,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.018012669926974922,
+                      "minimum_seconds": 0.00011012499453499913,
+                      "p50_seconds": 0.0001177709928015247,
+                      "p95_seconds": 0.0001441794884158298
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.015139166993321851,
+                      "minimum_seconds": 4.2458006646484137e-05,
+                      "p50_seconds": 0.00011852099851239473,
+                      "p95_seconds": 0.00018067095661535856
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052927711920347065,
+                      "minimum_seconds": 0.0003920840099453926,
+                      "p50_seconds": 0.0004065630055265501,
+                      "p95_seconds": 0.00043184790993109343
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.014538331917719916,
+                      "minimum_seconds": 0.00010699999984353781,
+                      "p50_seconds": 0.00011208299838472158,
+                      "p95_seconds": 0.00012353729252936318
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01507571098045446,
+                      "minimum_seconds": 3.958400338888168e-05,
+                      "p50_seconds": 0.00011691648978739977,
+                      "p95_seconds": 0.00018119779415428635
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05221337897819467,
+                      "minimum_seconds": 0.00039125001057982445,
+                      "p50_seconds": 0.0004067710106028244,
+                      "p95_seconds": 0.00042461633711354807
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 58900480,
+                "read_seconds": 0.0031797919946257025,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        }
+      },
+      "performance_method": "First receipt overlapped verification jobs. The additional original/extended/default sequence ran after those jobs, with three fresh processes per engine per variant; all receipts retained, OS cache uncontrolled."
+    },
+    {
+      "gid": 19177,
+      "compression": {
+        "local_helpers": 1239,
+        "structural_helpers": 496,
+        "literal_helpers": 743,
+        "expected_payload_savings": 115376108,
+        "maximum_original_operations": 117122,
+        "maximum_compressed_operations": 140360,
+        "maximum_operand_stack_bound": 44,
+        "maximum_subroutine_depth": 3,
+        "exact_expanded_bytes_verified": true,
+        "coefficients_changed": 0,
+        "operation_limit": 200000,
+        "local_call_bytes": null,
+        "minimum_local_call_bytes": 2,
+        "maximum_local_call_bytes": 3,
+        "local_subroutine_bias": 107,
+        "global_subroutine_indices_unchanged": true,
+        "input_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+        "candidate_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+        "input_bytes": 196056396,
+        "candidate_bytes": 80682776,
+        "load_seconds": 0.145152417011559,
+        "compression_seconds": 113.35287558299024,
+        "save_seconds": 1.5166164170077536,
+        "seconds": 115.16258216701681,
+        "peak_rss_bytes": 1163624448,
+        "all_non_CFF2_tables_unchanged": true,
+        "native_verification": "NOT_RUN",
+        "production_accepted": false
+      },
+      "native_acceptance": {
+        "seed": 2026110863,
+        "font_bytes": 80682776,
+        "candidate_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+        "atlas_sha256": "2ad7e83e21283a42cc96e81bad42b0a3d625e1a05b24af4bcd18fa448cbcd86d",
+        "parameter_archive_sha256": "257580a3ac22474779350a01545ea175147f7b602ea101b559138aff1ba9cf37",
+        "observations": 28570,
+        "strict_independent_native_passed": true,
+        "sampled_geometry_passed": true,
+        "acceptance_scope": "joint_post_avar_q_geometry_and_reported_metrics",
+        "independence": {
+          "proven": true,
+          "observations": 28570,
+          "unique_positions": 22557,
+          "overlapping_observations": 329,
+          "unique_independent_positions": 22481,
+          "duplicate_observations": 6013
+        },
+        "engines": {
+          "CoreText": {
+            "observations": 28570,
+            "independent_observations": 22481,
+            "max_error": 0.020124576587063233,
+            "independent_max_error": 0.020124576587063233,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0011130551895042044,
+            "max_advance_error": 0.0187575150300745,
+            "advance_failures": 0
+          },
+          "HarfBuzz": {
+            "observations": 28570,
+            "independent_observations": 22481,
+            "max_error": 0.018596886106602564,
+            "independent_max_error": 0.018596886106602564,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0011516090249092533,
+            "max_advance_error": 0.0,
+            "advance_failures": 0
+          },
+          "fontTools": {
+            "observations": 512,
+            "independent_observations": 398,
+            "max_error": 0.013433502068757652,
+            "independent_max_error": 0.011712863452840587,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0007818956301169054,
+            "max_advance_error": 0.006074962424804653,
+            "advance_failures": 0
+          }
+        },
+        "original_user_axis_equivalence": false,
+        "candidate_segment_maps_conformant": false,
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 19177
+        },
+        "categories": {
+          "boundary_grid": 125,
+          "single": 192,
+          "dual": 192,
+          "triple_random": 4096,
+          "branch_axis_zero": 25,
+          "branch_tangent_lower": 18,
+          "branch_tangent_upper": 18,
+          "branch_wide_axis_zero": 1246,
+          "branch_wide_tangent_upper": 12,
+          "branch_wide_tangent_lower": 12,
+          "patch_seam": 640,
+          "exact_physical_regression": 21994
+        },
+        "source_oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+        "coretext_oracle_sha256": "1e68e5fb4931441312ebee80cbcf2c2e83809070b118e33893b4ee2412c6ffbd",
+        "verifier_sha256": "6acd68aed18ff013ff46a4163b020b6e7fd32c49e50a10d84e924ecba6b5b8dc",
+        "os": "macOS-26.5.1-arm64-arm-64bit",
+        "harfbuzz": "14.6.0",
+        "private_report_sha256": "17933a027565cb1bb6b84ceb24ad2cd227929800e97bbf5d5a189cc80edb2f98"
+      },
+      "before_after": {
+        "identical_physical_requests": 28570,
+        "exact_CoreText_paths_and_advances": 28570,
+        "CoreText_path_mismatches": 0,
+        "identical_all_engine_per_observation_verdicts": 28570,
+        "new_native_and_source_observations": true
+      },
+      "native_performance": {
+        "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+        "font_bytes": 80682776,
+        "seed": 2026110723,
+        "samples": 128,
+        "repetitions": 3,
+        "cold_processes": true,
+        "OS_file_cache_controlled": false,
+        "production_accepted": false,
+        "accuracy_acceptance": false,
+        "engines": {
+          "HarfBuzz": [
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.011821708001662046,
+              "graphics_load_seconds": 0.007850416994187981,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.019116838899208233,
+                    "minimum_seconds": 8.224998600780964e-05,
+                    "p50_seconds": 9.183349902741611e-05,
+                    "p95_seconds": 0.00021642905048793176
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.006627668015426025,
+                    "minimum_seconds": 4.3339969124644995e-06,
+                    "p50_seconds": 4.4041487853974104e-05,
+                    "p95_seconds": 0.0001337897090706974
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.1000615039956756,
+                    "minimum_seconds": 0.0002852909965440631,
+                    "p50_seconds": 0.0005268959939712659,
+                    "p95_seconds": 0.001749381150875703
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.023265461990376934,
+                    "minimum_seconds": 8.033399353735149e-05,
+                    "p50_seconds": 8.687500667292625e-05,
+                    "p95_seconds": 0.0002237766617326997
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0030385020072571933,
+                    "minimum_seconds": 2.8329959604889154e-06,
+                    "p50_seconds": 1.912500010803342e-05,
+                    "p95_seconds": 6.104199565015733e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.09929387597367167,
+                    "minimum_seconds": 0.00026883400278165936,
+                    "p50_seconds": 0.000490624996018596,
+                    "p95_seconds": 0.0016563581099035213
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "peak_rss_bytes": 220495872
+            },
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.01237916701938957,
+              "graphics_load_seconds": 0.008172959001967683,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.018267749313963577,
+                    "minimum_seconds": 8.24590097181499e-05,
+                    "p50_seconds": 9.170851262751967e-05,
+                    "p95_seconds": 0.00022536461037816468
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.006550703896209598,
+                    "minimum_seconds": 4.457979230210185e-06,
+                    "p50_seconds": 3.5707998904399574e-05,
+                    "p95_seconds": 0.00014156205579638482
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.09087516384897754,
+                    "minimum_seconds": 0.00027562500326894224,
+                    "p50_seconds": 0.0004975420015398413,
+                    "p95_seconds": 0.0013610601905384098
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.017361328908009455,
+                    "minimum_seconds": 7.9624995123595e-05,
+                    "p50_seconds": 8.906199946068227e-05,
+                    "p95_seconds": 0.00021926876215729854
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.003635459201177582,
+                    "minimum_seconds": 3.4999975468963385e-06,
+                    "p50_seconds": 2.3520507966168225e-05,
+                    "p95_seconds": 6.66271924274042e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.1053584188921377,
+                    "minimum_seconds": 0.0002744999947026372,
+                    "p50_seconds": 0.0005853125039720908,
+                    "p95_seconds": 0.0017451375053497025
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "peak_rss_bytes": 220315648
+            },
+            {
+              "engine": "HarfBuzz",
+              "version": "14.6.0",
+              "read_seconds": 0.01034883302054368,
+              "graphics_load_seconds": 0.013917542004492134,
+              "requests_per_mode": 128,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.018364876916166395,
+                    "minimum_seconds": 8.425000123679638e-05,
+                    "p50_seconds": 9.464549657423049e-05,
+                    "p95_seconds": 0.00020989541226299477
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.007149379001930356,
+                    "minimum_seconds": 5.0000089686363935e-06,
+                    "p50_seconds": 4.3917010771110654e-05,
+                    "p95_seconds": 0.00013482960348483173
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.08569067186908796,
+                    "minimum_seconds": 0.0002761250070761889,
+                    "p50_seconds": 0.0005936454981565475,
+                    "p95_seconds": 0.0011655435431748627
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.019973088055849075,
+                    "minimum_seconds": 7.949999417178333e-05,
+                    "p50_seconds": 8.862548565957695e-05,
+                    "p95_seconds": 0.0002460688599967398
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0041693699022289366,
+                    "minimum_seconds": 3.1669915188103914e-06,
+                    "p50_seconds": 2.210399543400854e-05,
+                    "p95_seconds": 7.487894181394944e-05
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.09214990900363773,
+                    "minimum_seconds": 0.0003156669845338911,
+                    "p50_seconds": 0.0006191460124682635,
+                    "p95_seconds": 0.0013296870587510051
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "unshaped_base_outline_mismatches": 128,
+              "accuracy_acceptance": false,
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "peak_rss_bytes": 220217344
+            }
+          ],
+          "CoreText": [
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "graphics_load_seconds": 0.021504333009943366,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.07223338802577928,
+                    "minimum_seconds": 0.0001406670198775828,
+                    "p50_seconds": 0.00021429150365293026,
+                    "p95_seconds": 0.0020034044806379807
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.040065079054329544,
+                    "minimum_seconds": 0.0001340000017080456,
+                    "p50_seconds": 0.00025247900339309126,
+                    "p95_seconds": 0.000635435838194098
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.07933571224566549,
+                    "minimum_seconds": 0.00025029201060533524,
+                    "p50_seconds": 0.00034937499731313437,
+                    "p95_seconds": 0.001713343756273387
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.03287078902940266,
+                    "minimum_seconds": 0.00013195897918194532,
+                    "p50_seconds": 0.00016658302047289908,
+                    "p95_seconds": 0.0005918039678363128
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.037170249910559505,
+                    "minimum_seconds": 0.00013345899060368538,
+                    "p50_seconds": 0.00024477050465065986,
+                    "p95_seconds": 0.0005071897103334776
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.05779933001031168,
+                    "minimum_seconds": 0.0002466670121066272,
+                    "p50_seconds": 0.0002830420125974342,
+                    "p95_seconds": 0.0009838187615969205
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 104316928,
+              "read_seconds": 0.013555707992054522,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            },
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "graphics_load_seconds": 0.027036917017539963,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.08331904208171181,
+                    "minimum_seconds": 0.0001334169937763363,
+                    "p50_seconds": 0.0003759789979085326,
+                    "p95_seconds": 0.0015058965174830515
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0439628281746991,
+                    "minimum_seconds": 0.00014116699458099902,
+                    "p50_seconds": 0.0002632500109029934,
+                    "p95_seconds": 0.0007345834572333841
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.0874980801017955,
+                    "minimum_seconds": 0.0002446250000502914,
+                    "p50_seconds": 0.00041110400343313813,
+                    "p95_seconds": 0.0017202464921865607
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.13521241609123535,
+                    "minimum_seconds": 0.00015462501323781908,
+                    "p50_seconds": 0.0007711045036558062,
+                    "p95_seconds": 0.0026410124890389845
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.048448297020513564,
+                    "minimum_seconds": 0.00014195800758898258,
+                    "p50_seconds": 0.000337708494043909,
+                    "p95_seconds": 0.0007159163345932029
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.15026137194945477,
+                    "minimum_seconds": 0.00025554202147759497,
+                    "p50_seconds": 0.0009319164964836091,
+                    "p95_seconds": 0.0031647731317207195
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 104284160,
+              "read_seconds": 0.01226141699589789,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            },
+            {
+              "accuracy_acceptance": false,
+              "engine": "CoreText",
+              "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+              "graphics_load_seconds": 0.01489058299921453,
+              "measurements": [
+                {
+                  "explicit_hidden_defaults": true,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04202070503379218,
+                    "minimum_seconds": 0.00013570801820605993,
+                    "p50_seconds": 0.00021047898917458951,
+                    "p95_seconds": 0.0006072038595448248
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.04219341304269619,
+                    "minimum_seconds": 0.00013525001122616231,
+                    "p50_seconds": 0.00023616699036210775,
+                    "p95_seconds": 0.0006739645934430881
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.07782371403300203,
+                    "minimum_seconds": 0.00024958301219157875,
+                    "p50_seconds": 0.0003076874854741618,
+                    "p95_seconds": 0.0007310353044886138
+                  }
+                },
+                {
+                  "explicit_hidden_defaults": false,
+                  "font_instance_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.06480738005484454,
+                    "minimum_seconds": 0.00014108300092630088,
+                    "p50_seconds": 0.00022097950568422675,
+                    "p95_seconds": 0.0015594340075040219
+                  },
+                  "outline_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.041714086080901325,
+                    "minimum_seconds": 0.00013308299821801484,
+                    "p50_seconds": 0.00025233300402760506,
+                    "p95_seconds": 0.0006084335342166013
+                  },
+                  "shaping_seconds": {
+                    "count": 128,
+                    "sum_seconds": 0.08180124490172602,
+                    "minimum_seconds": 0.00025687500601634383,
+                    "p50_seconds": 0.0003399585111765191,
+                    "p95_seconds": 0.0019122228943160725
+                  }
+                }
+              ],
+              "omitted_hidden_default_mismatches": 0,
+              "peak_rss_bytes": 104316928,
+              "read_seconds": 0.010131583985639736,
+              "requests_per_mode": 128,
+              "unshaped_base_outline_mismatches": 128
+            }
+          ]
+        }
+      },
+      "profile": {
+        "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+        "file_bytes": 80682776,
+        "tables": {
+          "head": 54,
+          "hhea": 36,
+          "maxp": 6,
+          "OS/2": 96,
+          "hmtx": 8200,
+          "cmap": 60,
+          "name": 1851,
+          "post": 32,
+          "CFF2": 79804553,
+          "GSUB": 230846,
+          "HVAR": 2001,
+          "STAT": 172,
+          "avar": 625956,
+          "fvar": 396,
+          "vhea": 36,
+          "vmtx": 8200
+        },
+        "glyphs": 4099,
+        "axes": 19,
+        "flagged_hidden_axes": 18,
+        "computational_axes": 16,
+        "cff2_regions": 190,
+        "cff2_data_sets": 4097,
+        "cff2_variation_store_payload_bytes": 142354,
+        "cff2_variation_store_length_sentinel": true,
+        "avar2_regions": 4062,
+        "font_dicts": 1,
+        "program_categories": {
+          "main": {
+            "count": 4099,
+            "bytes": 61842945,
+            "maximum_bytes": 38468
+          },
+          "global": {
+            "count": 33898,
+            "bytes": 17641676,
+            "maximum_bytes": 38112
+          },
+          "local": {
+            "count": 1239,
+            "bytes": 23025,
+            "maximum_bytes": 128
+          }
+        },
+        "cff2_program_payload_bytes": 79507646,
+        "cff2_other_bytes": 296907,
+        "seconds": 0.3961927499913145,
+        "peak_rss_bytes": 286195712
+      },
+      "sequential_same_host_performance": {
+        "original": {
+          "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+          "font_bytes": 196056396,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.01886691601248458,
+                "graphics_load_seconds": 0.013357583025936037,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010086835216498002,
+                      "minimum_seconds": 7.54169886931777e-05,
+                      "p50_seconds": 7.829150126781315e-05,
+                      "p95_seconds": 8.294155268231406e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0038384548970498145,
+                      "minimum_seconds": 2.582994056865573e-06,
+                      "p50_seconds": 2.4062013835646212e-05,
+                      "p95_seconds": 6.648400449194013e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.04371812799945474,
+                      "minimum_seconds": 0.00020874998881481588,
+                      "p50_seconds": 0.00032735400600358844,
+                      "p95_seconds": 0.0004885203990852461
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009907542145811021,
+                      "minimum_seconds": 7.404197822324932e-05,
+                      "p50_seconds": 7.704200106672943e-05,
+                      "p95_seconds": 8.181863377103582e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001876037975307554,
+                      "minimum_seconds": 1.334003172814846e-06,
+                      "p50_seconds": 1.2374497600831091e-05,
+                      "p95_seconds": 3.2062492391560216e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.042900703934719786,
+                      "minimum_seconds": 0.00021120798191986978,
+                      "p50_seconds": 0.00032139600079972297,
+                      "p95_seconds": 0.0004831205951632
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "peak_rss_bytes": 451067904
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.019875458994647488,
+                "graphics_load_seconds": 0.012620458990568295,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010127285902854055,
+                      "minimum_seconds": 7.558299694210291e-05,
+                      "p50_seconds": 7.850000110920519e-05,
+                      "p95_seconds": 8.359384519280866e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0038667523476760834,
+                      "minimum_seconds": 2.707995008677244e-06,
+                      "p50_seconds": 2.4562497856095433e-05,
+                      "p95_seconds": 7.188750460045408e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.043779043946415186,
+                      "minimum_seconds": 0.0002076250093523413,
+                      "p50_seconds": 0.00032293748517986387,
+                      "p95_seconds": 0.00048689954710425806
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009900703851599246,
+                      "minimum_seconds": 7.399998139590025e-05,
+                      "p50_seconds": 7.689600170124322e-05,
+                      "p95_seconds": 8.144614548655227e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0021084579348098487,
+                      "minimum_seconds": 1.374981366097927e-06,
+                      "p50_seconds": 1.4124991139397025e-05,
+                      "p95_seconds": 3.425672330195084e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.043226411973591894,
+                      "minimum_seconds": 0.00020541599951684475,
+                      "p50_seconds": 0.00032264548644889146,
+                      "p95_seconds": 0.0004834954990656115
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "peak_rss_bytes": 451100672
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.019232083985116333,
+                "graphics_load_seconds": 0.012804958008928224,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010106209752848372,
+                      "minimum_seconds": 7.562499376945198e-05,
+                      "p50_seconds": 7.837498560547829e-05,
+                      "p95_seconds": 8.331928838742897e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.003926918172510341,
+                      "minimum_seconds": 2.7500209398567677e-06,
+                      "p50_seconds": 2.4374981876462698e-05,
+                      "p95_seconds": 6.940019375178955e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.043881710938876495,
+                      "minimum_seconds": 0.00020029200823046267,
+                      "p50_seconds": 0.0003282079997006804,
+                      "p95_seconds": 0.00048743134539108723
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009901572862872854,
+                      "minimum_seconds": 7.433301652781665e-05,
+                      "p50_seconds": 7.697900582570583e-05,
+                      "p95_seconds": 8.138310076901689e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0018618799222167581,
+                      "minimum_seconds": 1.7500133253633976e-06,
+                      "p50_seconds": 1.2333504855632782e-05,
+                      "p95_seconds": 3.167893155477941e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.04298670825664885,
+                      "minimum_seconds": 0.0001994580088648945,
+                      "p50_seconds": 0.00032749949605204165,
+                      "p95_seconds": 0.00048376021877629685
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "peak_rss_bytes": 451117056
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "graphics_load_seconds": 0.002018583007156849,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02117404292221181,
+                      "minimum_seconds": 0.0001336249988526106,
+                      "p50_seconds": 0.0001455415040254593,
+                      "p95_seconds": 0.00016628081939416004
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02063346398063004,
+                      "minimum_seconds": 8.870899910107255e-05,
+                      "p50_seconds": 0.0001512710005044937,
+                      "p95_seconds": 0.00025038520689122377
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.033668030926492065,
+                      "minimum_seconds": 0.0002389579894952476,
+                      "p50_seconds": 0.0002570000069681555,
+                      "p95_seconds": 0.00027347499708412214
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017024616652633995,
+                      "minimum_seconds": 0.0001248749904334545,
+                      "p50_seconds": 0.00013214550563134253,
+                      "p95_seconds": 0.0001405689414241351
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.020397374784806743,
+                      "minimum_seconds": 8.608301868662238e-05,
+                      "p50_seconds": 0.00015118798182811588,
+                      "p95_seconds": 0.00024954836408142
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03266245513805188,
+                      "minimum_seconds": 0.00023700000019744039,
+                      "p50_seconds": 0.0002542709989938885,
+                      "p95_seconds": 0.0002725500788073987
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 219611136,
+                "read_seconds": 0.01939679100178182,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "graphics_load_seconds": 0.001936917018610984,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.020816289907088503,
+                      "minimum_seconds": 0.00013245799345895648,
+                      "p50_seconds": 0.00014308349636849016,
+                      "p95_seconds": 0.00015742335090180857
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02059637420461513,
+                      "minimum_seconds": 8.766600512899458e-05,
+                      "p50_seconds": 0.00015174999134615064,
+                      "p95_seconds": 0.0002510084683308378
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.033553087880136445,
+                      "minimum_seconds": 0.00023941698600538075,
+                      "p50_seconds": 0.00025602150708436966,
+                      "p95_seconds": 0.0002704669008380733
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01686758385039866,
+                      "minimum_seconds": 0.00012450001668184996,
+                      "p50_seconds": 0.0001308960054302588,
+                      "p95_seconds": 0.00013905395317124203
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02036149683408439,
+                      "minimum_seconds": 8.704201900400221e-05,
+                      "p50_seconds": 0.00015102098404895514,
+                      "p95_seconds": 0.00024677885085111484
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03214474685955793,
+                      "minimum_seconds": 0.00023558398243039846,
+                      "p50_seconds": 0.0002505204902263358,
+                      "p95_seconds": 0.00026601020072121174
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 219611136,
+                "read_seconds": 0.01975458298693411,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+                "graphics_load_seconds": 0.0019777909910771996,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.020547505118884146,
+                      "minimum_seconds": 0.00013104200479574502,
+                      "p50_seconds": 0.0001416040031472221,
+                      "p95_seconds": 0.00015637730539310723
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02057198906550184,
+                      "minimum_seconds": 8.695799624547362e-05,
+                      "p50_seconds": 0.0001517919881734997,
+                      "p95_seconds": 0.0002499001988326199
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.033354668848915026,
+                      "minimum_seconds": 0.0002384590043220669,
+                      "p50_seconds": 0.00025466700026299804,
+                      "p95_seconds": 0.0002721453915000893
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01688670492148958,
+                      "minimum_seconds": 0.00012562499614432454,
+                      "p50_seconds": 0.0001308960054302588,
+                      "p95_seconds": 0.00014150219940347596
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0203665473673027,
+                      "minimum_seconds": 8.637501741759479e-05,
+                      "p50_seconds": 0.00015081251331139356,
+                      "p95_seconds": 0.0002492289684596471
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03225812173332088,
+                      "minimum_seconds": 0.00023583299480378628,
+                      "p50_seconds": 0.00025143798848148435,
+                      "p95_seconds": 0.00026782324857776985
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 219611136,
+                "read_seconds": 0.018863582983613014,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        },
+        "extended": {
+          "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+          "font_bytes": 80682776,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.00829770800191909,
+                "graphics_load_seconds": 0.005662291980115697,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01010929507901892,
+                      "minimum_seconds": 7.56670197006315e-05,
+                      "p50_seconds": 7.856250158511102e-05,
+                      "p95_seconds": 8.297095919260756e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.004129710257984698,
+                      "minimum_seconds": 2.542015863582492e-06,
+                      "p50_seconds": 2.8021007892675698e-05,
+                      "p95_seconds": 6.9948255259078e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05407049576751888,
+                      "minimum_seconds": 0.0002520840207580477,
+                      "p50_seconds": 0.00040560399065725505,
+                      "p95_seconds": 0.0005867437648703344
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009911330125760287,
+                      "minimum_seconds": 7.433400605805218e-05,
+                      "p50_seconds": 7.695850217714906e-05,
+                      "p95_seconds": 8.145210886141285e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001849704683991149,
+                      "minimum_seconds": 1.4159886632114649e-06,
+                      "p50_seconds": 1.2270495062693954e-05,
+                      "p95_seconds": 3.168914408888668e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05287329130806029,
+                      "minimum_seconds": 0.0002570000069681555,
+                      "p50_seconds": 0.0004002920031780377,
+                      "p95_seconds": 0.0005810791510157288
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "peak_rss_bytes": 220299264
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.008347499999217689,
+                "graphics_load_seconds": 0.0056399589811917394,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010109294118592516,
+                      "minimum_seconds": 7.541701779700816e-05,
+                      "p50_seconds": 7.847901724744588e-05,
+                      "p95_seconds": 8.315974992001429e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.003803923027589917,
+                      "minimum_seconds": 2.6250199880450964e-06,
+                      "p50_seconds": 2.38545035244897e-05,
+                      "p95_seconds": 6.849585770396513e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05380862799938768,
+                      "minimum_seconds": 0.0002530000056140125,
+                      "p50_seconds": 0.00040574999002274126,
+                      "p95_seconds": 0.0005851523004821501
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009958789101801813,
+                      "minimum_seconds": 7.40000104997307e-05,
+                      "p50_seconds": 7.71040067775175e-05,
+                      "p95_seconds": 8.208126382669434e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001830121036618948,
+                      "minimum_seconds": 1.4999823179095984e-06,
+                      "p50_seconds": 1.229200279340148e-05,
+                      "p95_seconds": 3.2426748657599074e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.052725915040355176,
+                      "minimum_seconds": 0.00025154202012345195,
+                      "p50_seconds": 0.00039743749948684126,
+                      "p95_seconds": 0.0005818834557430819
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "peak_rss_bytes": 220282880
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.00794316700194031,
+                "graphics_load_seconds": 0.005200040992349386,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010165160085307434,
+                      "minimum_seconds": 7.554100011475384e-05,
+                      "p50_seconds": 7.843700586818159e-05,
+                      "p95_seconds": 8.454770577372983e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0036994989786762744,
+                      "minimum_seconds": 2.749991836026311e-06,
+                      "p50_seconds": 2.2624997654929757e-05,
+                      "p95_seconds": 7.195854268502443e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.053728746017441154,
+                      "minimum_seconds": 0.00026295799762010574,
+                      "p50_seconds": 0.0004031665012007579,
+                      "p95_seconds": 0.000587678856390994
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009907292056595907,
+                      "minimum_seconds": 7.420801557600498e-05,
+                      "p50_seconds": 7.702098810113966e-05,
+                      "p95_seconds": 8.171644440153613e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001920289098052308,
+                      "minimum_seconds": 1.4170072972774506e-06,
+                      "p50_seconds": 1.2666510883718729e-05,
+                      "p95_seconds": 3.349549660924822e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.053120245051104575,
+                      "minimum_seconds": 0.0002624589833430946,
+                      "p50_seconds": 0.0004001454944955185,
+                      "p95_seconds": 0.0005822568040457554
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "peak_rss_bytes": 220430336
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "graphics_load_seconds": 0.0016452920099254698,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.020777415193151683,
+                      "minimum_seconds": 0.00013433300773613155,
+                      "p50_seconds": 0.000141333497595042,
+                      "p95_seconds": 0.00016203068807953968
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02666633593617007,
+                      "minimum_seconds": 0.00012733301264233887,
+                      "p50_seconds": 0.00019754200184252113,
+                      "p95_seconds": 0.0003137335501378402
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03330128893139772,
+                      "minimum_seconds": 0.00023929099552333355,
+                      "p50_seconds": 0.0002547080075601116,
+                      "p95_seconds": 0.00027043574955314397
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01709541500895284,
+                      "minimum_seconds": 0.00012587499804794788,
+                      "p50_seconds": 0.00013091700384393334,
+                      "p95_seconds": 0.00014426470152102406
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.026556044089375064,
+                      "minimum_seconds": 0.00012558299931697547,
+                      "p50_seconds": 0.0001960420049726963,
+                      "p95_seconds": 0.0003133749996777624
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03203446010593325,
+                      "minimum_seconds": 0.00023716699797660112,
+                      "p50_seconds": 0.0002505625016056001,
+                      "p95_seconds": 0.0002619436374516226
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 104235008,
+                "read_seconds": 0.007895417016698048,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "graphics_load_seconds": 0.001986000017495826,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02122537317336537,
+                      "minimum_seconds": 0.00013391600805334747,
+                      "p50_seconds": 0.00014693749835714698,
+                      "p95_seconds": 0.00016067895339801907
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.026838789985049516,
+                      "minimum_seconds": 0.0001264160091523081,
+                      "p50_seconds": 0.00019937499018851668,
+                      "p95_seconds": 0.00031434188567800445
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03350932977627963,
+                      "minimum_seconds": 0.00023725000210106373,
+                      "p50_seconds": 0.0002558544947532937,
+                      "p95_seconds": 0.00027329769800417126
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.016993421013467014,
+                      "minimum_seconds": 0.00012562499614432454,
+                      "p50_seconds": 0.0001322504976997152,
+                      "p95_seconds": 0.00014056864456506445
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.026703076990088448,
+                      "minimum_seconds": 0.00012658300693146884,
+                      "p50_seconds": 0.00019968749256804585,
+                      "p95_seconds": 0.00031316664826590567
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03265921983984299,
+                      "minimum_seconds": 0.0002359169884584844,
+                      "p50_seconds": 0.0002555000100983307,
+                      "p95_seconds": 0.0002701961566344835
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 104235008,
+                "read_seconds": 0.00795437500346452,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+                "graphics_load_seconds": 0.002055458986433223,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02099478806485422,
+                      "minimum_seconds": 0.00013554200995713472,
+                      "p50_seconds": 0.0001448124967282638,
+                      "p95_seconds": 0.0001593834502273239
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.026816586934728548,
+                      "minimum_seconds": 0.00012620800407603383,
+                      "p50_seconds": 0.00019762449664995074,
+                      "p95_seconds": 0.0003136994389933534
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03363704209914431,
+                      "minimum_seconds": 0.00024212501011788845,
+                      "p50_seconds": 0.0002566250041127205,
+                      "p95_seconds": 0.0002729472398641519
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017199793102918193,
+                      "minimum_seconds": 0.00012608300312422216,
+                      "p50_seconds": 0.00013299999409355223,
+                      "p95_seconds": 0.0001450347466743551
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.026661165815312415,
+                      "minimum_seconds": 0.00012737500946968794,
+                      "p50_seconds": 0.00019870849791914225,
+                      "p95_seconds": 0.0003143398047541268
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03263650188455358,
+                      "minimum_seconds": 0.00023733300622552633,
+                      "p50_seconds": 0.000254625003435649,
+                      "p95_seconds": 0.0002687119456822984
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 104235008,
+                "read_seconds": 0.00875287500093691,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        },
+        "default": {
+          "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+          "font_bytes": 89678604,
+          "seed": 2026110723,
+          "samples": 128,
+          "repetitions": 3,
+          "cold_processes": true,
+          "OS_file_cache_controlled": false,
+          "production_accepted": false,
+          "accuracy_acceptance": false,
+          "engines": {
+            "HarfBuzz": [
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.008573125000111759,
+                "graphics_load_seconds": 0.006186084006913006,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010094248980749398,
+                      "minimum_seconds": 7.558398647233844e-05,
+                      "p50_seconds": 7.841648766770959e-05,
+                      "p95_seconds": 8.303990762215108e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.003602675977163017,
+                      "minimum_seconds": 2.6249908842146397e-06,
+                      "p50_seconds": 2.306299575138837e-05,
+                      "p95_seconds": 6.464769103331487e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.051428374979877844,
+                      "minimum_seconds": 0.0002476670197211206,
+                      "p50_seconds": 0.00038516650965902954,
+                      "p95_seconds": 0.0005617579838144592
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009895174123812467,
+                      "minimum_seconds": 7.425001240335405e-05,
+                      "p50_seconds": 7.708399789407849e-05,
+                      "p95_seconds": 8.126480533974244e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0019085410458501428,
+                      "minimum_seconds": 1.6660196706652641e-06,
+                      "p50_seconds": 1.2188000255264342e-05,
+                      "p95_seconds": 3.32629366312176e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05053375693387352,
+                      "minimum_seconds": 0.000225499999942258,
+                      "p50_seconds": 0.0003824164887191728,
+                      "p95_seconds": 0.0005559146127779968
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "peak_rss_bytes": 238272512
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.008654542005388066,
+                "graphics_load_seconds": 0.005924166995100677,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010125453816726804,
+                      "minimum_seconds": 7.54999928176403e-05,
+                      "p50_seconds": 7.845849904697388e-05,
+                      "p95_seconds": 8.437442884314805e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.003848629188723862,
+                      "minimum_seconds": 2.6669877115637064e-06,
+                      "p50_seconds": 2.493748615961522e-05,
+                      "p95_seconds": 6.907905335538087e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05149087207973935,
+                      "minimum_seconds": 0.00022808299399912357,
+                      "p50_seconds": 0.00038720801239833236,
+                      "p95_seconds": 0.0005581103017902933
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009914252936141565,
+                      "minimum_seconds": 7.404200732707977e-05,
+                      "p50_seconds": 7.699998968746513e-05,
+                      "p95_seconds": 8.154164970619604e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0019705060112755746,
+                      "minimum_seconds": 1.4170072972774506e-06,
+                      "p50_seconds": 1.2667005648836493e-05,
+                      "p95_seconds": 3.383309813216328e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.050773083203239366,
+                      "minimum_seconds": 0.00022791599621996284,
+                      "p50_seconds": 0.0003822705039056018,
+                      "p95_seconds": 0.0005568660082644783
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "peak_rss_bytes": 238370816
+              },
+              {
+                "engine": "HarfBuzz",
+                "version": "14.6.0",
+                "read_seconds": 0.0087272499804385,
+                "graphics_load_seconds": 0.005901166994590312,
+                "requests_per_mode": 128,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.010092493786942214,
+                      "minimum_seconds": 7.54999928176403e-05,
+                      "p50_seconds": 7.843800995033234e-05,
+                      "p95_seconds": 8.306864328915254e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.0038404630322474986,
+                      "minimum_seconds": 2.6250199880450964e-06,
+                      "p50_seconds": 2.4020977434702218e-05,
+                      "p95_seconds": 6.932720280019566e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05198507499881089,
+                      "minimum_seconds": 0.00023566701565869153,
+                      "p50_seconds": 0.00039324950193986297,
+                      "p95_seconds": 0.0005617062488454394
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.009915247093886137,
+                      "minimum_seconds": 7.408301462419331e-05,
+                      "p50_seconds": 7.718698179814965e-05,
+                      "p95_seconds": 8.141700527630746e-05
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.001850913860835135,
+                      "minimum_seconds": 1.374981366097927e-06,
+                      "p50_seconds": 1.2333504855632782e-05,
+                      "p95_seconds": 3.263924008933826e-05
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.05055694800103083,
+                      "minimum_seconds": 0.00023970799520611763,
+                      "p50_seconds": 0.00038310450327116996,
+                      "p95_seconds": 0.000555764147429727
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "unshaped_base_outline_mismatches": 128,
+                "accuracy_acceptance": false,
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "peak_rss_bytes": 238403584
+              }
+            ],
+            "CoreText": [
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "graphics_load_seconds": 0.0021644590015057474,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021197544876486063,
+                      "minimum_seconds": 0.00013500000932253897,
+                      "p50_seconds": 0.00014585400640498847,
+                      "p95_seconds": 0.00016217489464906973
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02507888211403042,
+                      "minimum_seconds": 0.00010687499889172614,
+                      "p50_seconds": 0.00018697949417401105,
+                      "p95_seconds": 0.0002952329014078714
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03378899802919477,
+                      "minimum_seconds": 0.00024020799901336432,
+                      "p50_seconds": 0.00025912550336215645,
+                      "p95_seconds": 0.0002758544127573259
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01708920713281259,
+                      "minimum_seconds": 0.00012562499614432454,
+                      "p50_seconds": 0.0001321880117757246,
+                      "p95_seconds": 0.00014170459762681274
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.025098167854594067,
+                      "minimum_seconds": 0.00011620798613876104,
+                      "p50_seconds": 0.00018775000353343785,
+                      "p95_seconds": 0.00029616710962727667
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.032431463041575626,
+                      "minimum_seconds": 0.00023616600083187222,
+                      "p50_seconds": 0.0002521459973650053,
+                      "p95_seconds": 0.0002701665420318022
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 113229824,
+                "read_seconds": 0.009603916987543926,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "graphics_load_seconds": 0.00196954098646529,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.021018874016590416,
+                      "minimum_seconds": 0.00013433300773613155,
+                      "p50_seconds": 0.0001447709946660325,
+                      "p95_seconds": 0.00016258366231340914
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.025187587190885097,
+                      "minimum_seconds": 0.00010687499889172614,
+                      "p50_seconds": 0.00018656300380825996,
+                      "p95_seconds": 0.0002973435563035309
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.033521921053761616,
+                      "minimum_seconds": 0.00023800000781193376,
+                      "p50_seconds": 0.000258270520134829,
+                      "p95_seconds": 0.00027651523414533584
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.017072212096536532,
+                      "minimum_seconds": 0.00012562499614432454,
+                      "p50_seconds": 0.00013341700832825154,
+                      "p95_seconds": 0.00014081874542171136
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02503504609921947,
+                      "minimum_seconds": 0.0001062090159393847,
+                      "p50_seconds": 0.00018579151947051287,
+                      "p95_seconds": 0.00029638169216923417
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.032685918937204406,
+                      "minimum_seconds": 0.00023591599892824888,
+                      "p50_seconds": 0.0002554789971327409,
+                      "p95_seconds": 0.0002680233403225429
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 113229824,
+                "read_seconds": 0.00908245801110752,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              },
+              {
+                "accuracy_acceptance": false,
+                "engine": "CoreText",
+                "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+                "graphics_load_seconds": 0.0020112920028623194,
+                "measurements": [
+                  {
+                    "explicit_hidden_defaults": true,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.020658751018345356,
+                      "minimum_seconds": 0.00013387500075623393,
+                      "p50_seconds": 0.00014147900219541043,
+                      "p95_seconds": 0.00016281239950330929
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02511462412076071,
+                      "minimum_seconds": 0.00010800000745803118,
+                      "p50_seconds": 0.00018856249516829848,
+                      "p95_seconds": 0.0002963857434224337
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.033204086852492765,
+                      "minimum_seconds": 0.0002377500059083104,
+                      "p50_seconds": 0.0002540620043873787,
+                      "p95_seconds": 0.00027167104999534784
+                    }
+                  },
+                  {
+                    "explicit_hidden_defaults": false,
+                    "font_instance_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.01697312601027079,
+                      "minimum_seconds": 0.00012587499804794788,
+                      "p50_seconds": 0.0001320830051554367,
+                      "p95_seconds": 0.00014099760010140018
+                    },
+                    "outline_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.02499617188004777,
+                      "minimum_seconds": 0.00011208400246687233,
+                      "p50_seconds": 0.00018666699179448187,
+                      "p95_seconds": 0.0002952766430098563
+                    },
+                    "shaping_seconds": {
+                      "count": 128,
+                      "sum_seconds": 0.03265237485175021,
+                      "minimum_seconds": 0.0002357090124860406,
+                      "p50_seconds": 0.00025410398666281253,
+                      "p95_seconds": 0.0002700794968404807
+                    }
+                  }
+                ],
+                "omitted_hidden_default_mismatches": 0,
+                "peak_rss_bytes": 113229824,
+                "read_seconds": 0.009312457987107337,
+                "requests_per_mode": 128,
+                "unshaped_base_outline_mismatches": 128
+              }
+            ]
+          }
+        }
+      },
+      "performance_method": "First receipt overlapped verification jobs. The additional original/extended/default sequence ran after those jobs, with three fresh processes per engine per variant; all receipts retained, OS cache uncontrolled."
+    }
+  ],
+  "regression": {
+    "tests": 1069,
+    "passed": 1062,
+    "skipped": 7
+  },
+  "production_accepted": false
+}

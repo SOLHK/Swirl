@@ -1,0 +1,110 @@
+name: Swirl VF exact resident source diagnosis
+
+on:
+  push:
+    branches: [work/swirlvf-delivery-20261102]
+    paths:
+      - '.github/workflows/swirl-vf-source-diagnosis.yml'
+      - 'tools/swirl_vf/platform/diagnose_font_sources.py'
+      - 'tools/swirl_vf/platform/macos_source_baseline.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/attempt_strict_rebuild.py'
+      - 'tools/swirl_vf/tools/build_swirlvf.py'
+      - 'tools/swirl_vf/tools/rebuild.py'
+      - 'tools/swirl_vf/tools/verified_axis_oracle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-source-diagnosis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-resident-source:
+    # Historical exact-original evidence used this independent image. A
+    # missing runner/source is NOT_RUN/BLOCKED, never a substitute font pass.
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned parsers
+        run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Discover exact resident source and measure native identity and axes
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, platform, subprocess, sys, tempfile
+          sys.path.insert(0, str(pathlib.Path('tools/swirl_vf/platform').resolve()))
+          import diagnose_font_sources as diagnosis
+          import macos_source_baseline as baseline
+          import attempt_strict_rebuild as reconstruction
+          expected = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
+          output = pathlib.Path('build/resident-source-aggregates')
+          output.mkdir(parents=True, exist_ok=True)
+          summary = {'status': 'NOT_RUN', 'source_commit': os.environ['GITHUB_SHA'],
+              'host': platform.platform(), 'expected_source_sha256': expected,
+              'font_generated': False, 'production_accepted': False, 'windows11_acceptance': 'NOT_RUN'}
+          code = 2
+          try:
+              summary['tool_versions'] = {name: subprocess.check_output(command, text=True).strip()
+                  for name, command in {
+                      'xcode': ['xcodebuild', '-version'],
+                      'macos_sdk': ['xcrun', '--sdk', 'macosx', '--show-sdk-version'],
+                      'swift': ['xcrun', 'swiftc', '--version'],
+                  }.items()}
+              summary['python'] = platform.python_version()
+              summary['fonttools'] = diagnosis.fontTools.__version__
+              summary['harfbuzz'] = diagnosis.hb.version_string()
+              with tempfile.TemporaryDirectory(prefix='swirl-private-source-') as private_name:
+                  private = pathlib.Path(private_name)
+                  swift, binary = private/'probe.swift', private/'probe'
+                  swift.write_text(diagnosis.harness())
+                  build = subprocess.run(['xcrun', 'swiftc', '-O', str(swift), '-o', str(binary)], capture_output=True, timeout=180)
+                  if build.returncode:
+                      raise ValueError('source_probe_compile_failed')
+                  probe = subprocess.run([str(binary)], capture_output=True, timeout=180, check=True)
+                  inventory = json.loads(probe.stdout)
+                  paths, errors = diagnosis.discover(inventory, [pathlib.Path('/System/Library'), pathlib.Path('/Library/Fonts')])
+                  matching = [p for p in paths if p.is_file() and diagnosis.digest(p) == expected]
+                  summary.update(discovered_resources=len(paths), exact_source_locations=len(matching),
+                                 discovery_error_count=len(errors))
+                  if not matching:
+                      summary['status'] = 'BLOCKED_EXACT_SOURCE_NOT_RESIDENT'
+                  else:
+                      source = matching[0]
+                      full = diagnosis.run(source, private/'diagnosis', expected)
+                      summary['native_sources'] = diagnosis.public_summary(full)
+                      baseline.run(source, private/'baseline', expected)
+                      checked = json.loads((private/'baseline'/'baseline.json').read_text())
+                      summary['axis_baseline'] = checked['summary']
+                      b = checked['summary']
+                      accepted = b['physical_faces_verified'] == 32 and b['axis_requests'] > 0 and b['axis_strict_passes'] == b['axis_requests']
+                      # Attempt the existing converter even when the independent
+                      # raw-axis gate fails. The existing verified adapter must
+                      # prove every GID replay exactly; no raw guard is relaxed.
+                      summary['strict_rebuild'] = reconstruction.run(source, private/'strict-rebuild', expected)
+                      rebuilt = summary['strict_rebuild']
+                      summary['font_generated'] = rebuilt['output_generated']
+                      built = rebuilt['output_generated'] and rebuilt.get('process_exit_code') == 0 and rebuilt.get('source_unchanged') is True
+                      summary['status'] = 'SAMPLED_ONLY_PLATFORM_UNVERIFIED' if accepted and built else 'BLOCKED_NATIVE_SOURCE_AXES_OR_REBUILD'
+                      code = 0 if accepted and built else 1
+          except Exception as error:
+              summary.update(status='FAILED', error_type=type(error).__name__)
+          finally:
+              (output/'summary.json').write_text(json.dumps(summary, indent=2, allow_nan=False)+'\n')
+              print(json.dumps(summary, allow_nan=False))
+          raise SystemExit(code)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-resident-source-aggregates-${{ github.sha }}
+          path: build/resident-source-aggregates/summary.json
+          retention-days: 7

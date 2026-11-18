@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "nonce": "49eb7e56c9fe46099679e38c792bafaa",
+  "name": "SwirlIdentitySmoke-49eb7e56c9fe46099679e38c792bafaa",
+  "directory": "D:\\a\\_temp\\swirl-service-identity-smoke",
+  "image": "D:\\a\\_temp\\swirl-service-identity-smoke\\identity-worker.exe",
+  "image_sha256": "626d809e6f65331d870dabdd4274675e96e84be1561b58fce8c3374ec6968f99",
+  "endpoint": "127.0.0.1:50146"
+}

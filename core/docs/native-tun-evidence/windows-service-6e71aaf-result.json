@@ -1,0 +1,6 @@
+{
+  "error": "A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. (os error 10060)",
+  "nonce": "a25063eaed344f6195b3d12295e36167",
+  "ok": false,
+  "sdk_code": 10060
+}

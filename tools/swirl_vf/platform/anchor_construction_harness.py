@@ -24,7 +24,9 @@ MODE_ENV = "SWIRL_VF_ANCHOR_MODE"
 
 # Bind the exact reviewed production helpers. A later prefix change requires an
 # explicit source review and a corresponding update, not silent diagnostic drift.
-REVIEWED_PRODUCTION_PREFIX_SHA256 = "3f08090f15e7fb7d69e1c63516d129a4b066e7e4f5f6bfb4c8645b561c31e792"
+# 2026-11-02: reviewed CFF2 empty-CharString proof only. Construction, strict axis
+# validation, identity checks and extractGlyph are byte-identical to c824c2ee.
+REVIEWED_PRODUCTION_PREFIX_SHA256 = "e6cf906e907db19cc3a8f02f9f4d215ae26d23c5f4cea86bad36d46711a83991"
 _RUN = "\nfunc run() throws {"
 _MARKER = "// SWIRL_VF_ANCHOR_CONSTRUCTION_DIAGNOSTIC"
 _PLATEAU_MARKER = "// SWIRL_VF_PLATEAU_CONSTRUCTION_DIAGNOSTIC"

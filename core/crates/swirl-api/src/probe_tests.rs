@@ -40,6 +40,156 @@ fn accept_bounded(listener: &TcpListener) -> TcpStream {
     }
 }
 
+fn command(controller: &mut Controller, command: Value) -> Value {
+    controller.dispatch(&serde_json::to_vec(&command).unwrap())
+}
+
+fn wait_probe(controller: &mut Controller, handle: u64) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let status = command(controller, json!({"op":"probe_status","handle":handle}));
+        assert_eq!(status["ok"], true);
+        if status["probe"]["state"] != "running" {
+            return status;
+        }
+        assert!(Instant::now() < deadline, "physical probe never completed");
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn a_physical_probe_cannot_override_a_routed_core() {
+    let mut controller = Controller::default();
+    let started = command(
+        &mut controller,
+        json!({"op":"start","config":{
+            "schema":1,"listen":"127.0.0.1:0","selected":"direct",
+            "nodes":[{"id":"direct","outbound":{"type":"direct"}}],
+            "rules":[{"matcher":{"type":"match"},"outbound":"direct"}]
+        }}),
+    );
+    assert_eq!(started["ok"], true);
+    let handle = started["handle"].as_u64().unwrap();
+    let result = command(
+        &mut controller,
+        json!({"op":"probe_start","handle":handle,
+        "url":"http://127.0.0.1:9/","physical_egress":true}),
+    );
+    assert_eq!(result["ok"], false);
+    assert_eq!(result["error"], "ProbePhysicalWorkerRequired");
+    assert_eq!(
+        command(&mut controller, json!({"op":"stop","handle":handle}))["ok"],
+        true
+    );
+}
+
+#[cfg(not(windows))]
+#[test]
+fn unsupported_physical_probe_never_falls_back_to_an_unbound_request() {
+    let mut controller = Controller::default();
+    let started = command(
+        &mut controller,
+        json!({"op":"start","config":{
+            "schema":1,"listen":"127.0.0.1:0","selected":"direct",
+            "nodes":[{"id":"direct","outbound":{"type":"direct"}}]
+        }}),
+    );
+    assert_eq!(started["ok"], true);
+    let handle = started["handle"].as_u64().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let launched = command(
+        &mut controller,
+        json!({"op":"probe_start","handle":handle,
+        "url":format!("http://{}/",listener.local_addr().unwrap()),"physical_egress":true}),
+    );
+    assert_eq!(launched["ok"], true);
+    let result = wait_probe(&mut controller, handle);
+    assert_eq!(result["probe"]["state"], "failed");
+    assert_eq!(result["probe"]["failure"]["code"], "ProbeEgressUnsupported");
+    assert_eq!(
+        listener.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    assert_eq!(
+        command(&mut controller, json!({"op":"stop","handle":handle}))["ok"],
+        true
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_physical_probe_completes_configured_dns_and_http_over_bound_sockets() {
+    use std::net::{IpAddr, SocketAddr, UdpSocket};
+    let physical = swirl_platform::physical_network::physical_probe_interfaces().unwrap();
+    let source = physical
+        .iter()
+        .find(|entry| entry.source.is_ipv4())
+        .unwrap()
+        .source;
+    let origin = TcpListener::bind(SocketAddr::new(source, 0)).unwrap();
+    let port = origin.local_addr().unwrap().port();
+    let dns = UdpSocket::bind(SocketAddr::new(source, 0)).unwrap();
+    dns.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let dns_address = dns.local_addr().unwrap();
+    let dns_peer = thread::spawn(move || {
+        let mut bytes = [0; 2048];
+        let (length, remote) = dns.recv_from(&mut bytes).unwrap();
+        assert_eq!(remote.ip(), source);
+        let question = swirl_dns::decode_query(&bytes[..length]).unwrap();
+        assert_eq!(question.name, "physical-probe.fixture.invalid");
+        assert_eq!(question.kind, swirl_dns::DNS_A);
+        let response = swirl_dns::encode_response(&question, &[source], 30, 0).unwrap();
+        dns.send_to(&response, remote).unwrap();
+    });
+    let http_peer = thread::spawn(move || {
+        let mut stream = accept_bounded(&origin);
+        assert_eq!(stream.peer_addr().unwrap().ip(), source);
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut request = Vec::new();
+        while !request.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            stream.read_exact(&mut byte).unwrap();
+            request.push(byte[0]);
+            assert!(request.len() < 8192);
+        }
+        assert!(request.starts_with(b"HEAD /complete HTTP/1.1\r\n"));
+        stream
+            .write_all(b"HTTP/1.1 204 No Content\r\n\r\n")
+            .unwrap();
+    });
+    let mut controller = Controller::default();
+    let started = command(
+        &mut controller,
+        json!({"op":"start","config":{
+            "schema":1,"listen":"127.0.0.1:0","selected":"direct",
+            "nodes":[{"id":"direct","outbound":{"type":"direct"}}],
+            "dns":{"servers":[dns_address.to_string()],"query_family":"ipv4_only","use_system_hosts":false}
+        }}),
+    );
+    assert_eq!(started["ok"], true);
+    let handle = started["handle"].as_u64().unwrap();
+    let launched = command(
+        &mut controller,
+        json!({"op":"probe_start","handle":handle,
+        "url":format!("http://physical-probe.fixture.invalid:{port}/complete"),"physical_egress":true}),
+    );
+    assert_eq!(launched["ok"], true);
+    let result = wait_probe(&mut controller, handle);
+    assert_eq!(result["probe"]["state"], "succeeded", "{result}");
+    assert_eq!(result["probe"]["metrics"]["http_status"], 204);
+    assert!(!result.to_string().contains(&IpAddr::to_string(&source)));
+    assert_eq!(
+        command(&mut controller, json!({"op":"stop","handle":handle}))["ok"],
+        true
+    );
+    dns_peer.join().unwrap();
+    http_peer.join().unwrap();
+}
+
 #[test]
 fn ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status() {
     let started = ffi(json!({

@@ -1,0 +1,18 @@
+{
+    "child_exit_code": 0,
+    "child_normal_exit": true,
+    "child_stopped": true,
+    "data_tag": "pac-only-external-edit",
+    "exact_exit_snapshot": true,
+    "external_edit": true,
+    "flags": 5,
+    "http_roundtrip": true,
+    "pid": 6544,
+    "runner_original_restored": true,
+    "runtime_port": 52454,
+    "schema": 1,
+    "socks5_roundtrip": true,
+    "source_sha": "ec7e54fced672561f8f06f958b75f1364403184e",
+    "success": false,
+    "winhttp_unchanged": true
+}

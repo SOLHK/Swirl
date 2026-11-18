@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "scope": "optional-pr61-synthetic-cross-version-installer-acceptance",
+  "opt_in_label": "qa-cross-version-upgrade",
+  "repository": "SOLHK/Swirl",
+  "pull_request": 61,
+  "head_branch": "work/node-probe-render-20261105",
+  "base_branch": "test",
+  "candidate_version": "0.2.40",
+  "baseline": {
+    "version": "0.2.39",
+    "source_sha": "acd7005c99a99c4f81b62d328fcc15883d51b62a",
+    "run_id": 42033161827,
+    "artifact_id": 13424971381,
+    "artifact_name": "Swirl-Windows-Installer-EXE",
+    "zip_sha256": "e9fa544bcd28ed497aaec9c2ed5f1779a2790abbc3d52c74fb7e933d7942683a",
+    "zip_bytes": 60136202,
+    "exe_name": "Swirl-Setup.exe",
+    "exe_sha256": "6b8a694f295cc80ff7f156eb163ed886eece5059000172dc52f97de9face0f5c",
+    "exe_bytes": 60561452,
+    "package_manifest_sha256": "b64753518e0e8c8cf2df66d79e40d99619624f2857c1e456e6e38d028212b53c",
+    "application_sha256": "334ba997d6e425d62d7d9fc30c35d43508976c6b80193a88a9d1d613692f5d6a",
+    "rust_build_id": "7c63542f2b452dc1ad6f0d59a052f42509d27f5db910386632c17c4fa144f810"
+  },
+  "identical_persistence_sources": {
+    "src/Swirl.Quick/engine/NodeStore.cpp": "cbbf0e071895e04a0b8c55eb062c134c1dd229e1",
+    "src/Swirl.Quick/engine/NodeStore.h": "37150c941a313afa6089195f1d31d96f47d57da4"
+  },
+  "scope_limits": [
+    "This is an explicit one-time QA input, not a release approval or a default CI dependency.",
+    "Without the exact opt-in label and repository/PR/head/base scope, no baseline is downloaded.",
+    "An expired artifact or mismatched source, version, ZIP or EXE hash must fail; never substitute another package.",
+    "The current separately paired helper seeds fixed synthetic V1 data using unchanged production NodeStore sources; it is not the historical application writer.",
+    "Actual old and new installers and ordinary application launches are observed on one disposable standard-user profile; original private profiles and live providers are not tested."
+  ]
+}

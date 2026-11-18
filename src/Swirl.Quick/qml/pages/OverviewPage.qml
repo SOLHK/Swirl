@@ -62,11 +62,19 @@ Item {
                 onConfigure: AppState.navigate("activity")
             }
             AccessRow {
-                title: qsTr("增强模式")
-                description: qsTr("当前 Rust Core 尚未实现 TUN 数据通路，无法接管不遵循系统代理的应用。")
-                status: active ? qsTr("已启用") : qsTr("尚未支持")
-                active: page.engineController.tunEnabled; available: active && !page.engineController.busy
-                onToggled: on => { if (!page.engineController.setTunEnabled(!page.engineController.tunRequested)) AppState.notice(page.engineController.routingError || page.engineController.networkConfigurationError) }
+                title: qsTr("TUN 模式")
+                enabled: !page.engineController.busy && !page.engineController.policyBusy && !page.engineController.tunRecoveryBusy
+                description: qsTr("开启前确认管理员授权；切换期间连接可能短暂中断。")
+                status: {
+                    const state = page.engineController.tunRecoveryBusy ? qsTr("恢复中") : page.engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : page.engineController.tunBusy ? qsTr("切换中") : page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待启用") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+                    return page.engineController.routingError.length && !page.engineController.tunEnabled ? state + " · " + page.engineController.routingError : state
+                }
+                active: page.engineController.tunEnabled; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy && !page.engineController.tunRecoveryBusy
+                toggleVisible: !page.engineController.tunRecoveryRequired && !(page.engineController.tunRequested && !page.engineController.tunEnabled)
+                configurable: page.engineController.tunRecoveryRequired || (page.engineController.tunRequested && !page.engineController.tunEnabled)
+                configureLabel: page.engineController.tunRecoveryRequired ? qsTr("恢复 TUN 网络") : qsTr("取消待启用")
+                onConfigure: AppState.requestTunEnabled(page.engineController.tunRecoveryRequired)
+                onToggled: on => AppState.requestTunEnabled(on)
             }
             SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("局域网与设备"); description: qsTr("地址、认证与客户端配置可以保留；当前未支持的接管能力无法开启。") }
             AccessRow {
@@ -79,7 +87,7 @@ Item {
             }
             AccessRow {
                 title: qsTr("网关模式")
-                description: qsTr("管理网关配置、客户端记录与 CSV。当前 Rust Core 不支持 TUN 网关转发。")
+                description: qsTr("管理网关配置、客户端记录与 CSV。本测试版尚未接入 TUN 网关启动与恢复组件。")
                 status: gatewayProvider.busy ? qsTr("正在配置") : gatewayProvider.running ? qsTr("启用") : gatewayProvider.configured ? qsTr("配置已保留，转发尚未支持") : qsTr("尚未配置，转发尚未支持")
                 active: gatewayProvider.running; available: active && !gatewayProvider.busy; configurable: true; configureLabel: qsTr("管理设备")
                 onConfigure: AppState.navigate("gateway")

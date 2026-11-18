@@ -1,0 +1,31 @@
+{
+    "child_exit_code": 0,
+    "child_normal_exit": true,
+    "child_stopped": true,
+    "data_tag": "pac-only",
+    "exact_exit_snapshot": true,
+    "external_edit": false,
+    "flags": 5,
+    "http_roundtrip": true,
+    "journal_and_guard_markers_removed": true,
+    "listener_probe": {
+        "connected": false,
+        "deadline_ms": 3000,
+        "elapsed_ms": 3001,
+        "error_observed": false,
+        "outcome": "deadline",
+        "refused": false,
+        "signal_error": -1,
+        "socket_error": -1,
+        "socket_state": 2,
+        "terminal_observed": false
+    },
+    "pid": 4804,
+    "runner_original_restored": true,
+    "runtime_port": 60371,
+    "schema": 1,
+    "socks5_roundtrip": true,
+    "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+    "success": false,
+    "winhttp_unchanged": true
+}

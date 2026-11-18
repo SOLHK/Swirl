@@ -85,9 +85,7 @@ Row {
                     else controls.targetWindow.showMaximized()
                 } else controls.targetWindow.close()
             }
-            ToolTip.visible: hovered && !previewCaptureMode
-            ToolTip.delay: 650
-            ToolTip.text: Accessible.name
+
         }
     }
 }

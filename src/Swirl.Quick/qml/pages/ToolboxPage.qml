@@ -19,7 +19,7 @@ Item {
     Connections{target:page.componentReady?page:null;function onVisibleChanged(){if(page.visible)page.refreshNetwork()}}
     readonly property bool measuring:engineController.telemetry.measurementState==="正在测量"
     readonly property string measurementPhase:page.measuring?"pending":/^\d+ ms$/.test(engineController.telemetry.latencies.internet||"")?"succeeded":engineController.telemetry.measurementState==="测量完成"?"failed":"idle"
-    SwirlArcMotion{id:tabMotion;targetX:Math.max(0,page.tools.indexOf(page.tool))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:Math.max(0,page.tools.indexOf(page.tool))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout{
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("网络诊断");description:qsTr("分别查看 HTTPS 请求、网关 ICMP 与 DNS 查询耗时。");metadata:qsTr("各项分别采样，HTTPS 请求耗时包含连接、TLS 与目标响应")

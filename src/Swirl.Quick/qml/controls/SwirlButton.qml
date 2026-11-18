@@ -16,7 +16,7 @@ SwirlMotionButton {
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.weight: control.primary ? Font.DemiBold : Font.Medium
-    SwirlFontBinding { target: control; textRole: "button" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: "button" }
     font.hintingPreference:Font.PreferFullHinting
     font.pixelSize:Theme.buttonSize
     leftPadding:Theme.dp(16); rightPadding:Theme.dp(16)
@@ -61,9 +61,5 @@ SwirlMotionButton {
         }
     }
     Accessible.name: text
-    SwirlToolTip {
-        parent:control
-        visible:(control.hovered || control.visualFocus) && label.truncated && !previewCaptureMode
-        text:label.text
-    }
+
 }

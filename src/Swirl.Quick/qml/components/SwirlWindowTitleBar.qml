@@ -19,6 +19,7 @@ Item {
     }
     SwirlWindowControls { anchors.right: parent.right; height: parent.height; targetWindow: bar.targetWindow }
     SwirlText {
+        textRole: "pageTitle"; fitInFixedWidth: true
         x:Theme.dp(16);anchors.verticalCenter:parent.verticalCenter;width:Math.max(0,parent.width-Theme.dp(170));horizontalAlignment:Text.AlignLeft
         text:bar.targetWindow.title;color:Theme.text;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight
     }

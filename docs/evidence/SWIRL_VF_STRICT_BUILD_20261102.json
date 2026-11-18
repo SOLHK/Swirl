@@ -1,0 +1,247 @@
+{
+  "status": "PARTIAL_BLOCKED",
+  "source_commit": "cfebb62ec56c7ba3677a927091ba48d7cd562f5b",
+  "pr_merge_checkout": "09a83263d6de77411d1c3a9a40424c6d0a4f3167",
+  "runs": {
+    "resident_source": {
+      "id": 41365043273,
+      "job": 125023305540,
+      "conclusion": "failure"
+    },
+    "font_pr": {
+      "id": 41365047414,
+      "conclusion": "failure",
+      "jobs": {
+        "python": {
+          "id": 125023319088,
+          "conclusion": "success",
+          "tests": 914,
+          "skips": 0,
+          "audit_tests": 6
+        },
+        "directwrite": {
+          "id": 125023319060,
+          "conclusion": "success",
+          "scope": "authored fixtures on Windows Server 2022; no final-font or Windows 11 acceptance"
+        },
+        "apple": {
+          "id": 125023318801,
+          "conclusion": "failure",
+          "strict_error": "face 0 gid 2 vertical advance actual 849 expected 850 tolerance 0.03125"
+        }
+      }
+    },
+    "qt_pr": {
+      "id": 41365047454,
+      "job": 125023319048,
+      "conclusion": "success",
+      "ctest_passed": 3,
+      "ctest_failed": 0,
+      "qtest_passes": 62,
+      "declared_skips": 9,
+      "report_gate_errors": 0,
+      "scope": "Qt 6.12.0 authored fonts on hosted Windows Server; final-font and physical display acceptance NOT_RUN",
+      "complete_application": "SKIPPED_BY_EXISTING_PR_POLICY"
+    }
+  },
+  "local": {
+    "tests": 914,
+    "skips": 7,
+    "failures": 0,
+    "audit_tests": 6
+  },
+  "resident_source": {
+    "status": "BLOCKED_NATIVE_SOURCE_AXES_OR_REBUILD",
+    "source_commit": "cfebb62ec56c7ba3677a927091ba48d7cd562f5b",
+    "host": "macOS-27.0.1-arm64-arm-64bit",
+    "expected_source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "font_generated": false,
+    "production_accepted": false,
+    "windows11_acceptance": "NOT_RUN",
+    "tool_versions": {
+      "xcode": "Xcode 27.1\nBuild version 27A9275",
+      "macos_sdk": "27.0",
+      "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0"
+    },
+    "python": "3.12.10",
+    "fonttools": "4.61.1",
+    "harfbuzz": "14.6.0",
+    "discovered_resources": 1,
+    "exact_source_locations": 1,
+    "discovery_error_count": 63,
+    "native_sources": {
+      "status": "DIAGNOSIS_COMPLETE_NOT_FONT_ACCEPTANCE",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "source_unchanged": true,
+      "cases": {
+        "supplied-source": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 32,
+          "url_descriptors": 268,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": true,
+          "register_error_code": null,
+          "source_unchanged": true
+        },
+        "system-0": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 32,
+          "url_descriptors": 268,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": true,
+          "register_error_code": null,
+          "source_unchanged": true
+        },
+        "system-0-copy": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 0,
+          "url_descriptors": 0,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": false,
+          "register_error_code": 103,
+          "source_unchanged": true
+        }
+      },
+      "same_bytes_different_location_controls": {
+        "system-0": {
+          "byte_identical": true,
+          "differing_api_fields": [
+            "native_identity_faces",
+            "register_error_code",
+            "registered",
+            "url_descriptors"
+          ]
+        }
+      },
+      "font_generated": false,
+      "production_accepted": false,
+      "windows11_acceptance": "NOT_RUN"
+    },
+    "axis_baseline": {
+      "status": "SOURCE_IDENTITY_VERIFIED_NOT_CONVERSION",
+      "face_count": 32,
+      "physical_faces_verified": 32,
+      "axis_requests": 384,
+      "axis_strict_passes": 288,
+      "font_generated": false,
+      "windows11_acceptance": "NOT_RUN"
+    },
+    "strict_rebuild": {
+      "status": "BLOCKED",
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "outline_limit_font_units": 0.03125,
+      "metric_limit_font_units": 0.03125,
+      "cubic_approximation_limit_font_units": 0.015625,
+      "output_generated": false,
+      "production_accepted": false,
+      "windows11_acceptance": "NOT_RUN",
+      "compiler_exit_code": 0,
+      "native_binary_sha256": "214d08a1b580784916c1c57fa29ba89c4129cfbffa377adaaf3e46a7bb30a224",
+      "verified_axis_launcher_sha256": "a7058cf9f82eda35b7d464e077c5d4ae7c9be7cf4776cf2372a1c2474d31b5b8",
+      "builder_sha256": "138afabdd352ad9e92fd80fa934374f5e16925f86438764ccd8d9b7e07bb8301",
+      "engine_sha256": "ebfa3ec1ac3938378877b72afe2a4f3694655b0f1296830a398bcd51a92a1781",
+      "axis_acceptance": "every_requested_GID_exact_native_replay_before_batch_release",
+      "original_strict_readback_tolerance": 1e-06,
+      "process_exit_code": 2,
+      "native_faces_verified": 32,
+      "face_progress": [
+        {
+          "face_index": 0,
+          "glyph_count": 47102,
+          "glyphs_completed": 0,
+          "max_outline_error": 0,
+          "max_metric_error": 0
+        }
+      ],
+      "native_observation_progress": {
+        "attempted_batches_this_run": 91,
+        "completed_batches_this_run": 91,
+        "glyph_observations_in_completed_batches_this_run": 5824
+      },
+      "failures": [
+        {
+          "reason": "native horizontal coordinate of vertical origin is not representable by standard vmtx",
+          "context": {
+            "face_index": 0,
+            "glyph_id": 0,
+            "adaptive_points": 0,
+            "stage": "glyph_reconstruction",
+            "user_location": {},
+            "metric_representation": {
+              "field": "vertical_origin_x",
+              "sample_number": 1,
+              "sample_kind": "training",
+              "absolute_error_font_units": 100,
+              "representation_tolerance_font_units": 1e-05,
+              "user_location": {
+                "HGHT": 500,
+                "WDTH": 1,
+                "wght": 501
+              }
+            }
+          }
+        }
+      ],
+      "source_unchanged": true
+    }
+  },
+  "font_generated": false,
+  "production_accepted": false,
+  "windows11_acceptance": "NOT_RUN",
+  "final_font_qt_acceptance": "NOT_RUN",
+  "test_merge": "NOT_PERFORMED",
+  "downloaded_artifacts": [
+    {
+      "artifact_id": 13106683174,
+      "bytes": 1777,
+      "sha256": "8fd77f919af395a5429cc4bc53fe94fea2d56993da73693f86bf9f50a51ee4a6",
+      "download_verified_against_github_size_and_digest": true
+    },
+    {
+      "artifact_id": 13107205840,
+      "bytes": 285362,
+      "sha256": "938c504592c8b2574b8d0bcd944508d37c5e62fea83d7ab950e294f02ac952be",
+      "download_verified_against_github_size_and_digest": true
+    },
+    {
+      "artifact_id": 13106094404,
+      "bytes": 40308,
+      "sha256": "5ef3dd20e1370405f1e6743168679515058bdea45d1a3fc4095798facfbf4550",
+      "download_verified_against_github_size_and_digest": true
+    },
+    {
+      "artifact_id": 13106857838,
+      "bytes": 15356,
+      "sha256": "dd1a8cb387baad078258f7b8212b87cfbe453d83a7bd21e81c34cf11e570d914",
+      "download_verified_against_github_size_and_digest": true
+    }
+  ]
+}

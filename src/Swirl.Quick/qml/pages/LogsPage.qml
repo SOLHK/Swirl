@@ -13,7 +13,7 @@ Item {
     property var selected:null
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
- SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
+ readonly property Item ownedDetailClock: SwirlTransitionCoordinator {id:detailClock;parent:page;duration:SwirlMotion.dialogDuration}
     property bool followTail:true
     property var records:visible?(systemProvider.revision,systemProvider.logs()):[]
     readonly property var displayLogs:records.filter(function(r){

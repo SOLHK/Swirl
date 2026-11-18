@@ -9,10 +9,25 @@ Linux 的占位入口只返回 77 / `NOT_RUN`，不能用于字体兼容性证�
 在有 Visual Studio 2022 C++ 桌面工具、Windows SDK、CMake 和 PowerShell 7 的 Windows 11 电脑上运行：
 
 ```powershell
-.\run_directwrite_probe.ps1 -Font "D:\Codex\Swirl-VF\Swirl-VF.ttc" -OutputDirectory "D:\Codex\Swirl-VF\evidence\windows-first" -Render
+.\run_directwrite_probe.ps1 -Font "D:\Codex\Swirl-VF\SwirlVF.ttc" -OutputDirectory "D:\Codex\Swirl-VF\evidence\windows-first" -Render
 ```
 
-每次选择新的输出目录。没有 `Swirl-VF.ttc` 就记录尚未运行，不会把原版重命名成 Windows 字体。`-Binary` 可以指定已编译的程序；`-AllGlyphs` 会把每个字体面、每个测试坐标位置的检查扩展到所有 glyph ID，可能明显增加运行时间。
+每次选择新的输出目录。没有 `SwirlVF.ttc` 就记录尚未运行，不会把原版重命名成 Windows 字体。`-Binary` 可以指定已编译的程序；`-AllGlyphs` 会把每个字体面、每个测试坐标位置的检查扩展到所有 glyph ID，可能明显增加运行时间。
+
+完整集合的私有检查可以使用带输入 SHA-256 和终结记录校验的现有 Python 包装器。
+在 Windows 11 x64 上，将仓库、字体和输出放在 `D:\Codex` 下，使用实际候选的哈希：
+
+```powershell
+python tools\swirl_vf\platform\p8_windows_local.py `
+  --font D:\Codex\private\SwirlVF.ttc `
+  --expected-sha256 <candidate-SHA256> --font-scope original_derived_candidate `
+  --expected-faces 32 --expected-glyphs 47102 --all-glyphs `
+  --output D:\Codex\private\windows11-full-first
+```
+
+`--all-glyphs` 转交原生工具的 `-AllGlyphs`，并要求原生终结记录确认该模式、每面实际
+检查数量等于该面的完整 GID 数。省略它仅报告 `SAMPLED_GIDS`。两种模式都不能代替
+原始轮廓精度、排版、系统安装及真实 Qt/Swirl 验收；报告继续明确保留这些未运行项。
 
 轴标签区分大小写。实际 DirectWrite 实例可同时报告自定义 `WDTH` 与内建 `wdth`，脚本使用 `ConvertFrom-Json -AsHashtable` 完整保留二者。首轮原生 CI 在 C++ 检查成功后暴露了默认 PowerShell JSON 对象不能容纳这两个键的问题；修复处理方式，没有删除或改名任何轴。
 

@@ -61,8 +61,18 @@ try {
     & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $BuildDir -Destination $DistDir -OpenSslRoot $openssl
     $stage = (Resolve-Path -LiteralPath $DistDir).Path
     $p = Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
-    if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Packaged Qt UI smoke timed out.' }
-    if ($p.ExitCode) { throw 'Packaged Qt UI smoke failed.' }
+    $smokeDiag = Join-Path $stage 'Swirl-diagnostics.txt'
+    if (-not $p.WaitForExit(75000)) {
+        $p.Kill()
+        if (Test-Path -LiteralPath $smokeDiag) { Get-Content -LiteralPath $smokeDiag -Tail 15 | ForEach-Object { Write-Host "[smoke-timeout] $_" } }
+        throw "Packaged Qt UI smoke timed out (diagnostics: $smokeDiag)."
+    }
+    if ($p.ExitCode) {
+        if (Test-Path -LiteralPath $smokeDiag) {
+            Get-Content -LiteralPath $smokeDiag | Where-Object { $_ -match '^[123]: |QML_VME_WARNING_CONTEXT|Cannot find member data|is not a function' } | Select-Object -First 10 | ForEach-Object { Write-Host "[smoke-error] $_" }
+        }
+        throw "Packaged Qt UI smoke failed with exit code $($p.ExitCode) (diagnostics: $smokeDiag)."
+    }
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     $out = (Resolve-Path -LiteralPath $OutDir).Path
     $uninstallList = Join-Path $out 'Swirl-UninstallFiles.nsh'

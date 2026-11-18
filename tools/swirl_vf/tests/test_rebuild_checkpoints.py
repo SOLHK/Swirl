@@ -55,7 +55,7 @@ class RebuildCheckpointTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.source = self.root / "original-three-face.ttc"
         write_fixture(self.source, faces=3)
-        self.output = self.root / "Swirl-VF.ttc"
+        self.output = self.root / "SwirlVF.ttc"
         self.checkpoints = self.root / "private-checkpoints"
         self.executable = self.root / "original-oracle-double"
         self.executable.write_text("original analytic oracle protocol identity\n", encoding="utf-8")
@@ -178,7 +178,7 @@ class RebuildCheckpointTests(unittest.TestCase):
         self.assertEqual(len(set(original.logs)), 3)
         self.assertEqual([{face for face, _, _ in s.requests} for s in original.sessions], [{0}, {1}, {2}])
         self.assertTrue(all(s.finish_count == s.close_count == 1 for s in original.sessions))
-        self.output = self.root / "restored-output" / "Swirl-VF.ttc"
+        self.output = self.root / "restored-output" / "SwirlVF.ttc"
         resumed = OracleSessions(self.source)
         second = self.invoke(2, resumed)
         self.assertTrue(second["output_generated"])
@@ -192,7 +192,7 @@ class RebuildCheckpointTests(unittest.TestCase):
                          [face["native_face_transcript"] for face in second["faces"]])
         self.assertTrue(all(face["native_face_transcript"]["request_count"] > 0 for face in second["faces"]))
 
-        self.output = self.root / "rejected-restore" / "Swirl-VF.ttc"
+        self.output = self.root / "rejected-restore" / "SwirlVF.ttc"
         def reject_empty_session(oracle, index):
             oracle.finish = mock.Mock(side_effect=rebuild.ReconstructionError("empty-session-transcript-rejected"))
         rejected = OracleSessions(self.source, configure=reject_empty_session)

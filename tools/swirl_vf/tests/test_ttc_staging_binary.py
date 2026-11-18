@@ -96,6 +96,16 @@ class BinaryCollectionTests(unittest.TestCase):
                     self.assertFalse(list(self.root.glob('.ttc-staging-*')))
         self.assertEqual([hashlib.sha256(p.read_bytes()).hexdigest() for p in self.paths], source_hashes)
 
+
+    def test_binary_checker_is_bound_into_checkpoint_recipe(self):
+        import ttc_staging_engine as engine
+        previous = engine.builder_identity()
+        actual = engine.file_digest
+        def changed_module(path):
+            return '0'*64 if Path(path).name == 'ttc_staging_binary.py' else actual(path)
+        with mock.patch.object(engine, 'file_digest', side_effect=changed_module):
+            self.assertNotEqual(engine.builder_identity(), previous)
+
     def test_packer_attaches_independent_binary_evidence(self):
         target = self.root / 'reported.ttc'
         result = pack.pack_collection(self.paths, target)

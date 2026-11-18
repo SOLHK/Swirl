@@ -1,0 +1,232 @@
+{
+  "scope": "authored fractional glyf/gvar compatibility control; no original source glyph accepted",
+  "workflow_run": "https://github.com/SOLHK/Swirl/actions/runs/41582587871",
+  "commit": "0eb0013632af4bf46e0f70bdae7c5a441a529d24",
+  "Windows_11_client": "NOT_RUN",
+  "source_glyphs_accepted": 0,
+  "production_accepted": false,
+  "windows": [
+    {
+      "job_id": 125740578885,
+      "name": "native (windows-2022)",
+      "reports": [
+        {
+          "scope": "authored_scaled_glyf_only",
+          "limit": 0.03125,
+          "font_bytes": 1728,
+          "font_sha256": "03496e263967330d701fe0ac1489e22fe1b864393df927eed279e70ea1e14ed9",
+          "physical_axes": [
+            "WDTH",
+            "wght",
+            "HGHT"
+          ],
+          "computed_axes": 0,
+          "glyphs": 4,
+          "GSUB": false,
+          "avar_version": 1,
+          "component_scale": 0.03125,
+          "gvar_tuples": 22,
+          "source_glyphs_accepted": 0,
+          "production_accepted": false,
+          "engines": {
+            "HarfBuzz": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 0.001087561757756165,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            },
+            "fontTools": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 2.5421149729252077e-13,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            },
+            "DirectWrite": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 0.020982158260259717,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            }
+          },
+          "DirectWrite": "EXECUTED",
+          "Windows_11": "NOT_RUN",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          },
+          "axis_readback_failures": 0,
+          "sampled_control_passed": true
+        }
+      ]
+    },
+    {
+      "job_id": 125740578978,
+      "name": "native (windows-2025)",
+      "reports": [
+        {
+          "scope": "authored_scaled_glyf_only",
+          "limit": 0.03125,
+          "font_bytes": 1728,
+          "font_sha256": "03496e263967330d701fe0ac1489e22fe1b864393df927eed279e70ea1e14ed9",
+          "physical_axes": [
+            "WDTH",
+            "wght",
+            "HGHT"
+          ],
+          "computed_axes": 0,
+          "glyphs": 4,
+          "GSUB": false,
+          "avar_version": 1,
+          "component_scale": 0.03125,
+          "gvar_tuples": 22,
+          "source_glyphs_accepted": 0,
+          "production_accepted": false,
+          "engines": {
+            "HarfBuzz": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 0.001087561757756165,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            },
+            "fontTools": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 2.5421149729252077e-13,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            },
+            "DirectWrite": {
+              "observations": 283,
+              "failures": 0,
+              "max_error": 0.020982158260259717,
+              "selection_failures": 0,
+              "advance_failures": 0,
+              "empty_outlines": 0
+            }
+          },
+          "DirectWrite": "EXECUTED",
+          "Windows_11": "NOT_RUN",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          },
+          "axis_readback_failures": 0,
+          "sampled_control_passed": true
+        }
+      ]
+    }
+  ],
+  "macOS": [
+    {
+      "component_round_xy_to_grid": true,
+      "scope": "authored_scaled_glyf_only",
+      "limit": 0.03125,
+      "font_bytes": 1728,
+      "font_sha256": "3c9965de3961d62884fd11004a8b9b0778cd4190437fff43d27262a1dacf55fb",
+      "physical_axes": [
+        "WDTH",
+        "wght",
+        "HGHT"
+      ],
+      "computed_axes": 0,
+      "glyphs": 4,
+      "GSUB": false,
+      "avar_version": 1,
+      "component_scale": 0.03125,
+      "gvar_tuples": 22,
+      "source_glyphs_accepted": 0,
+      "production_accepted": false,
+      "engines": {
+        "HarfBuzz": {
+          "observations": 283,
+          "failures": 0,
+          "max_error": 0.001087561757756165,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        },
+        "fontTools": {
+          "observations": 283,
+          "failures": 0,
+          "max_error": 2.5421149729252077e-13,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        },
+        "CoreText": {
+          "observations": 283,
+          "failures": 282,
+          "max_error": 0.7044697674507434,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        }
+      },
+      "DirectWrite": "NOT_RUN",
+      "Windows_11": "NOT_RUN",
+      "sampled_control_passed": false
+    },
+    {
+      "component_round_xy_to_grid": false,
+      "scope": "authored_scaled_glyf_only",
+      "limit": 0.03125,
+      "font_bytes": 1728,
+      "font_sha256": "03496e263967330d701fe0ac1489e22fe1b864393df927eed279e70ea1e14ed9",
+      "physical_axes": [
+        "WDTH",
+        "wght",
+        "HGHT"
+      ],
+      "computed_axes": 0,
+      "glyphs": 4,
+      "GSUB": false,
+      "avar_version": 1,
+      "component_scale": 0.03125,
+      "gvar_tuples": 22,
+      "source_glyphs_accepted": 0,
+      "production_accepted": false,
+      "engines": {
+        "HarfBuzz": {
+          "observations": 283,
+          "failures": 0,
+          "max_error": 0.001087561757756165,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        },
+        "fontTools": {
+          "observations": 283,
+          "failures": 0,
+          "max_error": 2.5421149729252077e-13,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        },
+        "CoreText": {
+          "observations": 283,
+          "failures": 282,
+          "max_error": 0.7044697674507434,
+          "selection_failures": 0,
+          "advance_failures": 0,
+          "empty_outlines": 0
+        }
+      },
+      "DirectWrite": "NOT_RUN",
+      "Windows_11": "NOT_RUN",
+      "sampled_control_passed": false
+    }
+  ]
+}

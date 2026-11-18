@@ -186,6 +186,7 @@ pub fn from_raw(value: &Value) -> Result<Outbound, &'static str> {
             "udp",
             "global-padding",
             "authenticated-length",
+            "raw-ini",
         ],
     )?;
     if text(value, "type", "")? != "vmess" {

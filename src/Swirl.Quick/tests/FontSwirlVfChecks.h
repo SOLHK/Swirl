@@ -46,7 +46,7 @@ void FontTests::startupRejectsUnsupportedFontAndCorruptCache()
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
     const auto fonts=directory.filePath("fonts");QVERIFY(QDir().mkpath(fonts));
-    const auto unsupported=fonts+"/Swirl-VF.ttc";
+    const auto unsupported=fonts+"/SwirlVF.ttc";
     QVERIFY(QFile::copy(fixtures+"/hvgl-only.ttf",unsupported));
     {
         FontManager manager(nullptr,fonts);
@@ -86,7 +86,7 @@ void FontTests::localSwirlCollectionUsesPhysicalFaces()
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
     const auto fonts=directory.filePath("fonts");QVERIFY(QDir().mkpath(fonts));
-    QVERIFY(QFile::copy(fixtures+"/swirl-vf-probe.ttc",fonts+"/Swirl-VF.ttc"));
+    QVERIFY(QFile::copy(fixtures+"/swirl-vf-probe.ttc",fonts+"/SwirlVF.ttc"));
     FontManager manager(nullptr,fonts);
     QCOMPARE(manager.currentFamily(),QStringLiteral("Swirl VF UI Text SC"));
     QCOMPARE(manager.defaultFamily(),manager.currentFamily());

@@ -13,7 +13,7 @@ Item {
     property var selected:null
     property var jobs:[]
     readonly property var tabs:["Tasks","History","Conditions"]
-    SwirlArcMotion{id:tabMotion;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("自动化");description:qsTr("整理触发条件和动作草稿。");metadata:qsTr("任务服务未接入，当前不会监听事件或执行动作")

@@ -2,14 +2,14 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../RustProductPackagePolicy.ps1')
 $allowed = @('licenses/LGPL-3.0-only.txt','Swirl.exe','swirl_api.dll','Qt6Core.dll',
-    'rules/cn-domain.mrs','rules/cn-ip.mrs','THIRD_PARTY_NOTICES.txt')
+    'rules/cn-domain.mrs','rules/cn-ip.mrs','THIRD_PARTY_NOTICES.txt','swirl-tun-broker.exe','swirl-tun-helper.exe','wintun.dll')
 $denied = @('mihomo.exe','engine/mihomo-windows-amd64.exe','licenses/mihomo.exe',
     'licenses/mihomo-GPL-3.0.txt','licenses\mihomo-GPL-3.0.txt','LICENSES/MIHOMO-GPL-3.0.TXT',
     'licenses/mihomo-GPL-3.0.txt.exe','mihomo-GPL-3.0.txt','other/licenses/mihomo-GPL-3.0.txt',
     'Mihomo.dll','clash.exe','xray.exe','sing-box.exe','mihomo-manifest.json',
     'SwirlRustCoreTests.exe','SwirlEngineFixture.exe','swirl_loader_fixture_1.dll',
     'swirl_loader_fixture_10.dll','nodes.dpapi','subscriptions.private',
-    'Swirl-diagnostics.txt','Swirl-motion-diagnostics.txt')
+    'Swirl-diagnostics.txt','Swirl-motion-diagnostics.txt','swirl-tun-packet-worker.exe','windows-tun-smoke.exe','windows-gateway-forward-smoke.exe')
 foreach ($path in $allowed) {
     if (Test-SwirlForbiddenProductPath $path) { throw "Allowed package entry was rejected: $path" }
 }
@@ -178,6 +178,7 @@ function Write-TlsFixturePe {
     [BitConverter]::GetBytes([uint32]64).CopyTo($bytes,60)
     [BitConverter]::GetBytes([uint32]0x4550).CopyTo($bytes,64)
     [BitConverter]::GetBytes($Machine).CopyTo($bytes,68)
+    [BitConverter]::GetBytes([uint16]0x20b).CopyTo($bytes,88)
     [IO.File]::WriteAllBytes($Path,$bytes)
 }
 
@@ -216,7 +217,7 @@ function New-TlsFixture {
         $records[$entry.Key]=@{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item -LiteralPath $file).Length}
     }
     $runtimeTarget = if ($RustTarget -eq 'x86_64-pc-windows-msvc') { 'VC-WIN64A' } else { 'mingw64' }
-    $fixture = @{Root=$directory;Manifest=@{schema=1;source_sha=$tlsApplicationSha;rust=@{source_sha=$tlsApplicationSha;target=$RustTarget};files=@()};
+    $fixture = @{Root=$directory;Manifest=@{schema=1;source_sha=$tlsApplicationSha;rust=@{source_sha=$tlsApplicationSha;target=$RustTarget;build_id=('b'*64)};files=@()};
         Receipt=@{schema_version=1;status='success';version='3.5.9';source=@{sha256=$tlsSourceSha};target=$runtimeTarget;files=$records}}
     Write-TlsFixtureReceipt $fixture
     return $fixture
@@ -313,8 +314,189 @@ try {
     try {
         Assert-TlsFixtureRejected $fixture 'linked TLS directory' 'Linked package or output path is forbidden.'
     } finally { [IO.Directory]::Delete($link) }
+
+    # Synthetic PE images never execute. The genuine pinned driver is required
+    # for a successful product stage; this offline fixture exercises rejection.
+    $driver = Get-SwirlWintunArtifact
+    foreach ($fault in @('wrong-role','wrong-build','wrong-source','arm64-helper','changed-helper','untrusted-driver')) {
+        $fixture = New-TlsFixture
+        $binaries = [ordered]@{}
+        foreach ($program in @(@{name='swirl-tun-broker.exe';role='swirl_tun_broker'},@{name='swirl-tun-helper.exe';role='swirl_tun_helper'})) {
+            $file = Join-Path $fixture.Root $program.name
+            Write-TlsFixturePe $file
+            $binaries[$program.name] = @{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();
+                identity=@{abi_version=1;role=$program.role;source_sha=$tlsApplicationSha;build_id=('b'*64);target='x86_64-pc-windows-msvc'}}
+        }
+        Write-TlsFixturePe (Join-Path $fixture.Root 'wintun.dll')
+        $notice = Join-Path $fixture.Root 'licenses/rust/crates/swirl-platform/licenses/WINTUN-0.14.1.txt'
+        New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($notice)) | Out-Null
+        Copy-Item -LiteralPath $driver.notice -Destination $notice
+        $tun = @{schema=1;kind='windows-native-tun-payload';source_sha=$tlsApplicationSha;build_id=('b'*64);target='x86_64-pc-windows-msvc';
+            binaries=$binaries;driver=@{version=$driver.version;source=$driver.url;archive_sha256=$driver.archive_sha256;sha256=$driver.sha256}}
+        switch ($fault) {
+            'wrong-role' { $binaries['swirl-tun-broker.exe'].identity.role='swirl_tun_helper' }
+            'wrong-build' { $binaries['swirl-tun-helper.exe'].identity.build_id=('c'*64) }
+            'wrong-source' { $binaries['swirl-tun-helper.exe'].identity.source_sha=('a'*40) }
+            'arm64-helper' {
+                $file=Join-Path $fixture.Root 'swirl-tun-helper.exe';Write-TlsFixturePe $file 0xaa64
+                $binaries['swirl-tun-helper.exe'].sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            'changed-helper' { [IO.File]::AppendAllText((Join-Path $fixture.Root 'swirl-tun-helper.exe'),'changed after pairing') }
+        }
+        $tun | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $fixture.Root 'tun-runtime.json') -Encoding utf8
+        Write-TlsFixtureManifest $fixture
+        $failure=$null
+        try { $null=Assert-SwirlTunPayload -ApplicationDirectory $fixture.Root -ExpectedSourceSha $tlsApplicationSha -ExpectedBuildId ('b'*64) } catch { $failure=$_.Exception.Message }
+        $expected=if($fault -eq 'arm64-helper'){'Product TUN requires an AMD64 PE image.'}elseif($fault -eq 'untrusted-driver'){'Product Wintun payload differs from the reviewed official binary.'}else{'Product TUN executable pairing mismatch:*'}
+        if (-not $failure -or $failure -notlike $expected) { throw "TUN payload accepted $fault or rejected for another reason: $failure" }
+    }
+    Write-Host 'Product TUN payload: 6 offline rejection scenarios passed.'
+
+    # Reproduce the ten empty Qt directories from the native NSIS failure
+    # through the actual final packaging entry point. The generic historical
+    # manifest reader remains compatible; finalization must reject this tree
+    # without deleting directories from an arbitrary supplied package.
+    $stagingSourceSha = (& git -C $repo rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Finalization regression source identity is unavailable.' }
+    $finalizer = Join-Path $repo 'scripts/Finalize-WindowsRustProduct.ps1'
+    $emptyQtDirectories = @('qml/QtQml/DesignSupport','qml/QtQml/XmlListModel',
+        'qml/QtQuick/Controls/Native','qml/QtQuick/LocalStorage',
+        'qml/QtQuick/NativeStyle/controls','qml/QtQuick/NativeStyle/util',
+        'qml/QtQuick/Particles','qml/QtQuick/Shapes/DesignHelpers',
+        'qml/QtQuick/tooling','qml/QtQuick/VectorImage/Helpers')
+    $fixture = New-TlsFixture
+    $fixture.Manifest.source_sha = $stagingSourceSha
+    $fixture.Manifest.rust.source_sha = $stagingSourceSha
+    foreach ($relative in $emptyQtDirectories) {
+        New-Item -ItemType Directory -Path (Join-Path $fixture.Root $relative) -Force | Out-Null
+    }
+    New-Item -ItemType Directory -Path (Join-Path $fixture.Root 'kept') | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $fixture.Root 'kept/zero.bin'),[byte[]]@())
+    Write-TlsFixtureManifest $fixture
+    function Get-FinalizationFixtureFileIdentity([string]$Directory) {
+        return (@(Get-ChildItem -LiteralPath $Directory -File -Recurse -Force | Sort-Object FullName | ForEach-Object {
+            [ordered]@{path=$_.FullName.Substring($Directory.Length+1);length=$_.Length;
+                sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+        }) | ConvertTo-Json -Depth 4 -Compress)
+    }
+    $before = Get-FinalizationFixtureFileIdentity $fixture.Root
+    $null = Assert-SwirlProductManifest -ApplicationDirectory $fixture.Root -ExpectedSourceSha $stagingSourceSha
+    $finalEvidence = Join-Path $tlsTestRoot 'empty-directory-finalization'
+    $finalInclude = Join-Path $tlsTestRoot 'empty-directory-uninstall.nsh'
+    $failure = $null
+    try {
+        & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude
+    } catch { $failure = $_.Exception.Message }
+    if ($failure -cne 'Package contains empty directories; use fresh product staging before packaging.') {
+        throw "Final packaging accepted the native empty-directory uninstall regression or failed for another reason: $failure"
+    }
+    foreach ($relative in $emptyQtDirectories) {
+        if (-not (Test-Path -LiteralPath (Join-Path $fixture.Root $relative) -PathType Container)) {
+            throw 'Finalization mutated an arbitrary input directory instead of rejecting it.'
+        }
+    }
+    if ((Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before -or (Test-Path -LiteralPath $finalInclude)) {
+        throw 'Finalization rejection changed payload bytes or authorized an invalid NSIS input.'
+    }
+    # This fixture root was freshly created above, just as the production
+    # Stage entry point guarantees before calling its normalization helper.
+    $removed = @(Remove-SwirlEmptyStagingDirectories -StagingDirectory $fixture.Root)
+    if ($removed.Count -ne 17 -or (Test-Path -LiteralPath (Join-Path $fixture.Root 'qml')) -or
+        -not (Test-Path -LiteralPath $fixture.Root -PathType Container)) { throw 'Fresh staging did not remove exactly the native empty-directory closure.' }
+    if ((Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before -or
+        (Get-Item -LiteralPath (Join-Path $fixture.Root 'kept/zero.bin')).Length -ne 0) {
+        throw 'Staging changed a payload file, zero-length file, or the manifest.'
+    }
+    $failure = $null
+    try { & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude } catch { $failure=$_.Exception.Message }
+    if ($failure -cne 'Missing product TUN payload entry: swirl-tun-broker.exe' -or
+        (Test-Path -LiteralPath $finalInclude) -or (Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before) {
+        throw 'A TLS-only fixture must not authorize a current product package without the TUN payload.'
+    }
+    Write-Host 'Finalization empty-directory and required TUN payload regressions: 2 entry-point scenarios passed.'
 } finally {
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($tlsTestRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected TLS fixture cleanup path.' }
     Remove-Item -LiteralPath $tlsTestRoot -Recurse -Force
 }
 Write-Host "TLS package policy: $script:tlsAssertions scenarios passed."
+
+# NSIS File /r also includes empty directories. Normalize only the new build
+# stage; nested nonempty directories, all file bytes and outside data survive.
+$emptyStageBase = Join-Path ([IO.Path]::GetTempPath()) ('swirl-empty-stage-' + [guid]::NewGuid().ToString('N'))
+$emptyStage = Join-Path $emptyStageBase 'stage'
+$emptyStageChecks = 0
+function Check-EmptyStage([bool]$Passed,[string]$Label) {
+    if (-not $Passed) { throw "Empty staging directory regression: $Label" }
+    $script:emptyStageChecks++
+}
+New-Item -ItemType Directory -Path (Join-Path $emptyStage 'qml/Empty/Child'),
+    (Join-Path $emptyStage 'qml/Keep/EmptyChild'),(Join-Path $emptyStage '.empty'),
+    (Join-Path $emptyStage 'qml/[literal]/Nested'),(Join-Path $emptyStageBase 'outside/empty') -Force | Out-Null
+try {
+    $retained = Join-Path $emptyStage 'qml/Keep/.keep'
+    $product = Join-Path $emptyStage 'Swirl.exe'
+    $outside = Join-Path $emptyStageBase 'outside/sentinel.txt'
+    [IO.File]::WriteAllText($product,'controlled product bytes')
+    [IO.File]::WriteAllText($retained,'hidden nonempty-directory sentinel')
+    [IO.File]::WriteAllText($outside,'outside-stage sentinel')
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { [IO.File]::SetAttributes($retained,[IO.FileAttributes]::Hidden) }
+    $keptHash = (Get-FileHash -LiteralPath $retained -Algorithm SHA256).Hash
+    $outsideHash = (Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash
+    $productHash = (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash
+    $removed = @(Remove-SwirlEmptyStagingDirectories $emptyStage)
+    $expected = @('qml/Empty/Child','qml/Empty','qml/Keep/EmptyChild','.empty','qml/[literal]/Nested','qml/[literal]')
+    Check-EmptyStage ($removed.Count -eq $expected.Count -and
+        @(Compare-Object ($expected | Sort-Object) ($removed | Sort-Object)).Count -eq 0) 'exact nested and literal empty-directory list'
+    Check-EmptyStage ((Test-Path -LiteralPath $emptyStage) -and (Test-Path -LiteralPath (Join-Path $emptyStage 'qml/Keep'))) 'stage root and nonempty ancestors survive'
+    Check-EmptyStage ((Get-FileHash -LiteralPath $retained -Algorithm SHA256).Hash -ceq $keptHash -and
+        (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash -ceq $productHash) 'hidden file and product bytes unchanged'
+    Check-EmptyStage ((Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash -ceq $outsideHash -and
+        (Test-Path -LiteralPath (Join-Path $emptyStageBase 'outside/empty'))) 'outside file and empty directory untouched'
+    Check-EmptyStage (@(Remove-SwirlEmptyStagingDirectories $emptyStage).Count -eq 0) 'normalization is idempotent'
+    New-Item -ItemType Directory -Path (Join-Path $emptyStage 'must-remain-empty') | Out-Null
+    foreach ($marker in @('.swirl-install-owned','.swirl-isolated-install')) {
+        [IO.File]::WriteAllText((Join-Path $emptyStage $marker),'installed product marker')
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $emptyStage } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Empty-directory pruning never modifies an installed product.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) "installed product marker refused before mutation: $marker"
+        Remove-Item -LiteralPath (Join-Path $emptyStage $marker) -Force
+    }
+    $link = Join-Path $emptyStage 'linked-outside'
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        New-Item -ItemType Junction -Path $link -Target (Join-Path $emptyStageBase 'outside') | Out-Null
+    } else { New-Item -ItemType SymbolicLink -Path $link -Target (Join-Path $emptyStageBase 'outside') | Out-Null }
+    try {
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $emptyStage } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty')) -and
+            (Test-Path -LiteralPath (Join-Path $emptyStageBase 'outside/empty')) -and
+            (Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash -ceq $outsideHash) 'child link rejected before any pruning'
+    } finally { [IO.Directory]::Delete($link,$false) }
+    $rootLink = Join-Path $emptyStageBase 'stage-alias'
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        New-Item -ItemType Junction -Path $rootLink -Target $emptyStage | Out-Null
+    } else { New-Item -ItemType SymbolicLink -Path $rootLink -Target $emptyStage | Out-Null }
+    try {
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $rootLink } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) 'linked root rejected before pruning'
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories (Join-Path $rootLink 'qml') } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) 'linked root ancestor rejected before pruning'
+    } finally { [IO.Directory]::Delete($rootLink,$false) }
+    $failure=$null
+    try { $null=Remove-SwirlEmptyStagingDirectories ([IO.Path]::GetPathRoot($emptyStage)) } catch { $failure=$_.Exception.Message }
+    Check-EmptyStage ($failure -eq 'A filesystem root is not a build staging directory.') 'filesystem root refused without enumeration'
+    $failure=$null
+    try { $null=Remove-SwirlEmptyStagingDirectories $product } catch { $failure=$_.Exception.Message }
+    Check-EmptyStage ($failure -eq 'Empty-directory pruning requires a build staging directory.' -and
+        (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash -ceq $productHash) 'file root refused without modification'
+} finally {
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($emptyStageBase)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected empty-stage test cleanup path.' }
+    Remove-Item -LiteralPath $emptyStageBase -Recurse -Force
+}
+Write-Host "Empty staging directory policy: $emptyStageChecks scenarios passed."

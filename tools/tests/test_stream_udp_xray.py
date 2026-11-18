@@ -27,18 +27,48 @@ from test_socks5_udp import packet
 from transport_peer import Fixture, XRAY
 
 
+class DatagramObservations:
+    """Actual application UDP reads/sends; payloads are never retained here."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.events = []
+
+    def observe(self, stage, payload, source, error=None):
+        event = {"stage": stage, "source": list(source), "payload_bytes": len(payload),
+                 "payload_sha256": hashlib.sha256(payload).hexdigest()}
+        if error is not None:
+            event.update(error_type=type(error).__name__, errno=error.errno)
+        with self.lock:
+            self.events.append(event)
+
+    def snapshot(self):
+        with self.lock:
+            events = list(self.events)
+        return {"received_count": sum(e["stage"] == "received" for e in events),
+                "reply_sent_count": sum(e["stage"] == "reply_sent" for e in events),
+                "reply_error_count": sum(e["stage"] == "reply_error" for e in events),
+                "reply_sent_means": "successful application sendto, not client receipt",
+                "events": events}
+
+
+def core_counters(status):
+    # Never copy runtime configuration, credentials or arbitrary diagnostic text.
+    return {key: status[key] for key in
+            ("active", "upload", "download", "udp_dropped", "failed", "rejected", "running")
+            if isinstance(status.get(key), (int, bool))}
+
+
 class StreamUdpXrayTests(unittest.TestCase):
     command = core_fixture.QuicCoreTests.command
     associate = core_fixture.QuicCoreTests.associate
-    udp_exchange = core_fixture.QuicCoreTests.udp_exchange
-    stop = core_fixture.QuicCoreTests.stop
     close_runtime = core_fixture.QuicCoreTests.close_runtime
-    dns_origin = core_fixture.QuicCoreTests.dns_origin
-    origin = tuic_fixture.TuicReferenceTests.origin
     records = []
+    failures = []
 
     @classmethod
     def setUpClass(cls):
+        cls.records, cls.failures = [], []
         cls.harness = Path(os.environ["SWIRL_TRANSPORT_RUNTIME"]).resolve(strict=True)
         cls.xray = Path(os.environ["SWIRL_XRAY_BINARY"]).resolve(strict=True)
         Fixture._version(str(cls.xray), XRAY)
@@ -47,6 +77,9 @@ class StreamUdpXrayTests(unittest.TestCase):
         self.fixture = Fixture("X14-A6-stream-udp")
         self.addCleanup(self.fixture.close)
         self.origins, self.associations = [], []
+        self.pending_failures = []
+        self.exchange_stage = None
+        self.exchange_index = 0
 
         def close_origins():
             for origin in self.origins:
@@ -67,6 +100,72 @@ class StreamUdpXrayTests(unittest.TestCase):
         self.reader = threading.Thread(target=reader, daemon=True)
         self.reader.start()
         self.addCleanup(self.close_runtime)
+
+    def observe_origin(self, origin):
+        origin.datagram_observations = DatagramObservations()
+        origin.datagram_observer = origin.datagram_observations.observe
+        return origin
+
+    def origin(self, **options):
+        origin = tuic_fixture.TuicReferenceTests.origin(self, **options)
+        return self.observe_origin(origin) if options.get("udp") else origin
+
+    def dns_origin(self):
+        return self.observe_origin(core_fixture.QuicCoreTests.dns_origin(self))
+
+    def origin_observations(self):
+        return [{"origin_index": index, "bound_address": list(origin.server_address),
+                 "handler_received_count": len(origin.received),
+                 **origin.datagram_observations.snapshot()}
+                for index, origin in enumerate(self.origins)
+                if hasattr(origin, "datagram_observations")]
+
+    def record_udp_failure(self, association, origin, payload, host, error):
+        failure = {"case": self._testMethodName, "protocol": self.protocol,
+                   "stage": self.exchange_stage or f"exchange-{self.exchange_index}",
+                   "target": [host, origin.server_address[1]],
+                   "client": list(association[1].getsockname()),
+                   "relay": list(association[2]), "error_type": type(error).__name__,
+                   "payload_bytes": len(payload),
+                   "payload_sha256": hashlib.sha256(payload).hexdigest(),
+                   "origins_at_failure": self.origin_observations(),
+                   "core_at_failure": None, "core_after_association_close": None,
+                   "core_stop_ok": False, "diagnostic_errors": []}
+        self.failures.append(failure)
+        self.pending_failures.append(failure)
+        try:
+            reply = self.command(op="status")
+            failure["core_at_failure"] = core_counters(reply["status"])
+        except Exception as diagnostic_error:
+            failure["diagnostic_errors"].append(type(diagnostic_error).__name__)
+
+    def udp_exchange(self, association, origin, payload, host="127.0.0.1"):
+        self.exchange_index += 1
+        try:
+            return core_fixture.QuicCoreTests.udp_exchange(self, association, origin, payload, host)
+        except Exception as error:
+            try:
+                self.record_udp_failure(association, origin, payload, host, error)
+            except Exception as diagnostic_error:
+                # Evidence collection must never replace the original failure.
+                self.failures.append({"case": self._testMethodName,
+                    "stage": self.exchange_stage or f"exchange-{self.exchange_index}",
+                    "error_type": type(error).__name__,
+                    "diagnostic_errors": [type(diagnostic_error).__name__]})
+            raise
+
+    def stop(self):
+        before = len(self.records)
+        core_fixture.QuicCoreTests.stop(self)
+        if len(self.records) > before:
+            closed = self.records[-1]
+            counters = {"active": closed["active_after_close"], "upload": closed["uploaded"],
+                        "download": closed["downloaded"], "udp_dropped": closed["udp_dropped"]}
+            for failure in self.pending_failures:
+                failure["core_after_association_close"] = counters.copy()
+                failure["origins_after_association_close"] = self.origin_observations()
+                failure["core_stop_ok"] = True
+            self.pending_failures.clear()
 
     def peer(self, protocol="vless", network="raw", tls=True):
         peer = self.fixture.peer(network, protocol=protocol, tls=tls)
@@ -147,7 +246,9 @@ class StreamUdpXrayTests(unittest.TestCase):
                 first, second = self.origin(udp=True), self.origin(udp=True)
                 with self.running(peer):
                     association = self.associate()
-                    for origin, payload in ((first, b"first"), (second, b"second"), (first, b"first-again")):
+                    for stage, origin, payload in (("first", first, b"first"),
+                            ("second", second, b"second"), ("first-again", first, b"first-again")):
+                        self.exchange_stage = stage
                         self.assertEqual(self.udp_exchange(association, origin, payload), payload)
                     self.assertEqual(first.received, [b"first", b"first-again"])
                     self.assertEqual(second.received, [b"second"])
@@ -269,7 +370,9 @@ class StreamUdpXrayTests(unittest.TestCase):
                 "server_sha256": hashlib.sha256(cls.xray.read_bytes()).hexdigest(),
                 "platform": platform.platform(), "qt_product_acceptance": False,
                 "scope": "classic VLESS command 2 and Trojan command 3; no Vision/XUDP claim",
-                "records": cls.records}, indent=2) + "\n", encoding="utf-8")
+                "records": cls.records, "exchange_errors": cls.failures,
+                "exchange_error_scope": "exception observations include intentional negative probes; unittest determines test outcome"},
+                indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

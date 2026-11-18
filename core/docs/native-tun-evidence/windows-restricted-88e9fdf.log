@@ -1,0 +1,5 @@
+   Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+    Finished `release` profile [optimized] target(s) in 5.11s
+     Running `target\release\examples\windows-restricted-worker-smoke.exe --disposable-environment --directory D:\a\_temp\swirl-restricted-worker-smoke`
+restricted worker smoke failed: restricted worker capability probe failed; inspect preserved stdout/stderr
+error: process didn't exit successfully: `target\release\examples\windows-restricted-worker-smoke.exe --disposable-environment --directory D:\a\_temp\swirl-restricted-worker-smoke` (exit code: 1)

@@ -155,9 +155,14 @@ RustCoreLibrary::inspectPortableExecutable(QByteArrayView header)
 bool RustCoreLibrary::fail(const char *stage, const char *code, const QString &message)
 {
     m_command = nullptr;
+    m_configurationV2 = false; m_lanProxy = false;
     m_importXray = nullptr;
     m_importNode = nullptr;
     m_importProfile = nullptr;
+    m_downloadRoute = nullptr;
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    m_privateUiQuota = nullptr;
+#endif
     m_message = message;
     m_diagnostics["stage"] = QString::fromLatin1(stage);
     m_diagnostics["code"] = QString::fromLatin1(code);
@@ -344,14 +349,25 @@ bool RustCoreLibrary::load(const QString &absolutePath)
         required.size()==3&&capabilities.size()==3&&capabilities.contains("config_transactions_v1")&&
         capabilities.contains("stable_policy_ids_v1")&&capabilities.contains("routing_tiers_v1");
 
+    m_lanProxy = m_configurationV2 && info.value("capabilities").toObject().value("optional").toObject().value("lan_proxy").toBool(false)
+        && info.value("capabilities").toObject().value("optional").toObject().value("lan_proxy_control_schema").toInt() == 1;
+    m_diagnostics["lan_proxy_available"] = m_lanProxy;
+
     // Optional ABI additions are exposed only after the same ABI/source/build
     // checks as runtime commands. A consumer fails closed if its export is absent.
     m_importXray = reinterpret_cast<Command>(m_library.resolve("swirl_import_xray_v1"));
     m_importNode = reinterpret_cast<Command>(m_library.resolve("swirl_import_node_v1"));
     m_importProfile = reinterpret_cast<Command>(m_library.resolve("swirl_import_profile_v1"));
+    m_downloadRoute = reinterpret_cast<Command>(m_library.resolve("swirl_download_route_v1"));
+#ifdef SWIRL_PRIVATE_UI_QUOTA
+    m_privateUiQuota = reinterpret_cast<Command>(m_library.resolve("swirl_private_ui_quota_v1"));
+    if (!m_privateUiQuota)
+        return fail("private_ui", "PrivateUiQuotaAbiRequired", QStringLiteral("QA 配额内核接口缺失。"));
+#endif
     m_diagnostics["import_xray_available"] = m_importXray != nullptr;
     m_diagnostics["import_node_available"] = m_importNode != nullptr;
     m_diagnostics["import_profile_available"] = m_importProfile != nullptr;
+    m_diagnostics["download_route_available"] = m_downloadRoute != nullptr;
     m_command = command;
     m_diagnostics["stage"] = QStringLiteral("ready");
     m_diagnostics["code"] = QStringLiteral("Ok");

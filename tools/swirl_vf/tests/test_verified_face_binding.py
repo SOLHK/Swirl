@@ -44,7 +44,7 @@ class VerifiedFaceBindingTests(unittest.TestCase):
         write_fixture(source, faces=3)
         executable = root / "analytic-oracle-identity"
         executable.write_text("authored protocol double identity\n")
-        return source, executable, root / "Swirl-VF.ttc", root / "report.json"
+        return source, executable, root / "SwirlVF.ttc", root / "report.json"
 
     def assert_rejected_binding(self, operation, source, source_bytes, output, report, mutations):
         error = None
@@ -132,7 +132,7 @@ class VerifiedFaceBindingTests(unittest.TestCase):
             self.assertTrue(first_output.is_file())
             manifest = checkpoints / "verified-faces.json"
             accepted_manifest = manifest.read_bytes()
-            output = root / "resumed" / "Swirl-VF.ttc"
+            output = root / "resumed" / "SwirlVF.ttc"
             report = root / "resumed-report.json"
             original_restore = rebuild.FaceCheckpoints.restore
             accepted = []

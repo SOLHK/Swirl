@@ -85,7 +85,7 @@ class RebuildPipelineTests(unittest.TestCase):
     def fixture(self, root):
         source = root / "original-analytic-fixture.ttc"
         write_fixture(source, faces=3)
-        return source, root / "Swirl-VF.ttc", root / "synthetic-report.json"
+        return source, root / "SwirlVF.ttc", root / "synthetic-report.json"
 
     def invoke(self, source, output, report, oracle):
         with mock.patch.object(rebuild, "NativeOracle", return_value=oracle) as native:
@@ -182,7 +182,7 @@ class RebuildPipelineTests(unittest.TestCase):
             self.assertEqual(oracle.close_count, 1)
             self.assertEqual(source.read_bytes(), before)
             self.assertTrue(output.is_file())
-            self.assertEqual(output.name, "Swirl-VF.ttc")
+            self.assertEqual(output.name, "SwirlVF.ttc")
             self.assertFalse(list(root.glob("swirl-vf-*")))
             self.assertEqual(result["status"], "RECONSTRUCTION_SAMPLED_PASS_PLATFORM_UNVERIFIED")
             self.assertTrue(result["output_generated"])
@@ -380,9 +380,12 @@ class RebuildPipelineTests(unittest.TestCase):
             source, output, report = self.fixture(root)
             before = source.read_bytes()
             with mock.patch.object(rebuild, "NativeOracle") as native:
-                with self.assertRaisesRegex(rebuild.ReconstructionError, "final font filename"):
-                    rebuild.run(source, root / "no-native-process", root / "Swirl-VF-Fixed.ttc", report)
-                self.assertFalse((root / "Swirl-VF-Fixed.ttc").exists())
+                for rejected in ("Swirl-VF.ttc", "PingFangUI.ttc", "SwirlVF.ttf",
+                                 "swirlvf.ttc", "SWIRLVF.TTC", "Swirl-VF-Fixed.ttc"):
+                    with self.subTest(name=rejected), self.assertRaisesRegex(
+                            rebuild.ReconstructionError, "final font filename"):
+                        rebuild.run(source, root / "no-native-process", root / rejected, report)
+                    self.assertFalse((root / rejected).exists())
                 output.write_bytes(b"existing-unreviewed-output")
                 with self.assertRaisesRegex(rebuild.ReconstructionError, "destination already exists"):
                     rebuild.run(source, root / "no-native-process", output, report)

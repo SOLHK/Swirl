@@ -1,0 +1,119 @@
+{
+  "scope": "independent field diagnostics before encoding; cubic witnesses are floating samples on one retained cell",
+  "rows": [
+    {
+      "attempt": "retained 2048-cell failed model",
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 35709
+      },
+      "atlas_sha256": "28dcc73dd167c7df0a89c065abcb9fd2fd16a1063ce458665ca91eca71b0f5b1",
+      "seed": 2026110847,
+      "samples": 4096,
+      "holdouts_disjoint": true,
+      "boxes": 2048,
+      "factors": 12,
+      "maximum_component_envelope_error": 0.1638373089184363,
+      "component_failures": 1066,
+      "maximum_physical_error": 0.16383730891842882,
+      "physical_failures": 1066,
+      "worst_sample_field_maxima": [
+        0.16383730891842208,
+        0.0010693664722056027,
+        0.027964239750524627,
+        7.451649666408121e-06,
+        2.4048564108510088e-05,
+        4.163398573638505e-06,
+        1.2364509088723455e-05,
+        9.13344349434061e-06,
+        1.1756929534611613e-05,
+        8.621077874606592e-06,
+        1.1445924403993813e-05,
+        1.0187895967854334e-05,
+        1.082639607147526e-05
+      ],
+      "worst_cell_chord_event_counts": {
+        "axis_zero": 20
+      },
+      "measured_cubic_slice_lower_bound": 0.017342756642525714,
+      "witness_field": 0,
+      "witness_axis_index": 2,
+      "witness_scope": "retained component-field cubic on one existing cell; floating source evaluation",
+      "representation_or_format_impossibility_claimed": false,
+      "serialization_involved": false,
+      "native_acceptance": false,
+      "limit": 0.03125
+    },
+    {
+      "attempt": "old 2048-cell failed model, superseded by a branch-gate refinement",
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 4985
+      },
+      "atlas_sha256": "0b07ec561cb3527650522697265e634d564d510d7be38573fa24d0afc9496c03",
+      "seed": 2026110847,
+      "samples": 4096,
+      "holdouts_disjoint": true,
+      "boxes": 2048,
+      "factors": 3,
+      "maximum_component_envelope_error": 0.04353750575974104,
+      "component_failures": 34,
+      "maximum_physical_error": 0.040480470682478356,
+      "physical_failures": 13,
+      "worst_sample_field_maxima": [
+        0.021763865024482083,
+        0.02177364073525895,
+        4.353200753757148e-06,
+        6.8894529486358565e-06
+      ],
+      "worst_cell_chord_event_counts": {
+        "axis_zero": 8
+      },
+      "measured_cubic_slice_lower_bound": 0.002486829377511768,
+      "witness_field": 0,
+      "witness_axis_index": 2,
+      "witness_scope": "retained component-field cubic on one existing cell; floating source evaluation",
+      "representation_or_format_impossibility_claimed": false,
+      "serialization_involved": false,
+      "native_acceptance": false,
+      "limit": 0.03125
+    },
+    {
+      "attempt": "retained 2048-cell failed model",
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 46461
+      },
+      "atlas_sha256": "9edd153009ab36282dde16ecf6b302ce4b0d9e3b0596f1ca83726f69131e770f",
+      "seed": 2026110887,
+      "samples": 4096,
+      "holdouts_disjoint": true,
+      "boxes": 2048,
+      "factors": 2,
+      "maximum_component_envelope_error": 0.06793004839703404,
+      "component_failures": 190,
+      "maximum_physical_error": 0.06793004839703404,
+      "physical_failures": 190,
+      "worst_sample_field_maxima": [
+        0.06793004839703404,
+        1.8341478072482636e-05,
+        1.3461860813328215e-05
+      ],
+      "worst_cell_chord_event_counts": {
+        "axis_zero": 25
+      },
+      "measured_cubic_slice_lower_bound": 0.008916356497725725,
+      "witness_field": 0,
+      "witness_axis_index": 0,
+      "witness_scope": "retained component-field cubic on one existing cell; floating source evaluation",
+      "representation_or_format_impossibility_claimed": false,
+      "serialization_involved": false,
+      "native_acceptance": false,
+      "limit": 0.03125
+    }
+  ],
+  "production_accepted": false
+}

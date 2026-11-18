@@ -12,7 +12,7 @@ Item {
  property string query:""
  property string selectedGroup:""
  property string feedback:""
- SwirlArcMotion {id:tabMotion;targetX:page.tabIndex*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+ readonly property Item ownedTabMotion: SwirlArcMotion {id:tabMotion;parent:page;targetX:page.tabIndex*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
  onTabIndexChanged:{selectedGroup="";feedback=""}
  onFilterIndexChanged:selectedGroup=""
  readonly property var sourceRows:{

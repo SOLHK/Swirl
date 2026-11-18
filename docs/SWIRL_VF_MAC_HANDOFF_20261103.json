@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "report_date": "2026-11-03",
+  "scope": "finite Mac reference handoff; not a Windows font release",
+  "code_commit": "128f0b67130472249a46966c1a3d04ab1ed04ced",
+  "inputs": [
+    {
+      "role": "original",
+      "filename": "PingFangUI.ttc",
+      "bytes": 61473880,
+      "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "version": "22.0d5e2",
+      "physical_faces": 32,
+      "glyphs_per_face": 47102,
+      "outline": "hvgl"
+    },
+    {
+      "role": "reference",
+      "filename": "A_PingFangUI-VF.ttc",
+      "bytes": 102151892,
+      "sha256": "124bab748149ea99cd26727384c80f53c92b8abbb3299c66770668ca55ae438b",
+      "version": "21.4d1e1",
+      "physical_faces": 5,
+      "glyphs_per_face": 47647,
+      "outline": "glyf+gvar"
+    }
+  ],
+  "faces": [
+    {
+      "target": "SC Text",
+      "source_index": 0,
+      "glyphs": 47102,
+      "best_cmap_count": 34555,
+      "units_per_em": 1028
+    },
+    {
+      "target": "SC Display",
+      "source_index": 5,
+      "glyphs": 47102,
+      "best_cmap_count": 34555,
+      "units_per_em": 1064
+    },
+    {
+      "target": "TC Text",
+      "source_index": 1,
+      "glyphs": 47102,
+      "best_cmap_count": 31177,
+      "units_per_em": 1028
+    },
+    {
+      "target": "TC Display",
+      "source_index": 6,
+      "glyphs": 47102,
+      "best_cmap_count": 31177,
+      "units_per_em": 1064
+    }
+  ],
+  "native_geometry": {
+    "default_glyphs": 47102,
+    "shared_default_native_extractions": 1,
+    "variation_observations": 38076,
+    "boundary_observations": 1420,
+    "total_observations": 86598,
+    "failures": 0,
+    "max_control_coordinate_difference_FUnit": 9.890754881780595e-12,
+    "continuous_space_certified": false
+  },
+  "replay": {
+    "status": "PASS_FINITE_REFERENCE_REPLAY",
+    "geometry_replayed": 86598,
+    "geometry_failed": 0,
+    "max_replay_control_coordinate_error": 0.0,
+    "stored_native_compared": 86598,
+    "stored_native_failed": 0,
+    "default_metric_fields": 376816,
+    "default_metric_mismatches": 0,
+    "variation_metric_fields": 78992,
+    "variation_raw_fields_above_1_32": 17576,
+    "max_variation_raw_advance_difference": 0.4997120201587677,
+    "variation_integer_rounded_mismatches": 0,
+    "max_HB_design_readback_difference": 3.0339094429177038e-05,
+    "seconds": 576.6441724160104
+  },
+  "resources": {
+    "replay_peak_rss_bytes": 583614464,
+    "export_seconds": 606.6462329580099
+  },
+  "tests": {
+    "local_run": 1069,
+    "local_passed": 1062,
+    "local_skipped": 7,
+    "local_failed": 0,
+    "separate_audit_passed": 6,
+    "handoff_regressions": 14,
+    "windows_ci_handoff_passed": 12,
+    "windows_ci_handoff_mac_only_skips": 2,
+    "windows_ci_hvf_passed": 65,
+    "ci_url": "https://github.com/SOLHK/Swirl/actions/runs/41597247039",
+    "ci_platforms": [
+      "windows-2022",
+      "windows-2025",
+      "ubuntu-latest",
+      "macos-15"
+    ],
+    "ci_data": "authored only"
+  },
+  "bundle": {
+    "files_including_manifest": 518,
+    "bytes": 414582915,
+    "jsonl_records": 275006,
+    "manifest_sha256": "daf80e8c79947dc8488e1f9049b4a7311f32b8abe775cda4a81697bac7ef12b7",
+    "archive_bytes": 385915148,
+    "archive_sha256": "59877b45a8290626779670a8e8b546f559ed0426a5c5f85418547fd6fafe67f9",
+    "archive_entries_verified": true,
+    "private_data_uploaded": false
+  },
+  "limitations": {
+    "CoreText_identity_passed": 0,
+    "CoreText_identity_total": 32,
+    "CoreText_registration_error": 103,
+    "user_to_design_mapping_accepted": false,
+    "private_bundle_executed_on_Windows": false,
+    "DirectWrite_tested_this_task": false,
+    "Mac_fully_retired": false,
+    "other_HVF_versions_certified": false,
+    "unsupported_tangent_types": [
+      3,
+      4
+    ],
+    "remaining_Mac_work": [
+      "exact-source CoreText loading",
+      "global user-axis semantics",
+      "native vertical origins",
+      "optical size and tracking",
+      "native visual reference and new private-structure counterexamples"
+    ]
+  }
+}

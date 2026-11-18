@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite name="PolicyFormScrollLocal" timestamp="2026&#x002D;11&#x002D;02T16:12:27" hostname="cfda9646d62c" tests="7" failures="1" errors="0" skipped="0" time="0.249">
+  <properties>
+    <property name="QTestVersion" value="6.12.0"/>
+    <property name="QtVersion" value="6.12.0"/>
+    <property name="QtBuild" value="Qt 6.12.0 (x86_64&#x002D;little_endian&#x002D;lp64 shared (dynamic) release build; by GCC 11.5.0 20240719 (Red Hat 11.5.0&#x002D;5))"/>
+  </properties>
+  <testcase name="PolicyFormScroll::initTestCase" classname="PolicyFormScrollLocal" time="0.000"/>
+  <testcase name="PolicyFormScroll::test_externalFocusDoesNotScrollTheForm" classname="PolicyFormScrollLocal" time="0.122"/>
+  <testcase name="PolicyFormScroll::test_focusRevealsLastField" classname="PolicyFormScrollLocal" time="0.001"/>
+  <testcase name="PolicyFormScroll::test_unfocusedManualScrollIsPreserved" classname="PolicyFormScrollLocal" time="0.121"/>
+  <testcase name="PolicyFormScroll::test_viewportResizeKeepsFocusedFieldVisible" classname="PolicyFormScrollLocal" time="0.001"/>
+  <testcase name="PolicyFormScroll::test_viewportResizeRevealsBeforeReturningToEventLoop" classname="PolicyFormScrollLocal" time="0.000">
+    <failure type="fail" message="&apos;verify()&apos; returned FALSE. ()"/>
+  </testcase>
+  <testcase name="PolicyFormScroll::cleanupTestCase" classname="PolicyFormScrollLocal" time="0.000"/>
+</testsuite>

@@ -41,7 +41,7 @@ Item {
     function updateBuffer(value){if(!componentReady||editorBuffers[selected]===value)return;var next=Object.assign({},editorBuffers);next[selected]=value;editorBuffers=next}
     Component.onCompleted:{componentReady=true;regenerate()}
     onPageIdChanged:if(componentReady)regenerate()
-    SwirlArcMotion{id:tabMotion;targetX:Math.max(0,page.featureList.indexOf(page.selected))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:Math.max(0,page.featureList.indexOf(page.selected))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout{
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:AppState.page(page.pageId).title+qsTr("工作区");description:qsTr("选择功能，整理本地编辑草稿。");metadata:qsTr("实际服务尚未接入，草稿不会修改系统或网络")

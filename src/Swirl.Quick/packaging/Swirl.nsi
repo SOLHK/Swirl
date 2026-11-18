@@ -3,7 +3,10 @@
 Unicode true
 SetCompressor /SOLID lzma
 Var IsolatedInstall
+Var RecoverTunConsent
 Var Parameters
+Var FailurePhase
+Var FailureCode
 !ifndef APP_DIST
 !error "APP_DIST is required"
 !endif
@@ -84,12 +87,15 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     SetOutPath "$PLUGINSDIR"
     File /oname=Maintain-WindowsRustProduct.ps1 "${REPO_ROOT}\scripts\Maintain-WindowsRustProduct.ps1"
     File /oname=RustProductPackagePolicy.ps1 "${REPO_ROOT}\scripts\RustProductPackagePolicy.ps1"
+    File /oname=WindowsUserIntegration.ps1 "${REPO_ROOT}\scripts\WindowsUserIntegration.ps1"
     File /oname=package-manifest.json "${APP_DIST}\package-manifest.json"
 !macroend
 !macro MaintainPackage Mode ExtraArguments FailureLabel
+    StrCpy $FailurePhase "package-${Mode}"
     nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PLUGINSDIR\Maintain-WindowsRustProduct.ps1" -Mode ${Mode} -ApplicationDirectory "$INSTDIR" -ExpectedManifest "$PLUGINSDIR\package-manifest.json" ${ExtraArguments}'
     Pop $0
     Pop $1
+    StrCpy $FailureCode $0
     DetailPrint "$1"
     !ifdef PACKAGE_TEST_TRACE
     FileOpen $9 "${PACKAGE_TEST_TRACE}" a
@@ -100,13 +106,122 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     StrCmp $0 "0" +2
     Goto ${FailureLabel}
 !macroend
+!macro MaintainUserIntegration Mode FailureLabel
+    StrCpy $FailurePhase "user-integration-${Mode}"
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PLUGINSDIR\WindowsUserIntegration.ps1" -Mode ${Mode} -ApplicationDirectory "$INSTDIR" -ExpectedManifest "$PLUGINSDIR\package-manifest.json" -AppVersion "${APP_VERSION}"'
+    Pop $0
+    Pop $1
+    StrCpy $FailureCode $0
+    DetailPrint "$1"
+    StrCmp $0 "0" +2
+    Goto ${FailureLabel}
+!macroend
+!macro RequireNativeTunRecovery FailureLabel
+    ; Query the exact REG_DWORD in the same explicit 32-bit view as the GUI.
+    ; A missing marker does not launch anything or request elevation.
+    StrCpy $FailurePhase "native-tun-marker-open"
+    System::Call 'advapi32::RegOpenKeyExW(p 0x80000001, w "Software\SOLHK\Swirl\NativeTun", i 0, i 0x201, *p.r1) i.r0'
+    StrCpy $FailureCode $0
+    StrCmp $0 "2" native_tun_checked
+    StrCmp $0 "0" 0 ${FailureLabel}
+    StrCpy $5 "4"
+    StrCpy $FailurePhase "native-tun-marker-query"
+    System::Call 'advapi32::RegQueryValueExW(p r1, w "recoveryPending", p 0, *i.r2, *i.r3, *i r5r5) i.r0'
+    StrCpy $FailureCode $0
+    System::Call 'advapi32::RegCloseKey(p r1)'
+    StrCmp $0 "2" native_tun_checked
+    StrCmp $0 "0" 0 ${FailureLabel}
+    StrCpy $FailurePhase "native-tun-marker-type"
+    StrCpy $FailureCode $2
+    StrCmp $2 "4" 0 ${FailureLabel}
+    StrCpy $FailurePhase "native-tun-marker-size"
+    StrCpy $FailureCode $5
+    StrCmp $5 "4" 0 ${FailureLabel}
+    StrCmp $3 "0" native_tun_checked
+    StrCpy $FailurePhase "native-tun-marker-value"
+    StrCpy $FailureCode $3
+    StrCmp $3 "1" 0 ${FailureLabel}
+    ; A genuinely fresh destination has no old recovery payload to overwrite.
+    IfFileExists "$INSTDIR\Swirl.exe" native_tun_owned
+    StrCpy $FailurePhase "native-tun-payload"
+    StrCpy $FailureCode "missing-payload"
+    IfFileExists "$INSTDIR\swirl-tun-broker.exe" ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-helper.exe" ${FailureLabel}
+    IfFileExists "$INSTDIR\package-manifest.json" ${FailureLabel}
+    IfFileExists "$INSTDIR\.swirl-install-owned" ${FailureLabel}
+    Goto native_tun_checked
+    native_tun_owned:
+    StrCpy $FailurePhase "native-tun-payload"
+    StrCpy $FailureCode "missing-payload"
+    IfFileExists "$INSTDIR\.swirl-install-owned" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\package-manifest.json" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-broker.exe" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-helper.exe" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\wintun.dll" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\tun-runtime.json" 0 ${FailureLabel}
+    ; Verify the currently installed owner and bytes before executing its
+    ; maintenance entry. The new package's manifest describes another version.
+    StrCpy $FailurePhase "native-tun-installed-verify"
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PLUGINSDIR\Maintain-WindowsRustProduct.ps1" -Mode Verify -ApplicationDirectory "$INSTDIR" -ExpectedManifest "$INSTDIR\package-manifest.json"'
+    Pop $0
+    Pop $1
+    StrCpy $FailureCode $0
+    DetailPrint "$1"
+    StrCmp $0 "0" 0 ${FailureLabel}
+    ; Restoring host network state requires the user's explicit action.
+    ; A silent upgrade or uninstall cannot consent on the user's behalf
+    ; unless the caller explicitly passes /RECOVER_TUN=1.
+    StrCpy $FailurePhase "native-tun-consent"
+    StrCpy $FailureCode "required"
+    IfSilent native_tun_silent native_tun_prompt
+    native_tun_silent:
+    StrCmp $RecoverTunConsent "1" native_tun_recover ${FailureLabel}
+    native_tun_prompt:
+    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "上次 Swirl TUN 网络恢复尚未确认。继续前需要管理员授权，恢复 Swirl 自己接管的网络设置；发生冲突时会保留恢复记录并停止更新。是否现在恢复？" IDOK native_tun_recover IDCANCEL ${FailureLabel}
+    Goto ${FailureLabel}
+    native_tun_recover:
+    ClearErrors
+    StrCpy $FailurePhase "native-tun-maintenance"
+    StrCpy $FailureCode "unavailable"
+    ExecWait '"$INSTDIR\Swirl.exe" --recover-tun' $0
+    IfErrors ${FailureLabel}
+    StrCpy $FailureCode $0
+    StrCmp $0 "0" 0 ${FailureLabel}
+    SetRegView 32
+    ClearErrors
+    StrCpy $FailurePhase "native-tun-marker-confirm"
+    StrCpy $FailureCode "unavailable"
+    ReadRegDWORD $0 HKCU "Software\SOLHK\Swirl\NativeTun" "recoveryPending"
+    IfErrors ${FailureLabel}
+    StrCpy $FailureCode $0
+    StrCmp $0 "0" 0 ${FailureLabel}
+    native_tun_checked:
+!macroend
+!macro EmitFailureReceipt Kind
+    ; One bounded ASCII receipt reaches an existing inherited stderr handle.
+    ; Ordinary GUI launches have no such handle and create no diagnostic file.
+    System::Call 'kernel32::GetStdHandle(i -12) p.r0'
+    StrCmp $0 "0" ${Kind}_receipt_done
+    StrCmp $0 "-1" ${Kind}_receipt_done
+    StrCpy $1 "SWIRL_${Kind}_FAILURE phase=$FailurePhase code=$FailureCode$\r$\n"
+    StrLen $2 $1
+    System::Call 'kernel32::WriteFile(p r0, m r1, i r2, *i.r3, p 0) i'
+    ${Kind}_receipt_done:
+!macroend
 Function .onInit
     StrCpy $IsolatedInstall "0"
+    StrCpy $RecoverTunConsent "0"
     ${GetParameters} $Parameters
     ClearErrors
     ${GetOptions} $Parameters "/ISOLATED" $0
     IfErrors +2 0
     StrCpy $IsolatedInstall "1"
+    ClearErrors
+    ${GetOptions} $Parameters "/RECOVER_TUN=" $0
+    IfErrors init_recover_done 0
+    StrCmp $0 "1" 0 init_recover_done
+    StrCpy $RecoverTunConsent "1"
+    init_recover_done:
     StrCmp $IsolatedInstall "1" 0 init_done
     !insertmacro ValidateIsolatedDirectory
     init_done:
@@ -114,12 +229,23 @@ FunctionEnd
 Function un.onInit
     IfFileExists "$INSTDIR\.swirl-install-owned" 0 unowned_install
     StrCpy $IsolatedInstall "0"
+    StrCpy $RecoverTunConsent "0"
+    ${un.GetParameters} $Parameters
+    ClearErrors
+    ${un.GetOptions} $Parameters "/RECOVER_TUN=" $0
+    IfErrors uninit_recover_done 0
+    StrCmp $0 "1" 0 uninit_recover_done
+    StrCpy $RecoverTunConsent "1"
+    uninit_recover_done:
     IfFileExists "$INSTDIR\.swirl-isolated-install" 0 +2
     StrCpy $IsolatedInstall "1"
     StrCmp $IsolatedInstall "1" 0 uninstall_ready
     !insertmacro ValidateIsolatedDirectory
     Goto uninstall_ready
     unowned_install:
+    StrCpy $FailurePhase "ownership-marker"
+    StrCpy $FailureCode "missing-payload"
+    !insertmacro EmitFailureReceipt UNINSTALL
     SetErrorLevel 2
     Abort "缺少 Swirl 安装标记，停止卸载以保留目录内容。"
     uninstall_ready:
@@ -137,19 +263,24 @@ Section "安装 Swirl"
     ; Do not silently leave a running executable from the previous version.
     check_running:
     IfFileExists "$INSTDIR\Swirl.exe" 0 ready_to_copy
-    System::Call 'kernel32::CreateFileW(w "$INSTDIR\Swirl.exe", i 0x40000000, i 1, p 0, i 3, i 0, p 0) p.r0'
+    StrCpy $FailurePhase "gui-write-open"
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\Swirl.exe", i 0x40000000, i 1, p 0, i 3, i 0, p 0) p.r0 ?e'
+    Pop $FailureCode
     StrCmp $0 "-1" blocked ready_close
     ready_close:
     System::Call 'kernel32::CloseHandle(p r0)'
     Goto ready_to_copy
     blocked:
     IfSilent installation_failed
-    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先退出 Swirl，再点击重试。安装程序会覆盖更新，保留您的配置和数据。" IDRETRY check_running IDCANCEL installation_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先完全退出 Swirl，再点击重试。支持托盘的版本请在右下角图标菜单选择「退出 Swirl」。安装程序会覆盖更新，保留您的配置和数据。" IDRETRY check_running IDCANCEL installation_failed
     ready_to_copy:
     !insertmacro PreparePackageMaintenance
     !insertmacro MaintainPackage Upgrade '-PrepareOnly -PreviousManifest "$PLUGINSDIR\previous-package-manifest.json"' installation_failed
+    !insertmacro RequireNativeTunRecovery installation_failed
     SetOverwrite on
     ClearErrors
+    StrCpy $FailurePhase "payload-copy"
+    StrCpy $FailureCode "unavailable"
     SetOutPath "$INSTDIR"
     File /r "${APP_DIST}\\*.*"
     IfErrors installation_failed
@@ -166,48 +297,42 @@ Section "安装 Swirl"
     FileClose $0
     Goto install_done
     regular:
-    CreateDirectory "$SMPROGRAMS\\Swirl"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    !if /FileExists "${APP_DIST}\SwirlCodexLauncher.exe"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    !endif
-    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 桌面快捷方式属性更新失败，错误 $0。"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$SMPROGRAMS\Swirl\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 开始菜单快捷方式属性更新失败，错误 $0。"
-    WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-owned-pins "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 任务栏图标刷新未完成，错误 $0。"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "${APP_VERSION}.0"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-0217-optical.ico"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
-    WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoModify" 1
-    WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoRepair" 1
+    ; The embedded source-bound helper owns the complete per-user transaction:
+    ; raw original types/bytes, compare-before-restore and user-edit retention.
+    !insertmacro MaintainUserIntegration Install installation_failed
     install_done:
     Goto installation_finished
     installation_failed:
+    !insertmacro EmitFailureReceipt INSTALL
     SetErrorLevel 2
-    Abort "Swirl 正在运行或文件无法写入，更新未完成。"
+    Abort "Swirl 正在运行、TUN 恢复未确认或文件无法写入，更新未完成。请保留现有恢复文件后重试。"
     installation_finished:
 SectionEnd
 Section "Uninstall"
     SetShellVarContext current
+    uninstall_check_running:
+    IfFileExists "$INSTDIR\Swirl.exe" 0 uninstall_gui_stopped
+    StrCpy $FailurePhase "gui-write-open"
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\Swirl.exe", i 0x40000000, i 1, p 0, i 3, i 0, p 0) p.r0 ?e'
+    Pop $FailureCode
+    StrCmp $0 "-1" uninstall_running
+    System::Call 'kernel32::CloseHandle(p r0)'
+    Goto uninstall_gui_stopped
+    uninstall_running:
+    IfSilent uninstall_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先完全退出 Swirl 并等待网络恢复，再点击重试。支持托盘的版本请在右下角图标菜单选择「退出 Swirl」。" IDRETRY uninstall_check_running IDCANCEL uninstall_failed
+    uninstall_gui_stopped:
     !insertmacro PreparePackageMaintenance
+    !insertmacro RequireNativeTunRecovery uninstall_failed
+    StrCmp $IsolatedInstall "1" integration_validated
+    !insertmacro MaintainUserIntegration ValidateUninstall uninstall_failed
+    ; Preserve the source manifest and product bytes if a locked or otherwise
+    ; unavailable integration target needs a later restoration retry.
+    !insertmacro MaintainUserIntegration Uninstall uninstall_failed
+    integration_validated:
     !insertmacro MaintainPackage Uninstall '' uninstall_failed
     StrCmp $IsolatedInstall "1" isolated_uninstall
-    Delete "$DESKTOP\\Swirl.lnk"
-    Delete "$SMPROGRAMS\\Swirl\\Swirl.lnk"
-    Delete "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk"
-    RMDir "$SMPROGRAMS\\Swirl"
-    DeleteRegKey HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl"
-    DeleteRegKey HKCU "Software\\Swirl"
+    Delete "$INSTDIR\.swirl-user-integration.json"
     isolated_uninstall:
     ; The embedded helper removed only unchanged files owned by this build.
     Delete "$INSTDIR\.swirl-isolated-install"
@@ -216,7 +341,8 @@ Section "Uninstall"
     RMDir "$INSTDIR"
     Goto uninstall_finished
     uninstall_failed:
+    !insertmacro EmitFailureReceipt UNINSTALL
     SetErrorLevel 2
-    Abort "安装文件归属或路径验证失败，卸载未完成。您的未验证文件已保留。"
+    Abort "网络恢复、安装文件归属或路径未能确认安全，卸载已停止。请保留现有文件后重试。"
     uninstall_finished:
 SectionEnd

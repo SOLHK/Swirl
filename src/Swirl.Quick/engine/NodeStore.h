@@ -15,6 +15,7 @@ struct NodeSubscription {
     QString formatHint="auto";
     // Legacy metadata only; automatic refresh always has nodes-only authority.
     QString importScope="full-profile";
+    QString downloadRoute="system";
     QUrl url; // Token-bearing URL is DPAPI protected and never exposed to QML.
     int intervalMinutes=360;
     bool enabled=true;
@@ -40,9 +41,10 @@ public:
     bool select(const QString &id);
     QList<NodeSubscription> subscriptions() const { return m_subscriptions; }
     QVariantList publicSubscriptions() const;
-    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={},const QString &importScope={});
+    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={},const QString &importScope={},const QString &downloadRoute={});
     static QStringList subscriptionFormats(){return {"auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box","xray-v2ray-json"};}
     static QStringList subscriptionScopes(){return {"full-profile","nodes-only"};}
+    static QStringList subscriptionDownloadRoutes(){return {"system","physical"};}
     bool removeSubscription(const QString &id);
     int legacyNodeCount() const;
     bool cleanLegacyNodes();
@@ -69,8 +71,9 @@ public:
     bool prepareImport(const QList<ProxyNode> &incoming, const QString &sourceId, ImportPlan *plan);
     bool prepareSaveNode(const QVariantMap &,ImportPlan *);
     bool prepareRemoveNode(const QString &,ImportPlan *);
-    bool prepareSaveSubscription(const QString &id,const QString &name,const QUrl &,int intervalMinutes,bool enabled,const QString &formatHint,const QString &importScope,ImportPlan *);
+    bool prepareSaveSubscription(const QString &id,const QString &name,const QUrl &,int intervalMinutes,bool enabled,const QString &formatHint,const QString &importScope,ImportPlan *,const QString &downloadRoute={});
     bool prepareRemoveSubscription(const QString &,ImportPlan *);
+    bool prepareSelectSubscription(const QString &,ImportPlan *);
     bool prepareCleanLegacyNodes(ImportPlan *);
     bool commitImport(const ImportPlan &plan, const QJsonObject &networkConfiguration = {});
     // Returns whether the immutable plan was queued. On rejection no callback

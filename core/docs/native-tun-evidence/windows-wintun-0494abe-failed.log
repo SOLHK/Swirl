@@ -1,0 +1,117 @@
+   Compiling quinn v0.11.12
+   Compiling tokio-rustls v0.26.6
+   Compiling swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+   Compiling swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+   Compiling h3-quinn v0.0.10
+   Compiling swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+   Compiling swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+   Compiling swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+   Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+    Finished `release` profile [optimized] target(s) in 3m 05s
+     Running `target\release\examples\windows-tun-smoke.exe --disposable-network --wintun D:\a\_temp\swirl-wintun-smoke\wintun\bin\amd64\wintun.dll`
+Wintun smoke: PASS durable dual-stack Fake-IP close/reopen identity
+Wintun smoke: creating an owned adapter and applying exact test routes
+Wintun smoke: pre-validation snapshot {"observed":{"kind":"mtu","mtu":65535},"requested":{"kind":"mtu","mtu":1500},"resource":{"ipv6":false,"kind":"mtu"}}
+Wintun smoke: pre-validation snapshot {"observed":{"kind":"mtu","mtu":65535},"requested":{"kind":"mtu","mtu":1500},"resource":{"ipv6":true,"kind":"mtu"}}
+Wintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"address","prefix_len":30,"skip_as_source":false},"resource":{"address":"198.18.0.1","kind":"address"}}
+Wintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"address","prefix_len":126,"skip_as_source":false},"resource":{"address":"fd53:7769:726c::1","kind":"address"}}
+Wintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"route","metric":5},"resource":{"destination":"198.18.1.0/32","kind":"route","next_hop":"0.0.0.0"}}
+Wintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"route","metric":5},"resource":{"destination":"fd53:7769:726c::101/128","kind":"route","next_hop":"::"}}
+Wintun smoke: IPv4 DNS identity
+Wintun smoke: PASS IPv4 UDP DNS identity and TTL
+Wintun smoke: PASS IPv4 TCP DNS framing, identity and TTL
+Wintun smoke: IPv4 TCP payload and half-close
+Wintun smoke: PASS IPv4 TCP payload and half-close
+Wintun smoke: PASS IPv4 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup
+Wintun smoke: PASS IPv4 64 rounds on one TCP connection across a second connection reset
+Wintun smoke: IPv4 empty and full UDP datagrams
+Wintun smoke: PASS IPv4 empty and full UDP datagrams
+Wintun smoke: IPv6 DNS identity
+Wintun smoke: PASS IPv6 UDP DNS identity and TTL
+Wintun smoke: PASS IPv6 TCP DNS framing, identity and TTL
+Wintun smoke: IPv6 TCP payload and half-close
+Wintun smoke: PASS IPv6 TCP payload and half-close
+Wintun smoke: PASS IPv6 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup
+Wintun smoke: PASS IPv6 64 rounds on one TCP connection across a second connection reset
+Wintun smoke: IPv6 empty and full UDP datagrams
+Wintun smoke: PASS IPv6 empty and full UDP datagrams
+Wintun smoke: PASS verified DoT A/AAAA resolver fixture
+Wintun smoke: IPv4 proxy with reachable DIRECT controls
+Wintun smoke: PASS IPv4 proxy, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv4 reject with reachable DIRECT controls
+Wintun smoke: PASS IPv4 reject, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv4 proxy_rejected with reachable DIRECT controls
+Wintun smoke: PASS IPv4 proxy_rejected, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv4 proxy_unavailable with reachable DIRECT controls
+Wintun smoke: PASS IPv4 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv6 proxy with reachable DIRECT controls
+Wintun smoke: PASS IPv6 proxy, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv6 reject with reachable DIRECT controls
+Wintun smoke: PASS IPv6 reject, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv6 proxy_rejected with reachable DIRECT controls
+Wintun smoke: PASS IPv6 proxy_rejected, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv6 proxy_unavailable with reachable DIRECT controls
+Wintun smoke: PASS IPv6 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls
+Wintun smoke: IPv4 UDP proxy with reachable DIRECT controls
+Wintun smoke: UDP client stage {"case":"proxy","family":4,"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"direct_before_received"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"register control listener and relay"}
+Wintun smoke: UDP client stage {"context":{"baseline":44,"case":"proxy","configuration":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"27","engine_epoch":"2168289174607059581","expected_generation":"27","generation":"27","last_receipt":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"27","candidate_digest":"fdea1060aa5b415d0032d39273c38c60fb5424537f2bcf6a7df564617c6e6e12","candidate_revision":"27","durable_receipt":{"plan_digest":"fdea1060aa5b415d0032d39273c38c60fb5424537f2bcf6a7df564617c6e6e12","request_id":"d1000000-0000-4000-8000-00000000001b","saved_revision":"27","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"2168289174607059581","expected_generation":"27","generation":"27","ok":true,"outcome":"applied","plan_digest":"fdea1060aa5b415d0032d39273c38c60fb5424537f2bcf6a7df564617c6e6e12","request_id":"d1000000-0000-4000-8000-00000000001b","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"fdea1060aa5b415d0032d39273c38c60fb5424537f2bcf6a7df564617c6e6e12","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:54533","family":4,"host":"ipv4.wintun.smoke.invalid","port":54533,"proxy_control":"127.0.0.1:56247","proxy_relay":"127.0.0.1:54534","source":"198.18.0.1:54537"},"stage":"initial_empty_sent"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"accept TCP control"}
+Wintun smoke: SOCKS5 UDP stage {"control_local":"127.0.0.1:56247","host":"ipv4.wintun.smoke.invalid","port":54533,"relay":"127.0.0.1:54534","source":"127.0.0.1:56249","stage":"control_accepted"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"read TCP greeting"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"write TCP greeting selection"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"read TCP ASSOCIATE header"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"read TCP ASSOCIATE address and port"}
+Wintun smoke: SOCKS5 UDP stage {"address_bytes":6,"command":[5,3,0,1],"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"associate_request_validated"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"write TCP ASSOCIATE reply"}
+Wintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","port":54533,"relay":"127.0.0.1:54534","reply_code":0,"stage":"associate_reply_written"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"receive empty UDP relay datagram"}
+Wintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":0,"host":"ipv4.wintun.smoke.invalid","port":54533,"relay":"127.0.0.1:54534","source":"127.0.0.1:54538","stage":"relay_received","wire_bytes":32}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"send empty UDP relay reply"}
+Wintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","payload_bytes":0,"port":54533,"source":"127.0.0.1:54538","stage":"relay_reply_sent","wire_bytes":32}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"receive full UDP relay datagram"}
+Wintun smoke: UDP client stage {"bytes":0,"case":"proxy","family":4,"sender":"198.18.1.0:54533","source":"198.18.0.1:54537","stage":"empty_reply_received"}
+Wintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":1200,"host":"ipv4.wintun.smoke.invalid","port":54533,"relay":"127.0.0.1:54534","source":"127.0.0.1:54538","stage":"relay_received","wire_bytes":1232}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"send full UDP relay reply"}
+Wintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","payload_bytes":1200,"port":54533,"source":"127.0.0.1:54538","stage":"relay_reply_sent","wire_bytes":1232}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"wait for Windows to receive both UDP replies"}
+Wintun smoke: UDP client stage {"bytes":1200,"case":"proxy","family":4,"sender":"198.18.1.0:54533","source":"198.18.0.1:54537","stage":"full_reply_received"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54533,"stage":"shutdown TCP control"}
+Wintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy","category":"proxy","core_admissions_during_retry":0,"core_record_id":45,"direct_trap_controls":2,"download":1200,"ended":true,"error":"Socks5UdpControlClosed","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":54533,"proxy_payload_lengths":[0,1200],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:54537","unexpected_trap_datagrams":0,"upload":1200}
+Wintun smoke: IPv4 UDP reject with reachable DIRECT controls
+Wintun smoke: UDP client stage {"case":"reject","family":4,"host":"ipv4.wintun.smoke.invalid","port":54541,"stage":"direct_before_received"}
+Wintun smoke: UDP client stage {"context":{"baseline":47,"case":"reject","configuration":{"address":"127.0.0.1:55913","applied_mode":"rule","applied_revision":"31","engine_epoch":"2168289174607059581","expected_generation":"31","generation":"31","last_receipt":{"address":"127.0.0.1:55913","applied_mode":"rule","applied_revision":"31","candidate_digest":"194c0a373734f26bc56cebd64bd5a84b5d8dcba70b43c6410c8d8b12e8ce40ef","candidate_revision":"31","durable_receipt":{"plan_digest":"194c0a373734f26bc56cebd64bd5a84b5d8dcba70b43c6410c8d8b12e8ce40ef","request_id":"d1000000-0000-4000-8000-00000000001f","saved_revision":"31","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"2168289174607059581","expected_generation":"31","generation":"31","ok":true,"outcome":"applied","plan_digest":"194c0a373734f26bc56cebd64bd5a84b5d8dcba70b43c6410c8d8b12e8ce40ef","request_id":"d1000000-0000-4000-8000-00000000001f","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"194c0a373734f26bc56cebd64bd5a84b5d8dcba70b43c6410c8d8b12e8ce40ef","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:54541","family":4,"host":"ipv4.wintun.smoke.invalid","port":54541,"proxy_control":"127.0.0.1:56251","proxy_relay":"127.0.0.1:54542","source":"198.18.0.1:54545"},"stage":"initial_empty_sent"}
+Wintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"reject","category":"reject","core_admissions_during_retry":0,"core_record_id":48,"direct_trap_controls":2,"download":0,"ended":true,"error":"Rejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"SWIRL_V2_REJECT","port":54541,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:54545","unexpected_trap_datagrams":0,"upload":0}
+Wintun smoke: IPv4 UDP proxy_rejected with reachable DIRECT controls
+Wintun smoke: UDP client stage {"case":"proxy_rejected","family":4,"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"direct_before_received"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"register control listener and relay"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"accept TCP control"}
+Wintun smoke: UDP client stage {"context":{"baseline":50,"case":"proxy_rejected","configuration":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"35","engine_epoch":"2168289174607059581","expected_generation":"35","generation":"35","last_receipt":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"35","candidate_digest":"0168b4d7aa2192be0b531a5f1d6370fc9ba9e0d25b58f0f259cd10f79c6d97cb","candidate_revision":"35","durable_receipt":{"plan_digest":"0168b4d7aa2192be0b531a5f1d6370fc9ba9e0d25b58f0f259cd10f79c6d97cb","request_id":"d1000000-0000-4000-8000-000000000023","saved_revision":"35","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"2168289174607059581","expected_generation":"35","generation":"35","ok":true,"outcome":"applied","plan_digest":"0168b4d7aa2192be0b531a5f1d6370fc9ba9e0d25b58f0f259cd10f79c6d97cb","request_id":"d1000000-0000-4000-8000-000000000023","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"0168b4d7aa2192be0b531a5f1d6370fc9ba9e0d25b58f0f259cd10f79c6d97cb","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:54548","family":4,"host":"ipv4.wintun.smoke.invalid","port":54548,"proxy_control":"127.0.0.1:56254","proxy_relay":"127.0.0.1:54549","source":"198.18.0.1:54552"},"stage":"initial_empty_sent"}
+Wintun smoke: SOCKS5 UDP stage {"control_local":"127.0.0.1:56254","host":"ipv4.wintun.smoke.invalid","port":54548,"relay":"127.0.0.1:54549","source":"127.0.0.1:56256","stage":"control_accepted"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"read TCP greeting"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"write TCP greeting selection"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"read TCP ASSOCIATE header"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"read TCP ASSOCIATE address and port"}
+Wintun smoke: SOCKS5 UDP stage {"address_bytes":6,"command":[5,3,0,1],"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"associate_request_validated"}
+Wintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":54548,"stage":"write TCP ASSOCIATE reply"}
+Wintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","port":54548,"relay":"127.0.0.1:54549","reply_code":2,"stage":"associate_reply_written"}
+Wintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy_rejected","category":"proxy","core_admissions_during_retry":0,"core_record_id":51,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamRejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":54548,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:54552","unexpected_trap_datagrams":0,"upload":0}
+Wintun smoke: IPv4 UDP proxy_unavailable with reachable DIRECT controls
+Wintun smoke: peer failure [DoT A/AAAA resolver]: An existing connection was forcibly closed by the remote host. (os error 10054)
+Wintun smoke: UDP client stage {"case":"proxy_unavailable","family":4,"host":"ipv4.wintun.smoke.invalid","port":54555,"stage":"direct_before_received"}
+Wintun smoke: UDP client stage {"context":{"baseline":53,"case":"proxy_unavailable","configuration":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"39","engine_epoch":"2168289174607059581","expected_generation":"39","generation":"39","last_receipt":{"address":"127.0.0.1:55913","applied_mode":"global","applied_revision":"39","candidate_digest":"2217d9c86202252cf13fb8a7721b453a4da0e5e9d17a1209c99240e2dee01859","candidate_revision":"39","durable_receipt":{"plan_digest":"2217d9c86202252cf13fb8a7721b453a4da0e5e9d17a1209c99240e2dee01859","request_id":"d1000000-0000-4000-8000-000000000027","saved_revision":"39","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"2168289174607059581","expected_generation":"39","generation":"39","ok":true,"outcome":"applied","plan_digest":"2217d9c86202252cf13fb8a7721b453a4da0e5e9d17a1209c99240e2dee01859","request_id":"d1000000-0000-4000-8000-000000000027","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"2217d9c86202252cf13fb8a7721b453a4da0e5e9d17a1209c99240e2dee01859","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:54555","family":4,"host":"ipv4.wintun.smoke.invalid","port":54555,"proxy_control":"127.0.0.1:56259","proxy_relay":"127.0.0.1:54556","source":"198.18.0.1:54559"},"stage":"initial_empty_sent"}
+Wintun smoke: peer failure [UDP DIRECT trap control]: deadline has elapsed
+Wintun smoke: restoring owned network state
+Wintun smoke: recovery report {"already_restored":0,"conflicts":[],"restored":6}
+Wintun smoke: restored raw state {"before":{"kind":"mtu","mtu":65535},"exact":true,"observed":{"kind":"mtu","mtu":65535},"resource":{"ipv6":false,"kind":"mtu"},"state":"restored"}
+Wintun smoke: restored raw state {"before":{"kind":"mtu","mtu":65535},"exact":true,"observed":{"kind":"mtu","mtu":65535},"resource":{"ipv6":true,"kind":"mtu"},"state":"restored"}
+Wintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"address":"198.18.0.1","kind":"address"},"state":"restored"}
+Wintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"address":"fd53:7769:726c::1","kind":"address"},"state":"restored"}
+Wintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"destination":"198.18.1.0/32","kind":"route","next_hop":"0.0.0.0"},"state":"restored"}
+Wintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"destination":"fd53:7769:726c::101/128","kind":"route","next_hop":"::"},"state":"restored"}
+Wintun smoke: PASS packet resources released
+Wintun smoke: PASS default/split-default routes unchanged
+Wintun smoke: PASS owned Wintun adapter removed
+Wintun smoke: exact network configuration verification {"adapters_after":8,"adapters_before":8,"adapters_equal":true,"all_routes_equal":true,"routes_after":26,"routes_before":26}
+windows-tun-smoke failed: data tests: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. (os error 10060)
+error: process didn't exit successfully: `target\release\examples\windows-tun-smoke.exe --disposable-network --wintun D:\a\_temp\swirl-wintun-smoke\wintun\bin\amd64\wintun.dll` (exit code: 1)

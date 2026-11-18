@@ -66,6 +66,18 @@ REALITY_WIRE_BASELINE = [26, 10, 17]
 SYNTHETIC_SECRETS = set()
 
 
+def hold_authenticated_hello(release):
+    """Keep the real ClientHello stale even if an OS timed wait returns early."""
+    began = time.monotonic()
+    while not release.is_set():
+        elapsed = time.monotonic() - began
+        if elapsed >= 3.25:
+            return elapsed
+        if release.wait(3.25 - elapsed):
+            return None
+    return None
+
+
 def remember_secret(value):
     # Failure assertions can print a parsed node or its original encoded URI.
     # Register only this process's disposable fixture material, never providers.
@@ -851,12 +863,12 @@ class RealityRuntimeInterop(ChainBase):
                     hello = exact(client, length)
                     assert hello[0] == 1, "first record must contain ClientHello"
                     evidence["client_hello_received"] = True
-                    began = time.monotonic()
                     # Timestamp resolution is one second. A 3.25-second hold
                     # exceeds the two-second server limit even at its boundary.
-                    if release.wait(3.25):
+                    delay = hold_authenticated_hello(release)
+                    if delay is None:
                         return
-                    evidence["forwarding_delay_seconds"] = time.monotonic() - began
+                    evidence["forwarding_delay_seconds"] = delay
                     with socket.create_connection(("127.0.0.1", peer.port), timeout=3) as server:
                         server.sendall(prefix + hello)
                         streams = {client: server, server: client}
@@ -1221,12 +1233,12 @@ def validate_qt_lifecycle_report(value, mode, port):
         assert row.get("tls_error_count") == 0, "Qt lifecycle unexpected TLS error"
         if row["phase"] == "reject":
             assert row.get("tunnel_accepted") is False, "Qt policy rejection"
-            assert row.get("proxy_status") == (502 if row["frontend"] == "http-connect" else 5), "Qt policy reply"
+            assert row.get("proxy_status") == (502 if row["frontend"] == "http-connect" else 2), "Qt policy reply"
         elif mode == "authentication-failure":
             assert row.get("http_status", 0) == 0, "Qt authentication failure cannot count HTTP success"
             accepted = row.get("tunnel_accepted")
             assert type(accepted) is bool, "Qt authentication frontend outcome"
-            assert row.get("proxy_status") == ((200 if accepted else 502) if row["frontend"] == "http-connect" else (0 if accepted else 5)), "Qt authentication reply"
+            assert row.get("proxy_status") == ((200 if accepted else 502) if row["frontend"] == "http-connect" else (0 if accepted else 1)), "Qt authentication reply"
         else:
             assert row.get("tunnel_accepted") is True, "Qt selected tunnel"
             assert row.get("proxy_status") == (200 if row["frontend"] == "http-connect" else 0), "Qt accepted proxy reply"

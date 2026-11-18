@@ -234,6 +234,10 @@ class RebuildTests(unittest.TestCase):
             collection = TTCollection(source)
             paths = [folder / f"face-{i}.ttf" for i in range(2)]
             for face, path in zip(collection.fonts, paths):
+                # Reloading re-enables timestamp recalculation. Keep this
+                # authored fixture byte-identical even when saves cross a
+                # wall-clock second; the intentional mutation is face order.
+                face.recalcTimestamp = False
                 face.save(path)
             candidate = folder / "candidate.ttc"
             collection.save(candidate, shareTables=True)
@@ -250,7 +254,7 @@ class RebuildTests(unittest.TestCase):
 
     def test_missing_oracle_creates_no_final_font_and_keeps_source(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); source=root/'source.ttc'; output=root/'Swirl-VF.ttc'; report=root/'report.json'
+            root=Path(tmp); source=root/'source.ttc'; output=root/'SwirlVF.ttc'; report=root/'report.json'
             write_fixture(source)
             before=source.read_bytes()
             with self.assertRaises(OSError):

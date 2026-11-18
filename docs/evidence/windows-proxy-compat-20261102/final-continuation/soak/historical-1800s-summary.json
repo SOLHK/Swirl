@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "test": "production_v2_authenticated_socks5_verified_tls_sse_soak",
+  "requested_duration_seconds": 1800,
+  "connections": 8,
+  "event_interval_seconds": 1,
+  "expected_events_per_connection": 1801,
+  "peer_read_idle_budget_seconds": 1840,
+  "client_origin_io_timeout_seconds": 8,
+  "core_handshake_timeout_ms": 3000,
+  "reconnection_permitted": false,
+  "platform": "linux",
+  "scope": "controlled_local_network_no_desktop_acceptance",
+  "resource_observation_limit": "RSS and FD samples do not prove absence of leaks",
+  "client_results": [
+    {
+      "connection": 0,
+      "events": 1801,
+      "sha256": "46db98a86210ddcb635ba2440338cadecf64731951fd2dea9a7b0b850ce54172",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 1,
+      "events": 1801,
+      "sha256": "8f9afd92ce4c80bced998f794d66b5efe1fddfc1a2f535894c9d2a2734ce440e",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 2,
+      "events": 1801,
+      "sha256": "544d8f581e066b7527b8ef65434fcf373129db6ef6c4d3218bc340f271c62fd2",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 3,
+      "events": 1801,
+      "sha256": "c6090a72dff03e4b37e33d9ecf55fae38dea365faa597eebe73791c30382ec32",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 4,
+      "events": 1801,
+      "sha256": "34b3f6e17f63c6f2837cbc6d729ddbab23a26e1da9b8ce527c332f762ad69c45",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 5,
+      "events": 1801,
+      "sha256": "de5ec0299e455dfef00614ccae592a57af8aae543d6e68d03d100932bb30782d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 6,
+      "events": 1801,
+      "sha256": "c0b84101f2dad4500e85e9175701edd3905bf668a6eeb13dfa9077fe13c85d64",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 7,
+      "events": 1801,
+      "sha256": "dc28fcb1f9f58351cab99baecd552663541ea7561b11f7adb6393ef7f1bffa52",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    }
+  ],
+  "origin_results": [
+    {
+      "connection": 0,
+      "events": 1801,
+      "sha256": "46db98a86210ddcb635ba2440338cadecf64731951fd2dea9a7b0b850ce54172",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 1,
+      "events": 1801,
+      "sha256": "8f9afd92ce4c80bced998f794d66b5efe1fddfc1a2f535894c9d2a2734ce440e",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 2,
+      "events": 1801,
+      "sha256": "544d8f581e066b7527b8ef65434fcf373129db6ef6c4d3218bc340f271c62fd2",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 3,
+      "events": 1801,
+      "sha256": "c6090a72dff03e4b37e33d9ecf55fae38dea365faa597eebe73791c30382ec32",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 4,
+      "events": 1801,
+      "sha256": "34b3f6e17f63c6f2837cbc6d729ddbab23a26e1da9b8ce527c332f762ad69c45",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 5,
+      "events": 1801,
+      "sha256": "de5ec0299e455dfef00614ccae592a57af8aae543d6e68d03d100932bb30782d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 6,
+      "events": 1801,
+      "sha256": "c0b84101f2dad4500e85e9175701edd3905bf668a6eeb13dfa9077fe13c85d64",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 7,
+      "events": 1801,
+      "sha256": "dc28fcb1f9f58351cab99baecd552663541ea7561b11f7adb6393ef7f1bffa52",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    }
+  ],
+  "binary_sha256": "458f7e3067f61476dafd96001f53ac9906e9f58773ccfd9e68bf6535b98bc5e0",
+  "core_pid": 48554,
+  "observed_stream_seconds": 1800.026379,
+  "final_core": {
+    "active": 0,
+    "accepted": 8,
+    "failed": 0,
+    "upload": 13800,
+    "download": 1198970,
+    "ended_records": 8
+  },
+  "listener_closed": true,
+  "ready_connections": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "delivered_connections": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "independent_fixture_errors": [],
+  "errors": [],
+  "passed": true,
+  "raw_evidence_sha256": "c47df0a47a24fbfc4cc6e251d67cffc87468dc5b2a1b31ec3e875a72ba964dda",
+  "raw_evidence_filename": "candidate-v2-soak-1800.json",
+  "source_scope": "Local portable Rust revision built before commit 86b73d3; exact executable hash recorded separately. Not a Windows desktop acceptance.",
+  "resource_samples": 1798,
+  "sample_schema": [
+    "elapsed_seconds",
+    "active",
+    "accepted",
+    "rss_kib",
+    "fd_count"
+  ],
+  "rss_kib_range": [
+    10208,
+    21608
+  ],
+  "fd_count_range": [
+    23,
+    23
+  ]
+}

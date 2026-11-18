@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "scope": "Actual final packaging entry-point regression on Linux PowerShell7; native Windows/full CI and physical Windows11 acceptance remain separate.",
+  "base_commit": "48caea558f616c6d9b958345b4c71956fe038564",
+  "same_test_source_old_and_new": true,
+  "old_expected_failure": true,
+  "candidate_full_policy_pass": true,
+  "files": [
+    {
+      "path": "baseline48-result.json",
+      "bytes": 398,
+      "sha256": "6e8fb57fd6425c1295a023d54196d88e8607fbe9c2dace368121aa1cd2bef36f"
+    },
+    {
+      "path": "amended-result.json",
+      "bytes": 514,
+      "sha256": "a1c4e42d0980846bac0e9a917323d857e07896ec9a0ddc76e4ad82552d1dae76"
+    },
+    {
+      "path": "baseline48-finalizer-empty-dirs.log",
+      "bytes": 604,
+      "sha256": "063f83d15a4ba0784a7ebb97d114c009b081d73c35aed6a26d52405b24063db2"
+    },
+    {
+      "path": "amended-finalizer-empty-dirs.log",
+      "bytes": 386,
+      "sha256": "205f0c3c53841dbf107e2733879f2d96d0c5009b25962edaa3f4778e00ec6195"
+    }
+  ]
+}

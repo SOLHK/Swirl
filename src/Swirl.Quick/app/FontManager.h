@@ -67,6 +67,8 @@ public:
 #ifdef SWIRL_UI_TESTS
     int metadataCacheSize() const { return m_axisMetadata.size(); }
     int resolutionCacheSize() const { return m_resolvedAxes.size(); }
+    int textWidthCacheSize() const { return m_textWidths.size(); }
+    quint64 textWidthMeasurementCount() const { return m_textWidthMeasurements; }
 #endif
 signals:
     void currentFamilyChanged();
@@ -99,6 +101,9 @@ private:
     mutable QHash<QString,QVariantList> m_axisMetadata;
     mutable QCache<QByteArray,QVariantMap> m_resolvedAxes{256};
     mutable QCache<QByteArray,qreal> m_textWidths{256};
+#ifdef SWIRL_UI_TESTS
+    mutable quint64 m_textWidthMeasurements = 0;
+#endif
     QHash<QString,int> m_loadedPaths;
     QHash<QString,QString> m_familySources;
     QTimer m_saveTimer;

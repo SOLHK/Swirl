@@ -1,0 +1,348 @@
+{
+  "status": "PARTIAL_NOT_DELIVERED",
+  "production_accepted": false,
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "source_faces": 32,
+  "source_glyphs_per_face": 47102,
+  "limit_source_units": 0.03125,
+  "local_os": "macOS-26.5.1-arm64-arm-64bit",
+  "parent_commit": "1344bd4046f5a40d6b2e60f57d960d205f39f14b",
+  "python_tests": {
+    "total": 965,
+    "passed": 958,
+    "skipped": 7,
+    "failed": 0
+  },
+  "audit_tests": {
+    "total": 6,
+    "passed": 6
+  },
+  "source_axes": [
+    "WDTH",
+    "wght",
+    "HGHT"
+  ],
+  "registered_wdth_product_mapping": "NOT_IMPLEMENTED",
+  "source_mixed_axis_native": {
+    "scope": "selected_GIDs_post_avar_three_axis_native_and_CFF2_fit",
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "native_binary_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "face_index": 0,
+    "source_glyph_count": 47102,
+    "axis_order": [
+      "WDTH",
+      "wght",
+      "HGHT"
+    ],
+    "grid_positions": 27,
+    "independent_positions": 32,
+    "position_plan_sha256": "77c81eb4a41ef58206afc0f53948d5c01ef33e3e7a6467d246669420c3aa7ba5",
+    "limit_source_units": 0.03125,
+    "cases": [
+      {
+        "glyph_id": 0,
+        "native_comparisons": 59,
+        "native_failures": [],
+        "max_portable_native_control_error": 3.595093471822542e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 16,
+          "max_control_error": 0.04925420898536051
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": true,
+          "training_count": 81,
+          "holdout_count": 32,
+          "nonzero_regions": 44,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.0001002310886942233,
+          "max_refinement_error": 0.003149453956236065,
+          "max_holdout_error": 0.00310446932849372,
+          "native_failures": 0,
+          "max_native_control_error": 0.0031044693284421037
+        }
+      },
+      {
+        "glyph_id": 2,
+        "native_comparisons": 59,
+        "native_failures": [],
+        "max_portable_native_control_error": 0.0,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": true,
+          "failed_samples": 0,
+          "max_control_error": 0.0
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": true,
+          "training_count": 27,
+          "holdout_count": 32,
+          "nonzero_regions": 0,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.0,
+          "max_refinement_error": 0.0,
+          "max_holdout_error": 0.0,
+          "native_failures": 0,
+          "max_native_control_error": 0.0
+        }
+      },
+      {
+        "glyph_id": 12,
+        "native_comparisons": 59,
+        "native_failures": [],
+        "max_portable_native_control_error": 2.2737367544323206e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 3,
+          "max_control_error": 0.06021368744143714
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": true,
+          "training_count": 210,
+          "holdout_count": 32,
+          "nonzero_regions": 57,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.0001382381746752097,
+          "max_refinement_error": 0.007542782022330285,
+          "max_holdout_error": 0.006605729028240023,
+          "native_failures": 0,
+          "max_native_control_error": 0.00660572902836507
+        }
+      },
+      {
+        "glyph_id": 1166,
+        "native_comparisons": 59,
+        "native_failures": [],
+        "max_portable_native_control_error": 4.582862941503293e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 32,
+          "max_control_error": 24.91568400538237
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": false,
+          "training_count": 486,
+          "holdout_count": 32,
+          "nonzero_regions": 485,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.0005159026865336866,
+          "max_refinement_error": 3.006586287146321,
+          "max_holdout_error": 0.9801702507648833,
+          "native_failures": 30,
+          "max_native_control_error": 0.9801702507648344
+        }
+      },
+      {
+        "glyph_id": 19177,
+        "native_comparisons": 59,
+        "native_failures": [],
+        "max_portable_native_control_error": 4.687428401686771e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 32,
+          "max_control_error": 5.912349661076798
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": false,
+          "training_count": 504,
+          "holdout_count": 32,
+          "nonzero_regions": 503,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.000685436754632206,
+          "max_refinement_error": 1.7377722153299116,
+          "max_holdout_error": 1.6003919855950852,
+          "native_failures": 30,
+          "max_native_control_error": 1.600391985595075
+        }
+      }
+    ],
+    "production_accepted": false,
+    "complete_font_acceptance": "NOT_RUN",
+    "user_axis_mapping": "NOT_TESTED",
+    "metrics": "NOT_EXTRACTED",
+    "source_unchanged": true
+  },
+  "selected_source_CoreText": [
+    {
+      "gid": 0,
+      "scope": "full_design_cube_selected_source_glyph_in_authored_container",
+      "native_observations": 91,
+      "geometry_failures": 0,
+      "max_control_error": 0.0031039733865826226,
+      "source_font_GID_mapping_preserved": false,
+      "raw_metrics": "NOT_TESTED",
+      "production_accepted": false,
+      "font_sha256": "65e25d4a71e858917ae350caf9d55c476cc18e81c5728b3124c6ae63c6712561"
+    },
+    {
+      "gid": 12,
+      "scope": "full_design_cube_selected_source_glyph_in_authored_container",
+      "native_observations": 91,
+      "geometry_failures": 0,
+      "max_control_error": 0.006615704877584363,
+      "source_font_GID_mapping_preserved": false,
+      "raw_metrics": "NOT_TESTED",
+      "production_accepted": false,
+      "font_sha256": "b000461b5cfe9a6613f1fc6d49579cc2cd1b5613bbfb8b776ac1cda57427a1ca"
+    }
+  ],
+  "dense_grid_negative_controls": [
+    {
+      "gid": 19177,
+      "training_count": 4032,
+      "holdout_count": 128,
+      "nonzero_regions": 4031,
+      "flat_blend_stack_encodable": false,
+      "encoding_error": "cff2_blend_operand_stack_overflow",
+      "max_training_error": 0.0010649896273951327,
+      "max_refinement_error": 0.8162958978734822,
+      "max_holdout_error": 0.5906989363321608,
+      "sampled_geometry_passed": false,
+      "production_accepted": false
+    },
+    {
+      "gid": 1166,
+      "training_count": 4048,
+      "holdout_count": 128,
+      "nonzero_regions": 4041,
+      "flat_blend_stack_encodable": false,
+      "encoding_error": "cff2_blend_operand_stack_overflow",
+      "max_training_error": 0.0011069712948580418,
+      "max_refinement_error": 1.2465919522248756,
+      "max_holdout_error": 0.8564331994127622,
+      "sampled_geometry_passed": false,
+      "production_accepted": false
+    }
+  ],
+  "authored_CoreText": {
+    "status": "FAIL_STRICT_METRICS_OR_GEOMETRY",
+    "variants": {
+      "flat": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "factored": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "compact": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.001815558652092049,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "flat_long": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018081212919831642,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      },
+      "adaptive": {
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "max_cubic_control_error": 0.0018214870846191714,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        }
+      }
+    }
+  },
+  "previous_checkpoint_CI": {
+    "head": "1344bd4046f5a40d6b2e60f57d960d205f39f14b",
+    "merge_checkout": "a7a580bd711f6b9aa244151fb87f381bd7342821",
+    "run": 41458445938,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/41458445938",
+    "python": "PASS",
+    "native_jobs": "FAIL_RETAINED",
+    "Windows_platforms": [
+      "Windows Server 2022 x64 build 20348",
+      "Windows Server 2025 x64",
+      "Windows 11 ARM64 with x64 process emulation"
+    ],
+    "ordinary_controls_passed_per_platform": 13,
+    "nested_controls_failed_per_platform": 6,
+    "missing_outlines_per_nested_control": 124,
+    "final_font_tested": false
+  },
+  "private_receipt_sha256": {
+    "final-source-tests.log": "354299d5702d6c8473c080b73855f64b9c267095aed8c38bc98d07826d41f5f1",
+    "adaptive-mixed-native/report.json": "c94cb84cbcb5226a0f7290cfc4a4b826417bb33b3ff2e6a07f4a7cc3e37974ac",
+    "adaptive-coretext-report.json": "b97a231ba4a1b1343bf04f238bb642dad8bb2739028cd15d618ba4d778181ad3",
+    "adaptive-dense-report.json": "c9e2a565159fec4b18d61c5d03474dd341613c1049b86beee3865497d7355c07",
+    "current-cff2-native/cff2-result.json": "4716180a63f826972c1aa8950e09902802bd8aee8fc1c9082e183bde714364e0",
+    "windows-2022-ci.zip": "634e968e707cd7e285291c10d128fb43cb4ea0d46661da5d48e0a1d2cc7fb687"
+  },
+  "implementation_sha256": {
+    "tools/swirl_vf/platform/diagnose_cff2_directwrite.py": "dbc66212848d0f35ee877eb7d40461e5b6f6b794a30453de3228d678b3860600",
+    "tools/swirl_vf/platform/make_cff2_fixture.py": "8a695c903e1340cd2481a85ad74e41d3d188512c6bf318324e48dac480e46c61",
+    "tools/swirl_vf/platform/probe_hvf_cff2_geometry.py": "e348279b444792ea820c7db45d6b74edcb2563a8da80de3bacead5013680fc84",
+    "tools/swirl_vf/platform/test_coretext_cff2.py": "5923ae56b73c2a5971c4b4d7965c8232575af58d2e70e8c08cd3cf5180190980",
+    "tools/swirl_vf/platform/verify_cff2_directwrite_geometry.py": "6bb285f9d49b19284fadca8627941c94ea46b55f53f9117b22986571466526f8",
+    "tools/swirl_vf/tests/test_adaptive_cff2_geometry.py": "7494e1846c14ddcf20f6722d46e6f9f96fd8c7512a47e201d21e240d0586971a",
+    "tools/swirl_vf/tools/adaptive_cff2_geometry.py": "d1df327188811aa333f0f428399eef94190e2d20ef214b2eefa54ef83cb44a20"
+  },
+  "final_font": {
+    "generated": false,
+    "accepted_faces": 0,
+    "path": null,
+    "sha256": null,
+    "Windows_11_desktop_installation": "NOT_RUN"
+  }
+}

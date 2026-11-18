@@ -1,0 +1,87 @@
+[
+  {
+    "path": "qml",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQml",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQml/DesignSupport",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQml/XmlListModel",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQuick/Controls",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQuick/Controls/Native",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/LocalStorage",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/NativeStyle",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQuick/NativeStyle/controls",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/NativeStyle/util",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/Particles",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/Shapes",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQuick/Shapes/DesignHelpers",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/tooling",
+    "kind": "directory",
+    "empty": true
+  },
+  {
+    "path": "qml/QtQuick/VectorImage",
+    "kind": "directory",
+    "empty": false
+  },
+  {
+    "path": "qml/QtQuick/VectorImage/Helpers",
+    "kind": "directory",
+    "empty": true
+  }
+]

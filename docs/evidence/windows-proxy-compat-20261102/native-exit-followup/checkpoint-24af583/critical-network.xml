@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="10"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="114"
+	timestamp="2026-11-02T16:15:25"
+	>
+	<testcase name="swirl-system-proxy-state" classname="swirl-system-proxy-state" time="2.64314" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-system-proxy-recovery" classname="swirl-system-proxy-recovery" time="3.00336" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-node-real-chain" classname="swirl-node-real-chain" time="7.22532" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-stream-regression" classname="swirl-stream-regression" time="7.4692" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-subscription-download" classname="swirl-subscription-download" time="51.5299" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-qt-network-policy" classname="swirl-qt-network-policy" time="1.93505" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-subscription-formats" classname="swirl-subscription-formats" time="9.34811" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-import-subscription" classname="swirl-import-subscription" time="20.6378" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-import-boundaries" classname="swirl-import-boundaries" time="7.2967" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-gateway-network" classname="swirl-gateway-network" time="3.36639" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

@@ -1,0 +1,298 @@
+{
+  "scope": "optional representation specialization and exact source-field optimization; no full-font acceptance",
+  "limit": 0.03125,
+  "directions": {
+    "rows": [
+      {
+        "method": "dense",
+        "gid": 1166,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 2,
+        "seconds": 0.9017952079884708,
+        "peak_rss_bytes": 178995200,
+        "field_sha256": "6c924c715460e024b89d5c1d89d35a18efc05be9a470e2262518f401f4bbd261",
+        "parameter_sha256": "a670e605472c8d99b11ded5c43ce4be7149a943208ae6a78820cd14f5342d49f"
+      },
+      {
+        "method": "sparse",
+        "gid": 1166,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 2,
+        "seconds": 0.8178114159964025,
+        "peak_rss_bytes": 182435840,
+        "field_sha256": "6c924c715460e024b89d5c1d89d35a18efc05be9a470e2262518f401f4bbd261",
+        "parameter_sha256": "a670e605472c8d99b11ded5c43ce4be7149a943208ae6a78820cd14f5342d49f"
+      },
+      {
+        "method": "dense",
+        "gid": 19177,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 4,
+        "seconds": 3.2983312500000466,
+        "peak_rss_bytes": 235569152,
+        "field_sha256": "623ebe7dc4c29e176835bac8132898ba4260a20d430cbfb932c1a5b53ed343ad",
+        "parameter_sha256": "9fac27598c98ef671344413afb13f88c491d1d93b77b67a9db53911b1f8defdb"
+      },
+      {
+        "method": "sparse",
+        "gid": 19177,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 4,
+        "seconds": 2.5043373750231694,
+        "peak_rss_bytes": 228687872,
+        "field_sha256": "623ebe7dc4c29e176835bac8132898ba4260a20d430cbfb932c1a5b53ed343ad",
+        "parameter_sha256": "9fac27598c98ef671344413afb13f88c491d1d93b77b67a9db53911b1f8defdb"
+      },
+      {
+        "method": "dense",
+        "gid": 35709,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 12,
+        "seconds": 12.551210417004768,
+        "peak_rss_bytes": 505839616,
+        "field_sha256": "ec2402ee280331ed87e9e631d9e99e27518e968d2186d97eb3b5ac5b12d44a07",
+        "parameter_sha256": "a9d87acc8cbb8b36de7bbf6ef76826997990f1dc228efa61e749143ae180eeec"
+      },
+      {
+        "method": "sparse",
+        "gid": 35709,
+        "seed": 2026110841,
+        "positions": 16384,
+        "factors": 12,
+        "seconds": 7.226200999983121,
+        "peak_rss_bytes": 441516032,
+        "field_sha256": "ec2402ee280331ed87e9e631d9e99e27518e968d2186d97eb3b5ac5b12d44a07",
+        "parameter_sha256": "a9d87acc8cbb8b36de7bbf6ef76826997990f1dc228efa61e749143ae180eeec"
+      }
+    ],
+    "exact_field_and_parameter_bytes_equal": true,
+    "public_driver_repeat": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 35709
+      },
+      "reference_revision": "8c156168570fff9cbdd66d96853c53dd3e59cfc0",
+      "rows": [
+        {
+          "identity": {
+            "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+            "face_index": 0,
+            "glyph_id": 35709
+          },
+          "method": "reference",
+          "seed": 2026110841,
+          "positions": 16384,
+          "factors": 12,
+          "seconds": 18.477397709008073,
+          "peak_rss_bytes": 488931328,
+          "field_sha256": "ec2402ee280331ed87e9e631d9e99e27518e968d2186d97eb3b5ac5b12d44a07",
+          "parameter_sha256": "a9d87acc8cbb8b36de7bbf6ef76826997990f1dc228efa61e749143ae180eeec"
+        },
+        {
+          "identity": {
+            "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+            "face_index": 0,
+            "glyph_id": 35709
+          },
+          "method": "current",
+          "seed": 2026110841,
+          "positions": 16384,
+          "factors": 12,
+          "seconds": 10.890170416008914,
+          "peak_rss_bytes": 394117120,
+          "field_sha256": "ec2402ee280331ed87e9e631d9e99e27518e968d2186d97eb3b5ac5b12d44a07",
+          "parameter_sha256": "a9d87acc8cbb8b36de7bbf6ef76826997990f1dc228efa61e749143ae180eeec"
+        }
+      ],
+      "exact_field_and_parameter_bytes_equal": true,
+      "accuracy_acceptance": false,
+      "concurrent_host_activity_uncontrolled": true
+    }
+  },
+  "flat": {
+    "gid": 50,
+    "before_bytes": 5316,
+    "after_bytes": 3208,
+    "build_seconds": 0.18908220800221898,
+    "representation_change_control_bound": 1.7475e-320,
+    "glyphs": 3,
+    "patch_glyphs": 0,
+    "cff2_regions": 6,
+    "maximum_operand_stack": 13,
+    "seed": 2026110831,
+    "observations": 9506,
+    "engines": {
+      "CoreText": {
+        "observations": 9506,
+        "independent_observations": 9141,
+        "max_error": 0.01055307517301755,
+        "independent_max_error": 0.01055307517301755,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 4.57763671875e-05,
+        "max_advance_error": 0.01022757684586395,
+        "advance_failures": 0
+      },
+      "HarfBuzz": {
+        "observations": 9506,
+        "independent_observations": 9141,
+        "max_error": 0.008157006903108142,
+        "independent_max_error": 0.008157006903108142,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.0,
+        "max_advance_error": 15.0,
+        "advance_failures": 3162
+      },
+      "fontTools": {
+        "observations": 256,
+        "independent_observations": 246,
+        "max_error": 1.3571303251094826e-05,
+        "independent_max_error": 1.3571303251094826e-05,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 1.7053025658242404e-13,
+        "max_advance_error": 0.0,
+        "advance_failures": 0
+      }
+    },
+    "strict_independent_native_passed": false,
+    "same_request_preservation": {
+      "observations": 9506,
+      "exact_outline_mismatches": 0,
+      "advance_mismatches": 0,
+      "max_representation_error": 0.0,
+      "geometry_failures": 0,
+      "input_sha256": [
+        "d78d57a61b3a4e5fabf7e3bab14c9fb38c530598284c3954020d6fe39d44da00",
+        "203d6b5a95c7c8a764f355491300fcf3473370b341445fd8c5c4db9208d81b6b"
+      ]
+    },
+    "rejected_case": {
+      "gid": 0,
+      "representation_bound": 0.0901133219401,
+      "budget": 0.0009765625,
+      "keeps_prior_model": true
+    }
+  },
+  "cross_face_reuse": {
+    "identity": {
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "face_index": 31,
+      "glyph_id": 19177
+    },
+    "reused_from": {
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "face_index": 0,
+      "glyph_id": 19177
+    },
+    "geometry_table_hashes": {
+      "hvgl": "74fea4e2e8dbea3fe1ece47015f0439861aa3b3085b25557ac6d0d237837481e"
+    },
+    "boxes": 4096,
+    "component_holdout": {
+      "holdout_count": 4096,
+      "max_physical_error": 0.01059044818412453,
+      "physical_failures": 0,
+      "max_envelope_error": 0.01059044818412453,
+      "envelope_failures": 0,
+      "holdouts_disjoint": true,
+      "production_accepted": false,
+      "source_projection_parameters_exact": true
+    },
+    "parameter_holdout": {
+      "holdouts_disjoint": true,
+      "holdout_count": 4096,
+      "seed": 2026110801,
+      "max_parameter_induced_error": 0.005198754934254534,
+      "failures": 0,
+      "budget": 0.015625,
+      "native_verification": "NOT_RUN"
+    },
+    "seconds": 20.570555542013608,
+    "seed": 2026110801,
+    "refit_samples": 0,
+    "stage_passed": true
+  },
+  "cross_face_native": {
+    "identity": {
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "face_index": 31,
+      "glyph_id": 19177
+    },
+    "limit": 0.03125,
+    "observations": 7472,
+    "seed": 2029229880,
+    "engines": {
+      "CoreText": {
+        "observations": 7472,
+        "independent_observations": 5693,
+        "max_error": 0.021873662404609112,
+        "independent_max_error": 0.021873662404609112,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.0009352778882276584,
+        "max_advance_error": 0.009147552918307156,
+        "advance_failures": 0
+      },
+      "HarfBuzz": {
+        "observations": 7472,
+        "independent_observations": 5693,
+        "max_error": 0.015834344182079133,
+        "independent_max_error": 0.015834344182079133,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.0011516090249092533,
+        "max_advance_error": 0.0,
+        "advance_failures": 0
+      },
+      "fontTools": {
+        "observations": 256,
+        "independent_observations": 198,
+        "max_error": 0.012417686044554834,
+        "independent_max_error": 0.012417686044554834,
+        "failures": 0,
+        "topology_failures": 0,
+        "direction_failures": 0,
+        "closure_failures": 0,
+        "selection_failures": 0,
+        "max_explicit_closure_gap": 0.0005301684236642531,
+        "max_advance_error": 0.006053121868717426,
+        "advance_failures": 0
+      }
+    },
+    "font_bytes": 89678600,
+    "candidate_sha256": "e81eaaac1a028501f519bcc7b872a9e56f4a56665bad8278e049d6b73ae61cab",
+    "strict_independent_native_passed": true,
+    "acceptance_scope": "joint_post_avar_q_geometry_and_reported_metrics"
+  },
+  "private_source_data_included": false,
+  "production_accepted": false,
+  "regression": {
+    "executed": 1058,
+    "passed": 1051,
+    "skipped": 7,
+    "parser_audit_passed": 6
+  }
+}

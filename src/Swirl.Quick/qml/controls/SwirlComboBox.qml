@@ -8,20 +8,23 @@ ComboBox {
     implicitWidth:Theme.dp(146)
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
-    SwirlPressMotion {pressed:control.pressed}
+    property bool popupOpen: false
+    property Popup retainedPopup: null
+    readonly property Item ownedPressMotion: SwirlPressMotion {parent:control;pressed:control.pressed}
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
     focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
     font.weight: Theme.bodyFontWeight
     font.hintingPreference:Font.PreferFullHinting
-    SwirlFontBinding { target: control; textRole: "input" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: "input" }
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
         id: valueLabel
-        textRole:"input"
+        textRole:"label"
+        fitWidth: true; fitInFixedWidth: true
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
         font.family: control.font.family
@@ -32,13 +35,10 @@ ComboBox {
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
-    SwirlToolTip {
-        id: hint
-        parent:control;visible:(control.hovered||control.visualFocus)&&valueLabel.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
-    }
+
     indicator: SwirlIcon {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
-        name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
+        name:"chevron-right";size:Theme.dp(14);rotation:control.popupOpen?270:90;color:Theme.muted
         Behavior on rotation {enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
     }
     background: SwirlControlSurface {
@@ -51,7 +51,7 @@ ComboBox {
         id:option
         required property int index
         objectName:"swirlComboOption-"+index
-        SwirlPressMotion{}
+        readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
         width: ListView.view.width
         implicitHeight:Math.max(Theme.controlHeight,contentItem.implicitHeight+topPadding+bottomPadding)
         height:implicitHeight
@@ -78,10 +78,13 @@ ComboBox {
     }
     popup: Popup {
         id:popupLayer
+        Component.onCompleted:control.retainedPopup=popupLayer
+        onVisibleChanged:control.popupOpen=visible
+        property Item retainedBackground:null
         function requestDismiss(){close()}
         parent:control.Overlay.overlay
         property point anchorPoint:Qt.point(0,0)
-        readonly property real edgeMargin:Theme.dp(8)
+        readonly property real edgeMargin:Theme.dp(20)
         readonly property real below:parent?Math.max(0,parent.height-anchorPoint.y-control.height-Theme.dp(4)-edgeMargin):0
         readonly property real above:Math.max(0,anchorPoint.y-Theme.dp(4)-edgeMargin)
         readonly property real desiredHeight:Math.min(Theme.dp(290),contentItem.implicitHeight+topPadding+bottomPadding)
@@ -110,14 +113,14 @@ ComboBox {
         margins:edgeMargin
         enter:reveal.enterTransition
         exit:reveal.exitTransition
-        background: Rectangle { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
-            radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
+        background: SwirlCardSurface { id:popupBackground; Component.onCompleted:popupLayer.retainedBackground=popupBackground; floating:true;transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+            cornerRadius:Theme.menuRadius }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             clip: true
             implicitHeight: contentHeight
-            model: control.popup.visible ? control.delegateModel : null
+            model: popupLayer.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
             highlightMoveDuration:0
             boundsBehavior:Flickable.StopAtBounds

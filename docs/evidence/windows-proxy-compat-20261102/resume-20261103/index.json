@@ -1,0 +1,67 @@
+{
+  "scope": "Read-only recovery of 24af583 raw evidence and isolated Qt null-context diagnostic reproduction; new native Rust/WinINet test awaits Windows CI",
+  "source_head": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "core_tree": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "files": [
+    {
+      "path": "current-ci-soak-recheck.json",
+      "bytes": 2350,
+      "sha256": "25d950964bed2c7a254300f1cecdf6974c1e08467f190909d12bd5629a52ba29"
+    },
+    {
+      "path": "installer-validator-checks.json",
+      "bytes": 457,
+      "sha256": "668b6fb724df7d60c99162cf6a64aa5f5b451a04d84d445921dfbd809def2e03"
+    },
+    {
+      "path": "native-fixture-rust-check.json",
+      "bytes": 1014,
+      "sha256": "37dd1ab18a15c7ab219005f28036118bb4c1d43c3853f17891b397859c8f5444"
+    },
+    {
+      "path": "qml-null-context/candidate.py",
+      "bytes": 1170,
+      "sha256": "3c2e31233cb8f9d07eb6f3f8a69a2f07de1e43b708f932859c91b3942717615c"
+    },
+    {
+      "path": "qml-null-context/candidate.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "qml-null-context/candidate.stdout.log",
+      "bytes": 121,
+      "sha256": "47eb245a761ec2c547938d6dc33efa243ae09ec6bdc524459dda1688bfbb7966"
+    },
+    {
+      "path": "qml-null-context/old.py",
+      "bytes": 1174,
+      "sha256": "9da7e616cff5253c225f64d786e281e968c4ded4eb39dcb4ef229e515e59bb0a"
+    },
+    {
+      "path": "qml-null-context/old.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "qml-null-context/old.stdout.log",
+      "bytes": 73,
+      "sha256": "48efe6ada6cf08298646f8f740c53e94cff2fae2568fba5f5bce9a0583e6ac98"
+    },
+    {
+      "path": "qml-null-context/replay.py",
+      "bytes": 3684,
+      "sha256": "31cf9760dffa8fd9d81570fa54722feb24e236e5889e381b90c85d356297c46e"
+    },
+    {
+      "path": "qml-null-context/result.json",
+      "bytes": 1373,
+      "sha256": "471916ba5aeb0d0543f169b57417dceb05a4cb18cc6c54dcb37ff10eac4cd102"
+    },
+    {
+      "path": "soak-1800-recheck.json",
+      "bytes": 1574,
+      "sha256": "5febbbe9871a4efea6e897ec17a76fc95d845c509be5aa551fe7c525c29f0422"
+    }
+  ]
+}

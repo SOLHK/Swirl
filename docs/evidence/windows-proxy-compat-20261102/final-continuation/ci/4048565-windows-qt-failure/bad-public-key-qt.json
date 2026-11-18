@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "provider_connection": false,
+  "checks": [
+    {
+      "frontend": "http-connect",
+      "node": "A",
+      "phase": "authentication-failure",
+      "target": "a.product.invalid",
+      "proxy_host": "127.0.0.1",
+      "stage": "complete",
+      "frontend_response_valid": true,
+      "tunnel_accepted": false,
+      "expected_result_observed": true,
+      "closed": true,
+      "target_port": 59242,
+      "proxy_port": 59284,
+      "proxy_status": 502,
+      "socket_error": 1,
+      "tls_error_count": 0,
+      "elapsed_ms": 21
+    },
+    {
+      "frontend": "socks5",
+      "node": "A",
+      "phase": "authentication-failure",
+      "target": "a.product.invalid",
+      "proxy_host": "127.0.0.1",
+      "stage": "proxy-reply",
+      "frontend_response_valid": false,
+      "tunnel_accepted": false,
+      "expected_result_observed": false,
+      "closed": true,
+      "target_port": 59242,
+      "proxy_port": 59284,
+      "proxy_status": -1,
+      "socket_error": 1,
+      "tls_error_count": 0,
+      "elapsed_ms": 43
+    }
+  ],
+  "imported": true,
+  "encrypted_store_reloaded": true,
+  "parameters_preserved": true,
+  "in_process_rust": true,
+  "stopped": true,
+  "listener_released": true,
+  "mode": "authentication-failure"
+}
