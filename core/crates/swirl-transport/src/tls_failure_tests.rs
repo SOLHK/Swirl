@@ -102,6 +102,7 @@ async fn secure_preserves_typed_transport_failures_instead_of_claiming_bad_certi
         server_name: "fixture.invalid".into(),
         alpn: vec![],
         ca_der_base64: None,
+        insecure: false,
     };
     for (kind, expected) in [
         (io::ErrorKind::UnexpectedEof, "TlsHandshakeEof"),

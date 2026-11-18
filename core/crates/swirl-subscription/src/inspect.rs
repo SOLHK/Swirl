@@ -1165,9 +1165,19 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             .unwrap_or("")
             .to_string();
         let port = endpoint_port(raw);
-        let skip = raw.get("skip-cert-verify").and_then(Value::as_bool) == Some(true)
-            || raw.pointer("/tls/insecure").and_then(Value::as_bool) == Some(true)
-            || raw.get("tls-verification").and_then(Value::as_bool) == Some(false);
+        let skip_sources = [
+            raw.get("skip-cert-verify").and_then(Value::as_bool),
+            raw.pointer("/tls/insecure").and_then(Value::as_bool),
+            raw.get("tls-verification")
+                .and_then(Value::as_bool)
+                .map(|verify| !verify),
+        ];
+        let first_skip = skip_sources.into_iter().flatten().next();
+        let conflicting_skip = skip_sources
+            .into_iter()
+            .flatten()
+            .any(|value| Some(value) != first_skip);
+        let skip = first_skip.unwrap_or(false);
         let unsafe_booleans = ["udp", "skip-cert-verify", "tfo", "tls-verification"]
             .iter()
             .any(|key| raw.get(*key).is_some_and(|v| !v.is_boolean()));
@@ -1210,11 +1220,12 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                 .flatten()
                 .any(|n| !n.is_string() || Some(*n) != first_name)
             || (!tls_enabled
-                && tls_obj
-                    .and_then(Value::as_object)
-                    .is_some_and(|o| o.keys().any(|k| k != "enabled")));
-        diagnostic = if skip {
-            "CertificateVerificationDisabledUnsupported"
+                && (skip
+                    || tls_obj
+                        .and_then(Value::as_object)
+                        .is_some_and(|o| o.keys().any(|k| k != "enabled"))));
+        diagnostic = if conflicting_skip || (!tls_enabled && skip) {
+            "UnmappedOrInvalidParameters"
         } else if raw.get("tfo").and_then(Value::as_bool) == Some(true) {
             "TcpFastOpenNotImplemented"
         } else if reality {
@@ -1260,8 +1271,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             && !tls_unknown
             && !tls_invalid
             && !conflicting_alpn
+            && !conflicting_skip
             && !unsupported_trojan_username
-            && !skip
             && !reality
             && transport == "tcp"
             && family != "xray-v2ray-json"
@@ -1308,6 +1319,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                         server_name: name,
                         alpn,
                         ca_der_base64: None,
+                        insecure: skip,
                     }),
                     Err(_) => {
                         return (
@@ -1923,18 +1935,18 @@ mod tests {
                 "allowInsecure=1&skip-cert-verify=true",
                 "skip-cert-verify=true&allowInsecure=1",
             ] {
-                let unsafe_input = input.replace("allowInsecure=0", query);
-                let rejected = inspect(unsafe_input.as_bytes());
-                assert!(rejected.report.parsed);
-                assert_eq!(rejected.originals[0]["skip-cert-verify"], true);
-                assert!(!rejected.report.nodes[0].native_tcp_candidate);
-                assert!(!rejected.report.nodes[0].native_udp_supported);
-                assert_eq!(rejected.report.nodes[0].udp_declared, declared);
-                assert_eq!(
-                    rejected.report.nodes[0].diagnostic,
-                    "CertificateVerificationDisabledUnsupported"
-                );
-                assert_eq!(rejected.original, unsafe_input.as_bytes());
+                let insecure_input = input.replace("allowInsecure=0", query);
+                let accepted = inspect(insecure_input.as_bytes());
+                assert!(accepted.report.parsed);
+                assert_eq!(accepted.originals[0]["skip-cert-verify"], true);
+                assert!(accepted.report.nodes[0].native_tcp_candidate);
+                assert_eq!(accepted.report.nodes[0].native_udp_supported, declared);
+                assert_eq!(accepted.report.nodes[0].udp_declared, declared);
+                match accepted.tcp_candidates[0].as_ref().unwrap() {
+                    Outbound::Trojan { tls, .. } => assert!(tls.insecure),
+                    _ => panic!("expected native Trojan"),
+                }
+                assert_eq!(accepted.original, insecure_input.as_bytes());
             }
         }
     }
@@ -2253,11 +2265,28 @@ mod tests {
             }
             _ => panic!("expected native Trojan"),
         }
-        for suffix in [
-            "skip-cert-verify:true",
-            "skip-cert-verify:invalid",
-            "future:retained",
-        ] {
+        let mixed_ini = b"[Proxy]\ninsecure = trojan, example.org, 443, secret, skip-cert-verify:true\nstrict = trojan, example.org, 443, secret";
+        let mixed_result = inspect(mixed_ini);
+        assert!(mixed_result.report.parsed);
+        assert_eq!(mixed_result.tcp_candidates.len(), 2);
+        match (
+            mixed_result.tcp_candidates[0].as_ref().unwrap(),
+            mixed_result.tcp_candidates[1].as_ref().unwrap(),
+        ) {
+            (
+                Outbound::Trojan {
+                    tls: insecure_tls, ..
+                },
+                Outbound::Trojan {
+                    tls: strict_tls, ..
+                },
+            ) => {
+                assert!(insecure_tls.insecure);
+                assert!(!strict_tls.insecure);
+            }
+            _ => panic!("expected native Trojan pair"),
+        }
+        for suffix in ["skip-cert-verify:invalid", "future:retained"] {
             let input = format!("[Proxy]\nfixture = trojan, example.org, 443, secret, {suffix}");
             let r = inspect(input.as_bytes());
             assert!(r.report.parsed);
@@ -2356,16 +2385,21 @@ mod tests {
         assert!(r.report.nodes.iter().all(|n| !n.native_tcp_candidate));
     }
     #[test]
-    fn unsupported_tls_policy_is_explicit_and_preserved() {
-        let input = br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"x","skip-cert-verify":true},{"type":"trojan","server":"example.org","port":443,"password":"x","tfo":true}]}"#;
+    fn explicit_insecure_tls_policy_is_isolated_per_node_and_rejects_plaintext_or_conflicts() {
+        let input = br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"x","skip-cert-verify":true},{"type":"trojan","server":"example.org","port":443,"password":"x","tfo":true},{"type":"socks5","server":"example.org","port":1080,"skip-cert-verify":true},{"type":"trojan","server":"example.org","port":443,"password":"x","skip-cert-verify":true,"tls-verification":true}]}"#;
         let r = inspect(input);
-        assert_eq!(
-            r.report.nodes[0].diagnostic,
-            "CertificateVerificationDisabledUnsupported"
-        );
+        assert_eq!(r.report.nodes[0].diagnostic, "TcpCandidateNotYetVerified");
         assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenFallbackToTcp");
-        assert!(r.tcp_candidates[0].is_none());
-        assert!(r.tcp_candidates[1].is_some());
+        assert!(matches!(
+            r.tcp_candidates[0].as_ref(),
+            Some(Outbound::Trojan { tls, .. }) if tls.insecure
+        ));
+        assert!(matches!(
+            r.tcp_candidates[1].as_ref(),
+            Some(Outbound::Trojan { tls, .. }) if !tls.insecure
+        ));
+        assert!(r.tcp_candidates[2].is_none());
+        assert!(r.tcp_candidates[3].is_none());
         assert_eq!(r.original, input);
         assert_eq!(r.originals[0]["skip-cert-verify"], true);
     }

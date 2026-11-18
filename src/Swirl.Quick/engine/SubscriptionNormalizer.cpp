@@ -240,15 +240,29 @@ void uri(Result &r,const QString &line){
         node = {{"name", url.fragment(QUrl::FullyDecoded)}, {"type", scheme},
                 {"server", url.host()}, {"port", url.port(443)},
                 {"password", url.userName(QUrl::FullyDecoded)}, {"tls", true}};
-        QSet<QString> seen;
+        QSet<QString> seenKeys;
+        QJsonObject seenValues;
         for (const auto &[key, value] : QUrlQuery(url).queryItems(QUrl::FullyDecoded)) {
-            if (seen.contains(key)) { r.error = "AnyTLS URI 含重复参数。"; return; }
-            seen.insert(key);
-            if (key == "sni") {
+            if (seenKeys.contains(key)) { r.error = "AnyTLS URI 含重复参数。"; return; }
+            seenKeys.insert(key);
+            const auto canonical = (key == "insecure" || key == "allowInsecure" || key == "skip-cert-verify")
+                ? QStringLiteral("skip-cert-verify")
+                : (key == "peer" ? QStringLiteral("sni") : key);
+            QJsonValue typed = value;
+            if (canonical == "skip-cert-verify") {
+                const auto b = boolean(value, true);
+                if (!b) { r.error = "AnyTLS insecure 参数必须是 0/1 或 true/false。"; return; }
+                typed = *b;
+            }
+            if (seenValues.contains(canonical)) {
+                if (seenValues.value(canonical) != typed) { r.error = "AnyTLS URI 别名参数冲突。"; return; }
+                continue;
+            }
+            seenValues.insert(canonical, typed);
+            if (canonical == "sni") {
                 node["sni"] = value;
-            } else if (key == "insecure") {
-                if (value != "0" && value != "1") { r.error = "AnyTLS insecure 参数必须是 0 或 1。"; return; }
-                if (value == "1") issue(issues, "AnyTLS 源链接要求关闭证书验证；已保留原文并禁止连接。");
+            } else if (canonical == "skip-cert-verify") {
+                node["skip-cert-verify"] = typed;
             } else {
                 issue(issues, "AnyTLS URI 包含未映射扩展，原始参数已保留；不能忽略后连接。");
             }
@@ -287,10 +301,26 @@ void uri(Result &r,const QString &line){
         const auto tls=json.value("tls").toString();
         if(!tls.isEmpty()&&tls!="none"&&tls!="tls"){r.error="VMess URI 的 TLS 参数无效；未应用配置。";return;}
         node["tls"]=tls=="tls";
+        std::optional<bool> vmessInsecure;
+        for(const auto &key:QStringList{"insecure","allowInsecure"}){
+            if(!json.contains(key))continue;
+            const auto v=json.value(key);
+            std::optional<bool> parsed;
+            if(v.isBool())parsed=v.toBool();
+            else if(v.isString())parsed=boolean(v.toString(),true);
+            else if(v.isDouble()&&(v.toDouble()==0.0||v.toDouble()==1.0))parsed=(v.toDouble()==1.0);
+            if(!parsed){r.error="VMess URI 的 insecure 参数无效；未应用配置。";return;}
+            if(vmessInsecure&&*vmessInsecure!=*parsed){r.error="VMess URI 的 insecure 别名参数冲突；未应用配置。";return;}
+            vmessInsecure=parsed;
+        }
+        if(vmessInsecure){
+            if(*vmessInsecure&&tls!="tls"){r.error="未启用 TLS 的 VMess URI 不能跳过证书验证；未应用配置。";return;}
+            node["skip-cert-verify"]=*vmessInsecure;
+        }
         if(json.contains("sni"))node["servername"]=json.value("sni");
         transport(node,json.value("net").toString(),json.value("path").toString(),json.value("host").toString(),issues);
         if(json.value("type").toString()!="none"&&!json.value("type").toString().isEmpty())issue(issues,"VMess URI 的头部伪装尚未映射。");
-        const QSet<QString> known{"v","ps","add","port","id","aid","scy","net","type","host","path","tls","sni","alpn","fp"};
+        const QSet<QString> known{"v","ps","add","port","id","aid","scy","net","type","host","path","tls","sni","alpn","fp","insecure","allowInsecure"};
         for(auto it=json.begin();it!=json.end();++it)if(!known.contains(it.key()))issue(issues,"VMess URI 包含未映射扩展，原始参数已保留。");
         if(json.contains("alpn")){
             const auto alpn=json.value("alpn").toString();
@@ -811,7 +841,7 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
     }
     if(QRegularExpression("^(shadowsocks|trojan|vmess|http|socks5)\\s*=",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){ini(r,text);return r;}
-    if(QRegularExpression("^[^=\\r\\n]{1,128}\\s*=\\s*(Shadowsocks|Trojan|VMess|VLESS|socks5|http|https|ss)\\s*,",QRegularExpression::CaseInsensitiveOption|QRegularExpression::MultilineOption).match(text).hasMatch()){ini(r,text);return r;}
+    if(QRegularExpression("^[^=\\r\\n]{1,128}\\s*=\\s*(Shadowsocks|Trojan|VMess|VLESS|socks5|http|https|ss|anytls|hysteria2|hy2|tuic|snell)\\s*,",QRegularExpression::CaseInsensitiveOption|QRegularExpression::MultilineOption).match(text).hasMatch()){ini(r,text);return r;}
     const auto decoded=base64(bytes);
     if(!decoded.isEmpty()&&decoded!=bytes&&(decoded.contains("://")||decoded.contains("proxies:")||decoded.contains("[")||decoded.contains("outbounds"))){
         r=normalize(decoded,depth+1);if(r.decodedDocument.isEmpty())r.decodedDocument=decoded;r.format="Base64 / "+(r.format.isEmpty()?QString("Clash"):r.format);return r;

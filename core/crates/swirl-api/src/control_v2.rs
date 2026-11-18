@@ -11,6 +11,10 @@ enum Command {
         control_schema: u32,
         request_id: String,
         candidate: RuntimeConfig,
+        #[serde(default)]
+        require_start: bool,
+        #[serde(default)]
+        native_tun_startup: bool,
     },
     StartV2 {
         control_schema: u32,
@@ -192,9 +196,14 @@ impl Command {
             Self::ValidateConfigurationV2 {
                 request_id,
                 candidate,
+                require_start,
+                native_tun_startup,
                 ..
             } => {
                 let prepared = candidate.prepare()?;
+                if require_start {
+                    prepared.validate_start(native_tun_startup)?;
+                }
                 Ok(
                     json!({"ok":true,"request_id":request_id,"plan_digest":prepared.digest,"validation":{"conflicts":prepared.conflicts},"capabilities":capabilities()}),
                 )

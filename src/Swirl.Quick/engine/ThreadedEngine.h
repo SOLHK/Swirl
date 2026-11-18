@@ -62,6 +62,7 @@ public:
     }
     void start(const EngineStartOptions &options) override {
         const auto epoch=++m_epoch;m_status.state=State::Starting;
+        m_status.error=Error::None;m_status.message.clear();
         // Cover the queued startup interval before the worker can publish its
         // actual broker ownership. Later snapshots are authoritative.
         m_status.tunCapturePossible=m_status.tunCapturePossible||options.tunEnabled;emit statusChanged();

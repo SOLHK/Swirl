@@ -84,14 +84,25 @@ fn tfo_fallback_is_reported_without_changing_outbound_or_certificate_policy() {
     assert_eq!(fallback["native_outbound"], baseline);
     assert_eq!(fallback["warnings"], json!(["TcpFastOpenFallbackToTcp"]));
     assert_eq!(fallback["network_verified"], false);
+    assert!(fallback["native_outbound"]["tls"].get("insecure").is_none());
     raw["skip-cert-verify"] = json!(true);
-    let rejected = import(raw);
-    assert_eq!(rejected["ok"], false);
-    assert_eq!(
-        rejected["error"],
-        "CertificateVerificationDisabledUnsupported"
-    );
-    assert!(rejected.get("native_outbound").is_none());
+    let opt_in = import(raw);
+    assert_eq!(opt_in["ok"], true, "{}", opt_in["error"]);
+    assert_eq!(opt_in["native_outbound"]["tls"]["insecure"], json!(true));
+    assert_eq!(opt_in["warnings"], json!(["TcpFastOpenFallbackToTcp"]));
+
+    let mut hy_insecure = node("hysteria2");
+    hy_insecure["password"] = json!("synthetic-password");
+    hy_insecure["skip-cert-verify"] = json!(true);
+    let hy_out = native(hy_insecure);
+    assert_eq!(hy_out["insecure"], json!(true));
+    assert!(hy_out["tls"].get("insecure").is_none());
+
+    let mut plain_vless = node("vless");
+    plain_vless["uuid"] = json!(ID);
+    plain_vless["skip-cert-verify"] = json!(true);
+    let plain_rejected = import(plain_vless);
+    assert_eq!(plain_rejected["ok"], false);
 }
 
 #[test]
@@ -339,8 +350,8 @@ fn security_aliases_unknown_fields_and_malformed_authentication_fail_closed() {
     for (kind, key, value) in [
         ("vmess", "alterId", json!(true)),
         ("vmess", "udp", json!(true)),
-        ("hysteria2", "insecure", json!(true)),
-        ("tuic", "insecure", json!(true)),
+        ("hysteria2", "insecure", json!("true")),
+        ("tuic", "insecure", json!("true")),
         ("hysteria2", "future-option", json!("PRIVATE_TOKEN")),
         ("tuic", "reduce-rtt", json!(true)),
     ] {
@@ -359,6 +370,23 @@ fn security_aliases_unknown_fields_and_malformed_authentication_fail_closed() {
         assert_eq!(response["ok"], false);
         let text = String::from_utf8(bytes).unwrap();
         assert!(!text.contains("PRIVATE_TOKEN") && !text.contains("PRIVATE_PASSWORD"));
+    }
+    for kind in ["hysteria2", "tuic"] {
+        let mut conflict = node(kind);
+        if kind == "tuic" {
+            conflict["uuid"] = json!(ID);
+            conflict["alpn"] = json!(["h3"]);
+        }
+        conflict["password"] = json!("PRIVATE_PASSWORD");
+        conflict["insecure"] = json!(true);
+        conflict["skip-cert-verify"] = json!(false);
+        let (response, bytes) = call(&serde_json::to_vec(&json!({"proxies":[conflict]})).unwrap());
+        assert_eq!(response["ok"], false);
+        assert!(
+            !String::from_utf8(bytes)
+                .unwrap()
+                .contains("PRIVATE_PASSWORD")
+        );
     }
 }
 

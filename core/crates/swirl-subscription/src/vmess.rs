@@ -93,12 +93,13 @@ fn tls(
     sni: &str,
     alpn: Vec<String>,
     fingerprint: &str,
+    insecure: bool,
 ) -> Result<Option<Tls>, &'static str> {
     if !matches!(fingerprint, "" | "rustls") {
         return Err("VmessFingerprintUnsupported");
     }
     if !enabled {
-        if !sni.is_empty() || !alpn.is_empty() || !fingerprint.is_empty() {
+        if !sni.is_empty() || !alpn.is_empty() || !fingerprint.is_empty() || insecure {
             return Err("VmessTlsParametersWithoutTls");
         }
         return Ok(None);
@@ -111,6 +112,7 @@ fn tls(
         server_name: server_name.into(),
         alpn,
         ca_der_base64: None,
+        insecure,
     }))
 }
 
@@ -199,7 +201,11 @@ pub fn from_raw(value: &Value) -> Result<Outbound, &'static str> {
         "authenticated-length",
         "VmessAuthenticatedLengthUnsupported",
     )?;
-    disabled(value, "skip-cert-verify", "VmessInsecureUnsupported")?;
+    let skip_cert_verify = match value.get("skip-cert-verify") {
+        None => false,
+        Some(Value::Bool(skip)) => *skip,
+        _ => return Err("VmessFieldType"),
+    };
     let host = text(value, "server", "")?;
     let tls_enabled = match value.get("tls") {
         None | Some(Value::Bool(false)) => false,
@@ -212,6 +218,7 @@ pub fn from_raw(value: &Value) -> Result<Outbound, &'static str> {
         text(value, "servername", "")?,
         alpn(value.get("alpn"), false)?,
         text(value, "client-fingerprint", "")?,
+        skip_cert_verify,
     )?;
     let websocket = match text(value, "network", "tcp")? {
         "tcp" => {
@@ -304,12 +311,24 @@ fn from_uri_json(value: &Map<String, Value>) -> Result<Outbound, &'static str> {
     if unsigned(value.get("v"), 2)? != 2 {
         return Err("VmessUriVersionUnsupported");
     }
+    let mut insecure_value: Option<bool> = None;
     for key in ["insecure", "allowInsecure"] {
-        match value.get(key) {
-            None | Some(Value::Bool(false)) => (),
-            Some(Value::String(s)) if s == "0" || s == "false" => (),
-            Some(Value::Number(n)) if n.as_u64() == Some(0) => (),
-            _ => return Err("VmessInsecureUnsupported"),
+        let parsed = match value.get(key) {
+            None => None,
+            Some(Value::Bool(flag)) => Some(*flag),
+            Some(Value::String(s)) if s == "0" || s == "false" => Some(false),
+            Some(Value::String(s)) if s == "1" || s == "true" => Some(true),
+            Some(Value::Number(n)) if n.as_u64() == Some(0) => Some(false),
+            Some(Value::Number(n)) if n.as_u64() == Some(1) => Some(true),
+            _ => return Err("VmessTlsParameters"),
+        };
+        if let Some(flag) = parsed {
+            if let Some(existing) = insecure_value
+                && existing != flag
+            {
+                return Err("VmessTlsParameters");
+            }
+            insecure_value = Some(flag);
         }
     }
     if !matches!(text(value, "type", "none")?, "" | "none") {
@@ -327,6 +346,7 @@ fn from_uri_json(value: &Map<String, Value>) -> Result<Outbound, &'static str> {
         text(value, "sni", "")?,
         alpn(value.get("alpn"), true)?,
         text(value, "fp", "")?,
+        insecure_value.unwrap_or(false),
     )?;
     let websocket = match text(value, "net", "tcp")? {
         "tcp" => {
@@ -407,11 +427,36 @@ mod tests {
         let tls = tls.unwrap();
         assert_eq!(tls.server_name, "cert.example");
         assert_eq!(tls.alpn, ["http/1.1"]);
+        assert!(!tls.insecure);
         let ws = websocket.unwrap();
         assert_eq!(
             (ws.host.as_str(), ws.path.as_str()),
             ("cdn.example", "/vmess%2Ftest")
         );
+
+        let mut opt_in = value.clone();
+        opt_in["skip-cert-verify"] = json!(true);
+        let Outbound::Vmess {
+            tls: Some(opt_in_tls),
+            ..
+        } = from_raw(&opt_in).unwrap()
+        else {
+            panic!("expected VMess TLS")
+        };
+        assert!(opt_in_tls.insecure);
+
+        let uri_opt_in = envelope(json!({
+            "add":"proxy.example","port":"443",
+            "id":"00112233-4455-6677-8899-aabbccddeeff","aid":"0",
+            "tls":"tls","sni":"cert.example","allowInsecure":1
+        }));
+        let Outbound::Vmess {
+            tls: Some(uri_tls), ..
+        } = from_raw(&uri_opt_in).unwrap()
+        else {
+            panic!("expected VMess URI TLS")
+        };
+        assert!(uri_tls.insecure);
     }
 
     #[test]

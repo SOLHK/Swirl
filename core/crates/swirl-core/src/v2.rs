@@ -74,6 +74,15 @@ pub struct PreparedConfig {
     pub digest: String,
     pub conflicts: Vec<Conflict>,
 }
+impl PreparedConfig {
+    pub fn validate_start(&self, native_tun_startup: bool) -> Result<()> {
+        self.runtime.policy.validate_start()?;
+        if native_tun_startup {
+            native_flow::validate_tun_dns(&self.runtime)?;
+        }
+        Ok(())
+    }
+}
 impl RuntimeConfig {
     pub fn prepare(mut self) -> Result<PreparedConfig> {
         if self.schema != 2 {

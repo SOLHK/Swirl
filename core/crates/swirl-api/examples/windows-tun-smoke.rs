@@ -241,6 +241,7 @@ mod windows {
                         server_name: "dns.wintun.smoke.invalid".into(),
                         alpn: vec![],
                         ca_der_base64: None,
+                        insecure: false,
                     },
                     https_path: None,
                 }],
@@ -946,6 +947,7 @@ mod windows {
                         ca_der_base64: Some(
                             base64::engine::general_purpose::STANDARD.encode(certificate),
                         ),
+                        insecure: false,
                     },
                     https_path: None,
                 }],

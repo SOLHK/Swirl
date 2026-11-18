@@ -22,6 +22,7 @@ fn configuration(port: u16) -> AnyTls {
             server_name: "reality.test".into(),
             alpn: vec![],
             ca_der_base64: Some(base64::engine::general_purpose::STANDARD.encode(certificate)),
+            insecure: false,
         },
         udp: true,
         idle_session_timeout_seconds: 5,
@@ -550,6 +551,39 @@ async fn official_peer_reuse_padding_tcp_udp_and_owner_retirement() {
     drop(config);
     assert!(owner.upgrade().is_none());
     assert!(client.closed.load(Ordering::Acquire));
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if stats(stats_port).await["active"] == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    // Per-node skip-cert-verify isolation: an opt-in node connects to an
+    // untrusted leaf certificate, while a sibling node without skip-cert-verify
+    // (even sharing the same endpoint, credentials and SessionOwner) still
+    // strictly rejects the untrusted certificate without reusing pooled sessions.
+    let mut strict_sibling = configuration(port);
+    strict_sibling.tls.ca_der_base64 = None;
+    let mut opt_in_node = strict_sibling.clone();
+    opt_in_node.tls.insecure = true;
+    let mut insecure_stream = connect(&opt_in_node, &target, &resolver, limit)
+        .await
+        .expect("explicit per-node skip-cert-verify must allow untrusted proxy leaf");
+    roundtrip(&mut insecure_stream).await;
+    drop(insecure_stream);
+    assert_eq!(
+        connect(&strict_sibling, &target, &resolver, limit)
+            .await
+            .err(),
+        Some("TlsCertificateUnknownIssuer"),
+        "strict node must never reuse an insecure pooled session or ClientConfig"
+    );
+    drop(opt_in_node);
+    drop(strict_sibling);
     timeout(Duration::from_secs(2), async {
         loop {
             if stats(stats_port).await["active"] == 0 {

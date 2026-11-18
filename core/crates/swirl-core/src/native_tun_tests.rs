@@ -69,6 +69,7 @@ fn runtime_config() -> RuntimeConfig {
                     server_name: "dns.fixture.invalid".into(),
                     alpn: vec![],
                     ca_der_base64: None,
+                    insecure: false,
                 },
                 https_path: None,
             }],

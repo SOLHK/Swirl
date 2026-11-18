@@ -568,6 +568,7 @@ mod tests {
             server_name: "test.invalid".into(),
             alpn: vec!["h3".into()],
             ca_der_base64: None,
+            insecure: false,
         };
         let options = TlsOptions {
             tls: &tls,

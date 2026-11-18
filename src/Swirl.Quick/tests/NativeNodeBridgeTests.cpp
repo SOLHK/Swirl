@@ -95,11 +95,21 @@ private slots:
             "hy2://synthetic-password@127.0.0.1:443?alpn=h3,,#alpn",
             "tuic://"+Id.toUtf8()+":synthetic-password@127.0.0.1:443?alpn=h3,#alpn",
             clash({{"name","vmess"},{"type","vmess"},{"server","127.0.0.1"},{"port",443},{"uuid",Id},{"future-option",true}}),
-            clash({{"name","hy2"},{"type","hysteria2"},{"server","127.0.0.1"},{"port",443},{"password","synthetic-password"},{"insecure",true}})};
+            clash({{"name","hy2"},{"type","hysteria2"},{"server","127.0.0.1"},{"port",443},{"password","synthetic-password"},{"insecure",true},{"skip-cert-verify",false}})};
         for(const auto &source:sources){
             const auto result=NodeImporter::parse(source); QVERIFY2(result,qPrintable(result.error));
             QJsonObject output; QVERIFY(!NativeNodeBridge::executableOutbound(result.nodes.first(),&output).isEmpty()); QVERIFY(output.isEmpty());
         }
+        const auto hy2Mixed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{
+            QJsonObject{{"name","hy2-opt-in"},{"type","hysteria2"},{"server","127.0.0.1"},{"port",443},{"password","synthetic-password"},{"skip-cert-verify",true}},
+            QJsonObject{{"name","hy2-strict"},{"type","hysteria2"},{"server","127.0.0.1"},{"port",443},{"password","synthetic-password"}}
+        }}}).toJson(QJsonDocument::Compact));
+        QVERIFY2(hy2Mixed,qPrintable(hy2Mixed.error)); QCOMPARE(hy2Mixed.nodes.size(),2);
+        QJsonObject hy2OptInOut,hy2StrictOut;
+        QVERIFY2(NativeNodeBridge::executableOutbound(hy2Mixed.nodes.at(0),&hy2OptInOut).isEmpty(),"opt-in hy2 must convert");
+        QVERIFY2(NativeNodeBridge::executableOutbound(hy2Mixed.nodes.at(1),&hy2StrictOut).isEmpty(),"strict hy2 must convert");
+        QCOMPARE(hy2OptInOut.value("insecure"),QJsonValue(true));
+        QCOMPARE(hy2StrictOut.value("insecure"),QJsonValue(false));
         auto result=NodeImporter::parse("http://127.0.0.1:8080#http"); QVERIFY(result);
         auto node=result.nodes.first(); node.parameters["password"]="hidden-override";
         QJsonObject output; QVERIFY(!NativeNodeBridge::executableOutbound(node,&output).isEmpty());

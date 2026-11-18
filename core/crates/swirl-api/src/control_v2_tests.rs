@@ -36,6 +36,22 @@ fn offline_validation_is_pure_and_draft_default_is_not_a_listener() {
     );
     assert_eq!(result["ok"], true, "{result}");
     assert_eq!(result["plan_digest"].as_str().unwrap().len(), 64);
+    let start_rejected = call(
+        &mut controller,
+        json!({"control_schema":2,"op":"validate_configuration_v2","request_id":REQUEST,"candidate":config,"require_start":true}),
+    );
+    assert_eq!(start_rejected["ok"], false, "{start_rejected}");
+    assert_eq!(start_rejected["error"], "DefaultUnconfigured");
+    let start_ready = call(
+        &mut controller,
+        json!({"control_schema":2,"op":"validate_configuration_v2","request_id":REQUEST,"candidate":candidate(),"require_start":true}),
+    );
+    assert_eq!(start_ready["ok"], true, "{start_ready}");
+    let tun_dns_missing = call(
+        &mut controller,
+        json!({"control_schema":2,"op":"validate_configuration_v2","request_id":REQUEST,"candidate":candidate(),"require_start":true,"native_tun_startup":true}),
+    );
+    assert_eq!(tun_dns_missing["ok"], false, "{tun_dns_missing}");
     assert_eq!(
         (
             controller.next,

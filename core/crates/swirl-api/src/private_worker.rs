@@ -290,6 +290,7 @@ impl Grant {
             server_name: tls.server_name.clone(),
             alpn: vec!["http/1.1".into()],
             ca_der_base64: Some(tls.ca_der_base64.clone()),
+            insecure: false,
         }
     }
 }

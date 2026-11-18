@@ -100,8 +100,10 @@ impl HealthProbe {
                 server_name: host.clone(),
                 alpn: vec!["http/1.1".into()],
                 ca_der_base64: None,
+                insecure: false,
             });
-            if !tls.server_name.eq_ignore_ascii_case(&host)
+            if tls.insecure
+                || !tls.server_name.eq_ignore_ascii_case(&host)
                 || !(tls.alpn.is_empty() || tls.alpn == ["http/1.1"])
                 || tls
                     .ca_der_base64

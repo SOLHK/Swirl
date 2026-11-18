@@ -475,9 +475,16 @@ fn unsupported_transports_tls_reality_conflict_and_vision_conflicts_stay_blocked
 
 #[test]
 fn explicit_tls_and_websocket_extensions_never_disappear_to_make_a_candidate() {
+    let mut insecure_vless = source("vless");
+    insecure_vless["streamSettings"] = tls();
+    insecure_vless["streamSettings"]["tlsSettings"]["allowInsecure"] = json!(true);
+    let insecure_cfg = executable(&insecure_vless);
+    assert!(matches!(
+        &insecure_cfg.nodes[0].outbound,
+        Outbound::Vless { tls: Some(t), .. } if t.insecure
+    ));
     for extra in [
         json!({"fingerprint":"chrome"}),
-        json!({"allowInsecure":true}),
         json!({"disableSystemRoot":true}),
         json!({"certificates":[{"certificateFile":"SYNTHETIC_FILE.pem"}]}),
     ] {

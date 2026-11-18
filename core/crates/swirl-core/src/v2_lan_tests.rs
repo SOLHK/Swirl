@@ -1158,6 +1158,7 @@ impl EncryptedDnsProxy {
                 server_name: "reality.test".into(),
                 alpn: vec![],
                 ca_der_base64: Some(self.trust.clone()),
+                insecure: false,
             },
             https_path: None,
         }];
@@ -1933,6 +1934,7 @@ fn lan_and_native_tun_share_admission_and_stopping_lan_preserves_native_flow() {
                 server_name: "dns.fixture.invalid".into(),
                 alpn: vec![],
                 ca_der_base64: None,
+                insecure: false,
             },
             https_path: None,
         });

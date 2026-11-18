@@ -1553,6 +1553,7 @@ fn dns_transport_roundtrip(native_ingress: bool) {
                     .into(),
                     alpn: vec![],
                     ca_der_base64: Some(base64::engine::general_purpose::STANDARD.encode(&der)),
+                    insecure: false,
                 },
                 https_path: None,
             }],
@@ -1604,6 +1605,7 @@ fn native_dns_fixture(mut candidate: RuntimeConfig) -> RuntimeConfig {
             server_name: "dns.fixture.invalid".into(),
             alpn: vec![],
             ca_der_base64: None,
+            insecure: false,
         },
         https_path: None,
     }];

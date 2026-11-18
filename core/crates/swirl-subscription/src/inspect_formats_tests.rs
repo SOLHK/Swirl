@@ -11,6 +11,7 @@ fn loon_vmess_positional_cipher_and_uuid_preserve_typed_outbound() {
                 server_name: "secure.fixture.invalid".into(),
                 alpn: vec![],
                 ca_der_base64: None,
+                insecure: false,
             }),
             Some(WebSocket {
                 host: "cdn.fixture.invalid".into(),
@@ -65,6 +66,7 @@ fn loon_http_positional_authentication_retains_quoted_delimiters_and_tls() {
                 server_name: "edge.fixture.invalid".into(),
                 alpn: vec![],
                 ca_der_base64: None,
+                insecure: false,
             }),
         ),
     ] {

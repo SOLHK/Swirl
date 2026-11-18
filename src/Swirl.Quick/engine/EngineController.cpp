@@ -401,7 +401,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             // Shutdown already owns the restore attempt. In particular, stop
             // after its timeout must not start another asynchronous release.
             if(!m_shuttingDown)m_systemProxy.disable();
-            if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
+            if(s.state==ProxyEngine::State::Failed){
+                if(m_proxyRequested&&m_routingError.isEmpty()&&!s.message.isEmpty())m_routingError=s.message;
+                m_proxyRequested=false;
+            }
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
     if(m_options.tunEnabled&&!tunSupported())m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包，或先关闭已保存的增强模式。");
@@ -1410,6 +1413,34 @@ bool EngineController::beginTunTransition(bool enabled){
         if(enabled==m_options.tunEnabled&&((processAlive()&&tunEnabled()==enabled)||(!processAlive()&&!enabled)))return true;
         QJsonObject runtime;const auto error=RustCoreEngine::configurationV2(candidate,m_policyDocument,&runtime);
         if(!error.isEmpty()){m_routingError=error;emit statusChanged();return false;}
+        if(enabled&&m_policyDocument.value("mode")!=QJsonValue("direct")){
+            QSet<QString> missingTargets;
+            for(const auto &entry:m_policyDocument.value("missing_targets").toArray()){
+                const auto item=entry.toObject();
+                missingTargets.insert(item.value("kind").toString()+":"+item.value("id").toString());
+            }
+            const auto groups=m_policyDocument.value("groups").toArray();
+            const std::function<bool(const QJsonObject &,int,QSet<QString> &)> startable=[&](const QJsonObject &target,int depth,QSet<QString> &visited)->bool{
+                if(depth>16)return false;
+                const auto kind=target.value("kind").toString(),id=target.value("id").toString();
+                if(missingTargets.contains(kind+":"+id))return false;
+                if(kind=="node")return !id.isEmpty();
+                if(kind!="group"||id.isEmpty()||visited.contains(id))return false;
+                visited.insert(id);
+                for(const auto &entry:groups){
+                    const auto group=entry.toObject();if(group.value("id").toString()!=id)continue;
+                    if(group.value("strategy")==QJsonValue("manual"))return group.value("selected").isObject()&&startable(group.value("selected").toObject(),depth+1,visited);
+                    for(const auto &member:group.value("members").toArray())if(member.isObject()){auto branch=visited;if(startable(member.toObject(),depth+1,branch))return true;}
+                    return false;
+                }
+                return false;
+            };
+            QSet<QString> visited;
+            if(!startable(m_policyDocument.value("default_policy").toObject().value("target").toObject(),0,visited)){
+                m_routingError=QStringLiteral("默认策略尚未选择有效出口；请先在「策略」页选择默认出口后再开启 TUN。");
+                emit statusChanged();return false;
+            }
+        }
         TunTransition transition;transition.previous=m_options;transition.target=enabled;
         transition.wasRunning=processAlive();transition.proxyIntent=m_proxyRequested||m_systemProxy.owned();
         m_tunTransition=std::move(transition);

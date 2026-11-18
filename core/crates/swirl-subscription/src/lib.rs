@@ -43,7 +43,11 @@ pub struct Credentials {
     pub password: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tls {
     pub server_name: String,
@@ -52,6 +56,9 @@ pub struct Tls {
     /// Explicit extra trust anchor in DER/base64; never a filesystem path.
     #[serde(default)]
     pub ca_der_base64: Option<String>,
+    /// Explicit per-node outbound certificate-chain verification bypass (`skip-cert-verify`).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub insecure: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -592,6 +599,11 @@ impl Config {
                 Outbound::AnyTls(config) => Some(&config.tls),
                 _ => None,
             };
+            if matches!(&node.outbound, Outbound::Hysteria2(config) if config.tls.insecure)
+                || matches!(&node.outbound, Outbound::Tuic(config) if config.tls.insecure)
+            {
+                return Err("TlsParameters");
+            }
             if let Some(tls) = tls
                 && (!valid_host(&tls.server_name)
                     || tls.ca_der_base64.as_ref().is_some_and(|s| s.len() > 65536)

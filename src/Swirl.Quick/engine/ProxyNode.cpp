@@ -23,8 +23,8 @@ static QString parameterSafetyError(const QJsonValue &value,int depth,int &budge
             if(QStringList{"interface-name","routing-mark","iproute2-table-index","auto-route","script","command","planet","listeners","mapped-listeners","primary-port","secondary-port","enable-exit-node","proxy-networks"}.contains(key))
                 return QStringLiteral("扩展选项 %1 不允许由订阅设置（本地文件、脚本、系统网络或额外监听）。").arg(key);
             if(key=="skip-cert-verify"){
-                if(!it.value().isBool())return QStringLiteral("skip-cert-verify 必须为布尔值 false；不能使用字符串或其它类型。");
-                if(it.value().toBool())return QStringLiteral("skip-cert-verify=true 请求关闭 TLS 证书验证，已拒绝。请使用证书验证开启的订阅配置。");
+                if(depth>0)return QStringLiteral("嵌套的 skip-cert-verify 字段不受支持。");
+                if(!it.value().isBool())return QStringLiteral("skip-cert-verify 必须为布尔值；不能使用字符串或其它类型。");
             }
             const auto error=parameterSafetyError(it.value(),depth+1,budget);if(!error.isEmpty())return error;
         }
@@ -93,6 +93,14 @@ QString ProxyNode::validate(const ProxyNode &n) {
     if(n.protocol=="snell" && n.parameters.value("psk").toString().isEmpty())return QStringLiteral("Snell 需要在扩展选项中填写 psk。");
     if(n.protocol=="sudoku" && n.parameters.value("key").toString().isEmpty())return QStringLiteral("Sudoku 需要在扩展选项中填写 key。");
     if (!n.serverName.isEmpty() && !validHost(n.serverName)) return QStringLiteral("TLS 服务器名称（SNI）无效。");
+    if (n.parameters.value("skip-cert-verify").toBool()) {
+        const bool implicitTls = QStringList{"trojan","anytls","hysteria","hysteria2","tuic"}.contains(n.protocol);
+        const auto tlsParam = n.parameters.value("tls");
+        const bool explicitTls = tlsParam.toBool() || tlsParam.toObject().value("enabled").toBool();
+        const bool reality = n.parameters.contains("reality-opts") || tlsParam.toObject().value("reality").toObject().value("enabled").toBool();
+        if (reality || (!implicitTls && !explicitTls))
+            return QStringLiteral("未启用标准 TLS/QUIC 的节点不能设置 skip-cert-verify=true。");
+    }
     return {};
 }
 QStringList ProxyNode::protocols() {
@@ -117,6 +125,7 @@ QVariantMap ProxyNode::publicInfo() const {
     QStringList normalizationNotes;
     if(originalConfiguration.value("_swirl-default-client-fingerprint").toBool())normalizationNotes.append(QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"));
     if(certificateVerificationEnforced)normalizationNotes.append(QStringLiteral("源订阅请求跳过 %1 证书验证；Swirl 已保持证书验证开启。证书不可信、过期或名称不匹配仍会连接失败，原始参数已加密保留。").arg(protocol=="anytls"?QStringLiteral("AnyTLS"):QStringLiteral("Trojan")));
+    if(parameters.value("skip-cert-verify")==QJsonValue(true))normalizationNotes.append(QStringLiteral("此节点按源配置启用跳过出口 TLS 证书链校验（skip-cert-verify）；其他节点及目标网站 HTTPS 证书校验不受影响。"));
     if(executable&&parameters.value("tfo")==QJsonValue(true))normalizationNotes.append(QStringLiteral("TCP Fast Open 为可选加速项；当前使用普通 TCP，原始参数已保留，证书验证要求不变。"));
     return {{"id",id},{"name",name},{"protocol",protocol},{"host",host},{"port",port},
         {"protocolLabel",protocolLabels.value(protocol,protocol.toUpper())},

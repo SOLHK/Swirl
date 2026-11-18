@@ -94,8 +94,17 @@ fn tls_sni_and_string_or_array_alpn_are_lossless() {
 
 #[test]
 fn explicit_certificate_fingerprint_verification_and_ech_options_never_disappear() {
+    let default_doc = roundtrip(&vless(
+        json!({"security":"tls","tlsSettings":{"serverName":"sni.example.invalid"}}),
+    ));
+    assert!(!blocked(&default_doc));
+    assert!(!default_doc.nodes()[0].projected_tls().unwrap().insecure);
+    let insecure_doc = roundtrip(&vless(
+        json!({"security":"tls","tlsSettings":{"serverName":"sni.example.invalid","allowInsecure":true}}),
+    ));
+    assert!(!blocked(&insecure_doc));
+    assert!(insecure_doc.nodes()[0].projected_tls().unwrap().insecure);
     for extra in [
-        json!({"allowInsecure":true}),
         json!({"disableSystemRoot":true}),
         json!({"fingerprint":"chrome"}),
         json!({"fingerprint":""}),
@@ -532,7 +541,7 @@ fn unimplemented_or_unknown_stream_semantics_are_unverified_not_validated() {
         assert!(blocked(&doc));
     }
     let doc = roundtrip(&vless(
-        json!({"security":"tls","tlsSettings":{"allowInsecure":true}}),
+        json!({"security":"tls","tlsSettings":{"disableSystemRoot":true}}),
     ));
     assert_eq!(doc.nodes()[0].validation(), ValidationStatus::Valid);
     assert!(blocked(&doc));

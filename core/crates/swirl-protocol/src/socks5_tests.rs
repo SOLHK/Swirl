@@ -246,6 +246,7 @@ async fn disabled_tls_and_handshake_timeout_fail_closed() {
             server_name: "proxy.fixture.test".into(),
             alpn: Vec::new(),
             ca_der_base64: None,
+            insecure: false,
         });
     }
     assert!(matches!(
