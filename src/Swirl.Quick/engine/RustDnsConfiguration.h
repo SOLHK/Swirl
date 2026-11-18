@@ -10,6 +10,20 @@
 // Conversion only: no DNS queries, system configuration changes or GUI changes.
 // Network execution and TLS authentication belong to the Rust resolver.
 namespace SwirlRustDns {
+inline QString requireEncrypted(QJsonObject *dns) {
+    if (!dns->value("tls_servers").toArray().isEmpty()) return {};
+    if (!dns->value("servers").toArray().isEmpty())
+        return QStringLiteral("TUN 需要加密 DNS。请将自定义明文 DNS 改为 DoH/DoT，或恢复默认 DNS 以自动使用安全解析。");
+    // Fixed bootstrap IPs avoid the system resolver after capture. Authentication
+    // names remain independent and all queries use the native TLS verifier.
+    QJsonArray endpoints;
+    for (const auto &entry : {qMakePair(QString("223.5.5.5:443"), QString("dns.alidns.com")),
+                              qMakePair(QString("1.1.1.1:443"), QString("cloudflare-dns.com"))})
+        endpoints.append(QJsonObject{{"address", entry.first}, {"https_path", "/dns-query"},
+            {"tls", QJsonObject{{"server_name", entry.second}, {"alpn", QJsonArray{"http/1.1"}}}}});
+    (*dns)["tls_servers"] = endpoints;
+    return {};
+}
 inline bool usableAddress(const QHostAddress &address) {
     return !address.isNull() && address.scopeId().isEmpty() && !address.isMulticast()
         && address != QHostAddress(QHostAddress::AnyIPv4)

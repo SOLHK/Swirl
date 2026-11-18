@@ -34,7 +34,7 @@ Rectangle {
         enabled: !SwirlMotion.reduced && !surface.transientFill
         ColorAnimation { duration: SwirlMotion.hoverDuration }
     }
-    SwirlInteractionMotion {id:feedback;hovered:surface.hovered;pressed:surface.pressed;focused:surface.focused;controlEnabled:surface.controlEnabled}
+    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {id:feedback;parent:surface;hovered:surface.hovered;pressed:surface.pressed;focused:surface.focused;controlEnabled:surface.controlEnabled}
     Rectangle {
         objectName:"controlFocusFill"
         anchors.fill:parent

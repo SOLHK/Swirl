@@ -232,8 +232,8 @@ Item {
             visible:weave.cardItems.length===0
         }
     }
-    // Each card reveals the same travelling bodies above its fill and below
-    // its content. The shared scene clock never covers labels or hit targets.
+    // The routes cross card interiors. Reveal the same pose above each fill,
+    // below its text and controls, rather than losing the flight behind white.
     Repeater {
         model:weave.cardItems
         delegate:Item {

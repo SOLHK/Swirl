@@ -15,12 +15,14 @@ public:
  ~RustCoreEngine() override;
  void start(const EngineStartOptions &) override;
  void stop() override;
+ void recoverTunNetwork() override;
  void refresh() override;
  void selectNode(const QString &) override;
  void setRoutingMode(const QString &) override;
  void configurationCommand(const QJsonObject &) override;
  void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
+ void probeNodeTagged(const QUrl &,quint64 tag) override;
  bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override;
  QJsonObject probeNodesStatus() override;
  void cancelProbeNodes() override;

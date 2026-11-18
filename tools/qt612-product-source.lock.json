@@ -12,10 +12,10 @@
   },
   "modified_declarative": {
     "archive": {
-      "bytes": 54653393,
-      "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+      "bytes": 54653389,
+      "sha256": "458820cf47bcd4ada3a1885fc4fa604931c6784cbf96bdb3199969e53897a9ac"
     },
-    "file_manifest_content_id": "3e23d5e979ec3c1cf60b42c83ee873130be0a9b1b2fb34e5c179754067d74bb4",
+    "file_manifest_content_id": "9ececb605dc43603e2e224abc16cdda71e41c255a0f39cd35e13beb9af16229f",
     "omitted_gitlinks": [
       {
         "commit": "a0efb7e1ab1cee24c387abe1897ff18fa116c17d",
@@ -25,6 +25,18 @@
     ],
     "patch": {
       "added_lines": 15,
+      "additional": [
+        {
+          "added_lines": 3,
+          "deleted_lines": 2,
+          "path": "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff",
+          "postimage_sha256": "f0d4350042403b6a131cf4b30e9806276e61bafb9f46047f15d676fab67a02a4",
+          "preimage_sha256": "703d72c6cd9ef3dc3a23ad5cbc9c39ed8007d5a67980cc9cd068585d783c1456",
+          "production_path": "src/qml/jit/qv4baselinejit.cpp",
+          "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22",
+          "upstream_commit": "4c1054b0f997f2977a54d42523856805b309db9a"
+        }
+      ],
       "deleted_lines": 7,
       "path": "tools/patches/qt612-qv4-sweep-8c92fe0.patch",
       "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
@@ -51,7 +63,7 @@
       "repository": "https://github.com/qt/qtdeclarative.git",
       "tree": "98324181f2eebf01e806603a01829a40b8683631"
     },
-    "tracked_bytes": 119268782,
+    "tracked_bytes": 119268784,
     "tracked_regular_files": 23849
   },
   "official_sources": [
@@ -200,6 +212,7 @@
       "qmltooling/qmldbg_quickprofiler.dll": "qtdeclarative",
       "qmltooling/qmldbg_server.dll": "qtdeclarative",
       "qmltooling/qmldbg_tcp.dll": "qtdeclarative",
+      "styles/qmodernwindowsstyle.dll": "qtbase",
       "tls/qcertonlybackend.dll": "qtbase",
       "tls/qopensslbackend.dll": "qtbase",
       "tls/qschannelbackend.dll": "qtbase"
@@ -245,7 +258,9 @@
       "Qt6Quick.dll",
       "Qt6QuickControls2.dll",
       "Qt6Svg.dll",
+      "Qt6Widgets.dll",
       "platforms/qwindows.dll",
+      "styles/qmodernwindowsstyle.dll",
       "tls/qopensslbackend.dll"
     ],
     "root_dlls": {
@@ -284,7 +299,8 @@
       "Qt6QuickNativeStyle.dll": "qtdeclarative",
       "Qt6QuickShapes.dll": "qtdeclarative",
       "Qt6QuickTemplates2.dll": "qtdeclarative",
-      "Qt6Svg.dll": "qtsvg"
+      "Qt6Svg.dll": "qtsvg",
+      "Qt6Widgets.dll": "qtbase"
     }
   },
   "schema": 1,
@@ -296,40 +312,40 @@
     "source_sha": "1f4c1bbba938cdf435c89212c75bb3160b0b1679"
   },
   "sdk_artifact": {
-    "artifact_id": 13561016761,
-    "bytes": 60774580,
+    "artifact_id": 14221516760,
+    "bytes": 60827211,
     "files": {
       "CMakeCXXCompiler.cmake": {
         "bytes": 6603,
-        "sha256": "6b785cbe38f04d4be2b1b10fce27f15347e8298adb88db5b7a8f76cd5a1d5820"
+        "sha256": "15544101f5eb2482a70bf2e3b2778b950e770aaf52909476a0bd4015db17ffbd"
       },
       "CMakeCache.txt": {
         "bytes": 95395,
-        "sha256": "affd3b8cdf23ac66b37e567a299f6967c2616145d0ea159cb2ea442862e7eaed"
+        "sha256": "fb390d6c86a7aed6eda719bcc55179b02759b99239296e8db72980df86beb5c7"
       },
       "commands/10-configure.compiler-plan.json": {
         "bytes": 3897,
-        "sha256": "5a50f53663bd1b5abfc4643f99157ce0c814f8f5f6d7f24b678912c2f7ed13b6"
+        "sha256": "113294c87076aff4deb73a1d4141a670de5a068456eb20f32ceed20ca524bab8"
       },
       "commands/10-configure.json": {
-        "bytes": 5496,
-        "sha256": "54f451060763368510e83b63136d1577d12c3db3c694285bef15ee57a329ea2a"
+        "bytes": 5497,
+        "sha256": "5600c6ec34bb756fff209fe0d1dee498e77ac07fb706dea51e4da957a5905f14"
       },
       "commands/10-configure.stderr.log": {
         "bytes": 105,
-        "sha256": "54c2510dd4b4adc98b58737d210d406cec1c56ae71e3eba567de5120df232563"
+        "sha256": "6b5f508ce78a15e83540b112f50e077060c12270e32e8ed974ca19353b11b630"
       },
       "commands/10-configure.stdout.log": {
         "bytes": 2871,
-        "sha256": "99052dddc2de95271ca3d3d45c389a47a2e76a48be224b67b25bc113b6d9e0ee"
+        "sha256": "4ce8d8f9020626b255a377d74b59ea8ea77d1cb7147466cf8ddf50dfd33b5a70"
       },
       "commands/11-qml-build.compiler-plan.json": {
         "bytes": 3495,
-        "sha256": "48e61d4e5966c00547235ce7611ad561d51f7778d0b0e81434f61c3db303e587"
+        "sha256": "a521cbabfb035997b5e1f19a50a8488e1150e56a341ca508d6e127b49d89fd91"
       },
       "commands/11-qml-build.json": {
-        "bytes": 5498,
-        "sha256": "7b167dde3a53420215fd5caf10d1da7cdb8080c8a7d359c5f7daf025d14f19a0"
+        "bytes": 5497,
+        "sha256": "cb639369dc0dac2a91188bb2f2a1f03d702c53d235e2c58c333721254dc7f500"
       },
       "commands/11-qml-build.stderr.log": {
         "bytes": 0,
@@ -337,11 +353,11 @@
       },
       "commands/11-qml-build.stdout.log": {
         "bytes": 24303,
-        "sha256": "cce49c51e0b0912423beb410861a8a72f1bff1beb50055e38deccdedc11d4d77"
+        "sha256": "adbfdd3fab71087b8cca3a7561f085b1c21ed5f306f06c628e901c17fb052077"
       },
       "commands/12-install-qml-only.json": {
         "bytes": 1422,
-        "sha256": "67ea68e4b8dd66b62205cc9e615572219269ed6851f053b6e569244ea5f04ccd"
+        "sha256": "4e90b7bcbfc081e9e3ba01edad99aef758d4c2430d6da064fcc847451319def9"
       },
       "commands/12-install-qml-only.stderr.log": {
         "bytes": 0,
@@ -349,11 +365,11 @@
       },
       "commands/12-install-qml-only.stdout.log": {
         "bytes": 43308,
-        "sha256": "3232b2a8a613f58d71d03bf4d800a1927c871ed8410527ddbc98d230778890ba"
+        "sha256": "6784d130525ca784655a14a4a292b7ec8177ebe39f8868fcaf00e39eb7cc56c7"
       },
       "commands/13-patched-exports.json": {
         "bytes": 1515,
-        "sha256": "f46c5967e59f143cebb7080d37b66b8bbb4b725f5d62b57fcef5075a54dbb033"
+        "sha256": "37c4ad0fce15e6d9e386fccf6b72e4262453e1089b193b27df973bc2bee4592b"
       },
       "commands/13-patched-exports.stderr.log": {
         "bytes": 0,
@@ -361,11 +377,11 @@
       },
       "commands/13-patched-exports.stdout.log": {
         "bytes": 579291,
-        "sha256": "fb4e0a7f525aa97c3446180745d3d34b54233b4865db839d2ce9854afdaca563"
+        "sha256": "09e119b28828b682d0ab96c514a28a60e453f4728e951660b735cca8aa639def"
       },
       "commands/13-stock-exports.json": {
-        "bytes": 1524,
-        "sha256": "b3b2fba302f3facfd4b6fb74af4f7162eef04631f3d8c39b5d08cecbceebdfe1"
+        "bytes": 1525,
+        "sha256": "5cc3bb8b9e2806080e71fcdec132cc60ff9edc37b26e74781c243b04df1786a1"
       },
       "commands/13-stock-exports.stderr.log": {
         "bytes": 0,
@@ -373,11 +389,11 @@
       },
       "commands/13-stock-exports.stdout.log": {
         "bytes": 579303,
-        "sha256": "faa7a4ac8b2a4cff6b7b2b3fc742d4573d89a5ddad43c56445c5e26fe0186168"
+        "sha256": "79df3c75f0b27986e5ced2dd00a582c8c20bde31c4a1855415221a2f95928ace"
       },
       "commands/15-patched-dependents.json": {
         "bytes": 1521,
-        "sha256": "f5d0d745490778d7c114478d8fd6f8c203446d5b27b7fa5b3ea0e5f47d133b98"
+        "sha256": "79be2bc4bd2fa364ca6158c1d185decf718243083066aa6057e857350949077d"
       },
       "commands/15-patched-dependents.stderr.log": {
         "bytes": 0,
@@ -385,11 +401,11 @@
       },
       "commands/15-patched-dependents.stdout.log": {
         "bytes": 701,
-        "sha256": "b28515569c9372890689a2735395ed45500f50ea9832b13f94d942201c8d57d1"
+        "sha256": "39f789a18f01e147137644431b5eb39089eac81d510e99e3d3d17f9169230acf"
       },
       "commands/15-stock-dependents.json": {
         "bytes": 1531,
-        "sha256": "1d352d16c2495c182e4834c14d9fd14bb8be357dcff7bd2710e24c1592f8dbc6"
+        "sha256": "816b12a503a752e86a0aef62f1bee2104d8f6f94cf16387c84817c83d9cc461a"
       },
       "commands/15-stock-dependents.stderr.log": {
         "bytes": 0,
@@ -397,15 +413,15 @@
       },
       "commands/15-stock-dependents.stdout.log": {
         "bytes": 713,
-        "sha256": "d1b59da5d62cc7d3f99a86a7fcd9941006587f123add63c0147cd813b4832221"
+        "sha256": "9ce3d35481ab38c5a436a41d3a4fe3c6dc64ce5d380d301ec477ddd8c7353386"
       },
       "compile_commands.json": {
         "bytes": 11591603,
-        "sha256": "d404a060bf7f2b0ad7f8ad6ae6f49f75c97d2facde9807dcd6adda32a8b90b53"
+        "sha256": "81a5965afff8ffda46f889a343571692062cc9e0d2e9557d387ddd77c6583789"
       },
       "config.opt": {
         "bytes": 1229,
-        "sha256": "b0c44fea604d775a64549534f37e7ba2cecdbaed997c28f089e24a332d4cc978"
+        "sha256": "c3b45f0435327eddafa334ed164afe762802ff7b8861b6ed0c0a998b18fff787"
       },
       "config.summary": {
         "bytes": 2289,
@@ -413,47 +429,47 @@
       },
       "configuration-identity.json": {
         "bytes": 10159,
-        "sha256": "63c9e1e04482bb5291bd2d24df59e51030514319b273d8f93e0f124d9c5c48a4"
+        "sha256": "dc819466a1d8ec83b64bf212b810270bbabd62fb1e3009ffd69629dfccb5235e"
       },
       "configure-module.ps1": {
         "bytes": 1440,
-        "sha256": "b6cc206b4b55f3d70784ecdb8a67d1b3c5bbc9904d5c750f5a6e4267f0ff474a"
+        "sha256": "c03cb264455aa102894aa038ec210087e42a88bfedec48589de22cde92050459"
       },
       "corresponding-source.json": {
-        "bytes": 2116,
-        "sha256": "65f20366b34512e1b0b450c00c95e6d4d5ed3f191f8786e9f15e40085b1c1bf4"
+        "bytes": 2691,
+        "sha256": "c4b723771b3ffd1e14fd4b9a865a740279ad8d80d026728199de6043f4b01497"
       },
       "derived-files.json": {
         "bytes": 1884576,
-        "sha256": "cf3853876854a7cf88e1dfceb700c6174cfe2291a1de69c0b754bef489ed0a1a"
+        "sha256": "651e95db561ee9afe3486fb150bde263ed1bd29dc6920f301a76cf4a3609fbe6"
       },
       "header-alignment.json": {
         "bytes": 244886,
-        "sha256": "48e12238a77625668c803abeb366bc02c38cc6a06e4462489c48b39d971eb17e"
+        "sha256": "6532ca02949e973586bea544f1ea3dd047c78c212a06c7084d47971e48674e5f"
       },
       "install-qml-only.cmake": {
         "bytes": 585,
-        "sha256": "69ad109ae84ca69462009d3c5318e6cc8d3aa2f67062040b40a5ef09c9db5619"
+        "sha256": "8663acc88f4a40e76d334ece36a2d2e3093b0f6c0b692b78e35df2c4e6b8a056"
       },
       "module-files.json": {
         "bytes": 61027,
-        "sha256": "dcbc21d7d6394bc88a5d9b73cccb9cdc7a2efb27a7eed869e9c02e73ae895f04"
+        "sha256": "557e1db5811875624abe39af5e2d1bbe016da505e688bc0e7f8d264ce9c627e6"
       },
       "module-header-retention.json": {
         "bytes": 242884,
-        "sha256": "5f695da83db225c35542c3b8788fbdc79d190915dcfeddac20f56cb24a331f9f"
+        "sha256": "67ee3ed22ad8ffcf221c3f278dadc950572ef6b6d6d1a89d87e58d254f5a3abb"
       },
       "module-install-files.txt": {
         "bytes": 37909,
-        "sha256": "b2fb5190724a6753ea77abfd2ffffdc4f2f5a918956bf40fdf699bfb19327e3e"
+        "sha256": "a9cea2ca38888bd48fca8ff1048d9f02115100d56645d5e8498cdfc79257d56f"
       },
       "msvc-initial-cache.cmake": {
         "bytes": 231,
         "sha256": "d6ebe1d490bcd4efeaa970b9e3fe75944501d9658eddeda39187aa6df18d00cd"
       },
       "native-toolchain-files.json": {
-        "bytes": 1072830,
-        "sha256": "fff07a252295c5fdbf45da732cbf63af1920caa5ebe6fad8af5eb29394350f29"
+        "bytes": 1074508,
+        "sha256": "1d2ca01f0db1dac91a32090ee8f47cf46dfe1f037b5be5f12d1c014e5ff3cdf2"
       },
       "pe-interface-review.json": {
         "bytes": 943,
@@ -461,51 +477,59 @@
       },
       "qml-cmake-install.cmake": {
         "bytes": 40175,
-        "sha256": "3829979a5c2a95a08ab2f725b532ea9a523de56a0f20b99b1685bb7e786f19bd"
+        "sha256": "eb37ba5b0c9e29af341674d612246066001d907a70baacfc84648c5857ac556d"
       },
       "qtdeclarative-corresponding-source.zip": {
-        "bytes": 54653393,
-        "sha256": "3b9166901aa2c82a922d0d822ce0b46ac1fd036049ee510a60ac1a0c6806d2b8"
+        "bytes": 54653389,
+        "sha256": "458820cf47bcd4ada3a1885fc4fa604931c6784cbf96bdb3199969e53897a9ac"
       },
       "receipt.json": {
-        "bytes": 66395,
-        "sha256": "ca9c401827665956e929be87934d20252b61d525154da97148990fc1d0b7f361"
+        "bytes": 68089,
+        "sha256": "af81268c6b784ec3464e857e046c0387ae937047a8ca63e93550e394875238cd"
       },
       "reproduction/tools/Build-Qt612QmlDiagnosticSdk.py": {
-        "bytes": 113069,
-        "sha256": "164906db9e451121a45806cacd56be5b8af0c3fbe4b7a86a9237b7cf9d91afcc"
+        "bytes": 135722,
+        "sha256": "189e8ef003e0eedde461632962a38157c89d5fbd799ebc7d8cd387a77a70fa52"
       },
       "reproduction/tools/Install-QtSdk.py": {
         "bytes": 11188,
         "sha256": "c7c6709ab67947c343a12f35bfb68771360bbc54f849e943bbadbb2c8c7e13dd"
       },
       "reproduction/tools/PrivateSubscriptionBudget.py": {
-        "bytes": 80744,
-        "sha256": "054f85ecbfbaf60c30cf34f9aa021bf385740577abedc0f61106f2ca5230f7fb"
+        "bytes": 80864,
+        "sha256": "f8835c802d649fd597ec378e7b207da9ad7150b82bfdb7b118fe40b02028da1d"
       },
       "reproduction/tools/PrivateSubscriptionProcess.py": {
-        "bytes": 26253,
-        "sha256": "f5b71ca13933fce12312f7a7009f7d93235dab373b35eaf3bd4a08f3a984168d"
+        "bytes": 27233,
+        "sha256": "5a26c2230be8f70098658949085982e47d3f7f918b2444b740220971ac97740a"
       },
       "reproduction/tools/RunQt612GcProbe.py": {
-        "bytes": 16132,
-        "sha256": "6fca877c3ecf40e237948a0d58211d3fccb66595d182a1c6a763dc234cee0f74"
+        "bytes": 18148,
+        "sha256": "70fae8e86f30c22db546f3118617710f095fac916f25aef9a54e69081d96f974"
       },
       "reproduction/tools/RunQt612RuntimeComparison.py": {
-        "bytes": 19234,
-        "sha256": "54e91c7dc570b099843c3fc59277ea243c0baad8f5805bd54b6aac7851a7fda9"
+        "bytes": 20944,
+        "sha256": "1aa5af03fb8e9b5d16679d91374439b440ee98c213ccdcda2a6642eb8b8bfeca"
+      },
+      "reproduction/tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff": {
+        "bytes": 835,
+        "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22"
       },
       "reproduction/tools/patches/qt612-qv4-sweep-8c92fe0.patch": {
         "bytes": 2284,
         "sha256": "9729ad5b706ea02def9a036bf0f32508143f69e4fcdbff386b2873326d7ca3ac"
       },
       "reproduction/tools/qt612-qml-patch.lock.json": {
-        "bytes": 9857,
-        "sha256": "f6f5ed6a36d0bed68eda72a132eb1d2790f5961958130b35f286a96f41e568df"
+        "bytes": 10432,
+        "sha256": "dbbbd093ac96fbf50c3a90b161a7ad188ff364149d063e98d24f5c3d397ab2aa"
       },
       "reproduction/tools/repros/qt612-popup-gc/CMakeLists.txt": {
-        "bytes": 497,
-        "sha256": "3ac5707454c243c6a83e6991050d3c9d648042e32362e12c96b0eb277964936d"
+        "bytes": 609,
+        "sha256": "f3bee120a15168005f22ad6311b953751968ef23f4ce2e06086247d54906b7cf"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/LICENSE-GPL-3.0.txt": {
+        "bytes": 35147,
+        "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
       },
       "reproduction/tools/repros/qt612-popup-gc/Main.qml": {
         "bytes": 737,
@@ -518,6 +542,10 @@
       "reproduction/tools/repros/qt612-popup-gc/ProbeDialog.qml": {
         "bytes": 1526,
         "sha256": "518dc651975532a486983a591f11d7d7b28f43c9e8788a1158e7b599187f15cc"
+      },
+      "reproduction/tools/repros/qt612-popup-gc/jit.cpp": {
+        "bytes": 2723,
+        "sha256": "7ffd8b6c89a42cfeec624711448ae7a0c8338c1357a87538e89dcc2791fc841e"
       },
       "reproduction/tools/repros/qt612-popup-gc/main.cpp": {
         "bytes": 5005,
@@ -532,12 +560,12 @@
         "sha256": "e776cf2b9612d54b7894e3428e7ea4ac20ca4efa5abcf643c1e9f4b81bcf2b6a"
       },
       "reproduction/tools/tests/test_qt612_diagnostic_sdk.py": {
-        "bytes": 56851,
-        "sha256": "fe7995a18019ab083f129678d99546b8b22fada58fc5b2c3914070cf322c5602"
+        "bytes": 60288,
+        "sha256": "8ae0e2b93ba86a257d29b5a01cc4f1c54648582094753e8a7038fd0e4ffc30fb"
       },
       "source-snapshot-files.json": {
-        "bytes": 7234465,
-        "sha256": "8000d2e3d6a5903d1732d19f717087239907955594a817165224c369c50e755c"
+        "bytes": 7234478,
+        "sha256": "efd9b15492fd59821dc97ed96fdbc89c65c1dbf0af8887a4fcba0c8e0e2edce9"
       },
       "stock-Qml.json": {
         "bytes": 538,
@@ -545,15 +573,15 @@
       },
       "stock-files-before.json": {
         "bytes": 1884420,
-        "sha256": "8e0c4801ce2a7b3639b31970d5cbc4e9e727b0b9d60fd0203e7dbd57fc70b508"
+        "sha256": "571c90a0af8f21de866df2fc1d8853dcba3c459867906837d6f397f3ff957862"
       },
       "stock-sdk-receipt.json": {
         "bytes": 8545,
-        "sha256": "46a02c48f0e128fed32f4a8f9377dd0703e32e805935f1bdc71d662179b1f7b8"
+        "sha256": "8d57e768a2f687e43340c019b3fb3acf2ac6b0994ace71870fdf63beaf4f9f89"
       }
     },
-    "sha256": "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
-    "source_sha": "e76d264b9b5dfe1f1becdbef7dc8fceb3506a0ab",
-    "workflow_run_id": 42338365419
+    "sha256": "130b3eb29bec634ef91c6f37687b4c004e87ead599ea2151ab7c305a4f8e3425",
+    "source_sha": "93b0990e85fe9609bf75862066c3990d9430b1be",
+    "workflow_run_id": 43855072540
   }
 }

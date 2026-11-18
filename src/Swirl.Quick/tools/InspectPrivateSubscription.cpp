@@ -9,10 +9,7 @@
 #include <QJsonArray>
 #include <QRegularExpression>
 #include <QTextStream>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <wincrypt.h>
-#endif
+#include "app/DpapiDataProtection.h"
 
 namespace {
 // Only fixed classifications are public. Source-derived text is never echoed.
@@ -154,11 +151,10 @@ int main(int argc,char **argv) {
         if(!before.startsWith("SWIRLNODE1\n"))return error(output,"NodeStoreInputInvalid",3);
     }else{
         if(QFileInfo::exists(path)||QFileInfo::exists(path+".selected"))return error(output,"OutputAlreadyExists",6);
-        auto encrypted=readFile(app.arguments()[1],8*1024*1024);
+        const auto encrypted=readFile(app.arguments()[1],8*1024*1024);
         if(encrypted.isEmpty())return error(output,"EncryptedInputInvalid",3);
-        DATA_BLOB source{DWORD(encrypted.size()),reinterpret_cast<BYTE *>(encrypted.data())},out{};
-        if(!CryptUnprotectData(&source,nullptr,nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&out))return error(output,"DpapiDecryptFailed",4);
-        QByteArray plain(reinterpret_cast<char *>(out.pbData),out.cbData);SecureZeroMemory(out.pbData,out.cbData);LocalFree(out.pbData);
+        auto plain=SwirlDpapi::unprotect(encrypted);
+        if(plain.isEmpty())return error(output,"DpapiDecryptFailed",4);
         auto result=NodeImporter::parse(plain);plain.fill('\0');
         if(!result)return error(output,"SubscriptionParseFailed",5,result.error);
         parsedNodeRecords=result.nodes.size();

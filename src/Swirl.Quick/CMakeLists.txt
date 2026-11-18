@@ -87,14 +87,14 @@ unset(SWIRL_USE_RUST_CORE CACHE)
 unset(SWIRL_USE_RUST_CORE)
 set(SWIRL_RUNTIME rust CACHE INTERNAL "Sole product runtime" FORCE)
 
-find_package(Qt6 6.12 REQUIRED COMPONENTS Quick QuickPrivate Qml QuickControls2 QuickTemplates2Private Network Svg GuiPrivate ShaderTools)
+find_package(Qt6 6.12 REQUIRED COMPONENTS Quick QuickPrivate Qml QuickControls2 QuickTemplates2Private Network Svg GuiPrivate ShaderTools Widgets)
 qt_standard_project_setup(REQUIRES 6.12)
 qt_policy(SET QTP0004 NEW)
 add_subdirectory(third_party)
 add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
 target_link_libraries(SwirlScriptRunner PRIVATE Qt6::Core Qt6::Qml)
 target_compile_definitions(SwirlScriptRunner PRIVATE NOMINMAX)
-qt_add_executable(Swirl WIN32 main.cpp app/DismissalController.h app/DismissalController.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
+qt_add_executable(Swirl WIN32 main.cpp app/QmlDiagnosticCapture.h app/QmlDiagnosticCapture.cpp app/DismissalController.h app/DismissalController.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 target_sources(Swirl PRIVATE app/WindowShadowRenderer.cpp app/WindowShadowRenderer.h)
 execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE SWIRL_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE SWIRL_SOURCE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
@@ -205,7 +205,7 @@ set(SWIRL_QML_FILES
  qml/components/PolicyHelpers.js qml/components/PolicyTargetPicker.qml
  qml/components/ServicePolicyDialog.qml qml/components/PolicyProbeSettings.qml
  qml/components/PolicyGroupDialog.qml qml/components/ServiceAssignments.qml
- qml/components/SubscriptionRow.qml qml/components/SubscriptionDialog.qml qml/components/ConfigurationReviewDialog.qml qml/components/SubscriptionAction.qml qml/components/NodeRowActions.qml
+ qml/components/SubscriptionRow.qml qml/components/SubscriptionDialog.qml qml/components/ConfigurationReviewDialog.qml qml/components/SubscriptionAction.qml qml/components/NodeRowActions.qml qml/components/NodeLatencyButton.qml
  qml/components/OutboundModeControl.qml
  qml/components/PolicyGroupList.qml qml/components/PolicyFormScroll.qml
  qml/components/PolicyRouteStrip.qml qml/components/PolicyGroupTypes.qml
@@ -217,7 +217,7 @@ set(SWIRL_QML_FILES
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml
  qml/controls/SwirlTransitionCoordinator.qml qml/controls/SwirlHeroCard.qml qml/controls/SwirlHeroTitle.qml
  qml/components/SwirlContinuousSurface.qml qml/components/SwirlShellOutline.qml qml/components/SwirlBlurLayer.qml qml/components/SwirlGlassMaterial.qml qml/components/SwirlWindowControls.qml qml/components/SwirlDailyTrafficChart.qml
- qml/controls/SwirlClickLight.qml qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
+ qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
  qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js
@@ -282,7 +282,7 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_light.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_dark.svg"
 )
-qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
+qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag)
 qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag shaders/sidebar-shadow.frag shaders/card-shadow.frag shaders/sidebar-transmission.frag shaders/swirl-flow.frag)
 qt_add_shaders(Swirl liquid_navigation PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/sidebar-liquid.frag shaders/workspace-wing.frag)
 qt_add_shaders(Swirl window_edge BATCHABLE PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/window-edge.vert shaders/window-edge.frag)
@@ -296,7 +296,7 @@ set_property(SOURCE app/PopupMotionBridge.cpp APPEND PROPERTY INCLUDE_DIRECTORIE
 
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
 target_sources(Swirl PRIVATE app/SvgIconProvider.h app/SvgIconProvider.cpp)
-target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network Qt6::Svg)
+target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network Qt6::Svg Qt6::Widgets)
 if(MSVC)
  target_compile_options(Swirl PRIVATE /utf-8)
 endif()
@@ -313,6 +313,13 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_executable(SwirlStoragePathsTests tests/StoragePathsTests.cpp)
  target_link_libraries(SwirlStoragePathsTests PRIVATE Qt6::Core)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
+ if(WIN32)
+  add_executable(SwirlTrayLifecycleTests tests/TrayLifecycleTests.cpp)
+  target_include_directories(SwirlTrayLifecycleTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_link_libraries(SwirlTrayLifecycleTests PRIVATE Qt6::Quick Qt6::Widgets Qt6::Network advapi32)
+  add_test(NAME swirl-tray-lifecycle COMMAND SwirlTrayLifecycleTests "${CMAKE_CURRENT_BINARY_DIR}/tray-lifecycle.json")
+  set_tests_properties(swirl-tray-lifecycle PROPERTIES TIMEOUT 15 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11")
+ endif()
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
  qt_add_executable(SwirlLanProxyTests tests/LanProxyTests.cpp)
@@ -376,6 +383,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   target_compile_definitions(SwirlPolicyConfigurationTests PRIVATE SWIRL_PROXY_STOP_NEGATIVE_CONTROL)
  endif()
  target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
+ target_compile_definitions(SwirlPolicyConfigurationTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests
   -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.xml,xml"
@@ -392,6 +400,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  swirl_add_font_tests()
  if(SWIRL_BUILD_UI_TESTS)
+ target_sources(Swirl PRIVATE tests/UiTestCliDispatch.h tests/UiTestCliDispatch.cpp)
  target_sources(Swirl PRIVATE tests/ActivityLayoutChecks.cpp tests/ActivityLayoutChecks.h)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)

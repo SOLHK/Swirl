@@ -23,7 +23,8 @@ Item {
         property color rimColor: surface.border ? surface.border.color : "transparent"
         fragmentShader: "qrc:/swirl/shaders/swirl-surface.frag.qsb"
     }
-    SwirlShellOutline {
+    readonly property Item ownedOutline: SwirlShellOutline {
+        parent: surface
         anchors.fill: parent
         visible: !Theme.effectsSupported
         radius: surface.radius

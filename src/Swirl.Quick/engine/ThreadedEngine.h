@@ -15,7 +15,7 @@ public:
         m_status.tunCapturePossible=m_status.tunRecoveryRequired;
         if(m_status.tunRecoveryRequired){
             m_status.state=State::Failed;m_status.error=Error::OwnershipFailed;
-            m_status.message=QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+            m_status.message=QStringLiteral("上次 TUN 网络恢复尚未确认。请点击“恢复网络”，授权恢复 Swirl 的网络设置后再连接。");
         }
         m_context=new QObject;
         m_context->moveToThread(&m_thread);
@@ -46,6 +46,9 @@ public:
                 const auto epoch=m_workerEpoch;
                 QMetaObject::invokeMethod(this,[this,requestId,response,epoch]{if(epoch==m_epoch)emit configurationCommandFinished(requestId,response);},Qt::QueuedConnection);
             });
+            connect(m_engine,&ProxyEngine::tunRecoveryFinished,m_context,[this](bool success,const QString &message){
+                QMetaObject::invokeMethod(this,[this,success,message]{emit tunRecoveryFinished(success,message);},Qt::QueuedConnection);
+            });
             const auto initial=m_engine->status();const auto epoch=m_workerEpoch;
             QMetaObject::invokeMethod(this,[this,initial,epoch]{if(epoch==m_epoch){m_status=initial;emit statusChanged();}},Qt::QueuedConnection);
         });
@@ -73,6 +76,10 @@ public:
             QMetaObject::invokeMethod(this,[this,status,epoch]{if(epoch==m_epoch){m_status=status;emit statusChanged();}},Qt::QueuedConnection);},Qt::QueuedConnection);
     }
     void refresh() override {post([](auto *engine){engine->refresh();});}
+    void recoverTunNetwork() override {
+        const auto epoch=++m_epoch;
+        QMetaObject::invokeMethod(m_context,[this,epoch]{m_workerEpoch=epoch;m_engine->recoverTunNetwork();},Qt::QueuedConnection);
+    }
     void selectNode(const QString &id) override {post([this,id](auto *engine){m_workerProbeTag=0;engine->selectNode(id);});}
     void probeNode(const QUrl &url) override {probeNodeTagged(url,0);}
     void probeNodeTagged(const QUrl &url,quint64 tag) override {
@@ -88,28 +95,40 @@ public:
         });
     }
     void setRoutingMode(const QString &mode) override {post([this,mode](auto *engine){m_workerProbeTag=0;engine->setRoutingMode(mode);});}
-    // The sweep start and its incremental snapshot must be synchronous for the
-    // caller's poll loop, so they use a blocking hop into the worker. Both calls
-    // are short (spawn or mutex read) and never run while the worker is blocked
-    // on the GUI thread.
+    // Accept the request immediately; Rust commands and their global lifecycle
+    // lock stay on the worker. At most one snapshot request is outstanding.
     bool probeNodes(const QStringList &ids,const QUrl &url,QString *error) override {
-        std::atomic<bool> started{false};
-        std::atomic<bool> accepted{false};
-        QMetaObject::invokeMethod(m_context,[this,ids,url,&accepted]{
-            accepted.store(m_engine&&m_engine->probeNodes(ids,url,nullptr));
-        },Qt::BlockingQueuedConnection);
-        started.store(accepted.load());
-        if(!started.load()&&error)*error=QStringLiteral("probe-batch-unavailable");
-        return started.load();
+        if(!m_status.apiHealthy){if(error)*error=QStringLiteral("CoreUnavailable");return false;}
+        const auto epoch=m_epoch.load(),generation=++m_batchGeneration;
+        m_batchSnapshot={{"pending",true}};m_batchRefreshPending=true;
+        post([this,ids,url,epoch,generation](auto *engine){
+            QString error;
+            const auto snapshot=engine->probeNodes(ids,url,&error)?engine->probeNodesStatus():QJsonObject{{"ok",false},{"error",error}};
+            QMetaObject::invokeMethod(this,[this,snapshot,epoch,generation]{
+                if(epoch!=m_epoch||generation!=m_batchGeneration)return;
+                m_batchSnapshot=snapshot;m_batchRefreshPending=false;
+            },Qt::QueuedConnection);
+        });
+        return true;
     }
     QJsonObject probeNodesStatus() override {
-        QJsonObject snapshot;
-        QMetaObject::invokeMethod(m_context,[this,&snapshot]{
-            if(m_engine)snapshot=m_engine->probeNodesStatus();
-        },Qt::BlockingQueuedConnection);
-        return snapshot;
+        if(!m_batchRefreshPending){
+            m_batchRefreshPending=true;
+            const auto epoch=m_epoch.load(),generation=m_batchGeneration;
+            post([this,epoch,generation](auto *engine){
+                const auto snapshot=engine->probeNodesStatus();
+                QMetaObject::invokeMethod(this,[this,snapshot,epoch,generation]{
+                    if(epoch!=m_epoch||generation!=m_batchGeneration)return;
+                    m_batchSnapshot=snapshot;m_batchRefreshPending=false;
+                },Qt::QueuedConnection);
+            });
+        }
+        return m_batchSnapshot;
     }
-    void cancelProbeNodes() override {post([](auto *engine){engine->cancelProbeNodes();});}
+    void cancelProbeNodes() override {
+        ++m_batchGeneration;m_batchSnapshot={};m_batchRefreshPending=false;
+        post([](auto *engine){engine->cancelProbeNodes();});
+    }
     void configurationCommand(const QJsonObject &command) override {post([command](auto *engine){engine->configurationCommand(command);});}
     void lanCommand(const QJsonObject &command) override {post([command](auto *engine){engine->lanCommand(command);});}
     Status status() const override{return m_status;}
@@ -132,4 +151,7 @@ private:
     std::atomic<quint64> m_epoch{0};
     quint64 m_workerEpoch=0;
     quint64 m_workerProbeTag=0;
+    QJsonObject m_batchSnapshot;
+    quint64 m_batchGeneration=0;
+    bool m_batchRefreshPending=false;
 };

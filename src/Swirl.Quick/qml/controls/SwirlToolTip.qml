@@ -13,7 +13,7 @@ ToolTip {
     font.contextFontMerging: true
     font.preferTypoLineMetrics: true
     font.hintingPreference: Font.PreferFullHinting
-    SwirlFontBinding {
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding {
         target: control
         when: control.visible
         textRole: "auxiliary"

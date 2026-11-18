@@ -10,6 +10,7 @@ Menu {
     objectName:"swirlContextMenu"
     property point travelOrigin: Qt.point(-SwirlMotion.popupDistance*0.25,-SwirlMotion.popupDistance*0.5)
     property bool presentationReady:false
+    property Item retainedBackground:null
     Component.onCompleted:presentationReady=true
     Component.onDestruction:presentationReady=false
     function requestDismiss(){close()}
@@ -33,7 +34,7 @@ Menu {
     readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
     // Popup owns x/y placement (including screen clamping); translate its
     // visual content and background without changing pointer/keyboard grabs.
-    readonly property Binding contentMotionBinding: Binding {target:contextMenu.presentationReady?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady;restoreMode:Binding.RestoreBindingOrValue}
+    readonly property Binding contentMotionBinding: Binding {target:contextMenu.presentationReady && contextMenu.visible?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady && contextMenu.visible;restoreMode:Binding.RestoreBindingOrValue}
     readonly property Translate contentMotionTransform: Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     opacity:reveal.alpha
     onAboutToShow: {
@@ -44,6 +45,8 @@ Menu {
     enter:reveal.enterTransition
     exit:reveal.exitTransition
     background: SwirlCardSurface {
+        id:menuBackground
+        Component.onCompleted:contextMenu.retainedBackground=menuBackground
         floating: true
         transform: Translate { x: reveal.xOffset; y: reveal.yOffset }
         cornerRadius: Theme.menuRadius
@@ -57,7 +60,7 @@ Menu {
             required property int index
             required property var modelData
             objectName:"swirlContextOption-"+index
-            SwirlPressMotion{}
+            readonly property Item ownedPressMotion: SwirlPressMotion{parent:option}
             text: AppState.zh(String(modelData))
             height:Theme.dp(36)
             contentItem: SwirlText {

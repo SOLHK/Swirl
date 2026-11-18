@@ -12,7 +12,7 @@ Item {
     property string tab:"API 管理"
     property var routes:[]
     readonly property var tabs:["API 管理","命令行指令","Permissions","访问日志"]
-    SwirlArcMotion{id:tabMotion;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("本地控制 API");description:qsTr("准备请求草稿，查看接口接入状态。");metadata:qsTr("API 服务尚未启动")

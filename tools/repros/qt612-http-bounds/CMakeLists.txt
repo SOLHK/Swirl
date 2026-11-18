@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(QtHttpBounds LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 6.12 REQUIRED COMPONENTS Core Network Test)
+add_executable(QtHttpBounds main.cpp)
+target_link_libraries(QtHttpBounds PRIVATE Qt6::Network Qt6::Test)

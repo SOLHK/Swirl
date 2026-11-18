@@ -8,10 +8,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  # Only this repository's isolated TUN branch replaces stale/duplicate
-  # push + PR runs. Other branches retain their independent executions.
-  group: swirl-rust-${{ github.workflow }}-${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'native-tun-development' || github.run_id }}
-  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+  # Cancel superseded pull_request runs on the same PR while keeping all push
+  # runs on test/main independent and non-cancelling.
+  group: swirl-rust-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   portable-rust:
     strategy:
@@ -32,8 +32,17 @@ jobs:
           persist-credentials: false
       - name: Install stable Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Cache Cargo crate registry and git dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('core/Cargo.lock') }}
+          restore-keys: |
+            cargo-registry-${{ runner.os }}-
       - run: cargo fmt --all -- --check
-      - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --release --locked --workspace --lib --bins
@@ -48,7 +57,6 @@ jobs:
           cargo test --locked -p swirl-transport --features private-acceptance --lib egress::budget::tests
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
           cargo test --locked -p swirl-protocol --features private-acceptance --test anytls_private_guard
-          cargo check --locked -p swirl-api --features private-acceptance
           cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
       - name: Supervised private ledger and mandatory guarded worker
         shell: bash
@@ -583,8 +591,17 @@ jobs:
         run: ./tools/tests/Test-CodexNetworkEvidence.ps1
       - name: Install stable Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Cache Cargo crate registry and git dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('core/Cargo.lock') }}
+          restore-keys: |
+            cargo-registry-${{ runner.os }}-
       - run: cargo fmt --all -- --check
-      - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --release --locked --workspace --lib --bins
@@ -610,8 +627,6 @@ jobs:
           cargo test --locked -p swirl-transport --features private-acceptance --test private_tcp_quota
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p swirl-protocol --features private-acceptance --test anytls_private_guard
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo check --locked -p swirl-api --features private-acceptance
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p swirl-api --features private-acceptance --lib download_route::quota_tests
       - name: Verify Windows supervised private ledger and single-process Job

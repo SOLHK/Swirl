@@ -57,7 +57,7 @@ QString PrivateUiDnsTrust::apply(QJsonObject *dns) const {
 
 namespace {
 QString recoveryRequiredMessage(){
- return QStringLiteral("上次 TUN 网络恢复尚未确认，连接与测速保持停止。请退出 Swirl，运行安装目录中的 Swirl.exe --recover-tun，确认恢复成功后重新打开。");
+ return QStringLiteral("上次 TUN 网络恢复尚未确认。请点击“恢复网络”，授权恢复 Swirl 的网络设置后再连接。");
 }
 const QStringList &privateSubnets(){
  static const QStringList values{"127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","100.64.0.0/10","::1/128","fc00::/7","fe80::/10"};
@@ -65,6 +65,9 @@ const QStringList &privateSubnets(){
 }
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
  const auto error=SwirlRustDns::configuration(o.dnsConfig,output);if(!error.isEmpty())return error;
+ if(o.internalProbePhysicalEgress&&output->value("servers").toArray().isEmpty()){
+  const auto secure=SwirlRustDns::requireEncrypted(output);if(!secure.isEmpty())return secure;
+ }
 #ifdef SWIRL_PRIVATE_UI_QUOTA
  if(o.privateUiDnsTrust)return o.privateUiDnsTrust->apply(output);
 #endif
@@ -398,8 +401,10 @@ QString RustCoreEngine::configurationV2(const EngineStartOptions &options,const 
  auto base=options;base.policyDocument={};base.routingMode="global";base.directSession=true;base.smartRouting=false;base.tunEnabled=false;
  base.customGroups.clear();base.customRules.clear();QJsonObject config;
  const auto baseError=configuration(base,&config);if(!baseError.isEmpty())return baseError;
- if(options.tunEnabled&&config.value("dns").toObject().value("tls_servers").toArray().isEmpty())
-  return QStringLiteral("原生 TUN 需要加密 DNS。请先在 DNS 页面填写 DoH 或 DoT，并保存端点所需的精确 IP 映射。");
+ if(options.tunEnabled){
+  auto dns=config.value("dns").toObject();const auto error=SwirlRustDns::requireEncrypted(&dns);
+  if(!error.isEmpty())return error;config["dns"]=dns;
+ }
  QJsonArray nodes;QJsonObject sources;
  auto ordered=referenced.values();std::sort(ordered.begin(),ordered.end());
  for(const auto &id:ordered){
@@ -476,6 +481,7 @@ bool RustCoreEngine::recoverTunConnection(QString *error){
  m_handle=0;m_status.tunEnabled=false;return true;
 }
 void RustCoreEngine::resetProbeState(){
+ m_status.probeRequestRttMs=-1;
  m_probeRequestId=0;m_probeFailureStage.clear();m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
  m_status.probeFailureCode.clear();
  m_status.nodeBusy=false;m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
@@ -486,6 +492,7 @@ void RustCoreEngine::cancelProbe(){
  resetProbeState();
 }
 void RustCoreEngine::failProbe(const QString &stage,const QString &code,int httpStatus){
+ m_status.probeRequestRttMs=-1;
  m_probeRequestId=0;m_probeFailureStage=stage;m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
  m_status.probeFailureCode=code;
  m_status.nodeBusy=false;m_status.requestState=RequestState::Failed;
@@ -509,16 +516,18 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
  if(state=="succeeded"){
   const auto metrics=probe.value("metrics").toObject();
   const auto elapsed=metrics.value("response_headers_ms").toInteger(-1);
+  const auto rtt=metrics.value("request_rtt_ms").toInteger(-1);
   const auto outbound=metrics.value("outbound_connect_ms").toInteger(-1);
   const auto tlsValue=metrics.value("origin_tls_ms");
   const auto originTls=tlsValue.isNull()?-1:tlsValue.toInteger(-1);
   const auto code=metrics.value("http_status").toInt();
-  if(elapsed<0||elapsed>std::numeric_limits<int>::max()||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
+  if(elapsed<0||elapsed>std::numeric_limits<int>::max()||rtt<0||rtt>elapsed||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
   m_probeRequestId=0;m_probeFailureStage.clear();m_status.nodeBusy=false;
   m_status.probeFailureCode.clear();
   m_probeOutboundConnectMs=outbound;m_probeOriginTlsMs=originTls;
   m_status.requestState=RequestState::Succeeded;m_status.nodeHealth=NodeHealth::Available;
   m_status.latencyMs=int(elapsed);m_status.responseCode=code;
+  m_status.probeRequestRttMs=rtt;
   m_status.nodeMessage=QStringLiteral("Rust HEAD 响应首部已接收");return;
  }
  if(state=="failed"){
@@ -638,7 +647,8 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   m_brokerSession=true;
  }
  auto request=QJsonObject{{"control_schema",2},{"op","start_v2"},{"request_id",options.configurationRequestId},
-  {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate}};
+  {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate},
+  {"native_tun_startup",options.tunEnabled}};
  if(!options.configurationDigest.isEmpty())request.insert("plan_digest",options.configurationDigest);
  const auto response=call(request);
  if(!response.value("ok").toBool()){if(m_tunBroker.close())m_brokerSession=false;fail(Error::ConfigurationFailed,response.value("error").toString(response.value("code").toString("ConfigurationRejected")));return;}
@@ -670,7 +680,11 @@ void RustCoreEngine::startV2(const EngineStartOptions &options){
   const auto result=call(request);
   if(!result.value("ok").toBool()){
    const auto error=result.value("error").toString("TunStartRejected");
-   stop();fail(Error::ConfigurationFailed,QStringLiteral("原生 TUN 启动未完成：")+error);return;
+   stop();
+   const bool unconfirmed=m_handle||m_brokerSession||m_tunRecoveryRequired;
+   if(unconfirmed)m_tunRecoveryRequired=true;
+   const auto recovery=unconfirmed?QStringLiteral("；网络恢复未确认：")+m_status.message:QString();
+   fail(unconfirmed?Error::OwnershipFailed:Error::ConfigurationFailed,QStringLiteral("原生 TUN 启动未完成：")+error+recovery);return;
   }
  }
  const auto target=options.policyDocument.value("default_policy").toObject().value("target").toObject();
@@ -700,6 +714,7 @@ void RustCoreEngine::configurationCommand(const QJsonObject &input){
  }
  const auto result=call(request);
  if(result.value("ok").toBool()){
+  if(op=="activate_configuration_v2"||op=="rollback_configuration_v2")cancelProbe();
   if(op=="prepare_configuration_v2"){
    m_previousPolicy=m_options.policyDocument;m_preparedPolicy=request.value("candidate").toObject().value("policy").toObject();m_configurationRollback=false;
   }else if(op=="rollback_configuration_v2")m_configurationRollback=true;
@@ -778,6 +793,21 @@ void RustCoreEngine::stop(){
  }
  m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
  m_status.state=m_tunRecoveryRequired?State::Failed:State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
+}
+void RustCoreEngine::recoverTunNetwork(){
+ if(m_handle||m_brokerSession||m_tunBroker.running()){
+  emit tunRecoveryFinished(false,QStringLiteral("请先停止当前 Swirl 会话，再恢复网络。"));return;
+ }
+ QString error;
+ const bool recovered=recoverNativeTunForMaintenance(&error)==0;
+ m_tunRecoveryState=nativeTunRecoveryState();
+ m_tunRecoveryRequired=!recovered||m_tunRecoveryState!=NativeTunRecoveryState::Clear;
+ if(m_tunRecoveryRequired){
+  fail(Error::OwnershipFailed,QStringLiteral("TUN 网络恢复仍未确认：")+error);
+  emit tunRecoveryFinished(false,m_status.message);return;
+ }
+ m_status={};m_status.message=QStringLiteral("Swirl 的 TUN 网络状态已恢复，可以重新连接。");
+ emit statusChanged();emit tunRecoveryFinished(true,m_status.message);
 }
 void RustCoreEngine::refresh(){
  if(!m_handle)return;
@@ -891,6 +921,10 @@ void RustCoreEngine::setRoutingMode(const QString &mode){
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","RoutingFailed",result["error"].toString());emit statusChanged();return;}
  m_options=options;m_status.mode=mode;m_status.directSession=options.directSession||mode=="direct";refresh();
 }
+void RustCoreEngine::probeNodeTagged(const QUrl &url,quint64 tag){
+ if(!m_status.apiHealthy||m_status.nodeBusy){emit probeRequestRejected(tag,m_status.nodeBusy?QStringLiteral("probe-busy"):QStringLiteral("core-unavailable"));return;}
+ m_status.probeRequestTag=tag;probeNode(url);
+}
 void RustCoreEngine::probeNode(const QUrl &url){
  if(!m_handle||m_probeRequestId)return;
  const auto text=url.toString(QUrl::FullyEncoded);
@@ -923,7 +957,7 @@ bool RustCoreEngine::probeNodes(const QStringList &ids,const QUrl &url,QString *
  // One bounded concurrent sweep inside the already-running core. Nothing is
  // selected and no per-node engine is created.
  const auto response=call({{"op","probe_nodes"},{"handle",qint64(m_handle)},{"nodes",nodes},
-   {"url",text},{"timeout_ms",5000},{"concurrency",16}});
+   {"url",text},{"timeout_ms",8000},{"concurrency",64},{"physical_egress",m_options.internalProbePhysicalEgress}});
  if(!response.value("ok").toBool()){
   if(error)*error=response.value("error").toString("ProbeNodesFailed");return false;
  }

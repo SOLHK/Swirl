@@ -10,7 +10,7 @@ pub use association::{Association, DNS_IPV4, DNS_IPV6, Mapping, RecordKind, TUN_
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, Weak},
     time::{Duration, Instant},
 };
 use std::{future::Future, pin::Pin};
@@ -48,6 +48,8 @@ impl QueryTransport for DirectQueryTransport {
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
 type EndpointGuard = Arc<dyn Fn(SocketAddr) -> bool + Send + Sync>;
+type SharedAnswer = Result<Vec<IpAddr>, &'static str>;
+type QueryGates = HashMap<String, Weak<tokio::sync::Mutex<Option<SharedAnswer>>>>;
 #[cfg(all(test, windows))]
 #[path = "physical_probe_tests.rs"]
 mod physical_probe_tests;
@@ -61,6 +63,7 @@ const FAILURE_TTL: Duration = Duration::from_secs(1);
 pub struct Resolver {
     query_family: DnsQueryFamily,
     cache: Arc<Mutex<Cache>>,
+    query_gates: Arc<Mutex<QueryGates>>,
     pinned: Option<(String, Vec<IpAddr>)>,
     endpoint_guard: Option<EndpointGuard>,
     permits: Arc<Semaphore>,
@@ -74,6 +77,7 @@ impl Default for Resolver {
         Self {
             query_family: DnsQueryFamily::Dual,
             cache: Arc::new(Mutex::new(HashMap::new())),
+            query_gates: Arc::new(Mutex::new(HashMap::new())),
             pinned: None,
             endpoint_guard: None,
             permits: Arc::new(Semaphore::new(8)),
@@ -112,36 +116,94 @@ impl Resolver {
         if let Some(answer) = self.cached(&key, port)? {
             return answer;
         }
-        let _permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
-            .await
-            .map_err(|_| "DnsBusy")?
-            .map_err(|_| "DnsStopped")?;
-        if let Some(answer) = self.cached(&key, port)? {
-            return answer;
-        }
-        self.check_configured_endpoints()?;
-        let started = Instant::now();
-        let resolution = timeout(
-            Duration::from_secs(3),
-            dot::resolve_with_transport(&self.tls_servers, host, self.query_family, transport),
-        )
-        .await
-        .unwrap_or(Err("DnsTimeout"))
-        .map_err(|error| self.remember_failure(key.clone(), error))?;
-        let expires = started + Duration::from_secs(u64::from(resolution.ttl));
-        if expires > Instant::now() {
-            let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
-            if cache.len() >= 256 {
-                cache.clear();
+        // A routed DNS lookup may bootstrap its proxy using resolve() on this
+        // same resolver and hostname. These are separate in-flight domains.
+        self.share_query(&format!("routed:{key}"), port, async {
+            if let Some(answer) = self.cached(&key, port)? {
+                return answer;
             }
-            cache.insert(key, (expires, resolution.outcome.clone()));
-        }
-        resolution.outcome.for_port(port)
+            let _permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
+                .await
+                .map_err(|_| "DnsBusy")?
+                .map_err(|_| "DnsStopped")?;
+            if let Some(answer) = self.cached(&key, port)? {
+                return answer;
+            }
+            self.check_configured_endpoints()?;
+            let started = Instant::now();
+            let resolution = timeout(
+                Duration::from_secs(3),
+                dot::resolve_with_transport(&self.tls_servers, host, self.query_family, transport),
+            )
+            .await
+            .unwrap_or(Err("DnsTimeout"))
+            .map_err(|error| self.remember_failure(key.clone(), error))?;
+            let expires = started + Duration::from_secs(u64::from(resolution.ttl));
+            if expires > Instant::now() {
+                let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
+                if cache.len() >= 256 {
+                    cache.clear();
+                }
+                cache.insert(key.clone(), (expires, resolution.outcome.clone()));
+            }
+            resolution.outcome.for_port(port)
+        })
+        .await
     }
     fn cached(&self, key: &str, port: u16) -> Result<Option<Lookup>, &'static str> {
         let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
         cache.retain(|_, (expires, _)| *expires > Instant::now());
         Ok(cache.get(key).map(|(_, outcome)| outcome.for_port(port)))
+    }
+
+    // Subscriptions commonly share one server hostname. Wait for that lookup
+    // before taking a global DNS slot, so unrelated hosts can still progress.
+    // Weak entries and an explicit cap bound storage. Cancellation drops the
+    // owned guard, allowing the next waiter to perform the query.
+    async fn share_query<F: Future<Output = Lookup>>(
+        &self,
+        key: &str,
+        port: u16,
+        query: F,
+    ) -> Lookup {
+        let gate = {
+            let mut gates = self.query_gates.lock().map_err(|_| "DnsState")?;
+            gates.retain(|_, gate| gate.strong_count() > 0);
+            if let Some(gate) = gates.get(key).and_then(Weak::upgrade) {
+                gate
+            } else {
+                if gates.len() >= 256 {
+                    return Err("DnsBusy");
+                }
+                let gate = Arc::new(tokio::sync::Mutex::new(None));
+                gates.insert(key.to_owned(), Arc::downgrade(&gate));
+                gate
+            }
+        };
+        let mut completed = timeout(Duration::from_secs(6), gate.clone().lock_owned())
+            .await
+            .map_err(|_| "DnsBusy")?;
+        if let Some(answer) = completed.as_ref() {
+            return answer
+                .as_ref()
+                .map(|ips| ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect())
+                .map_err(|error| *error);
+        }
+        let result = query.await;
+        if let Ok(addresses) = &result {
+            *completed = Some(Ok(addresses.iter().map(SocketAddr::ip).collect()));
+        }
+        // Already registered waiters share even a zero-TTL answer. New callers
+        // must resolve again if no durable cache entry is valid.
+        let mut gates = self.query_gates.lock().map_err(|_| "DnsState")?;
+        if gates
+            .get(key)
+            .and_then(Weak::upgrade)
+            .is_some_and(|current| Arc::ptr_eq(&current, &gate))
+        {
+            gates.remove(key);
+        }
+        result
     }
 
     fn remember_failure(&self, key: String, error: &'static str) -> &'static str {
@@ -192,6 +254,7 @@ impl Resolver {
         Self {
             query_family: DnsQueryFamily::Dual,
             cache: Arc::new(Mutex::new(HashMap::new())),
+            query_gates: Arc::new(Mutex::new(HashMap::new())),
             pinned: None,
             endpoint_guard: None,
             permits: self.permits.clone(),
@@ -223,6 +286,7 @@ impl Resolver {
         Self {
             query_family: self.query_family,
             cache: self.cache.clone(),
+            query_gates: self.query_gates.clone(),
             pinned: Some((host.to_ascii_lowercase(), addresses)),
             endpoint_guard: self.endpoint_guard.clone(),
             permits: self.permits.clone(),
@@ -311,71 +375,77 @@ impl Resolver {
         if let Some(result) = self.cached(&key, port)? {
             return result;
         }
-        let permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
-            .await
-            .map_err(|_| "DnsBusy")?
-            .map_err(|_| "DnsStopped")?;
-        // Another query may have finished while this one waited for capacity.
-        if let Some(result) = self.cached(&key, port)? {
-            return result;
-        }
-        if !self.servers.is_empty() || !self.tls_servers.is_empty() {
-            let _permit = permit;
-            self.check_configured_endpoints()?;
-            let started = Instant::now();
-            let resolution = async {
-                if self.tls_servers.is_empty() {
-                    wire::resolve(&self.servers, host, self.query_family).await
-                } else {
-                    dot::resolve(&self.tls_servers, host, self.query_family).await
-                }
-            };
-            let answer = timeout(Duration::from_secs(3), resolution)
-                .await
-                .unwrap_or(Err("DnsTimeout"))
-                .map_err(|error| self.remember_failure(key.clone(), error))?;
-            let expires = started + Duration::from_secs(u64::from(answer.ttl));
-            if expires > Instant::now() {
-                let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
-                if cache.len() >= 256 {
-                    cache.clear();
-                }
-                cache.insert(key, (expires, answer.outcome.clone()));
+        self.share_query(&key, port, async {
+            if let Some(result) = self.cached(&key, port)? {
+                return result;
             }
-            return answer.outcome.for_port(port);
-        }
-        // Keep the permit until the underlying OS lookup actually finishes even
-        // if the caller times out/cancels. This bounds detached blocking lookups.
-        // Mark this unmetered path before spawning: a later guard installation
-        // must not race a detached OS resolver that is already running.
-        swirl_transport::egress::check_unmetered_egress()
-            .map_err(|_| "DnsPrivateMeteredResolverRequired")?;
-        let host = host.to_owned();
-        let lookup = tokio::spawn(async move {
-            let _permit = permit;
-            lookup_host((host, port))
+            let permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
                 .await
-                .map(|a| a.take(16).map(|address| address.ip()).collect::<Vec<_>>())
-        });
-        let addresses = timeout(Duration::from_secs(3), lookup)
-            .await
-            .map_err(|_| "DnsTimeout")
-            .and_then(|result| result.map_err(|_| "DnsTask"))
-            .and_then(|result| result.map_err(|_| "DnsLookupFailed"))
-            .map_err(|error| self.remember_failure(key.clone(), error))?;
-        if addresses.is_empty() {
-            return Err("DnsEmpty");
-        }
-        let outcome = wire::Outcome::Addresses(addresses);
-        let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
-        if cache.len() >= 256 {
-            cache.clear();
-        }
-        cache.insert(
-            key,
-            (Instant::now() + Duration::from_secs(30), outcome.clone()),
-        );
-        outcome.for_port(port)
+                .map_err(|_| "DnsBusy")?
+                .map_err(|_| "DnsStopped")?;
+            // Another query may have finished while this one waited for capacity.
+            if let Some(result) = self.cached(&key, port)? {
+                return result;
+            }
+            if !self.servers.is_empty() || !self.tls_servers.is_empty() {
+                let _permit = permit;
+                self.check_configured_endpoints()?;
+                let started = Instant::now();
+                let resolution = async {
+                    if self.tls_servers.is_empty() {
+                        wire::resolve(&self.servers, host, self.query_family).await
+                    } else {
+                        dot::resolve(&self.tls_servers, host, self.query_family).await
+                    }
+                };
+                let answer = timeout(Duration::from_secs(3), resolution)
+                    .await
+                    .unwrap_or(Err("DnsTimeout"))
+                    .map_err(|error| self.remember_failure(key.clone(), error))?;
+                let expires = started + Duration::from_secs(u64::from(answer.ttl));
+                if expires > Instant::now() {
+                    let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
+                    if cache.len() >= 256 {
+                        cache.clear();
+                    }
+                    cache.insert(key.clone(), (expires, answer.outcome.clone()));
+                }
+                return answer.outcome.for_port(port);
+            }
+            // Keep the permit until the underlying OS lookup actually finishes even
+            // if the caller times out/cancels. This bounds detached blocking lookups.
+            // Mark this unmetered path before spawning: a later guard installation
+            // must not race a detached OS resolver that is already running.
+            swirl_transport::egress::check_unmetered_egress()
+                .map_err(|_| "DnsPrivateMeteredResolverRequired")?;
+            let host = host.to_owned();
+            let lookup = tokio::spawn(async move {
+                let _permit = permit;
+                lookup_host((host, port))
+                    .await
+                    .map(|a| a.take(16).map(|address| address.ip()).collect::<Vec<_>>())
+            });
+            let addresses = timeout(Duration::from_secs(3), lookup)
+                .await
+                .map_err(|_| "DnsTimeout")
+                .and_then(|result| result.map_err(|_| "DnsTask"))
+                .and_then(|result| result.map_err(|_| "DnsLookupFailed"))
+                .map_err(|error| self.remember_failure(key.clone(), error))?;
+            if addresses.is_empty() {
+                return Err("DnsEmpty");
+            }
+            let outcome = wire::Outcome::Addresses(addresses);
+            let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
+            if cache.len() >= 256 {
+                cache.clear();
+            }
+            cache.insert(
+                key.clone(),
+                (Instant::now() + Duration::from_secs(30), outcome.clone()),
+            );
+            outcome.for_port(port)
+        })
+        .await
     }
 }
 

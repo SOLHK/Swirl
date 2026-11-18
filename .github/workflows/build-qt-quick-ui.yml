@@ -15,12 +15,10 @@ env:
   SWIRL_QT_VERSION: '6.12.0'
 
 concurrency:
-  # Keep retries of older PR #61 heads separate from the candidate under test.
-  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.repository == 'SOLHK/Swirl' && github.event.pull_request.number == 61 && github.base_ref == 'test' && format('-{0}', github.event.pull_request.head.sha) || '' }}
-  # The isolated network development PRs replace only their own obsolete
-  # builds. An old icon-tool stall must not keep the corrected installer queued.
-  # Other product branches retain their cache and installer evidence unchanged.
-  cancel-in-progress: ${{ contains(fromJSON('["work/native-tun-windows-20261030-isolated", "work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031", "work/node-probe-render-20261105"]'), github.head_ref || github.ref_name) }}
+  # Cancel superseded pull_request runs on the same PR while keeping all push
+  # runs on test/main independent and non-cancelling.
+  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-qt-ui:
@@ -394,6 +392,8 @@ jobs:
             if (Test-Path -LiteralPath $oldBootstrap -PathType Leaf) { Remove-Item -LiteralPath $oldBootstrap -Force }
           }
           ./scripts/Copy-VerifiedMsvcRuntime.ps1 -BuildDirectory build/swirl-quick -ApplicationDirectory dist
+          python tools/Compose-Qt612ProductSdk.py verify-msvc --receipt $env:SWIRL_QT_SELECTED_RECEIPT --runtime-dir "$env:GITHUB_WORKSPACE/dist" --evidence "$env:GITHUB_WORKSPACE/build-evidence/qt-product-qa-crt"
+          if ($LASTEXITCODE -ne 0) { throw 'Deployed QA MSVC runtime differs from the selected Network producer toolchain.' }
           if ((Get-FileHash -LiteralPath 'dist/Swirl.exe' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/Swirl.exe' -Algorithm SHA256).Hash) { throw 'Test runtime CRT deployment requires the exact verified application.' }
           $msvc = Get-Content -LiteralPath 'dist/msvc-runtime.json' -Raw -Encoding UTF8 | ConvertFrom-Json
           foreach ($entry in $msvc.files.PSObject.Properties) {
@@ -821,6 +821,8 @@ jobs:
         with:
           name: Swirl-Node-Regression-Evidence
           path: |
+            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
+            build/swirl-quick/Release/Swirl-node-ui-native-diagnostics.txt
             build-evidence/critical-ui.xml
             build-evidence/critical-network.xml
             build-evidence/node-diagnostic-regression.xml

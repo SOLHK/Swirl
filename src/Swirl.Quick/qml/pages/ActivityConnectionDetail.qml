@@ -38,7 +38,7 @@ Item {
         {label: qsTr("默认策略出口"), value: policyName},
         {label: qsTr("内核运行时长"), value: uptime},
         {label: qsTr("系统代理"), value: engineController.systemProxy.enabled ? engineController.systemProxy.owned ? qsTr("由 Swirl 接管") : qsTr("由其他应用设置") : qsTr("未开启")},
-        {label: qsTr("TUN"), value: engineController.tunEnabled ? qsTr("已开启") : qsTr("未开启")},
+        {label: qsTr("TUN"), value: engineController.tunRecoveryBusy ? qsTr("恢复中") : engineController.tunRecoveryRequired ? qsTr("需要恢复上次 TUN 网络") : engineController.tunBusy ? qsTr("切换中") : engineController.tunEnabled ? qsTr("已开启") : engineController.tunRequested ? qsTr("待启用") : qsTr("未开启")},
         {label: qsTr("内核 API"), value: engineController.apiHealthy ? qsTr("正常") : engineController.processAlive ? qsTr("尚未就绪") : qsTr("未运行")}
     ]
     function refreshNetwork() { if (visible && updatesEnabled) network = systemProvider.currentNetwork() }

@@ -18,7 +18,7 @@ Item {
  readonly property var processes:{if(!visible)return [];let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
- SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
+ readonly property Item ownedDetailClock: SwirlTransitionCoordinator {id:detailClock;parent:page;duration:SwirlMotion.dialogDuration}
  readonly property var selected:processes.find(r=>r.id===selectedId)||null
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap

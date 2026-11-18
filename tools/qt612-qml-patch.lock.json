@@ -110,7 +110,19 @@
     "preimage_sha256": "574d2d3d973a78cc6b3cb214069148dae5d0563d2c53c8602015f4735ee52780",
     "postimage_sha256": "baa35a86e41990d2b5170d0ac426a837c77a08148f69c35a88e80a8f2e1a1525",
     "added_lines": 15,
-    "deleted_lines": 7
+    "deleted_lines": 7,
+    "additional": [
+      {
+        "upstream_commit": "4c1054b0f997f2977a54d42523856805b309db9a",
+        "path": "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff",
+        "sha256": "ebec9ba5a71d73b1be29aa4fcd4e0d45a79f2967063e96327f70dcdceeb36d22",
+        "production_path": "src/qml/jit/qv4baselinejit.cpp",
+        "preimage_sha256": "703d72c6cd9ef3dc3a23ad5cbc9c39ed8007d5a67980cc9cd068585d783c1456",
+        "postimage_sha256": "f0d4350042403b6a131cf4b30e9806276e61bafb9f46047f15d676fab67a02a4",
+        "added_lines": 3,
+        "deleted_lines": 2
+      }
+    ]
   },
   "build": {
     "configuration": "Release",
@@ -128,7 +140,7 @@
     "image": "vctip.exe",
     "msvc_tools_version": "14.44.35207",
     "bytes": 335288,
-    "sha256": "d591358c6aee4b673562ca3b3a15c250e612708394fe3b44a7a7eda2470570a5",
+    "sha256": "c344a9dba77c62d271abb0a982486cfc9ae26b1f96dda6f5ec02703ff55526e6",
     "maximum_survivors": 1,
     "grace_seconds": 2,
     "proof_seconds": 5,

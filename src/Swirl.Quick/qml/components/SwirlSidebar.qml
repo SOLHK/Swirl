@@ -10,6 +10,7 @@ Item {
  property int geometryRevision:0
  property var entries:({})
  property Item backdropSource:null
+ property bool previewProfile:false
  readonly property Item glassSurface:floatingBackground
  readonly property bool glassSampled:liquidGlass.sampled
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
@@ -20,7 +21,7 @@ Item {
   x:Theme.shellInset;y:Theme.shellInset
   width:sidebar.width-2*Theme.shellInset;height:sidebar.height-2*Theme.shellInset
   readonly property real radius:Theme.sidebarRadius
-  SwirlInteractionMotion {id:materialResponse;hovered:glassHover.hovered;pressed:sidebar.selectedEntry && sidebar.selectedEntry.down;focused:sidebar.selectedEntry && sidebar.selectedEntry.visualFocus}
+  readonly property Item ownedMaterialResponse: SwirlInteractionMotion {id:materialResponse;parent:floatingBackground;hovered:glassHover.hovered;pressed:sidebar.selectedEntry && sidebar.selectedEntry.down;focused:sidebar.selectedEntry && sidebar.selectedEntry.visualFocus}
   HoverHandler {id:glassHover}
   SwirlLiquidGlass {
    id:liquidGlass
@@ -41,8 +42,8 @@ Item {
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }
- SwirlArcMotion {
-  id:selectionMotion;objectName:"sidebarArcMotion"
+ readonly property Item ownedSelectionMotion: SwirlArcMotion {
+  id:selectionMotion;parent:sidebar;objectName:"sidebarArcMotion"
   bend:Math.min(SwirlMotion.navigationArc,Theme.dp(7))
   targetX:Theme.dp(20)
   targetY:{sidebar.geometryRevision;sidebar.height;Theme.uiScale;const item=sidebar.selectedEntry;if(!item)return 0;item.y;return item.mapToItem(sidebar,0,0).y}
@@ -56,8 +57,8 @@ Item {
   y:selectionMotion.position.y
   color:sidebar.selectedEntry && sidebar.selectedEntry.down?Theme.navigationPressed:Theme.navigationSelected
   scale:sidebar.selectedEntry && sidebar.selectedEntry.down?SwirlMotion.pressScale:1
-  Behavior on scale {NumberAnimation {duration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
-  Behavior on color {ColorAnimation {duration:SwirlMotion.pressDuration}}
+  Behavior on scale {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
+  Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.pressDuration}}
  }
  property bool compactByWindow:false
  readonly property bool effectivelyCollapsed:AppState.sidebarCollapsed || compactByWindow
@@ -65,7 +66,7 @@ Item {
  readonly property real expansion:widthClock.progress
  readonly property real animatedWidth:Theme.sidebarCollapsedWidth+(Theme.sidebarWidth-Theme.sidebarCollapsedWidth)*expansion
  property bool initialized:false
- SwirlTransitionCoordinator {id:widthClock;progress:1;destination:1;duration:SwirlMotion.expandDuration}
+ readonly property Item ownedWidthClock: SwirlTransitionCoordinator {id:widthClock;parent:sidebar;progress:1;destination:1;duration:SwirlMotion.expandDuration}
  onEffectivelyCollapsedChanged:{
   if(!initialized)return
   widthClock.moveTo(effectivelyCollapsed?0:1)
@@ -86,7 +87,7 @@ Item {
  SwirlText {
   objectName:"engineIdentityLabel"
   x:Theme.dp(26);y:Theme.dp(62);width:sidebar.width-Theme.dp(52)
-  text:engineController.engineIdentityLabel
+  text:sidebar.previewProfile?qsTr("独立预览 · v%1").arg(Qt.application.version):engineController.engineIdentityLabel
   visible:sidebar.expansion>0.6;opacity:Math.max(0,(sidebar.expansion-0.6)/0.4)
   color:Theme.muted;font.pixelSize:Theme.fontSize(11)
   elide:Text.ElideRight

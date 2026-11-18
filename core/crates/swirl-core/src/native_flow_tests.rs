@@ -1298,6 +1298,91 @@ fn automatic_health_config(proxy: SocketAddr) -> RuntimeConfig {
     candidate
 }
 
+#[test]
+fn native_startup_blocks_reconnecting_clients_and_health_jobs_until_capture_is_ready() {
+    let runtime = runtime();
+    let proxy = runtime
+        .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+        .unwrap();
+    let mut core = Core::start_for_native_tun(
+        automatic_health_config(proxy.local_addr().unwrap()),
+        STORE.into(),
+        1,
+        START.into(),
+    )
+    .unwrap();
+    assert_eq!(
+        core.finish_native_tun_start(),
+        Err("TunStartupLeaseRequired")
+    );
+    assert!(matches!(
+        core.probe_start("http://127.0.0.1:9/".into(), None, None),
+        Err("TunStartupPending")
+    ));
+    assert!(matches!(
+        core.probe_nodes(vec![], "http://127.0.0.1:9/".into(), None, None, None),
+        Err("TunStartupPending")
+    ));
+    runtime.block_on(async {
+        // Real applications can reconnect to the same port as soon as it binds.
+        // They must not create resolver generations before the first TUN lease.
+        for _ in 0..8 {
+            let mut client = tokio::net::TcpStream::connect(core.address())
+                .await
+                .unwrap();
+            let mut byte = [0];
+            let read = timeout(Duration::from_secs(2), client.read(&mut byte))
+                .await
+                .unwrap();
+            assert!(matches!(read, Ok(0)) || read.is_err());
+        }
+        assert!(
+            timeout(Duration::from_millis(100), proxy.accept())
+                .await
+                .is_err()
+        );
+        assert_eq!(core.snapshot().unwrap()["active"], 0);
+        assert_eq!(core.snapshot().unwrap()["accepted"], 0);
+        let lease = core.prepare_native_tun().unwrap();
+        core.finish_native_tun_start().unwrap();
+        core.finish_native_tun_start().unwrap();
+        let (mut health, _) = timeout(Duration::from_secs(3), proxy.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut request = Vec::new();
+        timeout(Duration::from_secs(3), async {
+            while !request.ends_with(b"\r\n\r\n") {
+                assert!(request.len() < 8192);
+                request.push(health.read_u8().await.unwrap());
+            }
+        })
+        .await
+        .unwrap();
+        assert!(request.starts_with(b"CONNECT health.fixture.invalid:80 HTTP/1.1\r\n"));
+        health
+            .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        drop(lease);
+    });
+    core.stop();
+}
+
+#[test]
+fn cancelled_native_startup_releases_listener_without_starting_network_jobs() {
+    let mut core = Core::start_for_native_tun(config(), STORE.into(), 1, START.into()).unwrap();
+    let address = core.address();
+    core.stop();
+    let _replacement = std::net::TcpListener::bind(address).unwrap();
+    let mut plaintext = config();
+    plaintext.dns.tls_servers.clear();
+    assert!(matches!(
+        Core::start_for_native_tun(plaintext, STORE.into(), 1, START.into()),
+        Err("DnsEncryptedUpstreamRequired")
+    ));
+}
+
 fn blocked_automatic_health() -> (Core, tokio::runtime::Runtime, tokio::net::TcpStream) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();

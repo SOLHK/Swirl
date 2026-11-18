@@ -70,7 +70,7 @@ Item {
   const current=currentRect(),currentReveal=reveal;configuring=true;clock.stop();fromRect=current;fromReveal=currentReveal;toReveal=opened?1:0
   toRect=opened?destination:sourceRect(sourceRow);clock.progress=0;clock.moveTo(1);configuring=false
  }
- SwirlTransitionCoordinator {id:clock;duration:SwirlMotion.expandDuration
+ readonly property Item ownedClock: SwirlTransitionCoordinator {id:clock;parent:transfer;duration:SwirlMotion.expandDuration
   onMovingChanged:if(!moving&&!transfer.configuring&&!transfer.opened&&transfer.sourceRow&&transfer.sourceRow.visible)transfer.sourceRow.forceActiveFocus()
  }
  Component.onCompleted:{clock.destination=1;clock.finish()}

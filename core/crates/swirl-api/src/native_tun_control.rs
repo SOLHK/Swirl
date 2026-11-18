@@ -199,6 +199,11 @@ fn execute(controller: &mut Controller, command: Command) -> Result<Value> {
                     .ok_or("UnknownHandle")?
                     .flow_dispatcher()?;
                 let session = super::native_windows::NativeSession::start(dispatcher, config)?;
+                controller
+                    .cores_v2
+                    .get(&handle)
+                    .ok_or("UnknownHandle")?
+                    .finish_native_tun_start()?;
                 let status = session.status();
                 controller.native_sessions.insert(handle, session);
                 Ok(status)

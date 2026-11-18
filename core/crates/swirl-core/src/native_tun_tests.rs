@@ -1369,7 +1369,21 @@ fn failed_udp_tuple_requires_full_idle_before_readmission(v6: bool) {
             .unwrap();
         until(|| core.snapshot().unwrap()["upload"] == 14).await;
         let mut buffer = [0; 64];
-        let (size, _) = trap.recv_from(&mut buffer).unwrap();
+        let deadline = std::time::Instant::now() + WAIT;
+        let size = loop {
+            match trap.recv_from(&mut buffer) {
+                Ok((size, _)) => break size,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "readmitted UDP datagram was not delivered to loopback peer before deadline"
+                    );
+                    std::thread::yield_now();
+                    tokio::task::yield_now().await;
+                }
+                Err(error) => panic!("unexpected UDP loopback receive error: {error}"),
+            }
+        };
         assert_eq!(&buffer[..size], b"new-after-idle");
         assert_eq!(core.snapshot().unwrap()["accepted"], 2);
         assert_eq!(stats.udp_failures.load(Ordering::Relaxed), 1);

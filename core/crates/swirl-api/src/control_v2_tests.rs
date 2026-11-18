@@ -46,6 +46,19 @@ fn offline_validation_is_pure_and_draft_default_is_not_a_listener() {
     );
 }
 #[test]
+fn native_startup_barrier_is_helper_only_and_keeps_normal_start_compatible() {
+    let mut controller = Controller::default();
+    let denied = call(
+        &mut controller,
+        json!({"control_schema":2,"op":"start_v2","request_id":START,
+        "store_id":STORE,"saved_revision":"1","candidate":candidate(),"native_tun_startup":true}),
+    );
+    assert_eq!(denied["error"], "TunHelperRequired");
+    assert_eq!(controller.cores_v2.len(), 0);
+    let started = start(&mut controller);
+    assert_eq!(started["ok"], true);
+}
+#[test]
 fn activation_requires_durable_finish_and_returns_actual_revision() {
     let mut controller = Controller::default();
     let started = start(&mut controller);

@@ -8,6 +8,7 @@ import "components"
 import "controls"
 import "pages"
 ApplicationWindow {
+    property bool previewProfile:false
     id:window
     readonly property var engineControllerContext: engineController
     readonly property var systemProviderContext: systemProvider
@@ -27,7 +28,7 @@ ApplicationWindow {
     minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
-    SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
     palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
@@ -116,7 +117,7 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource;previewProfile:window.previewProfile }
         SwirlWindowControls {
             id:windowControls;objectName:"windowControls";z:90
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
@@ -148,15 +149,15 @@ ApplicationWindow {
                 SwirlStatusCapsule {
                     id: tunCapsule; objectName: "tunCapsule"
                     Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
-                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 待启用") : qsTr("TUN · 未开启")
-                    detail: engineController.routingError || (engineController.tunEnabled
-                        ? qsTr("TUN 模式已开启，关闭代理后可切换模式") : engineController.tunSupported ? qsTr("先配置加密 DNS，再选择 TUN；开启代理时将请求管理员授权。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
-                    tone: engineController.tunEnabled ? "success" : "neutral"
-                    enabled: !engineController.busy
-                    onClicked: {
-                        if (!engineController.setTunEnabled(!engineController.tunRequested))
-                            AppState.notice(engineController.routingError || engineController.networkConfigurationError)
-                    }
+                    label: engineController.tunRecoveryBusy ? qsTr("TUN · 恢复中") : engineController.tunRecoveryRequired ? qsTr("TUN · 需恢复") : engineController.tunBusy ? qsTr("TUN · 切换中") : engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 取消待启用") : qsTr("TUN · 未开启")
+                    detail: engineController.routingError || (engineController.tunRecoveryBusy
+                        ? qsTr("正在恢复上次 TUN 接管的网络设置。") : engineController.tunRecoveryRequired
+                        ? qsTr("点击请求管理员授权，恢复上次 TUN 接管的网络设置。") : engineController.tunBusy
+                        ? qsTr("正在切换 TUN 模式，请稍候。") : engineController.tunEnabled
+                        ? qsTr("TUN 模式已开启，点击关闭；系统代理保持原选择。") : engineController.tunRequested ? qsTr("TUN 尚未运行，点击取消待启用；之后可使用普通代理。") : engineController.tunSupported ? qsTr("点击查看 TUN 管理员授权说明。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
+                    tone: engineController.tunRecoveryRequired ? "warning" : engineController.tunEnabled ? "success" : "neutral"
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: AppState.requestTunEnabled(engineController.tunRecoveryRequired || !(engineController.tunEnabled || engineController.tunRequested))
                 }
                 OutboundModeControl {
                     id: outboundModeControl
@@ -252,6 +253,51 @@ ApplicationWindow {
     function persistExitDrafts(){
         const loader=pageLoader.pages["dns"]
         if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
+    }
+    Connections {
+        target: AppState
+        function onTunAuthorizationRequested(recovery) {
+            tunAuthorization.recovery = recovery
+            tunAuthorization.open()
+        }
+    }
+    Connections {
+        target: engineController
+        function onTunRecoveryFinished(success, message) { AppState.notice(message) }
+    }
+    SwirlDialog {
+        id: tunAuthorization
+        objectName: "tunAuthorizationDialog"
+        ownerItem: window.contentItem
+        property bool recovery: false
+        title: recovery ? qsTr("恢复 TUN 网络") : qsTr("开启 TUN 模式")
+        guardChanges: false
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(16)
+            SwirlText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: tunAuthorization.recovery
+                    ? qsTr("继续后将请求 Windows 管理员授权，恢复 Swirl 接管的网卡、路由和 DNS，并关闭已保存的 TUN 开关。订阅和出口选择会保留；无法确认的资源会保留恢复记录并报告原因。")
+                    : qsTr("TUN 会使用虚拟网卡接管流量。继续后 Windows 将请求管理员授权；切换期间连接可能短暂中断，授权失败会尝试恢复原模式。取消此对话会保留当前连接。")
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: Theme.compactGap
+                SwirlButton { objectName: "cancelTunAuthorization"; text: qsTr("取消"); onClicked: tunAuthorization.close() }
+                SwirlButton {
+                    objectName: "confirmTunAuthorization"
+                    text: tunAuthorization.recovery ? qsTr("授权并恢复") : qsTr("授权并开启")
+                    primary: true
+                    enabled: !engineController.busy && !engineController.policyBusy && !engineController.tunRecoveryBusy
+                    onClicked: {
+                        tunAuthorization.close()
+                        const accepted = tunAuthorization.recovery ? engineController.recoverTunNetwork() : engineController.setTunEnabled(true)
+                        if (!accepted) AppState.notice(engineController.routingError || engineController.policyError || engineController.error)
+                    }
+                }
+            }
+        }
     }
     function openRewriteEditor(kind,title){
         rewriteRulesLoader.requestedKind=kind
@@ -363,7 +409,8 @@ ApplicationWindow {
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
-    SwirlShellOutline {
+    readonly property Item ownedWindowOutline: SwirlShellOutline {
+        parent:window.contentItem
         objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
         anchors.fill:parent;z:998
         radius:window.shellRadius

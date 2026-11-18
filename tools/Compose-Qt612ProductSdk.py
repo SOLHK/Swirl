@@ -26,8 +26,12 @@ import zipfile
 
 HERE = Path(__file__).resolve().parent
 LOCK_PATH = HERE / "qt612-product-sdk.lock.json"
+NETWORK_LOCK_PATH = HERE / "qt612-network-sdk.lock.json"
 OWN_PATHS = ("tools/Compose-Qt612ProductSdk.py", "tools/qt612-product-sdk.lock.json",
+             "tools/qt612-network-sdk.lock.json", "tools/qt612-backports.lock.json",
              "tools/tests/test_qt612_product_sdk.py")
+NETWORK_FILES = ("bin/Qt6Network.dll", "lib/Qt6Network.lib",
+                 "include/QtNetwork/6.12.0/QtNetwork/private/qhttpnetworkreply_p.h")
 SHA = re.compile(r"[0-9a-f]{64}")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 MAX_JSON = 32 * 1024 * 1024
@@ -85,11 +89,13 @@ def load_lock():
     lock = read_json(LOCK_PATH)
     require(lock.get("schema") == 1 and lock.get("kind") == "swirl-qt612-product-sdk-fixed-artifact-candidate",
             "ProductLockSchemaRejected")
-    require(lock["producer"]["run"] == 42338365419 and lock["artifact"]["artifact"] == 13561016761
-            and lock["artifact"]["sha256"] == "4e21e07c3c94738f74a1dda2448d3594121013f4ae68a2198c00dcd32036aea8",
+    require(lock["producer"]["run"] == 43855072540 and lock["artifact"]["artifact"] == 14221516760
+            and lock["artifact"]["sha256"] == "130b3eb29bec634ef91c6f37687b4c004e87ead599ea2151ab7c305a4f8e3425",
             "FixedArtifactPolicyChanged")
     require(lock["recipe"]["patch"]["upstream_commit"] == "8c92fe01338c76885f412a68fd39238147e21a81"
-            and lock["content"]["derived"] == "6a2b82cc4a2133e128f83511a91764a121178c90cd3717399af612136ab2fc1c",
+            and [p["upstream_commit"] for p in lock["recipe"]["patch"].get("additional", [])]
+            == ["4c1054b0f997f2977a54d42523856805b309db9a"]
+            and lock["content"]["derived"] == "d668364f9f59abdf809681c46b878c3d0b738dd6915773176800248e6aee3f49",
             "FixedDerivationPolicyChanged")
     return lock
 
@@ -111,6 +117,198 @@ def load_support(repository, lock):
     return tuple(modules)
 
 
+def load_network_lock():
+    lock = read_json(NETWORK_LOCK_PATH)
+    recipe = read_json(HERE / "qt612-backports.lock.json")
+    require(lock.get("schema") == 1 and lock.get("kind") == "swirl-qt612-network-fixed-artifact"
+            and lock.get("status") == "verified" and lock.get("qt_version") == "6.12.0"
+            and lock.get("architecture") == "x86_64-windows-msvc", "NetworkArtifactPinIncomplete")
+    require(lock["repository"]["name"] == "SOLHK/Swirl" and lock["repository"]["id"] == 1411888911
+            and lock["producer"]["workflow"] == ".github/workflows/build-qt612-network-backport.yml"
+            and lock["producer"]["event"] in ("push", "workflow_dispatch")
+            and COMMIT.fullmatch(lock["producer"]["head"]), "NetworkProducerPolicyRejected")
+    require(lock["receipt"]["source"]["commit"] == recipe["sources"]["qtbase"]
+            and lock["receipt"]["patches"] == [p for p in recipe["patches"] if p["module"] == "qtbase"],
+            "NetworkBackportRecipeChanged")
+    return lock
+
+
+def validate_network_producer(run, jobs, artifact, lock, *, require_unexpired):
+    p, a, repo = lock["producer"], lock["artifact"], lock["repository"]
+    require(run.get("id") == p["run"] and run.get("run_attempt") == p["attempt"]
+            and run.get("repository", {}).get("id") == repo["id"]
+            and run.get("head_repository", {}).get("id") == repo["id"]
+            and run.get("head_sha") == p["head"] and run.get("head_branch") == repo["branch"]
+            and run.get("path") == p["workflow"] and run.get("event") == p["event"]
+            and run.get("status") == "completed" and run.get("conclusion") == "success",
+            "NetworkProducerRunRejected")
+    require(jobs.get("total_count") == 1 and len(jobs.get("jobs", [])) == 1,
+            "NetworkProducerJobsIncomplete")
+    job = jobs["jobs"][0]
+    require(job.get("id") == p["job"] and job.get("run_id") == p["run"]
+            and job.get("name") == p["job_name"] and job.get("status") == "completed"
+            and job.get("conclusion") == "success"
+            and [{k: s.get(k) for k in ("number", "name", "conclusion")} for s in job.get("steps", [])]
+            == p["steps"], "NetworkProducerJobRejected")
+    owner = artifact.get("workflow_run", {})
+    require(artifact.get("id") == a["artifact"] and artifact.get("name") == a["name"]
+            and artifact.get("size_in_bytes") == a["bytes"] and artifact.get("digest") == "sha256:" + a["sha256"]
+            and owner.get("id") == p["run"] and owner.get("repository_id") == repo["id"]
+            and owner.get("head_repository_id") == repo["id"] and owner.get("head_sha") == p["head"]
+            and owner.get("head_branch") == repo["branch"], "NetworkProducerArtifactRejected")
+    if require_unexpired:
+        require(artifact.get("expired") is False and datetime.fromisoformat(
+            artifact["expires_at"].replace("Z", "+00:00")) > datetime.now(timezone.utc),
+            "NetworkProducerArtifactExpired")
+    return {"run_id": p["run"], "job_id": p["job"], "run_attempt": p["attempt"],
+            "conclusion": "success", "metadata_checked_utc": datetime.now(timezone.utc).isoformat()}
+
+
+def network_compiler_compatibility(compiler, qml_lock):
+    historical = qml_lock["content"]["producer_compiler"]
+    metadata = compiler["metadata"]
+    current_version, historical_version = metadata["compiler_version"], historical["CMAKE_CXX_COMPILER_VERSION"]
+    linker_version = metadata["linker_version"]
+    require(re.fullmatch(r"19\.44\.\d+\.\d+", current_version)
+            and re.fullmatch(r"19\.44\.\d+\.\d+", historical_version)
+            and re.fullmatch(r"14\.44\.\d+\.\d+", linker_version)
+            and current_version.split(".")[1:] == linker_version.split(".")[1:]
+            and tuple(map(int, current_version.split("."))) >= tuple(map(int, historical_version.split(".")))
+            and metadata["compiler_id"] == historical["CMAKE_CXX_COMPILER_ID"] == "MSVC"
+            and metadata["msvc_architecture"] == historical["MSVC_CXX_ARCHITECTURE_ID"] == "x64",
+            "NetworkCompilerCompatibilityRejected")
+    return {"policy": "msvc-19.44-x64-dll-maintenance", "qml_compiler_version": historical_version,
+            "network_compiler_version": current_version,
+            "qml_compiler_binary": qml_lock["content"]["producer_compiler_binary"],
+            "network_compiler_binary": compiler["binary"], "product_linker": compiler["linker"],
+            "qt_inputs": "DLLs and import libraries; no historical GL/LTCG object code",
+            "reference": "https://learn.microsoft.com/en-us/cpp/porting/binary-compat-2015-2017"}
+
+
+def verify_network_pe_interface(stock_pe, patched_pe):
+    require(stock_pe["machine"] == patched_pe["machine"] == "AMD64"
+            and stock_pe["dependencies"] == patched_pe["dependencies"],
+            "NetworkPeInterfaceRejected")
+    stock_exports, patched_exports = stock_pe["exports"], patched_pe["exports"]
+    added = "?maxRawHeaderSize@QHttpHeaderParser@@QEBA_JXZ"
+    require(set(patched_exports) - set(stock_exports) == {added}
+            and not (set(stock_exports) - set(patched_exports)),
+            "NetworkPeInterfaceRejected")
+    added_ordinal = patched_exports[added]
+    require(all(patched_exports[name] == (ordinal if ordinal < added_ordinal else ordinal + 1)
+                for name, ordinal in stock_exports.items()),
+            "NetworkPeInterfaceRejected")
+
+
+def verify_network_artifact(root, inventory, lock, qml_lock, sdk, transport):
+    # Preserve every build recipe/log member in the corresponding-source bundle.
+    # Unlike the historical Qml artifact, this producer contains only its SDK
+    # evidence; selecting a smaller critical subset could omit rebuild inputs.
+    require(lock["critical_members"] == inventory, "NetworkEvidenceInventoryIncomplete")
+    def get(name):
+        return read_json(member(root, inventory, "network-sdk/" + name, sdk))
+    receipt = get("receipt.json")
+    require(receipt == lock["receipt"] and receipt.get("schema") == 1
+            and receipt.get("kind") == "swirl-qt612-network-backport"
+            and receipt.get("success") is True and receipt.get("errors") == []
+            and receipt.get("source_sha") == lock["producer"]["head"]
+            and receipt.get("qt_version") == "6.12.0"
+            and receipt.get("architecture") == "x86_64-windows-msvc", "NetworkBuildReceiptRejected")
+    for name, expected in receipt["source_inputs"].items():
+        if name.startswith(".github/"):
+            continue
+        require(file_id(member(root, inventory, "network-sdk/reproduction/" + name, sdk)) == expected,
+                "NetworkBuildRecipeChanged")
+    module = get("module-files.json")
+    require(module == receipt["module_files"] and set(module) == set(NETWORK_FILES)
+            and set(receipt["stock_files"]) == set(NETWORK_FILES), "NetworkModuleClosureRejected")
+    for name, expected in module.items():
+        require(file_id(member(root, inventory, "network-sdk/module-install-output/" + name, sdk)) == expected,
+                "NetworkModuleBytesChanged")
+    compiler = receipt["compiler"]
+    for name, field in (("cl.exe", "binary"), ("link.exe", "linker")):
+        tool = receipt["tools"][name]
+        require({k: compiler[field][k] for k in ("bytes", "sha256")} == {k: tool[k] for k in ("bytes", "sha256")}
+                and PureWindowsPath(compiler[field]["path"]) == PureWindowsPath(tool["path"]),
+                "NetworkCompilerBindingRejected")
+    compatibility = network_compiler_compatibility(compiler, qml_lock)
+    configuration = sdk.cache_values(member(root, inventory, "network-sdk/CMakeCache.txt", sdk).read_text(encoding="utf-8-sig"))
+    actual_compiler = sdk.compiler_values(member(root, inventory, "network-sdk/CMakeCXXCompiler.cmake", sdk).read_text(encoding="utf-8-sig"))
+    require(actual_compiler["CMAKE_CXX_COMPILER_ID"] == compiler["metadata"]["compiler_id"]
+            and actual_compiler["CMAKE_CXX_COMPILER_VERSION"] == compiler["metadata"]["compiler_version"]
+            and actual_compiler["MSVC_CXX_ARCHITECTURE_ID"] == compiler["metadata"]["msvc_architecture"]
+            and PureWindowsPath(actual_compiler["CMAKE_CXX_COMPILER"]).is_absolute()
+            and PureWindowsPath(actual_compiler["CMAKE_CXX_COMPILER"]) == PureWindowsPath(compiler["binary"]["path"])
+            and PureWindowsPath(configuration["CMAKE_LINKER"]).is_absolute()
+            and PureWindowsPath(configuration["CMAKE_LINKER"]) == PureWindowsPath(compiler["linker"]["path"]),
+            "NetworkActualCompilerLinkerRejected")
+    features = receipt["features"]
+    require(features["verified"] is True and features["stock"] == features["patched"]
+            and bool(features["stock"]), "NetworkFeatureContractRejected")
+    interface = receipt["interface"]
+    actual = pe_interface(member(root, inventory, "network-sdk/module-install-output/bin/Qt6Network.dll", sdk).read_bytes())
+    require(interface["patched"] == actual, "NetworkPeInterfaceRejected")
+    verify_network_pe_interface(interface["stock"], interface["patched"])
+    source = get("corresponding-source.json")
+    snapshot = get("source-snapshot-files.json")
+    require(source == receipt["corresponding_source"]
+            and source["source"] == receipt["source"] and source["patches"] == receipt["patches"]
+            and canonical(snapshot) == source["file_manifest_content_id"]
+            and file_id(member(root, inventory, "network-sdk/qtbase-corresponding-source.zip", sdk)) == source["archive"],
+            "NetworkCorrespondingSourceRejected")
+    seen, total, deadline = set(), 0, time.monotonic() + MAX_ARCHIVE_SECONDS
+    with zipfile.ZipFile(root / "network-sdk/qtbase-corresponding-source.zip") as archive:
+        require(len(archive.infolist()) == len(snapshot) == source["tracked_regular_files"],
+                "NetworkSourceClosureCountRejected")
+        for entry in archive.infolist():
+            require(time.monotonic() < deadline, "NetworkSourceArchiveDeadline")
+            transport.safe_member(entry)
+            require(entry.filename.startswith("qtbase/") and not entry.is_dir(), "NetworkSourceRootRejected")
+            relative = entry.filename.removeprefix("qtbase/")
+            require(relative in snapshot and relative not in seen and entry.file_size == snapshot[relative]["bytes"],
+                    "NetworkSourceMemberRejected")
+            seen.add(relative)
+            raw = archive.read(entry)
+            require(byte_id(raw) == snapshot[relative], "NetworkSourceBytesChanged")
+            total += len(raw)
+    require(seen == set(snapshot) and total == source["tracked_bytes"], "NetworkSourceClosureRejected")
+    return {"lock": lock, "receipt": receipt, "module_files": module,
+            "corresponding_source": source, "source_snapshot": snapshot,
+            "compiler_compatibility": compatibility,
+            "root": root, "inventory": inventory}
+
+
+def with_network_artifact(artifact, network):
+    module, stock = network["module_files"], network["receipt"]["stock_files"]
+    require(set(module) == set(stock) == set(NETWORK_FILES)
+            and all(artifact["stock_files"].get(name) == artifact["derived_files"].get(name) == stock[name]
+                    for name in NETWORK_FILES)
+            and module["bin/Qt6Network.dll"] != stock["bin/Qt6Network.dll"],
+            "NetworkOverlayBaselineRejected")
+    return {**artifact, "derived_files": {**artifact["derived_files"], **module}, "network": network}
+
+
+def restore_network_artifact(record, qml_lock, sdk, transport):
+    lock = load_network_lock()
+    require(record.get("lock") == file_id(NETWORK_LOCK_PATH)
+            and record.get("producer") == lock["producer"] and record.get("artifact") == lock["artifact"],
+            "SelectedNetworkBindingRejected")
+    root = sdk.plain_path(Path(record["artifact_root"]))
+    require(file_id(sdk.plain_path(Path(record["artifact_archive"])))
+            == {k: lock["artifact"][k] for k in ("bytes", "sha256")}, "SelectedNetworkArchiveChanged")
+    inventory = read_json(sdk.plain_path(Path(record["member_inventory"])))
+    require(canonical(inventory) == lock["artifact"]["member_inventory_sha256"], "SelectedNetworkInventoryChanged")
+    for name in inventory:
+        member(root, inventory, name, sdk)
+    require(sdk.plain_path(Path(record["sdk_evidence_dir"])) == root / "network-sdk",
+            "SelectedNetworkEvidencePathChanged")
+    verified = verify_network_artifact(root, inventory, lock, qml_lock, sdk, transport)
+    require(record.get("module_files") == verified["module_files"]
+            and record.get("corresponding_source") == verified["corresponding_source"],
+            "SelectedNetworkContentBindingRejected")
+    return verified
+
+
 def validate_producer(run, jobs, artifact, lock, *, require_unexpired):
     p, a, repo = lock["producer"], lock["artifact"], lock["repository"]
     require(run.get("id") == p["run"] and run.get("run_attempt") == p["attempt"]
@@ -118,13 +316,13 @@ def validate_producer(run, jobs, artifact, lock, *, require_unexpired):
             and run.get("head_repository", {}).get("id") == repo["id"]
             and run.get("head_sha") == p["head"] and run.get("head_branch") == repo["branch"]
             and run.get("path") == p["workflow"] and run.get("event") == "pull_request"
-            and run.get("status") == "completed" and run.get("conclusion") == "failure",
+            and run.get("status") == "completed" and run.get("conclusion") == p["conclusion"],
             "ProducerFinalRunRejected")
     require(jobs.get("total_count") == 1 and len(jobs.get("jobs", [])) == 1, "ProducerJobsIncomplete")
     job = jobs["jobs"][0]
     require(job.get("id") == p["job"] and job.get("run_id") == p["run"]
             and job.get("name") == p["job_name"] and job.get("status") == "completed"
-            and job.get("conclusion") == "failure", "ProducerJobRejected")
+            and job.get("conclusion") == p["conclusion"], "ProducerJobRejected")
     actual_steps = [{k: s.get(k) for k in ("number", "name", "conclusion")} for s in job.get("steps", [])]
     require(actual_steps == p["steps"], "ProducerExpectedNegativeStepsChanged")
     owner = artifact.get("workflow_run", {})
@@ -140,11 +338,11 @@ def validate_producer(run, jobs, artifact, lock, *, require_unexpired):
             artifact["expires_at"].replace("Z", "+00:00")) > datetime.now(timezone.utc),
             "ProducerArtifactExpired")
     return {"run_id": p["run"], "job_id": p["job"], "run_attempt": p["attempt"],
-            "original_conclusion": "failure", "expected_negative_preserved": True,
+            "original_conclusion": p["conclusion"], "expected_negative_preserved": True,
             "metadata_checked_utc": datetime.now(timezone.utc).isoformat()}
 
 
-def fetch_producer(lock, transport, evidence):
+def fetch_producer(lock, transport, evidence, validator=validate_producer):
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     require(bool(token), "GitHubActionsReadTokenMissing")
     prefix = "/repos/" + lock["repository"]["name"]
@@ -162,7 +360,7 @@ def fetch_producer(lock, transport, evidence):
     # authorization headers never enter a receipt, exception text, or stdout.
     for name, data in (("run", run), ("jobs", jobs), ("artifact", artifact)):
         write_json(evidence / ("original-" + name + ".json"), data)
-    return validate_producer(run, jobs, artifact, lock, require_unexpired=True), token
+    return validator(run, jobs, artifact, lock, require_unexpired=True), token
 
 
 def download_fixed_artifact(lock, destination, token, transport):
@@ -324,6 +522,8 @@ def member(root, inventory, name, sdk):
 
 
 def verify_source_archive(root, inventory, lock, sdk, transport):
+    patches = [lock["recipe"]["patch"], *lock["recipe"]["patch"].get("additional", [])]
+    postimages = {patch["production_path"]: patch["postimage_sha256"] for patch in patches}
     manifest = read_json(member(root, inventory, "sdk/source-snapshot-files.json", sdk))
     receipt = read_json(member(root, inventory, "sdk/corresponding-source.json", sdk))
     require(len(manifest) == 23849 and canonical(manifest) == receipt["file_manifest_content_id"]
@@ -345,9 +545,8 @@ def verify_source_archive(root, inventory, lock, sdk, transport):
             expected = {k: manifest[relative][k] for k in ("bytes", "sha256")}
             require(byte_id(raw) == expected, "CorrespondingSourceBytesChanged")
             actual[relative] = expected
-            if relative == lock["recipe"]["patch"]["production_path"]:
-                require(expected["sha256"] == lock["recipe"]["patch"]["postimage_sha256"],
-                        "AllocatorPostimageChanged")
+            if relative in postimages:
+                require(expected["sha256"] == postimages[relative], "PinnedQmlPostimageChanged")
     require(set(actual) == set(manifest), "CorrespondingSourceClosureMissing")
     return receipt
 
@@ -356,11 +555,14 @@ def verify_fixture_records(root, inventory, lock, sdk):
     def get(name):
         return read_json(member(root, inventory, name, sdk))
     comparison = get("comparison/comparison.json")
+    has_jit = bool(lock["recipe"]["patch"].get("additional"))
+    require(lock["producer"]["conclusion"] == ("success" if has_jit else "failure"), "ProducerRegressionGateMismatch")
     require(comparison["source_sha"] == lock["producer"]["merge"]
             and comparison["pr_head_sha"] == lock["producer"]["head"]
             and comparison["stage"] == "complete" and comparison["comparison_collected"] is True
-            and comparison["success"] is False
-            and comparison["errors"] == ["OriginalFixtureFailurePreserved; see separate stock and patched receipts"]
+            and comparison["success"] is has_jit
+            and (not has_jit or comparison.get("negative_controls_observed") is True)
+            and comparison["errors"] == ([] if has_jit else ["OriginalFixtureFailurePreserved; see separate stock and patched receipts"])
             and comparison["runtime_delta"] == {"added": [], "removed": [], "changed": ["Qt6Qml.dll"]},
             "OriginalFixtureFailureNotPreserved")
     outcomes = get("step-outcomes.json")
@@ -369,8 +571,9 @@ def verify_fixture_records(root, inventory, lock, sdk):
             and outcomes["run_id"] == str(lock["producer"]["run"])
             and outcomes["run_attempt"] == "1" and outcomes["prepare_step"] == "success"
             and outcomes["boundaries_step"] == "success" and outcomes["sdk_step"] == "success"
-            and outcomes["comparison_step"] == "failure", "ProducerStepReceiptRejected")
+            and outcomes["comparison_step"] == lock["producer"]["conclusion"], "ProducerStepReceiptRejected")
     summary = {}
+    cases = ("popup-normal", "popup-incremental", "sweep-slots") + (("jit-setlookup",) if has_jit else ())
     for variant in ("stock", "patched"):
         aggregate_name = "comparison/" + variant + "/aggregate.json"
         aggregate = get(aggregate_name)
@@ -379,34 +582,64 @@ def verify_fixture_records(root, inventory, lock, sdk):
                 and variant_record["collected"] is True
                 and variant_record["runner_exit_code"] == (1 if variant == "stock" else 0)
                 and aggregate["success"] is (variant == "patched"), "FixtureAggregateRejected")
+        require([case["name"] for case in aggregate["cases"]] == list(cases)
+                and set(variant_record["cases"]) == set(cases), "FixtureCaseSetChanged")
         summary[variant] = {}
-        for case in ("popup-normal", "popup-incremental", "sweep-slots"):
+        for case in cases:
             prefix = "comparison/" + variant + "/" + case + "/"
             result = get(prefix + "receipt.json")
             proof = result["exit_proof"]
-            success = variant == "patched" or case != "sweep-slots"
+            success = variant == "patched" or case not in ("sweep-slots", "jit-setlookup")
+            expected_exit = 0 if success else 0xc0000005 if case == "jit-setlookup" else 2
             require(result["source_sha"] == lock["producer"]["merge"]
                     and result["success"] is success and result["timed_out"] is False
-                    and proof["exitCode"] == (0 if success else 2)
+                    and proof["exitCode"] & 0xffffffff == expected_exit
                     and proof["processSignaled"] is True and proof["ownedProcessSetEmpty"] is True
                     and proof["backend"] == "windows-single-process-job", "FixtureExitProofRejected")
             interpretation = variant_record["cases"][case]["interpretation"]
-            require(interpretation["conclusive"] is True and not interpretation["warning_lines"],
+            require(interpretation == result["interpretation"]
+                    and interpretation["conclusive"] is (success or case == "sweep-slots")
+                    and not interpretation["warning_lines"],
                     "FixtureInterpretationRejected")
             if case == "sweep-slots":
                 require(interpretation["same_bitmap_word_allocations"] == 8
                         and interpretation["free_runs_inside_live_objects"] == (8 if variant == "stock" else 0),
                         "AllocatorInvariantEvidenceChanged")
+            elif case == "jit-setlookup":
+                require(interpretation["qt_version"] == "6.12.0"
+                        and interpretation["interpreter_override"] == ""
+                        and interpretation["runtime_verified"] is True, "JitRuntimeIdentityRejected")
+                require(result["errors"] == ([] if success else ["MissingOrAmbiguousJitCompletion", "MissingOrNonzeroActualExit"]),
+                        "JitFailureSignatureChanged")
+                if success:
+                    require(interpretation["iterations"] == 100 and interpretation["qml_warning_count"] == 0,
+                            "JitRegressionIncomplete")
+                expected_qml = lock["content"]["qml_" + variant]
+                for phase in ("before", "after"):
+                    observed = result["qt_qml_dll_" + phase]
+                    require({key: observed[key] for key in ("bytes", "sha256")} == expected_qml,
+                            "JitQmlBinaryChanged")
+                    require(interpretation["qml_module"].replace("\\", "/").casefold()
+                            == observed["path"].replace("\\", "/").casefold(), "JitLoadedModulePathChanged")
             else:
                 require(interpretation["completed_helpers"] == 288 and interpretation["fixture_exit"] == 0
                         and interpretation["qml_warning_count"] == 0, "PopupCompatibilityEvidenceChanged")
                 if case == "popup-incremental":
                     require(interpretation["actual_time_limit_us"] == 1000 and interpretation["yield_observed"] is True
                             and interpretation["pending_returns"] > 0, "IncrementalCoverageMissing")
+            text = []
             for name in ("stdout.log", "stderr.log"):
                 path = member(root, inventory, prefix + name, sdk)
                 require(sdk.file_identity(path) == {k: result["outputs"][name][k] for k in ("bytes", "sha256")},
                         "FixtureOutputBindingChanged")
+                if case == "jit-setlookup":
+                    text.append(path.read_text(encoding="utf-8-sig", errors="replace"))
+            if case == "jit-setlookup":
+                samples = re.findall(r"^(?:\[info\] )?JIT_GC_RUNTIME (\{.*\})\s*$", "\n".join(text), re.MULTILINE)
+                require(len(samples) == 1, "JitLoadedModuleObservationMissing")
+                sample = json.loads(samples[0], object_pairs_hook=no_duplicates)
+                require(sample == {"qt": "6.12.0", "interpreter_override": "", "qml_module": interpretation["qml_module"]},
+                        "JitLoadedModuleObservationChanged")
             summary[variant][case] = {"success": success, "exit_proof": proof,
                                       "interpretation": interpretation}
     return summary
@@ -522,7 +755,7 @@ def verify_artifact(root, inventory, lock, sdk, transport):
     return {"receipt": receipt, "stock_files": before, "derived_files": derived, "module_files": module,
             "headers": headers, "retained_headers": retained, "interface": parsed["patched"],
             "corresponding_source": source, "fixtures": fixtures,
-            "verification": {"original_conclusion": "failure", "stock_negative_preserved": True,
+            "verification": {"original_conclusion": lock["producer"]["conclusion"], "stock_negative_preserved": True,
                              "patched_fixtures_passed": True, "actual_archive_members": len(inventory),
                              "source_files_checked": 23849, "actual_patched_pe_exports": len(actual_pe["exports"]),
                              "producer_compiler_binding": compiler_binding,
@@ -632,7 +865,7 @@ def capture_hook(selected, context, content_id):
     # It neither sets a Qt property nor changes compile/link flags or test gates.
     return ('''# Generated by Compose-Qt612ProductSdk.py; product target observation only.
 function(swirl_capture_selected_qt)
-  if(NOT TARGET Qt6::Qml OR NOT TARGET Qt6::QmlPrivate OR NOT TARGET Swirl)
+  if(NOT TARGET Qt6::Qml OR NOT TARGET Qt6::QmlPrivate OR NOT TARGET Qt6::Network OR NOT TARGET Swirl)
     message(FATAL_ERROR "Selected Qt product targets are missing")
   endif()
   get_target_property(dll Qt6::Qml IMPORTED_LOCATION_RELEASE)
@@ -648,7 +881,7 @@ function(swirl_capture_selected_qt)
   # paths at generation; the independent verifier requires both real private
   # directories and rejects every nonempty path outside this complete SDK.
   file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/swirl-selected-qt-$<CONFIG>.txt"
-    CONTENT "schema=1\\nsource_sha=@SOURCE@\\ncontent_id=@CONTENT@\\nconfiguration=$<CONFIG>\\nqml_dll=$<TARGET_FILE:Qt6::Qml>\\nqml_import_library=$<TARGET_LINKER_FILE:Qt6::Qml>\\nqml_private_includes=$<TARGET_GENEX_EVAL:Qt6::QmlPrivate,$<TARGET_PROPERTY:Qt6::QmlPrivate,INTERFACE_INCLUDE_DIRECTORIES>>\\napplication=$<TARGET_FILE:Swirl>\\ncompiler=${CMAKE_CXX_COMPILER}\\ncompiler_version=${CMAKE_CXX_COMPILER_VERSION}\\ncompiler_id=${CMAKE_CXX_COMPILER_ID}\\ncmake=${CMAKE_COMMAND}\\nsource_directory=${CMAKE_SOURCE_DIR}\\nbuild_directory=${CMAKE_BINARY_DIR}\\n")
+    CONTENT "schema=1\\nsource_sha=@SOURCE@\\ncontent_id=@CONTENT@\\nconfiguration=$<CONFIG>\\nqml_dll=$<TARGET_FILE:Qt6::Qml>\\nqml_import_library=$<TARGET_LINKER_FILE:Qt6::Qml>\\nqml_private_includes=$<TARGET_GENEX_EVAL:Qt6::QmlPrivate,$<TARGET_PROPERTY:Qt6::QmlPrivate,INTERFACE_INCLUDE_DIRECTORIES>>\\nnetwork_dll=$<TARGET_FILE:Qt6::Network>\\nnetwork_import_library=$<TARGET_LINKER_FILE:Qt6::Network>\\napplication=$<TARGET_FILE:Swirl>\\ncompiler=${CMAKE_CXX_COMPILER}\\ncompiler_version=${CMAKE_CXX_COMPILER_VERSION}\\ncompiler_id=${CMAKE_CXX_COMPILER_ID}\\nlinker=${CMAKE_LINKER}\\ncmake=${CMAKE_COMMAND}\\nsource_directory=${CMAKE_SOURCE_DIR}\\nbuild_directory=${CMAKE_BINARY_DIR}\\n")
 endfunction()
 cmake_language(DEFER CALL swirl_capture_selected_qt)
 '''.replace("@PREFIX@", prefix).replace("@SOURCE@", source).replace("@CONTENT@", content_id)).encode()
@@ -713,6 +946,13 @@ def installation_inventories(stock_root, artifact, lock):
                "scope": "Only the two exact installer path fields differ from the producer; "
                         "the cloned batch file still targets stock and is not a selected-kit launcher. "
                         "Product tools and CMake targets use verified absolute selected-kit paths."}
+    if "network" in artifact:
+        binding["network_artifact"] = artifact["network"]["lock"]["artifact"]
+        binding["network_module_files"] = artifact["network"]["module_files"]
+        binding["composition_id"] = canonical({"qml_derivation_id": lock["content"]["derivation"],
+            "network_artifact": binding["network_artifact"],
+            "network_source_sha": artifact["network"]["lock"]["producer"]["head"],
+            "selected_content_id": binding["selected_content_id"]})
     return before, derived, binding
 
 
@@ -723,6 +963,10 @@ def validate_installed_identity(receipt, before, actual, binding, lock):
             and receipt.get("producer_selected_content_id") == lock["content"]["derived"]
             and receipt.get("installation_binding") == binding,
             "InstalledReceiptContentBindingRejected")
+    if "network_artifact" in binding:
+        require(receipt.get("qml_derivation_id") == lock["content"]["derivation"]
+                and receipt.get("derivation_id") == binding["composition_id"],
+                "InstalledCompositionIdentityRejected")
 
 
 def actual_kit_check(stock, selected, artifact, lock, sdk):
@@ -737,12 +981,18 @@ def actual_kit_check(stock, selected, artifact, lock, sdk):
     new_pe = pe_interface((selected / "bin/Qt6Qml.dll").read_bytes())
     require(old_pe == new_pe and {k: old_pe[k] for k in ("exports", "dependencies")} == artifact["interface"],
             "ActualStockPatchedPeMismatch")
+    if "network" in artifact:
+        interface = artifact["network"]["receipt"]["interface"]
+        require(pe_interface((stock / "bin/Qt6Network.dll").read_bytes()) == interface["stock"]
+                and pe_interface((selected / "bin/Qt6Network.dll").read_bytes()) == interface["patched"],
+                "ActualNetworkPeMismatch")
     return before, actual, binding
 
 
 def compose(args, lock, sdk, transport, report):
     repository = sdk.plain_path(Path(args.repository))
     context = current_context(repository, lock, sdk)
+    network_lock = load_network_lock()
     stock = sdk.plain_path(Path(args.stock_kit))
     selected = sdk.plain_path(Path(args.selected_kit), exists=False)
     evidence = sdk.plain_path(Path(args.evidence), exists=False)
@@ -767,6 +1017,25 @@ def compose(args, lock, sdk, transport, report):
     write_json(evidence / "original-member-inventory.json", inventory)
     artifact = verify_artifact(extracted, inventory, lock, sdk, transport)
     report["original_artifact_verification"] = artifact["verification"]
+    network_evidence = evidence / "network"
+    sdk.fresh_directory(network_evidence)
+    network_metadata, token = fetch_producer(network_lock, transport, network_evidence,
+                                             validator=validate_network_producer)
+    network_archive = network_evidence / "original-sdk.zip"
+    download_fixed_artifact(network_lock, network_archive, token, transport)
+    del token
+    network_root = network_evidence / "original-sdk"
+    network_inventory = audit_archive(network_archive, network_root, network_lock, sdk, transport)
+    write_json(network_evidence / "original-member-inventory.json", network_inventory)
+    network = verify_network_artifact(network_root, network_inventory, network_lock, lock, sdk, transport)
+    artifact = with_network_artifact(artifact, network)
+    network_record = {"lock": file_id(NETWORK_LOCK_PATH), "producer": network_lock["producer"],
+        "artifact": network_lock["artifact"], "producer_metadata": network_metadata,
+        "artifact_archive": str(network_archive), "artifact_root": str(network_root),
+        "member_inventory": str(network_evidence / "original-member-inventory.json"),
+        "sdk_evidence_dir": str(network_root / "network-sdk"),
+        "module_files": network["module_files"], "corresponding_source": network["corresponding_source"]}
+    report["network_artifact_verification"] = network_record
     before = sdk.inventory(stock)
     write_json(evidence / "stock-files-before.json", before)
     expected_stock, expected_selected, installation = installation_inventories(stock, artifact, lock)
@@ -781,6 +1050,12 @@ def compose(args, lock, sdk, transport, report):
             and sorted(changes) == sorted(artifact["receipt"]["module_install"]["approved_changes"]),
             "ActualModuleInstallClosureChanged")
     derived = sdk.compose_derived_kit(stock, stage, selected, before, staged, retained)
+    for name in NETWORK_FILES:
+        source = member(network_root, network_inventory, "network-sdk/module-install-output/" + name, sdk)
+        destination = sdk.plain_path(selected / name, root=selected)
+        require(file_id(destination) == network["receipt"]["stock_files"][name], "NetworkOverlayTargetChanged")
+        shutil.copyfile(source, destination)
+    derived = sdk.inventory(selected)
     require(derived == expected_selected, "ComposedKitContentMismatch")
     tools = query_tools(selected, evidence / "tool-queries", sdk)
     unchanged, actual, checked_installation = actual_kit_check(stock, selected, artifact, lock, sdk)
@@ -796,14 +1071,18 @@ def compose(args, lock, sdk, transport, report):
            for name in ("bin/Qt6Qml.pdb", "lib/Qt6Qml.pdb")}
     selected_receipt = {"schema": 1, "kind": "swirl-selected-qt612-product-sdk", "success": True,
         "consumer": context, "producer": lock["producer"], "artifact": lock["artifact"],
-        "producer_metadata": metadata, "original_workflow_conclusion": "failure",
+        "producer_metadata": metadata, "original_workflow_conclusion": lock["producer"]["conclusion"],
         "stock_negative_preserved": True, "qt_version": lock["qt_version"],
         "qt_source": lock["recipe"]["source"], "qt_patch": lock["recipe"]["patch"],
         "stock_kit_root": str(stock), "kit_root": str(selected),
         "stock_content_id": canonical(before), "selected_content_id": canonical(actual),
         "producer_stock_content_id": lock["content"]["stock"],
         "producer_selected_content_id": lock["content"]["derived"], "installation_binding": installation,
-        "derivation_id": lock["content"]["derivation"], "content_delta": lock["content"]["delta"],
+        "qml_derivation_id": lock["content"]["derivation"], "derivation_id": installation["composition_id"],
+        "content_delta": sdk.compare_tree(before, actual),
+        "network": network_record,
+        "product_toolchain": network["receipt"]["compiler"],
+        "toolchain_compatibility": network["compiler_compatibility"],
         "sdk_evidence_dir": str(extracted / "sdk"), "artifact_root": str(extracted),
         "artifact_archive": str(archive), "member_inventory": str(evidence / "original-member-inventory.json"),
         "lock": sdk.file_identity(LOCK_PATH), "qml_files": dlls, "qml_pdb_files": pdb,
@@ -829,7 +1108,8 @@ def capture_values(text):
         require(separator and re.fullmatch(r"[a-z_]+", key) and key not in result, "CmakeCaptureShapeRejected")
         result[key] = value
     expected = {"schema", "source_sha", "content_id", "configuration", "qml_dll", "qml_import_library",
-                "qml_private_includes", "application", "compiler", "compiler_version", "compiler_id",
+                "qml_private_includes", "network_dll", "network_import_library",
+                "application", "compiler", "compiler_version", "compiler_id", "linker",
                 "cmake", "source_directory", "build_directory"}
     require(set(result) == expected and result["schema"] == "1" and result["configuration"] == "Release",
             "CmakeCaptureSchemaRejected")
@@ -867,6 +1147,8 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
             "CmakeCaptureSourceChanged")
     for key, expected in (("qml_dll", selected / "bin/Qt6Qml.dll"),
                           ("qml_import_library", selected / "lib/Qt6Qml.lib"),
+                          ("network_dll", selected / "bin/Qt6Network.dll"),
+                          ("network_import_library", selected / "lib/Qt6Network.lib"),
                           ("source_directory", repository / "src/Swirl.Quick"), ("build_directory", build)):
         require(sdk.plain_path(Path(values[key])) == expected, "CmakeActualTargetPathRejected:" + key)
     # Empty members are the actual result of Qt's conditional export entries;
@@ -876,11 +1158,16 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
     actual = {str(sdk.plain_path(Path(value), root=selected)) for value in private}
     require(required <= actual, "CmakePrivateHeaderClosureMissing")
     compiler = sdk.plain_path(Path(values["compiler"]))
-    producer = lock["content"]["producer_compiler"]
-    require(values["compiler_id"] == producer["CMAKE_CXX_COMPILER_ID"]
-            and values["compiler_version"] == producer["CMAKE_CXX_COMPILER_VERSION"]
-            and sdk.file_identity(compiler) == {k: lock["content"]["producer_compiler_binary"][k] for k in ("bytes", "sha256")},
-            "ProductCompilerDiffersFromPinnedQmlCompiler")
+    producer = receipt["product_toolchain"]
+    require(values["compiler_id"] == producer["metadata"]["compiler_id"]
+            and values["compiler_version"] == producer["metadata"]["compiler_version"]
+            and sdk.file_identity(compiler) == {k: producer["binary"][k] for k in ("bytes", "sha256")},
+            "ProductCompilerDiffersFromPinnedNetworkCompiler")
+    linker = sdk.plain_path(Path(values["linker"]))
+    require(sdk.file_identity(linker) == {k: producer["linker"][k] for k in ("bytes", "sha256")},
+            "ProductLinkerDiffersFromPinnedNetworkLinker")
+    if "CMAKE_LINKER" in cache:
+        require(sdk.plain_path(Path(cache["CMAKE_LINKER"])) == linker, "CmakeLinkerBindingChanged")
     version_parts = [cache.get("CMAKE_CACHE_" + part + "_VERSION", "") for part in ("MAJOR", "MINOR", "PATCH")]
     require(all(part.isdecimal() for part in version_parts), "CmakeCacheVersionMissing")
     compiler_metadata = sdk.plain_path(build / "CMakeFiles" / ".".join(version_parts) / "CMakeCXXCompiler.cmake", root=build)
@@ -903,7 +1190,7 @@ def validate_configuration(build, selected, repository, context, receipt, lock, 
               "qt_directories": directories, "unavailable_optional_qt_packages": sorted(unavailable_optional_packages),
               "actual_target": values, "compiler_metadata": sdk.file_identity(compiler_metadata),
               "configured_compiler": configured_compiler,
-              "compiler_file": sdk.file_identity(compiler), "application": None}
+              "compiler_file": sdk.file_identity(compiler), "linker_file": sdk.file_identity(linker), "application": None}
     if require_application:
         pe = pe_interface(application.read_bytes(), require_dll=False)
         require("qt6qml.dll" in pe["dependencies"], "ApplicationDoesNotImportSelectedQtQml")
@@ -968,6 +1255,11 @@ def verified_selection(args, lock, sdk, transport):
     for name in inventory:
         member(extracted, inventory, name, sdk)
     artifact = verify_artifact(extracted, inventory, lock, sdk, transport)
+    network = restore_network_artifact(receipt.get("network", {}), lock, sdk, transport)
+    require(receipt.get("product_toolchain") == network["receipt"]["compiler"]
+            and receipt.get("toolchain_compatibility") == network["compiler_compatibility"],
+            "SelectedProductToolchainBindingRejected")
+    artifact = with_network_artifact(artifact, network)
     before, actual, installation = actual_kit_check(stock, selected, artifact, lock, sdk)
     validate_installed_identity(receipt, before, actual, installation, lock)
     return {"repository": repository, "context": context, "receipt_path": receipt_path,
@@ -1056,7 +1348,7 @@ def copy_d3d(args, lock, sdk, transport, report):
     report.update({"consumer": state["context"],
                    "selected_receipt": sdk.file_identity(state["receipt_path"]),
                    "selected_content_id": canonical(state["actual"]),
-                   "original_conclusion": "failure", "d3d_compiler": {},
+                   "original_conclusion": lock["producer"]["conclusion"], "d3d_compiler": {},
                    "scope": "Copy only the fixed original-kit D3D compiler; no code execution. "
                             "DXC/DXIL retain their existing deployment behavior and are not selected-kit pins."})
     copy_fixed_d3d(selected, runtime, expected, sdk, report["d3d_compiler"])
@@ -1105,6 +1397,50 @@ def write_shader_runtime_metadata(runtime, expected, sdk, record):
     require(record["after"] == identity, "ShaderMetadataChanged")
 
 
+def verify_msvc_payload(runtime, compiler, sdk):
+    runtime = sdk.plain_path(runtime)
+    receipt_path = sdk.plain_path(runtime / "msvc-runtime.json", root=runtime)
+    receipt = read_json(receipt_path)
+    require(receipt.get("schema") == 1 and receipt.get("kind") == "msvc-app-local"
+            and receipt.get("architecture") == "x64", "SelectedMsvcReceiptRejected")
+    require(receipt["source"]["compiler_sha256"] == compiler["binary"]["sha256"]
+            and receipt["source"]["compiler_version"] == compiler["metadata"]["compiler_version"],
+            "SelectedMsvcCompilerBindingRejected")
+    names = set(receipt["files"])
+    require(names == set(receipt["required_imports"])
+            and {"msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "vcruntime140.dll", "vcruntime140_1.dll"} <= names
+            and all(re.fullmatch(r"(?:msvcp[0-9][a-z0-9_]*|vcruntime[0-9][a-z0-9_]*|concrt[0-9][a-z0-9_]*|vccorlib[0-9][a-z0-9_]*)\.dll", name)
+                    for name in names), "SelectedMsvcClosureRejected")
+    actual = {}
+    for name in sorted(names):
+        pinned = compiler["crt"]["files"].get(name)
+        require(pinned is not None and re.fullmatch(r"14\.\d+\.\d+\.\d+", pinned["version"]),
+                "SelectedMsvcVersionRejected")
+        row = receipt["files"][name]
+        observed = file_id(sdk.plain_path(runtime / name, root=runtime))
+        require(observed == {k: pinned[k] for k in ("bytes", "sha256")}
+                and observed == {"bytes": row["size"], "sha256": row["sha256"]}
+                and row["file_version"] == pinned["version"] and row["machine"] == "0x8664"
+                and row["signature_status"] == "Valid", "SelectedMsvcRuntimeChanged:" + name)
+        actual[name] = {**observed, "version": pinned["version"]}
+    return {"source_receipt": file_id(receipt_path), "compiler_sha256": compiler["binary"]["sha256"],
+            "linker": compiler["linker"],
+            "runtime_version_policy": "Exact producer CRT; existing same-VS toolset/signature gate and producer runtime fixtures",
+            "files": actual, "scope": "Pinned bytes after the existing PE/signature/copy gate; no runtime execution"}
+
+
+def verify_msvc(args, lock, sdk, transport, report):
+    state = verified_selection(args, lock, sdk, transport)
+    runtime = sdk.plain_path(Path(args.runtime_dir))
+    require_disjoint((state["stock"], state["selected"], runtime, state["evidence"]))
+    report["msvc_runtime"] = verify_msvc_payload(runtime, state["receipt"]["product_toolchain"], sdk)
+    require(current_context(state["repository"], lock, sdk) == state["context"],
+            "ConsumerSourceChangedDuringMsvcVerification")
+    report.update({"success": True, "consumer": state["context"],
+                   "selected_receipt": file_id(state["receipt_path"]),
+                   "selected_content_id": canonical(state["actual"])})
+
+
 def verify(args, lock, sdk, transport, report):
     state = verified_selection(args, lock, sdk, transport)
     repository, context, receipt_path, receipt, stock, selected, evidence, before, actual = (
@@ -1116,7 +1452,7 @@ def verify(args, lock, sdk, transport, report):
                                           require_application=args.phase != "configured")
     report.update({"consumer": context, "selected_receipt": sdk.file_identity(receipt_path),
                    "selected_content_id": canonical(actual), "stock_content_id": canonical(before),
-                   "configuration": configuration, "original_conclusion": "failure"})
+                   "configuration": configuration, "original_conclusion": lock["producer"]["conclusion"]})
     if args.phase == "post-deploy":
         require(args.runtime_dir is not None, "PostDeployRuntimeRequired")
         runtime = sdk.plain_path(Path(args.runtime_dir))
@@ -1159,6 +1495,10 @@ def main(argv=None):
     d3d_copy.add_argument("--receipt", type=Path, required=True)
     d3d_copy.add_argument("--runtime-dir", type=Path, required=True)
     d3d_copy.add_argument("--evidence", type=Path, required=True)
+    msvc = commands.add_parser("verify-msvc", help="bind deployed CRT bytes to the fixed Network toolchain")
+    msvc.add_argument("--receipt", type=Path, required=True)
+    msvc.add_argument("--runtime-dir", type=Path, required=True)
+    msvc.add_argument("--evidence", type=Path, required=True)
     args = parser.parse_args(argv)
     report = {"schema": 1, "kind": "qt612-product-sdk-" + args.command, "success": False,
               "errors": [], "started_utc": datetime.now(timezone.utc).isoformat(),
@@ -1175,7 +1515,7 @@ def main(argv=None):
             selected = sdk.plain_path(Path(args.selected_kit), exists=False)
             require_disjoint((stock, selected, evidence))
             require(not selected.exists(), "SelectedKitMustBeFresh")
-        elif args.command in ("verify", "copy-d3d"):
+        elif args.command in ("verify", "copy-d3d", "verify-msvc"):
             selected_record = read_json(sdk.plain_path(Path(args.receipt)))
             require_disjoint((sdk.plain_path(Path(selected_record["stock_kit_root"])),
                               sdk.plain_path(Path(selected_record["kit_root"])), evidence))
@@ -1195,6 +1535,8 @@ def main(argv=None):
             compose(args, lock, sdk, transport, report)
         elif args.command == "copy-d3d":
             copy_d3d(args, lock, sdk, transport, report)
+        elif args.command == "verify-msvc":
+            verify_msvc(args, lock, sdk, transport, report)
         else:
             verify(args, lock, sdk, transport, report)
     except BaseException as error:

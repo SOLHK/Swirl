@@ -18,17 +18,18 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         CodexLaunch::requireListener(proxy);
         const auto existing=CodexLaunch::existingDesktops(path);
         if(check) {
-            const std::string report="{\"checkOnly\":true,\"explicitLoopbackProxy\":true,\"listenerReady\":true,\"existingDesktopCount\":"+std::to_string(existing)+",\"launchAllowed\":"+(existing?"false":"true")+",\"persistentSettingsChanged\":false}\n";
+            const std::string endpoint(proxy.endpoint.begin(),proxy.endpoint.end());
+            const std::string report="{\"checkOnly\":true,\"explicitLoopbackProxy\":true,\"selectedProxy\":\""+endpoint+"\",\"listenerReady\":true,\"existingDesktopCount\":"+std::to_string(existing)+",\"launchAllowed\":"+(existing?"false":"true")+",\"requiresFreshDesktop\":true,\"persistentSettingsChanged\":false}\n";
             DWORD written=0;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),report.data(),DWORD(report.size()),&written,nullptr);
             CloseHandle(mutex);return existing?2:0;
         }
-        if(existing)throw CodexLaunch::Error{L"Codex 桌面已在运行。请保存工作并自行完全退出 Codex 后，再双击此启动器。现有进程不会被停止。"};
+        if(existing)throw CodexLaunch::Error{L"Codex 桌面已在运行。切换代理软件后，旧进程仍可能使用原端口。请保存工作并自行完全退出 Codex，再用此启动器读取当前系统代理。现有进程不会被停止，配置文件不会被修改。"};
         auto environment=CodexLaunch::childEnvironment(CodexLaunch::currentEnvironment(),proxy);
         if(CodexLaunch::validateSettings(CodexLaunch::readSettings()).endpoint!=proxy.endpoint || CodexLaunch::existingDesktops(path))throw CodexLaunch::Error{L"代理或 Codex 进程在检查期间发生变化，请重试。"};
         CodexLaunch::startChild(path,environment,proxy);CloseHandle(mutex);return 0;
     } catch(const CodexLaunch::Error &error) {
         if(mutex)CloseHandle(mutex);
-        if(!check)MessageBoxW(nullptr,error.message.c_str(),L"通过 Swirl 启动 Codex",MB_OK|MB_ICONINFORMATION);
+        if(!check)MessageBoxW(nullptr,error.message.c_str(),L"使用当前系统代理启动 Codex",MB_OK|MB_ICONINFORMATION);
         return 3;
-    } catch(...) {if(mutex)CloseHandle(mutex);if(!check)MessageBoxW(nullptr,L"启动检查失败；没有修改系统设置。",L"通过 Swirl 启动 Codex",MB_OK|MB_ICONERROR);return 4;}
+    } catch(...) {if(mutex)CloseHandle(mutex);if(!check)MessageBoxW(nullptr,L"启动检查失败；没有修改系统设置。",L"使用当前系统代理启动 Codex",MB_OK|MB_ICONERROR);return 4;}
 }

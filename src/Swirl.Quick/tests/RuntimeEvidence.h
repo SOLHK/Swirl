@@ -10,9 +10,6 @@ class PrivateUiDnsTrust;
 #endif
 class QQuickWindow;
 class EngineController;
-class SystemDataProvider;
-class DiagnosticService;
-void startRuntimeEvidence(QQuickWindow *,EngineController *,SystemDataProvider *,DiagnosticService *,const QString &,const QString &);
 
 // One generated synthetic node in a private, parent-owned QA process. Neither
 // this session nor its fixture proof authorizes provider traffic or a budget.

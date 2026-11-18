@@ -6,4 +6,6 @@ find_package(Qt6 6.12 REQUIRED COMPONENTS Core Gui Qml QmlPrivate Quick QuickCon
 add_executable(PopupGcFixture main.cpp)
 target_link_libraries(PopupGcFixture PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::QmlPrivate Qt6::Quick Qt6::QuickControls2)
 add_executable(SweepSlotsProbe sweep.cpp)
+add_executable(JitGcProbe jit.cpp)
+target_link_libraries(JitGcProbe PRIVATE Qt6::Core Qt6::Qml Qt6::QmlPrivate)
 target_link_libraries(SweepSlotsProbe PRIVATE Qt6::Core Qt6::Qml Qt6::QmlPrivate)

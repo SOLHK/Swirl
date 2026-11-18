@@ -137,8 +137,18 @@ try {
     Run-Step 'stage-and-real-proxy-roundtrips' { & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $build -Destination (Join-Path $out 'app') -OpenSslRoot $openssl }
     Run-Step 'production-startup' {
         $process = Start-Process (Join-Path $out 'app/Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory $evidence -WindowStyle Hidden -PassThru
-        if (-not $process.WaitForExit(75000)) { $process.Kill(); throw 'Production startup timed out.' }
-        if ($process.ExitCode -ne 0) { throw 'Production startup failed.' }
+        $startupDiag = Join-Path $out 'app/Swirl-diagnostics.txt'
+        if (-not $process.WaitForExit(75000)) {
+            $process.Kill()
+            if (Test-Path -LiteralPath $startupDiag) { Get-Content -LiteralPath $startupDiag -Tail 15 | ForEach-Object { Write-Host "[startup-timeout] $_" } }
+            throw "Production startup timed out (diagnostics: $startupDiag)."
+        }
+        if ($process.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $startupDiag) {
+                Get-Content -LiteralPath $startupDiag | Where-Object { $_ -match '^[123]: |QML_VME_WARNING_CONTEXT|Cannot find member data|is not a function' } | Select-Object -First 10 | ForEach-Object { Write-Host "[startup-error] $_" }
+            }
+            throw "Production startup failed with exit code $($process.ExitCode) (diagnostics: $startupDiag)."
+        }
     }
     if (-not (Test-Path -LiteralPath $Nsis -PathType Leaf)) { throw 'NSIS is required to create the installer.' }
     Run-Step 'installer-lifecycle-security' {

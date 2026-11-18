@@ -97,7 +97,7 @@ private:
  quint64 m_routeGeneration=0;
  bool m_nativeProbePending=false,m_nativeProbeObservedRunning=false;
  quint64 m_nativeProbeGeneration=0,m_nativeProbeTag=0;
- QUrl m_internetProbe{QStringLiteral("https://www.gstatic.com/generate_204")};
+ QUrl m_internetProbe{QStringLiteral("https://cp.cloudflare.com/generate_204")};
  QSet<QString> m_failedMeasurements;
  QTimer m_save,m_measure,m_stale,m_nativeProbeDeadline;
 };

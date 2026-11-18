@@ -33,7 +33,7 @@ Item {
     function settle() { moreMenu.close(); detailClock.stop(); detailClock.progress = expanded ? 1 : 0; detailClock.destination = detailClock.progress; insertionOffset = 0; x = 0; opacity = 1 }
     onExpandedChanged: detailClock.moveTo(expanded ? 1 : 0)
     Component.onCompleted: detailClock.progress = expanded ? 1 : 0
-    SwirlTransitionCoordinator { id: detailClock; duration: SwirlMotion.selectionDuration }
+    readonly property Item ownedDetailClock: SwirlTransitionCoordinator { id: detailClock; parent: row; duration: SwirlMotion.selectionDuration }
 
     Rectangle {
         anchors.fill: parent; radius: Theme.controlRadius

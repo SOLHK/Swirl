@@ -21,10 +21,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: qt-network-security-${{ github.ref }}
-  # Only these development branches replace their own obsolete product builds;
-  # the newest source still runs every original and additive security gate.
-  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' || contains(fromJSON('["work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031"]'), github.head_ref || github.ref_name) }}
+  group: qt-network-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   downloader:
@@ -32,9 +30,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS 14 is in scheduled brownouts before its 2026-11-02 retirement.
-        # Keep the same ARM64 host and both Qt/security suites on supported 15.
-        os: [ubuntu-24.04, macos-15, windows-2022]
+        # Use macos-latest (ARM64) matching rust-core and native-lan so hosted
+        # macOS jobs are not starved on retiring macos-15 queues.
+        os: [ubuntu-24.04, macos-latest, windows-2022]
         qt-version: ['6.10.3', '6.11.3']
         include:
           - os: ubuntu-24.04
@@ -42,7 +40,7 @@ jobs:
             arch: linux_gcc_64
             generator: Ninja
             configure_args: ''
-          - os: macos-15
+          - os: macos-latest
             host: mac
             arch: clang_64
             generator: Ninja
@@ -66,6 +64,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev
+      - name: macOS build dependencies
+        if: runner.os == 'Darwin'
+        run: command -v ninja >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install ninja
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt-version }}

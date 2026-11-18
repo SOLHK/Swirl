@@ -6,7 +6,7 @@ Switch {
     id: control
     property bool large: false
     property real motionScale:1-(1-SwirlMotion.pressScale)*feedback.contact
-    SwirlInteractionMotion {id:feedback;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
+    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {id:feedback;parent:control;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     implicitWidth: Theme.dp(large ? 52 : 36)
     implicitHeight: Theme.dp(large ? 24 : 17)
     padding: 0

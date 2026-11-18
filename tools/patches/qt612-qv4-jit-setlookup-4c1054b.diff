@@ -1,0 +1,17 @@
+diff --git a/src/qml/jit/qv4baselinejit.cpp b/src/qml/jit/qv4baselinejit.cpp
+index cdb4b8f2674..abea5435a63 100644
+--- a/src/qml/jit/qv4baselinejit.cpp
++++ b/src/qml/jit/qv4baselinejit.cpp
+@@ -299,9 +299,10 @@ void BaselineJIT::generate_SetLookup(int index, int base)
+     as->passJSSlotAsArg(base, 1);
+     as->passFunctionAsArg(0);
+     if (function->isStrict())
+-        BASELINEJIT_GENERATE_RUNTIME_CALL(SetLookupStrict, CallResultDestination::InAccumulator)
++        BASELINEJIT_GENERATE_RUNTIME_CALL(SetLookupStrict, CallResultDestination::Ignore)
+     else
+-        BASELINEJIT_GENERATE_RUNTIME_CALL(SetLookupSloppy, CallResultDestination::InAccumulator)
++        BASELINEJIT_GENERATE_RUNTIME_CALL(SetLookupSloppy, CallResultDestination::Ignore)
++    LOAD_ACC();
+ }
+ 
+ void BaselineJIT::generate_LoadSuperProperty(int property)

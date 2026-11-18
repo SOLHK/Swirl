@@ -14,10 +14,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <algorithm>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <wincrypt.h>
-#endif
+#include "../app/DpapiDataProtection.h"
 
 struct TlsCertificateService::Impl {
 #ifdef Q_OS_WIN
@@ -189,10 +186,10 @@ bool TlsCertificateService::generate() {
 }
 bool TlsCertificateService::persist() {
 #ifdef Q_OS_WIN
-    const auto plain=QJsonDocument(QJsonObject{{"schema",1},{"certificate",QString::fromLatin1(m_certificate.toDer().toBase64())},{"key",QString::fromLatin1(d->privateBlob.toBase64())},{"hosts",QJsonArray::fromStringList(m_hostnames)}}).toJson(QJsonDocument::Compact);
-    DATA_BLOB input{DWORD(plain.size()),reinterpret_cast<BYTE *>(const_cast<char *>(plain.constData()))},output{};
-    if(!CryptProtectData(&input,L"Swirl CA",nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&output)){m_error=QStringLiteral("无法保护 CA 私钥。");emit changed();return false;}
-    const QByteArray encrypted(reinterpret_cast<char *>(output.pbData),output.cbData);LocalFree(output.pbData);
+    auto plain=QJsonDocument(QJsonObject{{"schema",1},{"certificate",QString::fromLatin1(m_certificate.toDer().toBase64())},{"key",QString::fromLatin1(d->privateBlob.toBase64())},{"hosts",QJsonArray::fromStringList(m_hostnames)}}).toJson(QJsonDocument::Compact);
+    const QByteArray encrypted=SwirlDpapi::protect(plain,L"Swirl CA");
+    plain.fill('\0');
+    if(encrypted.isEmpty()){m_error=QStringLiteral("无法保护 CA 私钥。");emit changed();return false;}
     QDir().mkpath(QFileInfo(m_path).absolutePath());QSaveFile file(m_path);
     if(!file.open(QIODevice::WriteOnly)||file.write(encrypted)!=encrypted.size()||!file.commit()){m_error=QStringLiteral("CA 保存失败。");emit changed();return false;}return true;
 #else
@@ -201,10 +198,10 @@ bool TlsCertificateService::persist() {
 }
 void TlsCertificateService::load() {
 #ifdef Q_OS_WIN
-    QFile file(m_path);if(!file.open(QIODevice::ReadOnly)||file.size()>128*1024)return;auto bytes=file.readAll();
-    DATA_BLOB input{DWORD(bytes.size()),reinterpret_cast<BYTE *>(bytes.data())},output{};
-    if(!CryptUnprotectData(&input,nullptr,nullptr,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&output))return;
-    const auto object=QJsonDocument::fromJson(QByteArray(reinterpret_cast<char *>(output.pbData),output.cbData)).object();SecureZeroMemory(output.pbData,output.cbData);LocalFree(output.pbData);
+    QFile file(m_path);if(!file.open(QIODevice::ReadOnly)||file.size()>128*1024)return;const auto bytes=file.readAll();
+    auto plain=SwirlDpapi::unprotect(bytes);
+    if(plain.isEmpty())return;
+    const auto object=QJsonDocument::fromJson(plain).object();plain.fill('\0');
     if(object.value("schema").toInt()!=1)return;
     for(const auto &host:object.value("hosts").toArray())if(host.isString()&&m_hostnames.size()<256)m_hostnames.append(host.toString());
     const auto key=QByteArray::fromBase64(object.value("key").toString().toLatin1());const QSslCertificate certificate(QByteArray::fromBase64(object.value("certificate").toString().toLatin1()),QSsl::Der);

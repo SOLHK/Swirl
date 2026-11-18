@@ -19,6 +19,59 @@
 
 #ifdef Q_OS_WIN
 namespace {
+#ifdef __MINGW32__
+bool inspectMingwRuntime(QJsonObject *output)
+{
+    QJsonObject result{{"required",true},{"success",false}};
+    const auto fail=[&](const char *code){result["error"]=QString::fromLatin1(code);*output=result;return false;};
+    const auto root=QFileInfo(QCoreApplication::applicationDirPath()).canonicalFilePath();
+    const auto path=QDir(root).filePath(QStringLiteral("mingw-runtime.json"));
+    const QFileInfo metadataInfo(path);
+    if(root.isEmpty()||sizeof(void *)!=8||metadataInfo.isSymLink()
+        ||metadataInfo.canonicalFilePath().compare(path,Qt::CaseInsensitive)!=0)
+        return fail("mingw-metadata-missing-or-outside-application");
+    QFile metadataFile(path);
+    if(!metadataFile.open(QIODevice::ReadOnly)||metadataFile.size()<=0||metadataFile.size()>65536)
+        return fail("mingw-metadata-unreadable-or-oversized");
+    QJsonParseError parseError;
+    const auto bytes=metadataFile.readAll();
+    const auto document=QJsonDocument::fromJson(bytes,&parseError);
+    const auto metadata=document.object();
+    const auto compiler=QStringLiteral("%1.%2.%3").arg(__GNUC__).arg(__GNUC_MINOR__).arg(__GNUC_PATCHLEVEL__);
+    if(parseError.error!=QJsonParseError::NoError||!document.isObject()
+        ||metadata.value("schema")!=QJsonValue(1)||metadata.value("kind")!="mingw-runtime"
+        ||metadata.value("target")!="x86_64-w64-mingw32"||metadata.value("compiler_version")!=compiler
+        ||!metadata.value("files").isArray()||metadata.value("files").toArray().size()!=3)
+        return fail("mingw-metadata-contract");
+    QSet<QString> remaining{QStringLiteral("libgcc_s_seh-1.dll"),QStringLiteral("libstdc++-6.dll"),QStringLiteral("libwinpthread-1.dll")};
+    const QRegularExpression hashPattern(QStringLiteral("^[0-9a-f]{64}$"));
+    QJsonObject modules;
+    for(const auto &value:metadata.value("files").toArray()){
+        const auto entry=value.toObject();const auto name=entry.value("path").toString();
+        if(!remaining.remove(name)||!hashPattern.match(entry.value("sha256").toString()).hasMatch())
+            return fail("mingw-file-inventory");
+        const auto expectedPath=QDir(root).filePath(name);const QFileInfo expected(expectedPath);
+        const auto canonicalExpected=expected.canonicalFilePath();
+        const auto module=GetModuleHandleW(reinterpret_cast<LPCWSTR>(name.utf16()));
+        wchar_t loadedPath[32768]{};
+        const DWORD length=module?GetModuleFileNameW(module,loadedPath,DWORD(std::size(loadedPath))):0;
+        const auto canonicalLoaded=length&&length<std::size(loadedPath)
+            ?QFileInfo(QString::fromWCharArray(loadedPath,int(length))).canonicalFilePath():QString();
+        QFile file(expectedPath);QCryptographicHash hash(QCryptographicHash::Sha256);
+        const bool inside=expected.isFile()&&!expected.isSymLink()&&!canonicalExpected.isEmpty()
+            &&canonicalExpected.compare(expectedPath,Qt::CaseInsensitive)==0
+            &&canonicalLoaded.compare(canonicalExpected,Qt::CaseInsensitive)==0;
+        const bool hashed=inside&&file.open(QIODevice::ReadOnly)&&hash.addData(&file);
+        const auto actual=hashed?QString::fromLatin1(hash.result().toHex()):QString();
+        const bool matches=hashed&&actual==entry.value("sha256").toString();
+        modules[name]=QJsonObject{{"loaded",module!=nullptr},{"inside_application",inside},{"sha256",actual},{"hash_matches",matches}};
+        if(!matches){result["modules"]=modules;return fail("mingw-file-or-loaded-module-verification");}
+    }
+    result["modules"]=modules;result["compiler_version"]=compiler;result["metadata_valid"]=true;
+    result["metadata_sha256"]=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    result["success"]=true;*output=result;return true;
+}
+#endif
 bool inspectMsvcRuntime(QJsonObject *output)
 {
     QJsonObject result{{"required",true},{"metadata_present",false},{"metadata_valid",false},{"success",false}};
@@ -146,11 +199,17 @@ int runTlsRuntimeSelfTest(const QString &reportPath)
                        {"backend",backend},{"runtime_version",version},{"client_alpn_supported",alpn},
                        {"qt_runtime_version",QString::fromLatin1(qVersion())},{"qt_build_version",QStringLiteral(QT_VERSION_STR)}};
     bool ownLibraries = true;
-    bool ownMsvcRuntime = false;
+    bool ownCompilerRuntime = false;
     QJsonObject libraries;
-    QJsonObject msvcRuntime;
+    QJsonObject compilerRuntime;
+    QString compilerRuntimeKey=QStringLiteral("msvc_runtime");
 #ifdef Q_OS_WIN
-    ownMsvcRuntime = inspectMsvcRuntime(&msvcRuntime);
+#ifdef __MINGW32__
+    compilerRuntimeKey=QStringLiteral("mingw_runtime");
+    ownCompilerRuntime=inspectMingwRuntime(&compilerRuntime);
+#else
+    ownCompilerRuntime = inspectMsvcRuntime(&compilerRuntime);
+#endif
     for (const auto &relative : {QStringLiteral("libssl-3-x64.dll"),QStringLiteral("libcrypto-3-x64.dll"),
                                 QStringLiteral("Qt6Network.dll"),QStringLiteral("tls/qopensslbackend.dll")}) {
         const auto name = QFileInfo(relative).fileName();
@@ -171,11 +230,11 @@ int runTlsRuntimeSelfTest(const QString &reportPath)
 #else
     ownLibraries = false;
 #endif
-    const bool success = available && backend==QStringLiteral("openssl") && alpn && ownLibraries && ownMsvcRuntime
+    const bool success = available && backend==QStringLiteral("openssl") && alpn && ownLibraries && ownCompilerRuntime
         && QString::fromLatin1(qVersion())==QStringLiteral(QT_VERSION_STR)
         && version.startsWith(QStringLiteral("OpenSSL " SWIRL_OPENSSL_VERSION " "));
     report["libraries"] = libraries;
-    report["msvc_runtime"] = msvcRuntime;
+    report[compilerRuntimeKey] = compilerRuntime;
     report["success"] = success;
     report["network_requests"] = 0;
     QSaveFile file(reportPath);

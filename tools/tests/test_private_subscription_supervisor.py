@@ -698,29 +698,40 @@ class RealWorkerTests(unittest.TestCase):
     def test_windows_parent_crash_kills_rust_child_and_retains_history(self):
         self.ledger.__exit__()
         self.path = self.path.with_name("crash-budget")
-        code = ("import sys\nsys.path.insert(0,sys.argv[1])\n"
+        ready = self.path.with_name("crash-active.json")
+        # Polling traffic-budget.json directly from the observer opens the target
+        # while Ledger._save() calls MoveFileExW(MOVEFILE_REPLACE_EXISTING),
+        # which NTFS rejects with ERROR_ACCESS_DENIED (5). Publish a separate
+        # marker after advance_supervised("active") has durably committed.
+        code = ("import json,os,sys\nsys.path.insert(0,sys.argv[1])\n"
+                "from pathlib import Path\n"
                 "from PrivateSubscriptionBudget import Ledger\n"
                 "from PrivateSubscriptionSupervisor import WorkerIdentity,Supervisor\n"
+                "orig=Ledger.advance_supervised\n"
+                "def observe(self,ticket,phase,*,process=None):\n"
+                " orig(self,ticket,phase,process=process)\n"
+                " if phase=='active':\n"
+                "  tmp=sys.argv[6]+'.tmp'\n"
+                "  Path(tmp).write_text(json.dumps(self.data['history']['1']),encoding='utf-8')\n"
+                "  os.replace(tmp,sys.argv[6])\n"
+                "Ledger.advance_supervised=observe\n"
                 "identity=WorkerIdentity.inspect(sys.argv[2],sys.argv[3],sys.argv[5])\n"
                 "with Ledger(sys.argv[4]) as ledger:\n"
                 " ledger.initialize_synthetic()\n"
                 " Supervisor(ledger,identity).run('stall_runtime_after_connect',timeout_ms=8000)\n")
         outer = subprocess.Popen([sys.executable, "-c", code, str(TOOLS), str(self.identity.path),
-                                  self.identity.metadata["source_sha"], str(self.path), self.identity.sha256],
+                                  self.identity.metadata["source_sha"], str(self.path), self.identity.sha256, str(ready)],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         handle = None
         try:
             stop = time.monotonic() + 5
-            history = None
             while time.monotonic() < stop:
-                try:
-                    data = json.loads((self.path / "traffic-budget.json").read_text())
-                    history = data["history"].get("1")
-                    if history and history["phase"] == "active":
-                        break
-                except (OSError, ValueError, KeyError):
-                    pass
+                if ready.is_file() or outer.poll() is not None:
+                    break
                 time.sleep(0.01)
+            self.assertTrue(ready.is_file(), f"active marker missing; outer poll={outer.poll()}")
+            data = json.loads((self.path / "traffic-budget.json").read_text())
+            history = data["history"].get("1")
             self.assertIsNotNone(history)
             self.assertEqual(history["phase"], "active")
             import ctypes as c

@@ -4,6 +4,8 @@
 #include "PolicySystemProxyBackend.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
+#include "engine/RustCoreEngine.h"
+#include "app/NodeViewModel.h"
 #include <QColor>
 #include <QCryptographicHash>
 #include <QDir>
@@ -23,6 +25,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
 #include <algorithm>
@@ -72,10 +75,57 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         if(name.startsWith("servicePolicyMore-")||name.startsWith("policyGroupMore-"))for(auto *menu:namedObjects("swirlContextMenu"))qInfo()<<"Fixture menu state"<<menu->property("visible")<<menu->property("count")<<menu->property("popupType");
         return true;
     };
-    const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
+    const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);if(text.isEmpty())QTest::keyClick(window,Qt::Key_Backspace);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"minimum_advanced_focus",minimumAdvancedFocus},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
+    {
+        QTemporaryDir fixture;
+        const auto path=fixture.filePath("source-first.dpapi"),backup=fixture.filePath("source-first.backup");
+        EngineController sourceController(std::make_unique<RustCoreEngine>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+        sourceController.imports()->shutdown();
+        check(fixture.isValid()&&sourceController.m_store.saveSubscription({},"Receipt fixture",QUrl("https://source.fixture.invalid/config"),1440,false),
+              QStringLiteral("First-source UI fixture stores a disabled synthetic subscription without downloading"));
+        const auto sources=sourceController.m_store.subscriptions();
+        if(sources.isEmpty())return finish();
+        const auto sourceId=sources.first().id;
+        QQmlContext context(qmlContext(window));context.setContextProperty("engineController",&sourceController);
+        QQmlComponent component(qmlEngine(window),QUrl("qrc:/qt/qml/SwirlQuick/pages/SubscriptionsPage.qml"));
+        std::unique_ptr<QObject> page(component.create(&context));
+        if(!check(page!=nullptr,QStringLiteral("First-source regression instantiates the production subscription page"))){qWarning()<<component.errorString();return finish();}
+        const auto sourceAction=[&](const QString &script){QQmlExpression expression(&context,page.get(),script);const auto result=expression.evaluate();check(!expression.hasError(),QStringLiteral("Subscription receipt action is valid"));return result;};
+        const auto selectScript=QString("selectSource('%1')").arg(sourceId);
+        const bool blocked=QFile::rename(path,backup)&&QDir().mkdir(path);
+        if(!check(blocked,QStringLiteral("A temporary directory blocks the first source's real atomic save")))return finish();
+        sourceAction(selectScript);
+        const auto failedRequest=sourceController.policyRequestId();
+        check(!sourceController.policyV2Active()&&sourceController.policyBusy()&&page->property("mutationPending").toBool()
+              &&page->property("mutationRequestId").toString()==failedRequest&&!failedRequest.isEmpty()
+              &&!page->property("mutationMessage").toString().contains(QStringLiteral("已使用")),
+              QStringLiteral("First-source selection remains pending before native validation and encrypted save complete"));
+        sourceAction(selectScript);
+        sourceAction("completeMutation('unrelated-receipt', true)");
+        check(sourceController.policyRequestId()==failedRequest&&page->property("mutationPending").toBool(),
+              QStringLiteral("Repeated source clicks and unrelated receipts cannot complete or replace a pending selection"));
+        check(QTest::qWaitFor([&]{return !sourceController.policyBusy()&&!page->property("mutationPending").toBool();},12000)
+              &&!sourceController.policyV2Active()&&!sourceController.subscriptionScopeEnabled()&&!sourceController.policyError().isEmpty()
+              &&page->property("mutationMessage").toString()==sourceController.policyError(),
+              QStringLiteral("Failed first-source persistence reports failure and retains the previous source scope"));
+        if(!check(QDir().rmdir(path)&&QFile::rename(backup,path),QStringLiteral("First-source failure fixture restores its original encrypted file")))return finish();
+        sourceAction(selectScript);
+        const auto savedRequest=sourceController.policyRequestId();
+        check(page->property("mutationPending").toBool()&&savedRequest!=failedRequest,
+              QStringLiteral("Retry receives a fresh pending request instead of reusing the failed selection"));
+        check(QTest::qWaitFor([&]{return !sourceController.policyBusy()&&!page->property("mutationPending").toBool();},12000)
+              &&sourceController.policyError().isEmpty()&&sourceController.policyV2Active()
+              &&sourceController.activeSubscriptionId()==sourceId&&sourceController.policyReceipt().value("request_id")==savedRequest
+              &&page->property("mutationMessage").toString().contains(QStringLiteral("已使用")),
+              QStringLiteral("First-source success is shown only after its matching durable configuration receipt"));
+        sourceAction(selectScript);
+        check(sourceController.policyRequestId()==savedRequest&&!page->property("mutationPending").toBool()
+              &&!sourceController.processAlive()&&!sourceController.systemProxy()->owned(),
+              QStringLiteral("Selecting the committed source again is a no-op and never starts a proxy"));
+    }
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
     check(eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0").toBool(),QStringLiteral("An external host proxy never displays Swirl's small wing"));
@@ -124,6 +174,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     ControlledNetwork net;if(!check(net.start(),QStringLiteral("Controlled real proxy peers and HTTP origin start")))return finish();
     const QString defaultDomain=QStringLiteral("default.policy.fixture.invalid"),serviceDomain=QStringLiteral("service.policy.fixture.invalid"),childDomain="sub."+serviceDomain;net.a.aliases={defaultDomain,serviceDomain,childDomain};net.b.aliases=net.a.aliases;
     auto defaultUrl=net.url();defaultUrl.setHost(defaultDomain);auto serviceUrl=net.url();serviceUrl.setHost(serviceDomain);auto childUrl=net.url();childUrl.setHost(childDomain);
+    controller->m_proxyProbeUrl=defaultUrl;
     check(controller->saveNode({{"name","Policy fixture A"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.a.serverPort()}}),QStringLiteral("Setup stores isolated node A"));
     check(controller->saveNode({{"name","Policy fixture B"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}}),QStringLiteral("Setup stores isolated authenticated node B"));
     const auto nodes=controller->nodes();if(!check(nodes.size()==2,QStringLiteral("Exactly two isolated nodes exist")))return finish();const auto nodeA=nodes[0].toMap().value("id").toString(),nodeB=nodes[1].toMap().value("id").toString();
@@ -187,6 +238,90 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!awaitSaved(QStringLiteral("Default node A is durably saved through real input")))return finish();
     check(controller->defaultPolicy().value("id")=="policy:default"&&controller->defaultPolicy().value("target").toMap().value("id")==nodeA,QStringLiteral("Permanent default policy holds stable identity and selected node"));
     targetPresentation("defaultPolicyTargetText","defaultPolicySource",nodeA,QStringLiteral("Default routing shows the configured node and its real configuration source"));
+    {
+        controller->tests()->invalidateResults();
+        const auto saved=controller->defaultPolicy();const auto revision=controller->savedRevision();
+        click("defaultPolicyTarget");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()
+            &&controller->tests()->result(nodeA).value("success").toBool()
+            &&controller->tests()->result(nodeB).value("success").toBool();},12000),
+            QStringLiteral("Opening the exit picker automatically completes real authenticated proxy requests for every candidate"));
+        for(const auto &id:{nodeA,nodeB}){
+            // A fresh result may already be cached before this popup's deferred
+            // model/delegates are created. Observe the presented value itself.
+            check(QTest::qWaitFor([&]{
+                auto *row=item("policyNode-"+id);auto *label=row?find(row,"policyNodeLatency"):nullptr;
+                const auto latency=controller->tests()->result(id).value("latency").toLongLong();
+                return label&&label->property("text").toString()==QString::number(latency)+" ms"&&latency>=0;
+            },1000),
+                QStringLiteral("Each visible exit row displays its measured request RTT button"));
+        }
+        auto *list=item("policyTargetList");
+        auto *model=list?qobject_cast<NodeViewModel *>(list->property("model").value<QObject *>()):nullptr;
+        click("policySortLatency");
+        check(model&&model->rowCount()==2&&model->get(0).value("exitLatency").toLongLong()<=model->get(1).value("exitLatency").toLongLong(),
+            QStringLiteral("Exit latency sorting orders actual measured results"));
+        click("policyAvailableOnly");
+        check(model&&model->rowCount()==2&&model->get(0).value("testAvailable").toBool()&&model->get(1).value("testAvailable").toBool(),
+            QStringLiteral("Available-only filtering retains only successful authenticated candidates"));
+        click("policySortName");
+        check(model&&model->get(0).value("name")=="Policy fixture A"&&model->get(1).value("name")=="Policy fixture B",
+            QStringLiteral("Name sorting remains available after live measurements"));
+        auto *dialog=popup("policyTargetPicker");
+        QQmlExpression selected(dialog?qmlContext(dialog):nullptr,dialog,"selectedTarget.id===currentTarget.id");
+        check(dialog&&selected.evaluate().toBool()&&!selected.hasError()&&controller->defaultPolicy()==saved
+            &&controller->savedRevision()==revision,
+            QStringLiteral("Measurement, filtering and reordering preserve the selected exit and saved policy"));
+        const auto measured=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        const auto untouched=controller->tests()->result(nodeB);
+        auto *nodeRow=item("policyNode-"+nodeA);auto *latencyButton=nodeRow?find(nodeRow,"policyNodeLatency"):nullptr;
+        if(check(latencyButton&&latencyButton->isEnabled(),QStringLiteral("Per-node liquid glass latency control is actionable"))){
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,latencyButton->mapToScene(QPointF(latencyButton->width()/2,latencyButton->height()/2)).toPoint());
+            check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>measured;},12000),QStringLiteral("Clicking a latency button refreshes that node's real request"));
+            check(controller->tests()->result(nodeB)==untouched&&selected.evaluate().toBool()&&controller->defaultPolicy()==saved&&controller->savedRevision()==revision,
+                QStringLiteral("Single-node refresh preserves other results and the selected policy"));
+        }
+        const auto singleMeasured=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        click("policyRetest");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()
+            &&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>singleMeasured
+            &&controller->tests()->succeeded()==2;},12000),QStringLiteral("Manual retry obtains fresh real request results"));
+        capture("automatic-exit-latencies");
+        click("policyAvailableOnly");click("cancelPolicyTarget");
+        check(QTest::qWaitFor([&]{return !popup("policyTargetPicker")&&!controller->tests()->busy();},3000),
+            QStringLiteral("Closing the exit picker retires its probe ownership"));
+    }
+    {
+        QTcpServer stalled;check(stalled.listen(QHostAddress::LocalHost,0),QStringLiteral("External batch uses an isolated stalled peer"));
+        auto probeOptions=controller->nodeProbeOptions();for(auto &node:probeOptions.nodes)if(node.id==nodeB)node.port=stalled.serverPort();
+        controller->tests()->start(probeOptions,{nodeA,nodeB},defaultUrl);
+        check(QTest::qWaitFor([&]{return controller->tests()->result(nodeA).value("success").toBool()&&controller->tests()->testing(nodeB);},5000),QStringLiteral("External batch has one completed and one pending node"));
+        click("defaultPolicyTarget");auto *row=item("policyNode-"+nodeA);auto *button=row?find(row,"policyNodeLatency"):nullptr;
+        const auto stamp=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        if(check(button&&button->isEnabled(),QStringLiteral("Completed node can refresh beside an external batch")))
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());
+        check(QTest::qWaitFor([&]{return controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>stamp;},4000),QStringLiteral("Interactive refresh completes without waiting for stalled batch rows"));
+        click("cancelPolicyTarget");
+        check(controller->tests()->busy()&&controller->tests()->testing(nodeB),QStringLiteral("Closing the picker preserves the external batch's pending work"));
+        controller->tests()->cancel();check(QTest::qWaitFor([&]{return !controller->tests()->busy();},5000),QStringLiteral("External test owner cancels and retires its batch"));
+    }
+    {
+        if(!navigate("proxies"))return finish();fill("nodeSearchField","Policy fixture A");
+        auto *model=window->findChild<NodeViewModel *>("nodeViewModel");
+        check(model&&QTest::qWaitFor([&]{return model->rowCount()==1;},3000),QStringLiteral("Node library search narrows the visible rows"));
+        const auto before=net.httpRequests;
+        click("allNodesTestButton");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->total()==2&&controller->tests()->succeeded()==2;},10000)
+            &&net.httpRequests==before+2,QStringLiteral("Test all button immediately probes both nodes despite the visible filter"));
+        fill("nodeSearchField","");check(model&&QTest::qWaitFor([&]{return model->rowCount()==2;},3000),QStringLiteral("Node library restores both measured rows"));
+        const auto untouched=controller->tests()->result(nodeB);const auto selectedRow=eval("pageLoader.item.focusedId");
+        const auto stamp=controller->tests()->result(nodeA).value("measuredAtMs").toLongLong();
+        click("nodeLatency-"+nodeA);
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy()&&controller->tests()->result(nodeA).value("measuredAtMs").toLongLong()>stamp;},10000)
+            &&controller->tests()->result(nodeB)==untouched&&eval("pageLoader.item.focusedId")==selectedRow,
+            QStringLiteral("Library glass button refreshes one node without selecting its table row"));
+        capture("node-library-latency-buttons");if(!navigate("policies"))return finish();
+    }
     {
         const auto priorSize=window->size();const auto priorPolicy=controller->defaultPolicy();const auto priorRevision=controller->savedRevision();
         window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(150);
@@ -404,8 +539,16 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
     check(!liveEpoch.isEmpty(),QStringLiteral("Live receipt reports the actual runtime epoch"));
     const auto request=[&](const QUrl &url,SocksPeer *expected,const QString &label){
-        const auto before=net.httpRequestsByExit;const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;controller->testNode(url);
-        const bool finished=QTest::qWaitFor([&]{return !controller->nodeBusy()&&net.httpRequests>0&&(net.httpRequestsByExit!=before);},10000);
+        (void)QTest::qWaitFor([&]{return !controller->nodeBusy();},5000);
+        const auto before=net.httpRequestsByExit;const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;
+        bool sawBusy=false,sawFinished=false;
+        const auto probeConnection=QObject::connect(controller,&EngineController::statusChanged,window,[&]{
+            if(controller->nodeBusy())sawBusy=true;
+            else if(sawBusy||controller->requestStateText().startsWith(QStringLiteral("Rust HEAD 探测失败")))sawFinished=true;
+        });
+        controller->testNode(url);
+        const bool finished=QTest::qWaitFor([&]{return sawFinished&&!controller->nodeBusy()&&net.httpRequests>0&&(net.httpRequestsByExit!=before);},10000);
+        QObject::disconnect(probeConnection);
         const auto marker=expected?expected->label:QStringLiteral("DIRECT-BYPASS");
         bool route=finished&&controller->requestSucceeded()&&net.httpRequestsByExit.value(marker)>before.value(marker);
         if(expected)route=route&&net.httpRequestsByExit.value("DIRECT-BYPASS")==before.value("DIRECT-BYPASS")&&(expected==&net.a?net.b.forwarded==beforeB:net.a.forwarded==beforeA);
@@ -655,9 +798,43 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     setTab(1);if(auto *list=item("policyGroupList")){QMetaObject::invokeMethod(list,"positionViewAtIndex",Q_ARG(int,3),Q_ARG(int,0));QTest::qWait(100);}
     const auto unusedGroup=recordNamed(controller->strategyGroups(),"Automatic fixture 2").value("id").toString();click("policyGroupMore-"+unusedGroup);click("swirlContextOption-1");click("confirmDeletePolicy");awaitSaved(QStringLiteral("Unused strategy group deletion is committed"));check(controller->strategyGroups().size()==4,QStringLiteral("Deleting an unused group retains all unrelated references"));
     check(applied.count()>=14,QStringLiteral("Real policy completion signals accompany accepted transactions"));
-    check(!controller->setTunEnabled(true)&&!controller->tunEnabled(),QStringLiteral("Unsupported TUN is rejected before any platform mutation"));
     eval("AppState.navigate('activity')");
     if(!check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity mode is reachable after policy edits")))return finish();
+    // The real confirmation is exercised against the production controller's
+    // unsupported-component guard, never against the host's privileged helper.
+    if(!check(!controller->tunSupported(),QStringLiteral("TUN confirmation fixture has no privileged platform components")))return finish();
+    const auto beforeTunError=controller->routingError(),beforeTunRevision=controller->savedRevision();
+    const auto beforeTunProxy=controller->systemProxy()->diagnosticState();
+    const bool beforeTunAlive=controller->processAlive(),beforeTunRequested=controller->tunRequested();
+    const int beforeTunTakeovers=proxyBackend->takeoverCalls,beforeTunRestores=proxyBackend->restoreCalls;
+    click("tunCapsule");
+    check(popup("tunAuthorizationDialog")!=nullptr,QStringLiteral("TUN enable first opens an explicit administrator authorization explanation"));
+    capture("tun-authorization");click("cancelTunAuthorization");
+    check(QTest::qWaitFor([&]{return !popup("tunAuthorizationDialog");},2000)
+          &&controller->routingError()==beforeTunError&&controller->savedRevision()==beforeTunRevision
+          &&controller->processAlive()==beforeTunAlive&&controller->tunRequested()==beforeTunRequested
+          &&controller->systemProxy()->diagnosticState()==beforeTunProxy
+          &&proxyBackend->takeoverCalls==beforeTunTakeovers&&proxyBackend->restoreCalls==beforeTunRestores,
+          QStringLiteral("Cancelling TUN authorization invokes no transition and preserves current connection, receipt and proxy state"));
+    click("tunCapsule");click("confirmTunAuthorization");
+    check(QTest::qWaitFor([&]{return !popup("tunAuthorizationDialog");},2000)
+          &&controller->routingError().contains(QStringLiteral("组件或驱动缺失"))&&!controller->tunEnabled()
+          &&controller->systemProxy()->diagnosticState()==beforeTunProxy,
+          QStringLiteral("Explicit TUN confirmation reaches the real controller and unsupported components fail before platform mutation"));
+    auto pendingTunOptions=controller->m_options;pendingTunOptions.tunEnabled=true;
+    check(!controller->processAlive()&&controller->applyPolicyConfiguration(QJsonObject::fromVariantMap(controller->policyDocument()),pendingTunOptions)
+          &&QTest::qWaitFor([&]{return !controller->policyBusy();},5000)&&controller->policyError().isEmpty(),
+          QStringLiteral("An isolated durable TUN preference can be pending while the actual capture is stopped"));
+    check(controller->tunRequested()&&!controller->tunEnabled()
+          &&item("tunCapsule")->property("label").toString().contains(QStringLiteral("取消待启用"))
+          &&item("tunCapsule")->property("tone").toString()==QStringLiteral("neutral"),
+          QStringLiteral("The pending TUN action is explicit and never claims actual capture is enabled"));
+    click("tunCapsule");
+    check(QTest::qWaitFor([&]{return !controller->busy()&&!controller->policyBusy();},5000)
+          &&!controller->tunRequested()&&!controller->tunEnabled()&&!controller->processAlive()
+          &&!popup("tunAuthorizationDialog")&&controller->systemProxy()->diagnosticState()==beforeTunProxy
+          &&proxyBackend->takeoverCalls==beforeTunTakeovers&&proxyBackend->restoreCalls==beforeTunRestores,
+          QStringLiteral("Cancelling the pending TUN preference saves the change without elevation, core start or proxy takeover"));
     auto *activityMode=item("activityOutboundMode");
     auto *modeText=item("activityOutboundModeText");
     auto *modeContent=activityMode->property("contentItem").value<QQuickItem *>();

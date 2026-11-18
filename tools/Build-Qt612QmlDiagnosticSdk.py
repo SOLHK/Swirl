@@ -21,8 +21,9 @@ import zipfile
 
 LOCK = "tools/qt612-qml-patch.lock.json"
 PATCH = "tools/patches/qt612-qv4-sweep-8c92fe0.patch"
+JIT_PATCH = "tools/patches/qt612-qv4-jit-setlookup-4c1054b.diff"
 NEW_INPUTS = [
-    LOCK, PATCH, "tools/Build-Qt612QmlDiagnosticSdk.py",
+    LOCK, PATCH, JIT_PATCH, "tools/Build-Qt612QmlDiagnosticSdk.py",
     "tools/RunQt612RuntimeComparison.py", "tools/tests/test_qt612_diagnostic_sdk.py",
     ".github/workflows/diagnose-qt612-runtime-patch.yml",
 ]
@@ -31,7 +32,7 @@ SOURCE_INPUTS = NEW_INPUTS + [
     "tools/RunQt612GcProbe.py", "tools/PrivateSubscriptionProcess.py",
     "tools/PrivateSubscriptionBudget.py", ".github/workflows/diagnose-qt612-gc.yml",
 ] + ["tools/repros/qt612-popup-gc/" + name for name in
-     ("CMakeLists.txt", "main.cpp", "sweep.cpp", "Main.qml", "ProbeDialog.qml", "OwnedHelper.qml")]
+     ("CMakeLists.txt", "main.cpp", "sweep.cpp", "jit.cpp", "LICENSE-GPL-3.0.txt", "Main.qml", "ProbeDialog.qml", "OwnedHelper.qml")]
 SHA = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 MAX_LOG_BYTES = 64 * 1024 * 1024
@@ -281,17 +282,17 @@ def admit(repo, source_sha, head_sha):
     require(os.name == "nt" and struct.calcsize("P") == 8, "WindowsX64Required")
     expected = {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
                 "GITHUB_REPOSITORY": "SOLHK/Swirl", "GITHUB_BASE_REF": "test",
-                "GITHUB_HEAD_REF": "work/node-probe-render-20261105",
-                "SWIRL_QT612_RUNTIME_PATCH": "1", "SWIRL_DIAGNOSTIC_PR": "61",
+                "GITHUB_HEAD_REF": "work/subscription-tun-0245-20261115",
+                "SWIRL_QT612_RUNTIME_PATCH": "1", "SWIRL_DIAGNOSTIC_PR": "62",
                 "SWIRL_EXECUTING_PR_HEAD": head_sha, "GITHUB_SHA": source_sha,
                 "GITHUB_EVENT_NAME": "pull_request"}
     require(all(os.environ.get(k) == v for k, v in expected.items()), "HostedDiagnosticAdmissionRejected")
     event = read_json(plain_path(Path(os.environ["GITHUB_EVENT_PATH"])), 2 * 1024**2)
     pr = event.get("pull_request", {})
-    require(event.get("action") == "labeled" and event.get("number") == 61
+    require(event.get("action") == "labeled" and event.get("number") == 62
             and event.get("label", {}).get("name") == "qa-qt612-runtime-patch"
             and pr.get("head", {}).get("sha") == head_sha
-            and pr.get("head", {}).get("ref") == "work/node-probe-render-20261105"
+            and pr.get("head", {}).get("ref") == "work/subscription-tun-0245-20261115"
             and pr.get("head", {}).get("repo", {}).get("full_name") == "SOLHK/Swirl"
             and pr.get("base", {}).get("ref") == "test"
             and pr.get("base", {}).get("repo", {}).get("full_name") == "SOLHK/Swirl",
@@ -412,7 +413,7 @@ def compiler_phase_plan(phase, arguments, cwd, context, lock, tool_identities, k
     else:
         source = (plain_path(work / "source", root=work) if phase.startswith("sdk:")
                   else plain_path(repo / "tools/repros/qt612-popup-gc", root=repo))
-        targets = ["Qml", "BuiltinsOutput"] if phase.startswith("sdk:") else ["PopupGcFixture", "SweepSlotsProbe"]
+        targets = ["Qml", "BuiltinsOutput"] if phase.startswith("sdk:") else ["PopupGcFixture", "SweepSlotsProbe", "JitGcProbe"]
         expected = [tools["cmake.exe"], "--build", build, "--target", *targets, "--parallel", "2"]
         expected_cwd = work
     args = [str(x) for x in arguments]
@@ -1906,8 +1907,10 @@ def verify_configuration(source, build, stock, tools, evidence, lock, pinned_cma
 
 
 def verify_source_bytes(lock, name, data, expected_blob):
-    if name == lock["patch"]["production_path"]:
-        require(hashlib.sha256(data).hexdigest() == lock["patch"]["postimage_sha256"],
+    patches = [lock["patch"], *lock["patch"].get("additional", [])]
+    patch = next((patch for patch in patches if name == patch["production_path"]), None)
+    if patch is not None:
+        require(hashlib.sha256(data).hexdigest() == patch["postimage_sha256"],
                 "ArchivedPatchPostimageMismatch")
         return "pinned-production-postimage"
     contract = lock["source"]["checkout_eol_contract"]
@@ -1959,7 +1962,8 @@ def preserve_corresponding_source(source, entries, lock, evidence):
             entry.external_attr, entry.compress_type = int(mode, 8) << 16, zipfile.ZIP_DEFLATED
             archive.writestr(entry, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=6)
     require(len(files) == 23849 and len(omitted) == 1, "SourceSnapshotClosureChanged")
-    require(files[lock["patch"]["production_path"]]["sha256"] == lock["patch"]["postimage_sha256"],
+    require(all(files[patch["production_path"]]["sha256"] == patch["postimage_sha256"]
+                for patch in [lock["patch"], *lock["patch"].get("additional", [])]),
             "ArchivedPatchPostimageMismatch")
     require(any(n.startswith("LICENSES/") for n in files), "SourceLicensesMissing")
     contract = lock["source"]["checkout_eol_contract"]
@@ -2080,21 +2084,32 @@ def main():
         run("05-source-identity", [git, "-C", source, "show", "-s", "--format=%H%n%T", "HEAD"], seconds=20)
         require(output_text(commands, "05-source-identity").splitlines()
                 == [lock["source"]["commit"], lock["source"]["tree"]], "QtSourceIdentityMismatch")
-        original = source / lock["patch"]["production_path"]
-        check_patch(lock, repo / PATCH, original)
-        run("06-patch-check", [git, "-C", source, "apply", "--check", repo / PATCH], seconds=20)
-        run("07-patch-apply", [git, "-C", source, "apply", repo / PATCH], seconds=20)
-        require(digest(original) == lock["patch"]["postimage_sha256"], "PatchPostimageMismatch")
+        patches = sorted([lock["patch"], *lock["patch"].get("additional", [])],
+                         key=lambda patch: patch["production_path"])
+        require([(patch["path"], patch["production_path"]) for patch in patches] == [
+            (JIT_PATCH, "src/qml/jit/qv4baselinejit.cpp"), (PATCH, "src/qml/memory/qv4mm.cpp")],
+            "UnexpectedQtPatchSet")
+        for index, patch in enumerate(patches):
+            original = source / patch["production_path"]
+            patch_file = repo / patch["path"]
+            check_patch({"patch": patch}, patch_file, original)
+            run(f"06-patch-check-{index}", [git, "-C", source, "apply", "--check", patch_file], seconds=20)
+            run(f"07-patch-apply-{index}", [git, "-C", source, "apply", patch_file], seconds=20)
+            require(digest(original) == patch["postimage_sha256"], "PatchPostimageMismatch")
+        patch_paths = "\n".join(patch["production_path"] for patch in patches)
+        patch_status = "\n".join(" M " + patch["production_path"] for patch in patches).strip()
         run("08-patch-stat", [git, "-C", source, "diff", "--numstat"], seconds=20)
-        require(output_text(commands, "08-patch-stat") == "15\t7\t" + lock["patch"]["production_path"],
+        require(output_text(commands, "08-patch-stat") == "\n".join(
+                    f'{patch["added_lines"]}\t{patch["deleted_lines"]}\t{patch["production_path"]}'
+                    for patch in patches),
                 "UnexpectedQtSourceChanges")
         run("09-patch-diff", [git, "-C", source, "diff", "--binary"], seconds=20)
         run("09a-source-files", [git, "-C", source, "ls-files", "--stage", "-z"], seconds=30)
         run("09b-source-status", [git, "-C", source, "status", "--porcelain=v1", "--untracked-files=all"], seconds=30)
         run("09c-source-diff-paths", [git, "-C", source, "diff", "--name-only"], seconds=20)
-        require(output_text(commands, "09b-source-status") == "M " + lock["patch"]["production_path"],
+        require(output_text(commands, "09b-source-status") == patch_status,
                 "UnexpectedPatchedSourceStatus")
-        require(output_text(commands, "09c-source-diff-paths") == lock["patch"]["production_path"],
+        require(output_text(commands, "09c-source-diff-paths") == patch_paths,
                 "UnexpectedPatchedSourcePaths")
         report["corresponding_source"] = preserve_corresponding_source(
             source, (commands / "09a-source-files.stdout.log").read_bytes(), lock, evidence)
@@ -2254,8 +2269,8 @@ def main():
         run("18-source-status-after-build", [git, "-C", source, "status", "--porcelain=v1",
                                             "--untracked-files=all"], seconds=30)
         require(output_text(commands, "18-source-status-after-build")
-                == "M " + lock["patch"]["production_path"]
-                and digest(original) == lock["patch"]["postimage_sha256"], "QtSourceChangedDuringBuild")
+                == patch_status and all(digest(source / patch["production_path"]) == patch["postimage_sha256"]
+                                        for patch in patches), "QtSourceChangedDuringBuild")
         require(source_identity(repo, args.expected_source_sha, args.expected_pr_head_sha) == inputs,
                 "DiagnosticSourceChangedDuringBuild")
         for name, item in report["tools"].items():

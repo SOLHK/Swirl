@@ -38,8 +38,8 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <sddl.h>
-#include <wincrypt.h>
 #endif
+#include "app/DpapiDataProtection.h"
 
 namespace {
 constexpr qint64 BodyLimit = 4 * 1024 * 1024;
@@ -47,19 +47,9 @@ const QByteArray Magic("SWIRLCAPTURE1\n");
 const QUrl ProbeUrl(QStringLiteral("https://www.cloudflare.com/robots.txt"));
 
 QByteArray crypt(QByteArray bytes, bool decrypt) {
-#ifdef Q_OS_WIN
-    DATA_BLOB input{DWORD(bytes.size()), reinterpret_cast<BYTE *>(bytes.data())}, result{};
-    const bool ok = decrypt
-        ? CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result)
-        : CryptProtectData(&input, L"Swirl private QA", nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result);
+    const QByteArray output = decrypt ? SwirlDpapi::unprotect(bytes) : SwirlDpapi::protect(bytes, L"Swirl private QA");
     bytes.fill('\0');
-    if (!ok) return {};
-    QByteArray output(reinterpret_cast<char *>(result.pbData), result.cbData);
-    SecureZeroMemory(result.pbData, result.cbData); LocalFree(result.pbData);
     return output;
-#else
-    Q_UNUSED(bytes); Q_UNUSED(decrypt); return {};
-#endif
 }
 QByteArray readPrivate(const QString &path) {
     QFile file(path);

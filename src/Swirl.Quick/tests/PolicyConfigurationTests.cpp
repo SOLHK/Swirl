@@ -1,6 +1,8 @@
 #include "engine/EngineController.h"
 #include "engine/RustCoreEngine.h"
 #include "PolicySystemProxyBackend.h"
+#include "ControlledNetwork.h"
+#include "IsolatedUserRegistry.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
@@ -12,6 +14,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTcpServer>
+#include <QTimer>
 #include <QTest>
 #include <QUuid>
 #include <functional>
@@ -29,14 +32,23 @@ public:
     QStringList operations;
     QJsonObject prepared,base;
     quint64 generation=1;
-    bool rejectPrepare=false,rejectFinishOnce=false,rolledBack=false,gate=false;
-    int activations=0,starts=0,stops=0;
+    bool rejectPrepare=false,rejectValidate=false,rejectFinishOnce=false,rolledBack=false,gate=false;
+    bool probeSucceeds=true;
+    QString probeFailureCode;
+    bool rejectTunStart=false,holdTunStart=false,degradeTunStart=false,rejectStop=false,stopTunStart=false,recoverySucceeds=true;
+    int activations=0,starts=0,stops=0,recoveries=0;
     std::function<void()> beforeActivate,beforeRollback,beforeFinish;
     static QString digest(const QJsonObject &candidate) {
         return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(candidate).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
     }
     void start(const EngineStartOptions &options) override {
         ++starts;current.processId=QCoreApplication::applicationPid();
+        if(options.tunEnabled&&stopTunStart){current.state=State::Stopped;current.processAlive=false;current.message="Controlled start declined";emit statusChanged();return;}
+        if(options.tunEnabled&&(rejectTunStart||holdTunStart||degradeTunStart)){
+            current.state=holdTunStart?State::Starting:degradeTunStart?State::Degraded:State::Failed;current.processAlive=degradeTunStart;current.apiHealthy=false;
+            current.message="Controlled administrator denial";current.tunEnabled=false;emit statusChanged();return;
+        }
+        current.tunEnabled=options.tunEnabled;current.tunCapturePossible=options.tunEnabled;
         current.state=State::Running;current.processAlive=true;current.apiHealthy=true;current.proxyPort=options.proxyPort;
         current.directSession=options.policyDocument.value("mode")==QJsonValue("direct");current.mode=options.policyDocument.value("mode").toString();
         current.configurationReceipt={{"engine_epoch","1"},{"generation",QString::number(generation)},
@@ -44,16 +56,37 @@ public:
             {"applied_mode",current.mode},{"store_id",options.configurationStoreId},{"request_id",options.configurationRequestId}};
         emit statusChanged();
     }
-    void stop() override {++stops;current.state=State::Stopped;current.processAlive=false;current.apiHealthy=false;current.configurationReceipt={};gate=false;emit statusChanged();}
+    void stop() override {++stops;if(rejectStop){current.state=State::Degraded;current.apiHealthy=false;current.message="Controlled stop unconfirmed";emit statusChanged();return;}current.state=State::Stopped;current.processAlive=false;current.apiHealthy=false;current.tunEnabled=false;current.tunCapturePossible=false;current.configurationReceipt={};gate=false;emit statusChanged();}
     void refresh() override {}
+    void recoverTunNetwork() override {
+        ++recoveries;
+        QTimer::singleShot(0,this,[this]{
+            if(recoverySucceeds){current={};emit statusChanged();}
+            emit tunRecoveryFinished(recoverySucceeds,recoverySucceeds?QStringLiteral("Controlled recovery confirmed"):QStringLiteral("Controlled recovery unconfirmed"));
+        });
+    }
     void selectNode(const QString &) override {QFAIL("V2 coordinator used legacy selection");}
     void probeNode(const QUrl &) override {}
+    void probeNodeTagged(const QUrl &,quint64 tag) override {
+        // Coordinator fixture only: real TLS/exit behavior is tested by the
+        // Rust and socket integration suites, never inferred from this peer.
+        current.probeRequestTag=tag;current.nodeBusy=true;current.requestState=RequestState::InProgress;emit statusChanged();
+        QTimer::singleShot(0,this,[this,tag]{
+            current.probeRequestTag=tag;current.nodeBusy=false;
+            current.requestState=probeSucceeds?RequestState::Succeeded:RequestState::Failed;
+            current.nodeHealth=probeSucceeds?NodeHealth::Available:probeFailureCode.isEmpty()?NodeHealth::Unknown:NodeHealth::Unavailable;
+            current.nodeMessage=probeSucceeds?QString():probeFailureCode.isEmpty()?QString("Controlled origin TLS failure"):probeFailureCode;emit statusChanged();
+        });
+    }
     Status status() const override {return current;}
     QString configurationSummary() const override {return "controlled configuration peer";}
     void configurationCommand(const QJsonObject &request) override {
         const auto op=request.value("op").toString(),id=request.value("request_id").toString();operations.append(op);
         QJsonObject response{{"ok",true},{"request_id",id}};
-        if(op=="validate_configuration_v2")response.insert("plan_digest",digest(request.value("candidate").toObject()));
+        if(op=="validate_configuration_v2"){
+            if(rejectValidate){emit configurationCommandFinished(id,{{"ok",false},{"request_id",id},{"code","InjectedValidationFailure"},{"phase","validate"}});return;}
+            response.insert("plan_digest",digest(request.value("candidate").toObject()));
+        }
         else if(op=="prepare_configuration_v2"){
             if(rejectPrepare){emit configurationCommandFinished(id,{{"ok",false},{"request_id",id},{"code","InjectedPrepareFailure"},{"phase","prepare"}});return;}
             prepared=request;base=current.configurationReceipt;rolledBack=false;
@@ -194,6 +227,74 @@ private slots:
     }
 #ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
     // The pinned controller predates these APIs; its six stop cases stay intact.
+    void versionAndWorkingDirectoryChangesKeepSavedSubscriptionAndExit(){
+        QTemporaryDir dir;const auto path=dir.filePath("retained.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        const auto version=QCoreApplication::applicationVersion(),cwd=QDir::currentPath();
+        const auto restore=qScopeGuard([&]{QCoreApplication::setApplicationVersion(version);QDir::setCurrent(cwd);});
+        QCoreApplication::setApplicationVersion("0.2.42");QJsonObject saved;QByteArray encrypted;
+        {
+            EngineController first(std::make_unique<RustCoreEngine>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+            first.imports()->shutdown();QVERIFY(first.selectSubscription(pool.a));QTRY_VERIFY(!first.policyBusy());
+            QVERIFY(first.chooseNode(pool.otherA));QTRY_VERIFY(!first.policyBusy());QVERIFY(first.policyError().isEmpty());
+            saved=first.m_store.networkConfiguration();encrypted=bytes(path);
+        }
+        QCoreApplication::setApplicationVersion("0.2.43");QVERIFY(QDir().mkpath(dir.filePath("new-install")));QVERIFY(QDir::setCurrent(dir.filePath("new-install")));
+        auto peer=std::make_unique<RustCoreEngine>();auto *runtime=peer.get();
+        EngineController next(std::move(peer),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());next.imports()->shutdown();
+        QCOMPARE(next.activeSubscriptionId(),pool.a);QCOMPARE(next.selectedNodeId(),pool.otherA);QCOMPARE(next.m_store.nodes().size(),4);
+        QCOMPARE(next.m_store.networkConfiguration(),saved);QCOMPARE(bytes(path),encrypted);
+        QJsonObject config;QVERIFY(RustCoreEngine::configurationV2(next.m_options,next.m_policyDocument,&config).isEmpty());
+        QSignalSpy response(runtime,&ProxyEngine::configurationCommandFinished);
+        runtime->configurationCommand({{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"candidate",config}});
+        QTRY_COMPARE(response.size(),1);const auto result=response.first().at(1).value<QJsonObject>();QVERIFY(result.value("ok").toBool());
+        QCOMPARE(result.value("plan_digest"),next.m_store.configurationReceipt().value("plan_digest"));QVERIFY(!next.processAlive());
+    }
+    void copiedExistingProfileRevalidatesOffline(){
+        const auto input=qEnvironmentVariable("SWIRL_TEST_EXISTING_STORE");if(input.isEmpty())QSKIP("Optional owner-provided encrypted store audit");
+        QTemporaryDir dir;const auto path=dir.filePath("copy.dpapi");QVERIFY(QFile::copy(input,path));const auto before=bytes(path);
+        auto peer=std::make_unique<RustCoreEngine>();auto *runtime=peer.get();
+        EngineController controller(std::move(peer),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());controller.imports()->shutdown();
+        QVERIFY(controller.policyV2Active());QVERIFY(controller.m_store.error().isEmpty());QVERIFY(!controller.availableNodes().isEmpty());
+        // Match the original product's rules resource path. An explicit fixture
+        // store otherwise intentionally disables production routing resources.
+        const auto rules=QDir::fromNativeSeparators(qEnvironmentVariable("SWIRL_TEST_EXISTING_RULES"));
+        QVERIFY(QDir::isAbsolutePath(rules)&&QDir(rules).exists());controller.m_options.rulesDirectory=rules;
+        QJsonObject config;QVERIFY(RustCoreEngine::configurationV2(controller.m_options,controller.m_policyDocument,&config).isEmpty());
+        QSignalSpy response(runtime,&ProxyEngine::configurationCommandFinished);
+        runtime->configurationCommand({{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"candidate",config}});
+        QTRY_COMPARE(response.size(),1);const auto result=response.first().at(1).value<QJsonObject>();QVERIFY(result.value("ok").toBool());
+        QCOMPARE(result.value("plan_digest"),controller.m_store.configurationReceipt().value("plan_digest"));
+        QCOMPARE(bytes(path),before);QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxy()->owned());
+        qInfo()<<"OFFLINE_SAVED_PROFILE_AUDIT"<<"scoped_nodes"<<controller.availableNodes().size()<<"digest_matches"<<true<<"file_unchanged"<<true;
+    }
+    void subscriptionCanBeChosenBeforeOpeningOrConfirmingPolicy(){
+        QTemporaryDir dir;const auto path=dir.filePath("source-first.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        {
+            auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();EngineController controller(std::move(peer),nullptr,path);
+            QVERIFY(controller.policyMigrationRequired());QVERIFY(!controller.policyV2Active());
+            const auto original=bytes(path);engine->rejectValidate=true;
+            QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+            QVERIFY(!controller.policyError().isEmpty());QVERIFY(!controller.policyV2Active());QCOMPARE(bytes(path),original);
+            engine->rejectValidate=false;
+            QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+            QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+            QVERIFY(controller.policyV2Active());QVERIFY(!controller.policyMigrationRequired());
+            QCOMPARE(controller.activeSubscriptionId(),pool.a);QCOMPARE(controller.nodes().size(),2);
+            QCOMPARE(controller.m_store.nodes().size(),4);QVERIFY(!controller.processAlive());
+        }
+        EngineController reloaded(std::make_unique<ConfigurationPeer>(),nullptr,path);
+        QCOMPARE(reloaded.activeSubscriptionId(),pool.a);QCOMPARE(reloaded.nodes().size(),2);
+        QVERIFY(reloaded.policyV2Active());QVERIFY(!reloaded.policyMigrationRequired());
+    }
+    void firstSubscriptionUsesRealNativeValidationWithoutStartingNetwork(){
+        QTemporaryDir dir;const auto path=dir.filePath("native-source-first.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+        QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QVERIFY(controller.policyV2Active());QCOMPARE(controller.activeSubscriptionId(),pool.a);
+        QCOMPARE(controller.policyReceipt().value("plan_digest").toString().size(),64);
+        QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxy()->owned());
+    }
     void subscriptionChoiceScopesCandidatesRuntimeAndColdReloadWithoutDeletingIndependentImports(){
         QTemporaryDir dir;const auto path=dir.filePath("sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         {
@@ -263,12 +364,15 @@ private slots:
         const auto saved=envelope(path).value("committed").toObject().value("snapshot").toObject();
         QCOMPARE(saved.value("networkConfiguration").toObject().value("activeSubscriptionId").toString(),pool.b);QCOMPARE(saved.value("nodes").toArray().size(),4);
     }
-    void tunRequiresExplicitEncryptedDnsAndNeverEnablesGatewayAsASideEffect(){
+    void tunPreparesSecureDefaultsPreservesExplicitDnsAndNeverEnablesGateway(){
         QTemporaryDir dir;const auto path=dir.filePath("tun-configuration.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         NodeStore store(path);EngineStartOptions options;options.nodes=store.nodes();options.proxyPort=1080;options.tunEnabled=true;
         const auto policy=sourcePolicy(pool);QJsonObject runtime;
 #ifdef Q_OS_WIN
-        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        QVERIFY(RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        const auto defaults=runtime.value("dns").toObject().value("tls_servers").toArray();QCOMPARE(defaults.size(),2);
+        QCOMPARE(defaults.first().toObject().value("tls").toObject().value("server_name").toString(),QString("dns.alidns.com"));
+        QVERIFY(runtime.value("dns").toObject().value("servers").toArray().isEmpty());QVERIFY(options.dnsConfig.isEmpty());
         options.dnsConfig={{"mode",2},{"servers","1.1.1.1"}};
         QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
         options.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
@@ -281,16 +385,121 @@ private slots:
         QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
 #endif
     }
-    void tunPreferenceCannotSwitchControllersWhileTheCurrentCoreIsAlive(){
-        QTemporaryDir dir;const auto path=dir.filePath("tun-live-choice.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
-        auto peer=std::make_unique<ConfigurationPeer>();EngineController controller(std::move(peer),nullptr,path);
-        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
-        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
-        QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
-        controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());
-        controller.m_options.tunEnabled=true;const auto before=bytes(path);
-        QVERIFY(!controller.setTunEnabled(false));QVERIFY(controller.tunRequested());QVERIFY(controller.processAlive());
-        QCOMPARE(bytes(path),before);QVERIFY(!controller.routingError().isEmpty());
+    void tunSwitchWhileProxyRunsPreservesIndependentControls_data(){
+        QTest::addColumn<bool>("denyElevation");QTest::addColumn<bool>("unconfirmedStart");
+        QTest::newRow("enable-disable")<<false<<false;QTest::newRow("denied-rollback")<<true<<false;QTest::newRow("unconfirmed-rollback")<<false<<true;
+    }
+    void tunSwitchWhileProxyRunsPreservesIndependentControls(){
+        QFETCH(bool,denyElevation);QFETCH(bool,unconfirmedStart);const bool failedStart=denyElevation||unconfirmedStart;
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-transition.dpapi"),false,std::move(backend));
+        controller.m_options.proxyPort=listener.serverPort();
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.setSystemProxy(true);QTRY_VERIFY(controller.systemProxy()->owned());QVERIFY(controller.processAlive());
+        engine->rejectTunStart=denyElevation;engine->degradeTunStart=unconfirmedStart;const auto starts=engine->starts;
+        // Exercise the production coordinator with an in-memory broker peer;
+        // do not require or launch elevated driver helpers in unit tests.
+        QVERIFY(controller.beginTunTransition(true));QVERIFY(controller.tunBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&controller.systemProxy()->owned(),8000);
+        QVERIFY(controller.processAlive());QVERIFY(controller.proxyRequested());QCOMPARE(controller.activeProxyPort(),int(listener.serverPort()));
+        QCOMPARE(controller.tunEnabled(),!failedStart);QCOMPARE(controller.tunRequested(),!failedStart);
+        QCOMPARE(controller.m_store.networkConfiguration().value("tun").toBool(),!failedStart);
+        QCOMPARE(engine->starts,starts+(failedStart?2:1));QCOMPARE(proxy->restoreCalls,1);
+        if(failedStart){QVERIFY(controller.routingError().contains("administrator denial"));return;}
+        const auto stopped=engine->stops;
+        engine->current.state=ProxyEngine::State::Degraded;engine->current.apiHealthy=false;
+        controller.setSystemProxy(false);QTRY_VERIFY(!controller.systemProxy()->owned());
+        QVERIFY(engine->current.tunCapturePossible);QVERIFY(controller.processAlive());QCOMPARE(engine->stops,stopped);
+        engine->current.state=ProxyEngine::State::Running;engine->current.apiHealthy=true;emit engine->statusChanged();
+        QVERIFY(controller.tunEnabled());
+        controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(engine->stops,stopped);
+        QVERIFY(controller.setTunEnabled(false));QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&controller.systemProxy()->owned(),8000);
+        QVERIFY(!controller.tunEnabled());QVERIFY(!controller.tunRequested());QVERIFY(controller.processAlive());QVERIFY(controller.proxyRequested());
+    }
+    void unconfirmedCoreStopLeavesTunChangeRetryable(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-stop.dpapi"),false,std::make_unique<PolicySystemProxyBackend>());
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());const auto revision=controller.savedRevision();
+        engine->rejectStop=true;QVERIFY(controller.beginTunTransition(true));
+        QTRY_VERIFY(!controller.tunBusy());QVERIFY(!controller.busy());QVERIFY(controller.processAlive());
+        QVERIFY(!controller.tunRequested());QCOMPARE(controller.savedRevision(),revision);QCOMPARE(engine->starts,1);
+        QVERIFY(controller.routingError().contains("stop unconfirmed"));
+        engine->rejectStop=false;controller.stop();QTRY_VERIFY(!controller.processAlive());QCOMPARE(engine->stops,2);
+    }
+    void savedTunPreferenceStillStartsCaptureWhenCurrentlyStopped(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-saved.dpapi"));
+        auto options=controller.m_options;options.tunEnabled=true;
+        QVERIFY(controller.applyPolicyConfiguration(document(),options));QTRY_VERIFY(!controller.policyBusy());
+        QVERIFY(controller.tunRequested());QVERIFY(!controller.tunEnabled());QCOMPARE(engine->starts,0);
+        QVERIFY(controller.beginTunTransition(true));QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy(),5000);
+        QVERIFY(controller.tunEnabled());QCOMPARE(engine->starts,1);
+    }
+    void cancellingTunStartupRestoresPreferenceWithoutRestart(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-cancel.dpapi"));
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        engine->holdTunStart=true;QVERIFY(controller.beginTunTransition(true));
+        QTRY_COMPARE(engine->current.state,ProxyEngine::State::Starting);controller.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&!controller.policyBusy(),8000);
+        QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());QVERIFY(!controller.proxyRequested());
+        QCOMPARE(engine->starts,1);QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+    }
+    void failedSavedTunCanBeCancelledBeforeCatalogEditAndOrdinaryProxyStart(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-pending.dpapi"),false,std::move(backend));
+        auto options=controller.m_options;options.tunEnabled=true;options.proxyPort=listener.serverPort();
+        QVERIFY(controller.applyPolicyConfiguration(document(),options));QTRY_VERIFY(!controller.policyBusy());
+        engine->holdTunStart=true;controller.connectConfiguredPolicy();
+        QVERIFY(controller.busy());QVERIFY(controller.tunRequested());QVERIFY(!controller.tunEnabled());
+        QVERIFY(!controller.setTunEnabled(false));
+        QVERIFY(!controller.saveNode({{"name","blocked pending fixture"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",9}}));
+        engine->current.state=ProxyEngine::State::Failed;engine->current.message="TunBrokerIoTimeout";emit engine->statusChanged();
+        QVERIFY(!controller.busy());QVERIFY(!controller.tunRecoveryRequired());
+        QVERIFY(controller.setTunEnabled(false));QTRY_VERIFY(!controller.busy()&&!controller.policyBusy());
+        QVERIFY(!controller.tunRequested());QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+        QCOMPARE(engine->starts,1);QCOMPARE(proxy->enableCalls,0);QVERIFY(!controller.processAlive());
+        QVERIFY(controller.saveNode({{"name","saved after TUN failure"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",9}}));
+        QTRY_VERIFY(!controller.policyBusy());QVERIFY(controller.policyError().isEmpty());
+        QCOMPARE(controller.m_store.nodes().size(),1);
+        controller.setSystemProxy(true);QTRY_VERIFY(controller.systemProxy()->owned());
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QVERIFY(!controller.tunEnabled());
+        QCOMPARE(engine->starts,2);QCOMPARE(proxy->enableCalls,1);
+    }
+    void stoppedTunStartupDoesNotRemainInTransition(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-declined.dpapi"));
+        QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        engine->stopTunStart=true;QVERIFY(controller.beginTunTransition(true));
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.tunBusy()&&!controller.policyBusy(),5000);
+        QVERIFY(!controller.processAlive());QVERIFY(!controller.tunRequested());
+        QVERIFY(controller.routingError().contains("Controlled start declined"));
+    }
+    void explicitTunRecoveryKeepsUnconfirmedStateAndClosesFailedSavedPreference(){
+        QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tun-recover.dpapi"),false,std::move(backend));
+        auto options=controller.m_options;options.tunEnabled=true;
+        QVERIFY(controller.applyPolicyConfiguration(document(),options));QTRY_VERIFY(!controller.policyBusy());
+        const auto revision=controller.savedRevision();
+        engine->current.state=ProxyEngine::State::Failed;engine->current.tunRecoveryRequired=true;engine->current.tunCapturePossible=true;
+        emit engine->statusChanged();QVERIFY(controller.tunRecoveryRequired());
+        QVERIFY(!controller.beginTunTransition(true));QVERIFY(!controller.tunBusy());
+        QCOMPARE(engine->starts,0);QCOMPARE(engine->stops,0);QCOMPARE(engine->recoveries,0);
+        QSignalSpy completed(&controller,&EngineController::tunRecoveryFinished);
+        engine->recoverySucceeds=false;QVERIFY(controller.recoverTunNetwork());QVERIFY(controller.tunRecoveryBusy());
+        QTRY_COMPARE(completed.size(),1);QVERIFY(!completed.first().first().toBool());
+        QVERIFY(controller.tunRecoveryRequired());QVERIFY(controller.tunRequested());QCOMPARE(controller.savedRevision(),revision);
+        engine->recoverySucceeds=true;QVERIFY(controller.recoverTunNetwork());
+        QTRY_COMPARE_WITH_TIMEOUT(completed.size(),2,5000);QVERIFY(completed.last().first().toBool());
+        QVERIFY(!controller.tunRecoveryRequired());QVERIFY(!controller.tunRecoveryBusy());QVERIFY(!controller.tunRequested());
+        QVERIFY(!controller.m_store.networkConfiguration().value("tun").toBool());
+        QCOMPARE(engine->starts,0);QCOMPARE(proxy->enableCalls,0);QCOMPARE(engine->recoveries,2);
     }
     void probeEgressUsesActualCaptureOwnershipInsteadOfTheSavedPreference(){
         QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
@@ -678,9 +887,13 @@ private slots:
         QVERIFY(first.sourceDigest!=second.sourceDigest);
     }
     void activityProxySwitchStartsSavedRustAndRestoresTheExternalProxy(){
+        ControlledNetwork network;QVERIFY(network.start());
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();
         auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
         EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,dir.filePath("master.dpapi"),false,std::move(backend));
+#ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
+        controller.m_proxyProbeUrl=network.url();
+#endif
         controller.setProxyPort(port);QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));const auto revision=controller.savedRevision();reserved.close();
         QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(!controller.systemProxy()->owned());
@@ -690,6 +903,16 @@ private slots:
         controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());
         QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
         QVERIFY(!controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->systemEnabled());QCOMPARE(proxy->restoreCalls,1);QCOMPARE(controller.savedRevision(),revision);
+    }
+    void aListeningCoreWithAFailedExitDoesNotTakeSystemProxyOwnership(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        auto peer=std::make_unique<ConfigurationPeer>();peer->probeSucceeds=false;
+        EngineController controller(std::move(peer),nullptr,dir.filePath("failed-exit.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(!controller.proxyRequested()&&!controller.processAlive(),5000);
+        QCOMPARE(proxy->enableCalls,0);QVERIFY(!controller.systemProxy()->owned());QVERIFY(proxy->current().systemEnabled);
+        QVERIFY(controller.routingError().contains("Controlled origin TLS failure"));
     }
     void closingDuringTheListenerProbeCannotReacquireFromALateCallback(){
         QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
@@ -896,6 +1119,17 @@ private slots:
         QCOMPARE(released.size(),0);QCOMPARE(proxy->memory.disableCalls,0);QCOMPARE(proxy->memory.enableCalls,0);
         QVERIFY(proxy->memory.current().systemEnabled);
     }
+    void failedNodeReportsItsTlsReasonAndCanBeRetriedWithoutReimport(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost,0));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *runtime=peer.get();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("tls-retry.dpapi"),false,std::move(backend));
+        controller.m_options.proxyPort=listener.serverPort();QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        runtime->probeSucceeds=false;runtime->probeFailureCode="TlsCertificateUnknownIssuer";controller.setSystemProxy(true);
+        QTRY_VERIFY(!controller.proxyRequested()&&!controller.processAlive());
+        QVERIFY(controller.routingError().contains("TlsCertificateUnknownIssuer"));QVERIFY(!controller.routingError().contains(QStringLiteral("端口尚未健康")));QCOMPARE(proxy->enableCalls,0);
+        runtime->probeSucceeds=true;controller.setSystemProxy(true);QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->enableCalls,1);
+    }
     void unavailableListenerRollsBackTheMasterIntentAndStopsTheCore(){
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();reserved.close();
         auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
@@ -1044,5 +1278,11 @@ private slots:
         QTest::qWait(80);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(finished.size(),1);
     }
 };
-QTEST_GUILESS_MAIN(PolicyConfigurationTests)
+int main(int argc,char **argv){
+    IsolatedUserRegistry registry;
+    if(!registry.initialize())return 64;
+    QCoreApplication app(argc,argv);
+    PolicyConfigurationTests tests;
+    return QTest::qExec(&tests,argc,argv);
+}
 #include "PolicyConfigurationTests.moc"

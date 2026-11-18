@@ -15,7 +15,7 @@ SwirlMotionButton {
         radius:Theme.controlRadius
         Rectangle { width:parent.width-Theme.dp(52); x:Theme.dp(52); height:Theme.dp(1); color:Theme.border; opacity:0.65 }
 
- Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.duration}}
  }
     contentItem:RowLayout {
         spacing:Theme.dp(24)

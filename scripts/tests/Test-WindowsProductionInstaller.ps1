@@ -44,7 +44,7 @@ $result = [ordered]@{
     user_integration_unchanged=$false; remaining_owned_processes=$null; fixture_removed=$false
     failure_diagnostics_preserved=$false
     tun_pending_uninstall=[ordered]@{requested=$tunMaintenance;scope='test marker only and empty fixed journal; no native_tun_start, adapter or WAN traffic';
-        marker_set=$false;marker_cleared_by_maintenance=$false;journal_empty_after=$false;original_marker_restored=$false;verified=$false;recovery_files_retained=$false}
+        marker_set=$false;silent_without_consent_refused=$false;marker_cleared_by_maintenance=$false;journal_empty_after=$false;original_marker_restored=$false;verified=$false;recovery_files_retained=$false}
     forced_termination=$false; processes=$processes; success=$false; error=$null
 }
 $savedEnvironment = @{}
@@ -119,7 +119,7 @@ function Assert-EmptyTunJournal {
         throw 'Existing TUN journals or active owners must not enter an empty-journal installer check.'
     }
 }
-function Run-InstalledProcess([string]$Name,[string]$Executable,[string]$Arguments,[int]$TimeoutSeconds) {
+function Run-InstalledProcess([string]$Name,[string]$Executable,[string]$Arguments,[int]$TimeoutSeconds,[int]$ExpectedExitCode=0) {
     $entry = [ordered]@{name=$Name; started_utc=[DateTime]::UtcNow.ToString('o'); elapsed_ms=$null; exited=$false; exit_code=$null}
     $processes.Add($entry)
     $watch = [Diagnostics.Stopwatch]::StartNew()
@@ -130,7 +130,7 @@ function Run-InstalledProcess([string]$Name,[string]$Executable,[string]$Argumen
         $entry.exited = $process.WaitForExit($TimeoutSeconds * 1000)
         if (-not $entry.exited) { throw "Production installer lifecycle phase timed out: $Name" }
         $entry.exit_code = $process.ExitCode
-        if ($process.ExitCode -ne 0) { throw "Production installer lifecycle phase failed: $Name (exit $($process.ExitCode))." }
+        if ($process.ExitCode -ne $ExpectedExitCode) { throw "Production installer lifecycle phase failed: $Name (exit $($process.ExitCode), expected $ExpectedExitCode)." }
         return $entry.exit_code
     } finally {
         $watch.Stop(); $entry.elapsed_ms = $watch.Elapsed.TotalMilliseconds
@@ -269,8 +269,20 @@ try {
         $marker=Read-TunRecoveryMarker
         if (-not $marker.exists -or $marker.value -ne 1) { throw 'The test-only pending marker was not durably written.' }
         $result.tun_pending_uninstall.marker_set=$true
+        $null = Run-InstalledProcess 'uninstall-without-consent' $uninstaller "/S _?=$target" 120 2
+        $consentStderr = Get-Content -LiteralPath (Join-Path $evidence 'uninstall-without-consent.stderr.log') -Raw
+        if ($consentStderr -notmatch '(?m)^SWIRL_UNINSTALL_FAILURE phase=native-tun-consent code=required\r?$') {
+            throw 'Silent pending-marker uninstall without explicit consent did not emit the required native-tun-consent receipt.'
+        }
+        $markerAfterRefusal = Read-TunRecoveryMarker
+        if (-not $markerAfterRefusal.exists -or $markerAfterRefusal.value -ne 1) {
+            throw 'Silent pending-marker uninstall refusal mutated recoveryPending.'
+        }
+        Assert-InstalledPayload
+        $result.tun_pending_uninstall.silent_without_consent_refused=$true
     }
-    $result.uninstaller_exit_code = Run-InstalledProcess 'uninstall' $uninstaller "/S _?=$target" 120
+    $uninstallArgs = if ($tunMaintenance) { "/RECOVER_TUN=1 /S _?=$target" } else { "/S _?=$target" }
+    $result.uninstaller_exit_code = Run-InstalledProcess 'uninstall' $uninstaller $uninstallArgs 120
     if ($tunMaintenance) {
         $marker=Read-TunRecoveryMarker
         if (-not $marker.exists -or $marker.value -ne 0) { throw 'The real production maintenance entry did not clear the pending DWORD.' }

@@ -54,7 +54,7 @@ Item {
         [qsTr("连接状态"),observed(selected.status)],
         [qsTr("传输状态"),observed(selected.transportState)],[qsTr("上传"),observed(selected.up)],
         [qsTr("下载"),observed(selected.down)],[qsTr("耗时"),observed(selected.latency)],[qsTr("建立时间"),observed(selected.time)]])
-    SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
+    readonly property Item ownedDetailClock: SwirlTransitionCoordinator {id:detailClock;parent:page;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
     Connections {target:AppState;function onDetailOpenChanged(){detailClock.moveTo(AppState.detailOpen?1:0)}}
     readonly property var heroTargets:({activeConnections:activeCount})
     readonly property var motionSurfaces:({activeConnections:connectionSummary})

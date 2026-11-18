@@ -20,7 +20,7 @@ TextArea {
     font.pixelSize: Theme.bodySize
     font.hintingPreference: Font.PreferFullHinting
     renderType: TextEdit.NativeRendering
-    SwirlFontBinding { target: control; textRole: control.textRole }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { target: control; textRole: control.textRole }
     background: SwirlControlSurface {
         field: true
         hovered: control.hovered

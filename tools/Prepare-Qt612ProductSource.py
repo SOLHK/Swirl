@@ -120,7 +120,7 @@ def classify_runtime(name, rules):
     if name.lower().endswith(".dll"):
         require(name in rules["non_qt_root_dlls"], "UnknownRuntimeLibrary")
     require(not name.lower().startswith("qt6")
-            and not name.startswith(("platforms/", "qmltooling/", "tls/", "imageformats/",
+            and not name.startswith(("platforms/", "qmltooling/", "styles/", "tls/", "imageformats/",
                                      "generic/", "networkinformation/", "iconengines/")),
             "UnknownQtRuntimeFile")
     return None
@@ -183,6 +183,42 @@ def verify_sdk(directory, lock):
     stock = read_json(directory / "stock-files-before.json")
     require(derived["bin/Qt6Qml.dll"] != stock["bin/Qt6Qml.dll"], "PatchedQtQmlMissing")
     return source, snapshot, derived
+
+
+def verify_network_sdk(directory, derived):
+    directory = plain_path(directory)
+    tools = Path(__file__).resolve().parent
+    lock = read_json(tools / "qt612-network-sdk.lock.json")
+    require(lock.get("schema") == 1 and lock.get("kind") == "swirl-qt612-network-fixed-artifact"
+            and lock.get("status") == "verified", "NetworkSourceArtifactPinIncomplete")
+    for name in ("receipt.json", "module-files.json", "corresponding-source.json",
+                 "source-snapshot-files.json", "qtbase-corresponding-source.zip"):
+        require(file_identity(directory / name) == lock["critical_members"]["network-sdk/" + name],
+                "NetworkSourceEvidenceChanged")
+    receipt = read_json(directory / "receipt.json")
+    recipe = read_json(tools / "qt612-backports.lock.json")
+    require(receipt == lock["receipt"] and receipt["success"] is True and receipt["errors"] == []
+            and receipt["source_sha"] == lock["producer"]["head"]
+            and receipt["source"]["commit"] == recipe["sources"]["qtbase"]
+            and receipt["patches"] == [p for p in recipe["patches"] if p["module"] == "qtbase"],
+            "NetworkSourceRecipeMismatch")
+    module = read_json(directory / "module-files.json")
+    names = {"bin/Qt6Network.dll", "lib/Qt6Network.lib",
+             "include/QtNetwork/6.12.0/QtNetwork/private/qhttpnetworkreply_p.h"}
+    require(module == receipt["module_files"] and set(module) == set(receipt["stock_files"]) == names
+            and all(derived.get(name) == receipt["stock_files"][name] for name in names)
+            and module["bin/Qt6Network.dll"] != derived["bin/Qt6Network.dll"],
+            "NetworkSourceRuntimeBindingRejected")
+    for name, expected in module.items():
+        require(file_identity(directory / "module-install-output" / name) == expected,
+                "NetworkSourceRuntimeBytesChanged")
+    source = read_json(directory / "corresponding-source.json")
+    snapshot = read_json(directory / "source-snapshot-files.json")
+    require(source == receipt["corresponding_source"]
+            and source["source"] == receipt["source"] and source["patches"] == receipt["patches"]
+            and sha(canonical(snapshot)) == source["file_manifest_content_id"],
+            "NetworkSourceManifestMismatch")
+    return lock, source, snapshot, {**derived, **module}
 
 
 class HttpsRedirects(urllib.request.HTTPRedirectHandler):
@@ -277,17 +313,17 @@ def inspect_official_archive(path, item, limits):
             "tag_commit": tag, "license_files": len(notices)}, notices
 
 
-def inspect_modified_archive(path, source, snapshot, limits):
+def inspect_modified_archive(path, source, snapshot, limits, *, module="qtdeclarative"):
     require(file_identity(path) == source["archive"], "ModifiedSourceArchiveMismatch")
     names, notices, total = set(), {}, 0
     with zipfile.ZipFile(path) as archive:
         for member in archive.infolist():
             require(member.orig_filename == member.filename, "ArchiveOriginalPathChanged")
             name = relative_name(member.filename)
-            require(name.startswith("qtdeclarative/") and not member.is_dir()
+            require(name.startswith(module + "/") and not member.is_dir()
                     and stat.S_IFMT(member.external_attr >> 16) == stat.S_IFREG,
                     "ModifiedSourceEntryRejected")
-            relative = name[len("qtdeclarative/"):]
+            relative = name[len(module) + 1:]
             require(relative not in names and relative in snapshot, "ModifiedSourcePathMismatch")
             names.add(relative)
             total += member.file_size
@@ -346,6 +382,8 @@ def prepare(args):
     notes_root = plain_path(runtime / "licenses/qt", exists=False)
     require(not notes_root.exists(), "InstallerQtNotesAlreadyExist")
     source, snapshot, derived = verify_sdk(sdk, lock)
+    network_sdk = plain_path(args.network_evidence)
+    network_lock, network_source, network_snapshot, derived = verify_network_sdk(network_sdk, derived)
     runtime_files, excluded = verify_runtime(runtime, lock, derived)
     source_paths, inspections, notices = {}, {}, {}
     for item in lock["official_sources"]:
@@ -359,16 +397,32 @@ def prepare(args):
     source_paths["sources/qtdeclarative-corresponding-source.zip"] = modified
     inspections["qtdeclarative"] = result
     notices.update({"qtdeclarative/" + n: b for n, b in license_files.items()})
+    network_archive = network_sdk / "qtbase-corresponding-source.zip"
+    result, license_files = inspect_modified_archive(network_archive, network_source, network_snapshot,
+                                                     lock["limits"], module="qtbase")
+    source_paths["sources/qtbase-network-corresponding-source.zip"] = network_archive
+    inspections["modified_qtbase_network"] = result
+    notices.update({"qtbase-network/" + n: b for n, b in license_files.items()})
     repository = Path(__file__).resolve().parents[1]
     recipe_paths = {
         "recipe/Prepare-Qt612ProductSource.py": Path(__file__),
         "recipe/qt612-product-source.lock.json": lock_path,
+        "recipe/qt612-network-sdk.lock.json": repository / "tools/qt612-network-sdk.lock.json",
         "README.md": repository / "docs/qt/QT612_PRODUCT_SOURCE.md",
         "NOTICES.md": repository / "docs/qt/QT612_SOURCE_NOTICES.md",
     }
     for name in lock["sdk_artifact"]["files"]:
         if name != "qtdeclarative-corresponding-source.zip":
             recipe_paths["sdk-build-evidence/" + name] = sdk / name
+    for name, expected in network_lock["critical_members"].items():
+        relative_name(name)
+        require(name.startswith("network-sdk/"), "NetworkEvidenceMemberRootRejected")
+        relative = name[len("network-sdk/"):]
+        if relative.startswith("module-install-output/") or relative == "qtbase-corresponding-source.zip":
+            continue
+        path = network_sdk / relative
+        require(file_identity(path) == expected, "NetworkSourceRecipeFileChanged")
+        recipe_paths["network-build-evidence/" + relative] = path
     for path in recipe_paths.values():
         plain_path(path)
     manifest = {
@@ -377,6 +431,8 @@ def prepare(args):
         "runtime_files": runtime_files, "runtime_content_id": sha(canonical(runtime_files)),
         "official_sources": lock["official_sources"], "source_inspections": inspections,
         "modified_declarative": source,
+        "modified_network": network_source,
+        "network_artifact": {"producer": network_lock["producer"], "artifact": network_lock["artifact"]},
         "recipe_files": {name: file_identity(path) for name, path in recipe_paths.items()},
         "source_archives": {name: file_identity(path) for name, path in source_paths.items()},
         "notices": {"notices/" + name: {"bytes": len(data), "sha256": sha(data)}
@@ -409,6 +465,9 @@ def prepare(args):
             "runtime_modules": lock["runtime_modules"], "build_only_modules": lock["build_only_modules"],
             "qtdeclarative_source_commit": source["source"]["commit"],
             "patch_commit": source["patch"]["upstream_commit"],
+            "patch_commits": [p["upstream_commit"] for p in
+                              [source["patch"], *source["patch"].get("additional", [])]],
+            "network_patch_commits": [p["upstream_commit"] for p in network_source["patches"]],
             "delivery": "Provide this complete source archive together with the installer. "
                         "CI artifact retention is temporary and is not a long-term source offer."}
     installed_notes = {"SOURCE-BUNDLE.json": json_bytes(note),
@@ -428,8 +487,13 @@ def prepare(args):
                "installer_notes": {"licenses/qt/" + n: {"bytes": len(b), "sha256": sha(b)}
                                    for n, b in installed_notes.items()},
                "patched_qml": {"commit": source["patch"]["upstream_commit"],
+                               "patches": [source["patch"], *source["patch"].get("additional", [])],
                                "source_commit": source["source"]["commit"],
                                "binary_sha256": runtime_files["Qt6Qml.dll"]["sha256"]},
+               "patched_network": {"source_commit": network_source["source"]["commit"],
+                                   "patches": network_source["patches"],
+                                   "binary_sha256": runtime_files["Qt6Network.dll"]["sha256"]},
+               "network_artifact": manifest["network_artifact"],
                "sdk_artifact": {k: v for k, v in lock["sdk_artifact"].items() if k != "files"},
                "exclusions": manifest["exclusions"]}
     write_new(output / "qt-source-bundle.json", json_bytes(receipt))
@@ -469,6 +533,26 @@ def verify_package(args):
             and bound.get("runtime_files") == receipt["runtime_files"]
             and bound.get("runtime_content_id") == receipt["runtime_content_id"]
             == sha(canonical(receipt["runtime_files"])), "SourceBundleReceiptMismatch")
+    network_lock = read_json(Path(__file__).with_name("qt612-network-sdk.lock.json"))
+    require(network_lock.get("status") == "verified"
+            and bound.get("network_artifact") == receipt.get("network_artifact")
+            == {"producer": network_lock["producer"], "artifact": network_lock["artifact"]}
+            and receipt.get("patched_network", {}).get("patches") == network_lock["receipt"]["patches"]
+            and receipt["patched_network"]["binary_sha256"]
+            == network_lock["receipt"]["module_files"]["bin/Qt6Network.dll"]["sha256"]
+            == receipt["runtime_files"].get("Qt6Network.dll", {}).get("sha256"),
+            "SourceBundleNetworkBindingMismatch")
+    network_source = network_lock["receipt"]["corresponding_source"]
+    source_member = "sources/qtbase-network-corresponding-source.zip"
+    require(bound.get("modified_network") == network_source
+            and bound.get("source_archives", {}).get(source_member) == network_source["archive"],
+            "SourceBundleNetworkSourceMismatch")
+    with zipfile.ZipFile(directory / archive["filename"]) as container:
+        source_entry = container.getinfo(source_member)
+        require(source_entry.file_size == network_source["archive"]["bytes"], "PackagedNetworkSourceSizeMismatch")
+        with container.open(source_entry) as stream:
+            require(hashlib.file_digest(stream, "sha256").hexdigest() == network_source["archive"]["sha256"],
+                    "PackagedNetworkSourceChanged")
     package_path, delivery_path = plain_path(args.package_manifest), plain_path(args.delivery)
     require(package_path.stat().st_size <= 32 * 1024**2
             and delivery_path.stat().st_size <= 32 * 1024**2, "JsonInputBoundExceeded")
@@ -520,7 +604,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
     before = sub.add_parser("prepare")
-    for name in ("runtime-dir", "source-sha", "sdk-evidence", "cache-dir", "output-dir"):
+    for name in ("runtime-dir", "source-sha", "sdk-evidence", "network-evidence", "cache-dir", "output-dir"):
         before.add_argument("--" + name, required=True)
     after = sub.add_parser("verify-package")
     for name in ("bundle-dir", "package-manifest", "delivery"):

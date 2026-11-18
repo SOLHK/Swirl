@@ -211,10 +211,28 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
-          && qAbs(state("Theme.sidebarRadius").toReal()-state("Theme.dp(14)").toReal())<0.001,
-          "approved 14dp shell stays fixed while 14dp sidebar follows manual content zoom");
+    // The owner's latest request narrows only the outer shell to 14dp.
+    // Inner surfaces retain 28dp; Qt applies monitor DPR after content zoom.
+    auto *sidebarSurface=find(window->contentItem(),"sidebarLiquidGlass");
+    const bool cornersMatch=QTest::qWaitFor([&]{
+        return qAbs(state("Theme.uiScale").toReal()-1.25)<0.001
+            &&qAbs(state("Theme.shapeCorner").toReal()-35.0)<0.001
+            &&qAbs(state("Theme.windowRadius").toReal()-18.0)<0.001
+            &&qAbs(state("Theme.sidebarRadius").toReal()-35.0)<0.001
+            &&qAbs(state("Theme.cardRadius").toReal()-35.0)<0.001
+            &&qAbs(window->property("shellRadius").toReal()-18.0)<0.001
+            &&sidebarSurface&&qAbs(sidebarSurface->property("cornerRadius").toReal()-35.0)<0.001
+            &&qAbs(backdrop->cornerRadius()-18.0)<0.001;
+    },1000);
+    qInfo()<<"WINDOW_CORNER_SCALE"<<"zoom"<<state("Theme.uiScale")<<"shared"<<state("Theme.shapeCorner")
+           <<"shell"<<window->property("shellRadius")<<"sidebar"<<(sidebarSurface?sidebarSurface->property("cornerRadius"):QVariant())
+           <<"native"<<backdrop->cornerRadius()<<"dpr"<<window->devicePixelRatio();
+    check(cornersMatch,"Requested 14dp shell scales to 18 logical pixels while 28dp sidebar and cards retain 35 at 125 percent zoom");
     state("Theme.resetScale()");QTest::qWait(150);
+    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
+          &&qAbs(window->property("shellRadius").toReal()-14.0)<0.001&&qAbs(backdrop->cornerRadius()-14.0)<0.001
+          &&qAbs(state("Theme.sidebarRadius").toReal()-28.0)<0.001&&qAbs(state("Theme.cardRadius").toReal()-28.0)<0.001,
+          "Reset zoom restores requested 14dp outer shell and retains 28dp inner surfaces");
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
     // actual desktop at 200% DPR, rather than sampling offscreen black pixels.

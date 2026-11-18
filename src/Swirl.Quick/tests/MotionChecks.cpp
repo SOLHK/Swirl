@@ -105,9 +105,9 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         auto *layer=card?card->property("decorationLayer").value<QQuickItem *>():nullptr;
         auto *body=card?activityVisual(card,"activityCardContent"):nullptr;
         cardLayers=cardLayers&&card&&flight&&layer&&body&&flight->parentItem()==layer&&layer->parentItem()==card
-            &&layer->clip()&&!layer->isEnabled()&&behindItem(layer,body);
+            &&behindItem(back,card)&&!layer->isEnabled()&&behindItem(layer,body);
     }
-    check("weave-all-five-cards-reveal-artwork-below-content-without-input-handlers",cardLayers);
+    check("weave-all-five-cards-reveal-feathers-below-text-and-controls",cardLayers);
     const QList<QPointF> corners={QPointF(),QPointF(target->width(),0),QPointF(0,target->height()),QPointF(target->width(),target->height())};
     bool sameClip=front->clip()&&front->size()==target->size();
     for(const auto &point:corners)sameClip=sameClip&&QLineF(front->mapToScene(point),target->mapToScene(point)).length()<0.01;
@@ -138,11 +138,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
     bool cardPoses=true;
     for(int i=0;i<cardNames.size();++i)for(const auto &key:keys){
         auto *piece=find("cloudFeather-"+key),*copy=find("cloudFeatherCard-"+QString::number(i)+"-"+key);
-        cardPoses=cardPoses&&piece&&copy&&copy->acceptedMouseButtons()==Qt::NoButton&&!copy->acceptHoverEvents();
-        if(piece&&copy)for(const auto &point:probes)
-            cardPoses=cardPoses&&QLineF(piece->mapToScene(point),copy->mapToScene(point)).length()<0.01;
+        cardPoses=cardPoses&&piece&&copy&&piece->parentItem()==back&&piece->acceptedMouseButtons()==Qt::NoButton&&!piece->acceptHoverEvents();
+        if(piece&&copy)for(const auto &point:probes)cardPoses=cardPoses&&QLineF(piece->mapToScene(point),copy->mapToScene(point)).length()<0.01;
     }
-    check("weave-card-feathers-share-one-global-pose-and-do-not-capture-input",cardPoses);
+    check("weave-card-views-share-the-exact-background-feather-pose",cardPoses);
     window->update();activityWait(80);
     const QImage withFlight=window->grabWindow();
     QQmlComponent opacityComponent(qmlEngine(window));
@@ -186,7 +185,10 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
                 const QRect pixels=QRectF(logical.x()*sx,logical.y()*sy,logical.width()*sx,logical.height()*sy).toAlignedRect().intersected(withFlight.rect());
                 const auto a=withFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
                 const auto b=withoutFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
-                const bool textRegion=region->property("text").isValid()&&region->property("color").isValid();
+                // The opaque toolbar protects the complete label rectangle,
+                // including disabled/antialiased glyphs which never equal the
+                // raw ink color. Card labels protect glyphs above their artwork.
+                const bool textRegion=name!="proxyCapsule"&&region->property("text").isValid()&&region->property("color").isValid();
                 const auto ink=region->property("color").value<QColor>().rgba();
                 int changed=0,compared=0;
                 for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x){
@@ -201,7 +203,9 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         }
         samples.append(QJsonObject{{"kind","weave-control-occlusion"},{"observedProgress",sampledProgress},
             {"devicePixelRatio",window->devicePixelRatio()},{"controls",controls}});
-        int visibleCardPixels=0;
+        int visibleCardPixels=0,opaqueCardPixels=0,visibleScenePixels=0;
+        for(int y=0;y<withFlight.height();++y)for(int x=0;x<withFlight.width();++x)
+            if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y))++visibleScenePixels;
         for(const auto &cardName:cardNames){
             auto *card=find(cardName);
             auto *layer=card?card->property("decorationLayer").value<QQuickItem *>():nullptr;
@@ -210,10 +214,12 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
             const double sx=double(withFlight.width())/window->width(),sy=double(withFlight.height())/window->height();
             const QRect pixels=QRectF(logical.x()*sx,logical.y()*sy,logical.width()*sx,logical.height()*sy).toAlignedRect().intersected(withFlight.rect());
             for(int y=pixels.top();y<=pixels.bottom();++y)for(int x=pixels.left();x<=pixels.right();++x)
-                if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y))++visibleCardPixels;
+                if(withFlight.pixel(x,y)!=withoutFlight.pixel(x,y)){
+                    ++visibleCardPixels;if(card->property("color").value<QColor>().alpha()==255)++opaqueCardPixels;
+                }
         }
-        check("weave-travelling-feathers-are-visible-on-card-surfaces",visibleCardPixels>0);
-        samples.append(QJsonObject{{"kind","weave-card-artwork"},{"changedPixels",visibleCardPixels}});
+        check("weave-flight-remains-visible-on-opaque-card-surfaces",visibleScenePixels>0&&opaqueCardPixels>0);
+        samples.append(QJsonObject{{"kind","weave-window-background"},{"changedPixels",visibleScenePixels},{"cardPixels",visibleCardPixels},{"opaqueCardPixels",opaqueCardPixels}});
         if(!output.isEmpty()){
             const auto directory=QFileInfo(output).absolutePath();
             check("weave-render-evidence-directory-created",QDir().mkpath(directory));
@@ -1886,6 +1892,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 property bool systemProxyBusy: false
                 property bool proxyRequested: false
                 property bool processAlive: false
+                property bool tunEnabled: false
                 property bool systemProxyStopping: false
                 property bool policyBusy: false
                 property string routingError: ""
@@ -1906,7 +1913,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 function toggleSystemProxy() {
                     calls++
                     if(reject) { routingError="test-operation-failed"; return }
-                    const requested = !(proxyRequested || systemProxy.owned || processAlive || busy)
+                    const requested = !(proxyRequested || systemProxy.owned || systemProxyBusy)
                     if(requested) originalSystemEnabled=systemProxy.systemEnabled
                     proxyRequested=requested;processAlive=requested;busy=false;systemProxyBusy=false
                     systemProxy.owned=requested;systemProxy.enabled=requested
@@ -1937,14 +1944,14 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                     &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail
                     &&accessibleName.isValid()&&accessibleName.toString()==label;
             };
-            check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
+            check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击通过 Swirl 开启系统代理")));
             clickProxy();
             check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
             check("proxy-on-offers-disable",proxyState(true,true,true,"success","succeeded",QStringLiteral("点击恢复原设置并停止内核")));
             check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
             clickProxy();
             check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
-            check("proxy-disabled-state-updates-action",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
+            check("proxy-disabled-state-updates-action",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击通过 Swirl 开启系统代理")));
             fake->setProperty("proxyRequested",true);fake->setProperty("busy",true);fake->setProperty("systemProxyBusy",true);clickProxy();
             check("proxy-pending-request-can-be-cancelled",fake->property("calls").toInt()==3&&!fake->property("proxyRequested").toBool()&&!fake->property("busy").toBool());
             fake->setProperty("systemProxyStopping",true);clickProxy();
@@ -1955,7 +1962,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             clickProxy();clickProxy();
             check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             fake->setProperty("processAlive",true);
-            check("running-core-without-owned-proxy-stays-neutral",proxyState(true,false,true,"neutral","idle",QStringLiteral("内核正在运行")));
+            check("running-core-without-owned-proxy-stays-neutral",proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             fake->setProperty("processAlive",false);
             if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
             fake->setProperty("reject",true);clickProxy();

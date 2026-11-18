@@ -137,14 +137,14 @@ QtObject {
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
     readonly property color windowCloseHover: dark ? "#C95058" : "#C8444C"
     readonly property color windowClosePressed: dark ? "#AF3943" : "#AD3039"
-    // Shared corner extent for the 2.5-power surface, native mask and shadows.
+    // The outer shell uses the requested 14dp contour; inner surfaces keep 28dp.
     // Content zoom uses dp(); Qt applies monitor DPI exactly once afterwards.
     readonly property real shapeCorner: dp(28)
     readonly property real toolbarHeight: dp(30)
     readonly property real toolbarPadding: dp(16)
     readonly property real toolbarIconSize: dp(14)
     readonly property real toolbarFontSize: fontSize(11)
-    readonly property real windowRadius: shapeCorner
+    readonly property real windowRadius: dp(14)
     readonly property real sidebarRadius: shapeCorner
     // Maximum corner extent; short cards adapt to their smaller dimension.
     readonly property real cardRadius: shapeCorner

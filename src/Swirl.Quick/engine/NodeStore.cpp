@@ -23,25 +23,11 @@
 #include <QLockFile>
 #include <limits>
 #include <algorithm>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <wincrypt.h>
-#endif
+#include "../app/DpapiDataProtection.h"
 
 static QByteArray protect(const QByteArray &input, bool decrypt) {
-#ifdef Q_OS_WIN
-    DATA_BLOB source{DWORD(input.size()), reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))}, result{};
-    const QByteArray context("Swirl.NodeStore.v1");
-    DATA_BLOB entropy{DWORD(context.size()), reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
-    const bool ok = decrypt ? CryptUnprotectData(&source, nullptr, &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result)
-        : CryptProtectData(&source, L"Swirl nodes", &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &result);
-    if (!ok) return {};
-    const QByteArray bytes(reinterpret_cast<char *>(result.pbData), result.cbData);
-    SecureZeroMemory(result.pbData, result.cbData); LocalFree(result.pbData);
-    return bytes;
-#else
-    Q_UNUSED(input); Q_UNUSED(decrypt); return {}; // No plaintext fallback.
-#endif
+    static constexpr QByteArrayView kEntropy("Swirl.NodeStore.v1");
+    return decrypt ? SwirlDpapi::unprotect(input, kEntropy) : SwirlDpapi::protect(input, L"Swirl nodes", kEntropy);
 }
 static QJsonObject serialize(const ProxyNode &n) {
     if(n.isXray()) {
@@ -1082,7 +1068,9 @@ bool NodeStore::beginConfigurationIntent(const QJsonObject &network,const QStrin
 }
 bool NodeStore::saveCatalogOffline(const ImportPlan &catalog,const QJsonObject &network,const QString &requestId,
                                   const QString &revision,const QString &digest,SaveCompletion completion) {
-    if((!m_configurationLease&&!allowMutation())||!configurationV2()||catalog.m_owner!=this||catalog.m_revision!=m_revision||
+    // Like saveConfigurationOffline, this can create the first V2 envelope.
+    // Source choice and its validated policy must migrate in one atomic write.
+    if((!m_configurationLease&&!allowMutation())||catalog.m_owner!=this||catalog.m_revision!=m_revision||
        !validConfigurationIdentity(requestId,revision,digest,m_lastIssuedRevision)||revision.toULongLong()<=configurationRevision().toULongLong()||
        requestId==configurationReceipt().value("request_id").toString()||!m_configurationEnvelope.value("pending").toObject().isEmpty()||!acquireConfigurationLock())return false;
     return persistConfigurationState(network,configurationEnvelope(requestId,revision,digest),true,false,std::move(completion),&catalog);

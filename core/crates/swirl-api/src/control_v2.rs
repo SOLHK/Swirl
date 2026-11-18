@@ -20,6 +20,8 @@ enum Command {
         candidate: RuntimeConfig,
         #[serde(default)]
         plan_digest: Option<String>,
+        #[serde(default)]
+        native_tun_startup: bool,
     },
     PrepareConfigurationV2 {
         control_schema: u32,
@@ -203,6 +205,7 @@ impl Command {
                 saved_revision,
                 candidate,
                 plan_digest,
+                native_tun_startup,
                 ..
             } => {
                 if controller.cores.len() + controller.cores_v2.len() >= 4 {
@@ -213,7 +216,15 @@ impl Command {
                 {
                     return Err("ReceiptMismatch");
                 }
-                let core = Core::start(
+                if native_tun_startup && !controller.native_helper {
+                    return Err("TunHelperRequired");
+                }
+                let start = if native_tun_startup {
+                    Core::start_for_native_tun
+                } else {
+                    Core::start
+                };
+                let core = start(
                     candidate,
                     store_id,
                     decimal(&saved_revision)?,

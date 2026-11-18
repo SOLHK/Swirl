@@ -99,7 +99,7 @@ FocusScope {
                 Keys.onUpPressed: page.moveCategory(-1)
                 Keys.onDownPressed: page.moveCategory(1)
                 ScrollBar.vertical: SwirlScrollBar {}
-                SwirlArcMotion {
+                readonly property Item ownedSelectionPath: SwirlArcMotion {
                     id: selectionPath
                     parent: categories.contentItem
                     targetX: 0
@@ -155,7 +155,7 @@ FocusScope {
                             verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
                         }
-                        SwirlInteractionMotion { id: feedback; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
+                        readonly property Item ownedFeedback: SwirlInteractionMotion { id: feedback; parent: category; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
                         Accessible.name: text
                     }
                 }
@@ -207,8 +207,8 @@ FocusScope {
                             function onVisibleChanged() { if (paneShell.initialized && !page.visible) { reveal.finish(); curve.settle() } }
                         }
                         Component.onCompleted: { initialized = true; if (selected && ready) { hasPresented = true; reveal.progress = 1; reveal.destination = 1 } else retarget() }
-                        SwirlArcMotion { id: curve; bend: Theme.dp(6); duration: SwirlMotion.pageDuration; motionEnabled: page.visible }
-                        SwirlTransitionCoordinator { id: reveal; duration: SwirlMotion.pageDuration }
+                        readonly property Item ownedCurve: SwirlArcMotion { id: curve; parent: paneShell; bend: Theme.dp(6); duration: SwirlMotion.pageDuration; motionEnabled: page.visible }
+                        readonly property Item ownedReveal: SwirlTransitionCoordinator { id: reveal; parent: paneShell; duration: SwirlMotion.pageDuration }
                         ScrollView {
                             id: options
                             anchors.fill: parent

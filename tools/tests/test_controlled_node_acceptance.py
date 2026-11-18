@@ -602,6 +602,34 @@ class WindowsStateSnapshotTests(unittest.TestCase):
         with self.assertRaises(qa.BudgetError):
             qa.read_controlled_state(link)
 
+    def test_transient_replace_gap_retries_bounded_and_exclusive_lock_fails(self):
+        original_storage=qa._WindowsStorage
+        errors=[2,32]
+
+        def wrapped_storage():
+            instance=original_storage()
+            real_create=instance.kernel.CreateFileW
+
+            def flaky_create(*args):
+                if errors:
+                    instance.c.set_last_error(errors.pop(0))
+                    return instance.c.c_void_p(-1).value
+                return real_create(*args)
+
+            instance.kernel.CreateFileW=flaky_create
+            return instance
+
+        with patch.object(qa,"_WindowsStorage",wrapped_storage),patch.object(qa.time,"sleep") as sleep:
+            self.assertEqual(qa.read_controlled_state(self.path),self.old)
+        self.assertEqual(errors,[])
+        self.assertEqual(sleep.call_count,2)
+
+        locked=self.root/"locked-state.json"
+        with os.fdopen(self.storage.open(locked,exclusive=True),"wb") as stream:
+            stream.write(json.dumps(self.old).encode("utf-8"))
+            with patch.object(qa.time,"sleep"),self.assertRaisesRegex(qa.BudgetError,"ControlledStateOpenFailed"):
+                qa.read_controlled_state(locked)
+
 
 @unittest.skipUnless(os.name=="nt","Windows atomic Job boundary required")
 class WindowsProcessTests(unittest.TestCase):

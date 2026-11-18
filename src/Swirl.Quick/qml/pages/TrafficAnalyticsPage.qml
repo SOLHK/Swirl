@@ -100,7 +100,7 @@ Item {
    SwirlSectionTitle {Layout.fillWidth:true;Layout.topMargin:Theme.dp(8);title:qsTr("流量排行");description:qsTr("所选期间内已归属的完整来源记录；短连接可能无法归属。")}
 Item { id:rankingTabs; Layout.fillWidth:true; Layout.preferredHeight:Theme.controlHeight
     readonly property int selectedIndex:["domains","apps","nodes"].indexOf(page.kind)
-    SwirlArcMotion {id:rankingSelection;targetX:rankingTabs.selectedIndex*Theme.dp(100);targetY:0;bend:Theme.dp(4);motionEnabled:page.visible}
+    readonly property Item ownedRankingSelection: SwirlArcMotion {id:rankingSelection;parent:page;targetX:rankingTabs.selectedIndex*Theme.dp(100);targetY:0;bend:Theme.dp(4);motionEnabled:page.visible}
     Rectangle {x:rankingSelection.position.x;y:rankingSelection.position.y;width:Theme.dp(96);height:rankingTabs.height;radius:Theme.controlRadius;color:Theme.withAlpha(Theme.accent,0.1)}
     Row {spacing:Theme.dp(4)
      Repeater {model:[{name:"域名",key:"domains"},{name:"应用",key:"apps"},{name:"出口",key:"nodes"}];SwirlButton {required property var modelData;width:Theme.dp(96);text:modelData.name;quiet:true;onClicked:page.kind=modelData.key}}

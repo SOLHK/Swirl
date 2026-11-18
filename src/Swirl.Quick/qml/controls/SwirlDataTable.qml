@@ -15,6 +15,7 @@ Item {
     property real sectionHeight:Theme.dp(32)
     property Component sectionDelegate:null
     property Component rowActions:null
+    property Component latencyCell:null
     property real rowActionsWidth:0
     property bool activateOnSingleClick:true
     property bool followTail:false
@@ -219,7 +220,7 @@ Item {
     }
     function focusRowAt(index){if(projectionBlocked)return;const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
-    SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
+    readonly property QtObject ownedStableRows: SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
     property Item selectedItem:null
     property int itemHeight:Theme.tableRowHeight
@@ -369,8 +370,9 @@ Item {
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
-                    SwirlInteractionMotion {
+                    readonly property Item ownedInteractionMotion: SwirlInteractionMotion {
                         id:rowFeedback
+                        parent:recordRow
                         hovered:!recordRow.pooled && mouse.containsMouse
                         pressed:!recordRow.pooled && mouse.pressed
                         focused:!recordRow.pooled && list.activeFocus && list.currentIndex===index
@@ -419,13 +421,22 @@ Item {
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
                     Rectangle {anchors.fill:parent;radius:parent.radius;color:Theme.withAlpha(Theme.text,0.05);opacity:rowFeedback.focusAmount;visible:opacity>0;Accessible.ignored:true}
                     Row {
+                        z:1
                         anchors.fill:parent
                         visible:!recordRow.sectionRow
                         Repeater {
                             model:recordRow.sectionRow?[]:table.columns
                             delegate:Item {
                                 width:table.columnWidth(modelData); height:table.itemHeight
+                                Loader {
+                                    anchors.fill:parent;anchors.leftMargin:table.cellPadding;anchors.rightMargin:Theme.dp(8)
+                                    active:modelData.key==="latency"&&table.latencyCell!==null
+                                    sourceComponent:table.latencyCell
+                                    readonly property var record:recordRow.record
+                                    enabled:table.currentPresentation(recordRow)
+                                }
                                 SwirlText {renderType:Text.NativeRendering;
+                                    visible:modelData.key!=="latency"||table.latencyCell===null
                                     anchors.fill:parent
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
                                     id:cell

@@ -29,7 +29,8 @@ Item {
         property real darkAppearance: Theme.dark ? 1 : 0
         fragmentShader: "qrc:/swirl/shaders/sidebar-liquid.frag.qsb"
     }
-    SwirlShellOutline {
+    readonly property Item ownedOutline: SwirlShellOutline {
+        parent: glass
         anchors.fill: parent
         visible: !Theme.effectsSupported || Theme.increaseContrast
         radius: glass.cornerRadius

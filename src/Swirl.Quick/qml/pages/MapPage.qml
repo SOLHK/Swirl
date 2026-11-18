@@ -17,7 +17,7 @@ Item {
     readonly property var visibleRows:entries.filter(function(row){return row.type===page.selectedTab&&(row.name+" "+row.match+" "+row.target).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     function updateBuffer(key,value){if(!componentReady)return;var current=editorBuffers[selectedTab]||{};if(current[key]===value)return;var next=Object.assign({},editorBuffers);next[selectedTab]=Object.assign({},current);next[selectedTab][key]=value;editorBuffers=next}
     Component.onCompleted:componentReady=true
-    SwirlArcMotion{id:tabMotion;targetX:["本地映射","远程映射"].indexOf(page.selectedTab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    readonly property Item ownedTabMotion: SwirlArcMotion{id:tabMotion;parent:page;targetX:["本地映射","远程映射"].indexOf(page.selectedTab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         SwirlPageHeader{Layout.fillWidth:true;title:qsTr("响应映射");description:qsTr("编辑请求匹配与替换目标。");metadata:qsTr("映射服务尚未接入，不会读取文件或重定向请求")

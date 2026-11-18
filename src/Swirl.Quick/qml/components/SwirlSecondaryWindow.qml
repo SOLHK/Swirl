@@ -25,7 +25,7 @@ Window {
     SwirlWorkspaceBackdrop { anchors.fill: parent; targetWindow: shell; composition: shell.composition }
     SwirlWindowTitleBar { id: titleBar; anchors.left:parent.left; anchors.right:parent.right; targetWindow:shell }
     Item { id:bodyItem; anchors.left:parent.left;anchors.right:parent.right;anchors.top:titleBar.bottom;anchors.bottom:parent.bottom;clip:true }
-    SwirlShellOutline {
+    readonly property Item ownedOutline: SwirlShellOutline {
         parent:shell.contentItem;anchors.fill:parent;z:998
         visible:shell.composition.exactCorners
         radius:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:Theme.windowRadius

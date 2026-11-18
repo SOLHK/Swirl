@@ -18,7 +18,7 @@ Item {
  readonly property var records:{if(!visible)return [];let rows=gatewayProvider.devices.map(r=>Object.assign({},r));for(const client of(lanSnapshot.clients||[])){let row=rows.find(r=>r.ip===client.ip);if(!row){row={id:"lan:"+client.ip,name:client.ip,ip:client.ip,mac:"",lastSeen:0,speed:0,speedText:"—"};rows.push(row)}row.upload=engineController.telemetry.formatBytes(client.uploaded||0);row.download=engineController.telemetry.formatBytes(client.downloaded||0);row.total=(client.uploaded||0)+(client.downloaded||0);row.status=qsTr("LAN · %1 个当前连接").arg(client.active_connections||0)}if(sortIndex===0)rows.sort((a,b)=>b.total-a.total);else if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));else if(sortIndex===3)rows.sort((a,b)=>ipNumber(a.ip)-ipNumber(b.ip));else if(sortIndex===4)rows.sort((a,b)=>b.lastSeen-a.lastSeen);return rows}
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
- SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
+ readonly property Item ownedDetailClock: SwirlTransitionCoordinator {id:detailClock;parent:page;duration:SwirlMotion.dialogDuration}
  readonly property var trafficDevice:engineController.telemetry.ranking("devices",AppState.trafficPeriod,100).find(r=>r.name===AppState.trafficSelectedDevice)||null
  readonly property var selected:records.find(r=>r.id===selectedId)||trafficDevice
  readonly property var heroTargets:({deviceName:deviceDetailName})

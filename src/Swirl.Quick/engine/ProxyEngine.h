@@ -107,7 +107,7 @@ public:
         QString nodeMessage;
         QString probeFailureStage;
         QString probeFailureCode;
-        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1;
+        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1,probeRequestRttMs=-1;
         quint64 probeRequestTag=0;
         QVariantList connections;
         qint64 connectionsAt = 0;
@@ -135,6 +135,7 @@ public:
     virtual ~ProxyEngine() = default;
     virtual void start(const EngineStartOptions &options) = 0;
     virtual void stop() = 0;
+    virtual void recoverTunNetwork() { emit tunRecoveryFinished(false,QStringLiteral("TunRecoveryUnsupported")); }
     virtual void refresh() = 0;
     virtual void selectNode(const QString &id) = 0;
     virtual void probeNode(const QUrl &url) = 0;
@@ -167,6 +168,7 @@ public:
     virtual qint64 probeOutboundConnectMs() const { return -1; }
     virtual qint64 probeOriginTlsMs() const { return -1; }
 signals:
+    void tunRecoveryFinished(bool success,const QString &message);
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
     void probeRequestRejected(quint64 tag,const QString &code);

@@ -262,6 +262,7 @@ pub fn secure_state_directory() -> io::Result<PathBuf> {
 
 pub struct WindowsNetworkBackend {
     owned: InterfaceIdentity,
+    session: Option<crate::windows_network_session::NetworkSession>,
 }
 
 impl WindowsNetworkBackend {
@@ -269,7 +270,32 @@ impl WindowsNetworkBackend {
     /// It does not elevate the current process or touch routes/DNS.
     pub fn for_owned_interface(owned: InterfaceIdentity) -> io::Result<Self> {
         owned.validate()?;
-        Ok(Self { owned })
+        Ok(Self {
+            owned,
+            session: None,
+        })
+    }
+
+    fn resource_request<T: DeserializeOwned>(
+        &mut self,
+        input: &serde_json::Value,
+    ) -> io::Result<T> {
+        if self.session.is_none() {
+            self.session = Some(crate::windows_network_session::NetworkSession::start(
+                &resource_session_script(RESOURCE_SCRIPT),
+            )?);
+        }
+        let result = self
+            .session
+            .as_mut()
+            .expect("created network session")
+            .request(input, COMMAND_TIMEOUT);
+        if result.is_err() {
+            // Never retry a possibly completed write. Destroy this session;
+            // a later journal recovery operation starts a fresh owned child.
+            self.session = None;
+        }
+        result
     }
 
     fn check_identity(&self, identity: &InterfaceIdentity) -> io::Result<()> {
@@ -336,11 +362,8 @@ impl NetworkBackend for WindowsNetworkBackend {
     ) -> io::Result<Option<Value>> {
         self.check_identity(interface)?;
         self.check_resource(resource)?;
-        run_json(
-            RESOURCE_SCRIPT,
-            &json!({"mode":"read", "interface":interface, "resource":resource}),
-        )
-        .map(normalized)
+        self.resource_request(&json!({"mode":"read", "interface":interface, "resource":resource}))
+            .map(normalized)
     }
 
     fn compare_exchange(
@@ -383,8 +406,7 @@ impl NetworkBackend for WindowsNetworkBackend {
                 ));
             }
         }
-        let actual: Option<Value> = run_json(
-            RESOURCE_SCRIPT,
+        let actual: Option<Value> = self.resource_request(
             &json!({"mode":"compare_exchange", "interface":interface, "resource":resource, "expected":expected, "desired":desired}),
         ).map_err(|error| {
             if error.to_string().starts_with("Windows network operation failed: Network resource changed after snapshot; refusing overwrite") {
@@ -397,6 +419,37 @@ impl NetworkBackend for WindowsNetworkBackend {
         Ok(())
     }
 }
+
+fn resource_session_script(script: &str) -> String {
+    // Capture exactly one JSON result before publishing its request identity.
+    // Each body invocation gets fresh locals, while imported CIM modules stay
+    // in the owned PowerShell process. No resource snapshot is cached.
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+try {{
+  while ($null -ne ($line = [Console]::In.ReadLine())) {{
+    $envelope = $line | ConvertFrom-Json
+    $swirlRequest = ConvertTo-Json -InputObject $envelope.request -Compress -Depth 16
+    $response = @(& {{
+{script}
+    }})
+    if ($response.Count -ne 1 -or $response[0] -isnot [string]) {{ throw 'Network operation did not return exactly one JSON result' }}
+    [Console]::Out.WriteLine('{{"request_id":' + [string][uint64]$envelope.request_id + ',"result":' + $response[0] + '}}')
+  }}
+}} catch {{
+  [Console]::Error.WriteLine($_.Exception.Message)
+  exit 1
+}}
+"#
+    )
+}
+
+#[cfg(test)]
+#[path = "windows_network_session_tests.rs"]
+mod session_tests;
 
 pub(crate) fn run_json<T: DeserializeOwned>(
     script: &str,
@@ -504,7 +557,7 @@ fn run_json_with_timeout<T: DeserializeOwned>(
     decode_json(stdout)
 }
 
-fn decode_json<T: DeserializeOwned>(stdout: &[u8]) -> io::Result<T> {
+pub(crate) fn decode_json<T: DeserializeOwned>(stdout: &[u8]) -> io::Result<T> {
     serde_json::from_slice(stdout).map_err(|error| {
         // Report exact null field locations without printing addresses, adapter
         // names or other system configuration. Keep the original strict type
@@ -553,7 +606,7 @@ fn read_bounded(reader: impl Read) -> io::Result<Vec<u8>> {
 }
 
 #[allow(unsafe_code)]
-fn system_powershell() -> io::Result<PathBuf> {
+pub(crate) fn system_powershell() -> io::Result<PathBuf> {
     let mut buffer = [0u16; 32768];
     // SAFETY: Windows receives a writable buffer of the stated size, writes a
     // bounded UTF-16 path, and does not retain its pointer.
@@ -583,7 +636,8 @@ $ProgressPreference = 'SilentlyContinue'
 [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 try {
-  $p = [Console]::In.ReadToEnd() | ConvertFrom-Json
+  $inputJson = if ($null -ne $swirlRequest) { $swirlRequest } else { [Console]::In.ReadToEnd() }
+  $p = $inputJson | ConvertFrom-Json
   $index = [uint32]$p.interface.index
   $expectedGuid = [guid]$p.interface.guid
   function Owned-Adapter {
@@ -783,7 +837,7 @@ try {
   } elseif ($p.mode -ne 'read') { throw 'Unsupported helper operation' }
   # Windows PowerShell 5.1 emits nothing for ConvertTo-Json $null. Missing
   # resources are a successful typed None, so they need an explicit JSON null.
-  if ($null -eq $current) { [Console]::Out.WriteLine('null') }
+  if ($null -eq $current) { Write-Output 'null' }
   else { ConvertTo-Json -InputObject $current -Compress -Depth 8 }
 } catch {
   [Console]::Error.WriteLine($_.Exception.Message)

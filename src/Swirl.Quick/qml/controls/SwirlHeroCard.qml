@@ -15,6 +15,6 @@ SwirlGlassPanel {
     onExpandedChanged: clock.moveTo(expanded?1:0)
     onVisibleChanged:if(!visible)clock.finish()
     Connections {target:card.Window.window;function onVisibilityChanged(){if(card.Window.window.visibility===Window.Minimized)clock.finish()}}
-    SwirlTransitionCoordinator { id: clock }
+    readonly property Item ownedClock: SwirlTransitionCoordinator { id: clock; parent: card }
     Component.onCompleted: { clock.destination=expanded?1:0; clock.finish() }
 }
